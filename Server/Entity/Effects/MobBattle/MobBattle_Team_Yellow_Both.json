@@ -1,0 +1,20 @@
+{
+  "ApplicationEffects": {
+    "EntityTopTint": "#FFD23E",
+    "EntityBottomTint": "#FFD23E",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Mist_Yellow",
+        "TargetNodeName": "Chest",
+        "PositionOffset": {
+          "X": 0,
+          "Y": -1,
+          "Z": 0
+        }
+      }
+    ]
+  },
+  "Infinite": true,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

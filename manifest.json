@@ -1,0 +1,24 @@
+{
+  "Group": "Dackoro",
+  "Name": "Mob Battle",
+  "Version": "0.0.1",
+  "ServerVersion": ">=0.7.0-pre <0.8.0",
+  "Description": "Nine wands for mob duels, team battles, battle royale, summoning, healing, effects and morphs.",
+  "Authors": [
+    {
+      "Name": "Dackoro",
+      "Email": "",
+      "Url": ""
+    }
+  ],
+  "Website": "https://x.com/dackoro",
+  "Dependencies": {
+    "Hytale:AssetModule": "*"
+  },
+  "OptionalDependencies": {},
+  "LoadBefore": {},
+  "DisabledByDefault": false,
+  "IncludesAssetPack": true,
+  "Main": "dev.dackoro.mobbattle.MobBattlePlugin",
+  "SubPlugins": []
+}

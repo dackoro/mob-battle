@@ -1,0 +1,10 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Mist_Lime",
+      "PositionOffset": {
+        "Y": 0.5
+      }
+    }
+  ]
+}

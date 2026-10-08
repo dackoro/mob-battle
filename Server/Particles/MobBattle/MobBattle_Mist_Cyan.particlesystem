@@ -1,0 +1,10 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Mist_Cyan",
+      "PositionOffset": {
+        "Y": 0.5
+      }
+    }
+  ]
+}

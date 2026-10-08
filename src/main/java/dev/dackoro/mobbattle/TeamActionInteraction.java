@@ -1,0 +1,109 @@
+package dev.dackoro.mobbattle;
+
+import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.protocol.InteractionState;
+import com.hypixel.hytale.protocol.InteractionType;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.InteractionContext;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+
+import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Team Wand right click.
+ * <ul>
+ *   <li>In the air: switch to the next team (RED, BLUE, GREEN, YELLOW).</li>
+ *   <li>On a mob: start the battle with the teams built so far.</li>
+ * </ul>
+ */
+public class TeamActionInteraction extends SimpleInstantInteraction {
+
+    public static final String TYPE = "MobBattle_TeamAction";
+
+    public static final BuilderCodec<TeamActionInteraction> CODEC = BuilderCodec
+            .builder(TeamActionInteraction.class, TeamActionInteraction::new, SimpleInstantInteraction.CODEC)
+            .documentation("Team Wand: right click in the air switches team, right click on a mob starts the battle.")
+            .build();
+
+    @Override
+    protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
+        PlayerRef player = buffer != null ? buffer.getComponent(context.getEntity(), PlayerRef.getComponentType()) : null;
+        if (player == null) {
+            context.getState().state = InteractionState.Failed;
+            return;
+        }
+        BattleManager.Draft draft = BattleManager.draft(player);
+        Ref<EntityStore> target = context.getTargetEntity();
+        boolean onNpc = target != null && target.isValid()
+                && buffer.getComponent(target, NPCEntity.getComponentType()) != null;
+
+        if (!onNpc) {
+            int team = BattleManager.nextTeam(draft);
+            player.sendMessage(Message.raw("Now adding mobs to the " + Teams.name(team) + " team ("
+                    + draft.teams().get(team).size() + " mobs). Right click a mob to start the battle.")
+                    .color(Teams.color(team)));
+            return;
+        }
+        start(player, context.getEntity(), draft, buffer);
+    }
+
+    static void start(PlayerRef player, Ref<EntityStore> playerEntity, BattleManager.Draft draft,
+                              com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        draft.prune();
+        List<List<Ref<EntityStore>>> teams = new ArrayList<>();
+        List<Integer> colors = new ArrayList<>();
+        for (int t = 0; t < draft.teams().size(); t++) {
+            List<Ref<EntityStore>> members = new ArrayList<>(draft.teams().get(t));
+            members.removeIf(r -> !BattleManager.isAlive(r, buffer));
+            if (!members.isEmpty()) {
+                teams.add(members);
+                colors.add(t);
+            }
+        }
+        if (teams.size() < 2) {
+            player.sendMessage(Message.raw("You need at least 2 teams with mobs. Left click mobs to add them, "
+                    + "right click in the air to switch team.").color("#ffcc55"));
+            return;
+        }
+
+        // The battle stores team indexes 0..n-1; keep the draft's colors for them.
+        List<List<Ref<EntityStore>>> byColor = new ArrayList<>();
+        for (int t = 0; t < BattleManager.TEAM_NAMES.length; t++) {
+            int k = colors.indexOf(t);
+            byColor.add(k >= 0 ? teams.get(k) : new ArrayList<>());
+        }
+        BattleManager.Battle battle = BattleManager.startTeams(player, byColor);
+        BattleManager.clearDraft(player.getUuid());
+
+        int aggressive = 0;
+        for (Ref<EntityStore> npc : battle.members().values()) {
+            Ref<EntityStore> enemy = BattleManager.nearestEnemy(battle, npc, buffer);
+            if (enemy == null) {
+                continue;
+            }
+            BattleManager.setTarget(battle, npc, enemy);
+            if (FightManager.turnAgainst(npc, enemy, buffer) == FightManager.Result.AGGRESSIVE) {
+                aggressive++;
+            }
+            FightManager.provoke(npc, enemy, buffer);
+            FightFx.link(playerEntity, npc, enemy, battle.color(battle.teamOf.get(npc.getIndex())), buffer);
+        }
+
+        String versus = colors.stream()
+                .map(t -> battle.name(t) + " (" + byColor.get(t).size() + ")")
+                .collect(Collectors.joining(" vs "));
+        MobBattlePlugin.log("Team battle: " + versus + ", " + aggressive + " aggressive");
+        player.sendMessage(Message.raw("TEAM BATTLE! " + versus + ". Last team standing wins.").color("#ff6b5e"));
+        FightFx.title(player, "TEAM BATTLE!", versus);
+    }
+}
