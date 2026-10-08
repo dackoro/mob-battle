@@ -86,7 +86,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
         BattleManager.clearDraft(player.getUuid());
 
         int aggressive = 0;
-        for (Ref<EntityStore> npc : battle.members().values()) {
+        for (Ref<EntityStore> npc : battle.members()) {
             Ref<EntityStore> enemy = BattleManager.nearestEnemy(battle, npc, buffer);
             if (enemy == null) {
                 continue;
@@ -96,7 +96,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                 aggressive++;
             }
             FightManager.provoke(npc, enemy, buffer);
-            FightFx.link(playerEntity, npc, enemy, battle.color(battle.teamOf.get(npc.getIndex())), buffer);
+            FightFx.link(playerEntity, npc, enemy, battle.color(battle.team(npc)), buffer);
         }
 
         String versus = colors.stream()

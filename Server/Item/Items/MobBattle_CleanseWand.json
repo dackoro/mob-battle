@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Cleanse Wand",
-    "Description": "Left click an entity: remove every effect and undo a Morph Wand morph."
+    "Name": "server.items.MobBattle_CleanseWand.name",
+    "Description": "server.items.MobBattle_CleanseWand.description"
   },
   "Categories": [
     "Items.Weapons"

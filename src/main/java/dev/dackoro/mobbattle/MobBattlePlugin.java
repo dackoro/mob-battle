@@ -13,6 +13,9 @@ import java.util.logging.Level;
  */
 public class MobBattlePlugin extends JavaPlugin {
 
+    /** Players who already got the /mobbattle help hint this server session. */
+    private static final java.util.Set<java.util.UUID> WELCOMED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private static MobBattlePlugin instance;
 
     public MobBattlePlugin(@Nonnull JavaPluginInit init) {
@@ -56,6 +59,23 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new BattleLifecycleSystem());
         FxSettings.load(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
+        // One chat hint per player and server session, only in Creative (the mod is a creative tool).
+        getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent.class,
+                event -> {
+                    var player = event.getPlayer();
+                    if (player == null || player.getGameMode() != com.hypixel.hytale.protocol.GameMode.Creative) {
+                        return;
+                    }
+                    var entity = event.getPlayerRef();
+                    var ref = entity != null && entity.isValid()
+                            ? entity.getStore().getComponent(entity, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType())
+                            : null;
+                    if (ref != null && WELCOMED.add(ref.getUuid())) {
+                        ref.sendMessage(com.hypixel.hytale.server.core.Message.raw(
+                                "Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all nine wands.")
+                                .color("#ffd23e"));
+                    }
+                });
 
         getLogger().at(Level.INFO).log("Mob Battle loaded (interactions: "
                 + SelectFighterInteraction.TYPE + ", " + ClearSelectionInteraction.TYPE + ")");

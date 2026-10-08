@@ -24,7 +24,7 @@
     "Animation": {
       "0": {
         "Opacity": 0,
-        "Color": "#ffffff"
+        "Color": "#f2f2f2"
       },
       "40": {
         "Opacity": 0.9
@@ -41,7 +41,7 @@
         }
       },
       "Opacity": 0,
-      "Color": "#ffffff",
+      "Color": "#f2f2f2",
       "Rotation": {
         "X": {
           "Min": 90,

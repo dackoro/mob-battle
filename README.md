@@ -6,7 +6,7 @@ Patchline: **pre-release** (`ServerVersion >=0.7.0-pre <0.8.0`).
 
 ## Items
 
-Get all nine at once with `/mobbattle give`, or individually from the creative inventory or with `/give <item ID>`. The command gives one of each using Hytale's normal inventory placement and requires the same permission as `/give` for yourself. If some do not fit, it reports which ones were not delivered.
+Each wand's tooltip explains what it does (English and Spanish). Get all nine at once with `/mobbattle give`, or individually from the creative inventory or with `/give <item ID>`. The command gives one of each using Hytale's normal inventory placement and requires the same permission as `/give` for yourself. If some do not fit, it reports which ones were not delivered.
 
 ### Fights
 | Item ID | Name | Left click | Right click |
@@ -38,56 +38,60 @@ Get all nine at once with `/mobbattle give`, or individually from the creative i
 - The opening "provocation" hit is 0.01 damage and is healed back 0.3 s later.
 - The Chaos Wand affects at most the **40 nearest** mobs, and one summon attempts to spawn at most that many too (`/mobbattle maxmobs`). Failed spawns also count toward the limit.
 - Summoned mobs appear in a ring 3 blocks or more around you; the list is saved with the settings.
-- While you hold the Team Wand, each team's mobs show a ring in the team color at their feet (only you see it).
-- Duels (Battle Wand) and group battles (royale and teams) announce the winner with a title. They stop after 15 minutes if nobody wins.
+- While you hold the Team Wand, each team's mobs show a solid ring in the team color on the ground at their feet (only you see it).
+- Duels (Battle Wand), everyone vs one (Chaos Wand left click) and group battles (royale and teams) announce the winner with a title. They stop after 15 minutes if nobody wins.
 - **The newest combat order wins:** a fight order or team assignment on mobs that are in a battle royale or team battle pulls only those mobs out of it; the rest keep fighting. If fewer than 2 sides are left, the battle ends without a winner title. Healing, effects and morphs do not cancel a fight. Mobs don't rejoin a battle on their own.
 - A trork's pet (same flock) joins its owner's side in group battles.
 - **Morphs** work like the vanilla frog potion, but have no time limit. A morph is saved with the world, while the original model is only remembered while the server runs: use `/mobbattle morph reset` or the Cleanse Wand before leaving the world, or the mob keeps the new look. Animations of the new model may not match the old role's attacks.
 
 ### Effects
-- **Fight start (Battle Wand, Chaos Wand, Team Wand):** a big title (`FIGHT!`, `EVERYONE vs X`, `BATTLE ROYALE!`, `TEAM BATTLE!`) and, with `/mobbattle laser on`, a laser linking each mob to its first opponent (team color in team battles).
+- **Fight start (Battle Wand, Chaos Wand, Team Wand):** a big title (`FIGHT!`, `EVERYONE vs X`, `BATTLE ROYALE!`, `TEAM BATTLE!`) and, with `/mobbattle fightlaser on`, a laser linking each mob to its first opponent (team color in team battles).
 - **Titles:** each lasts about 3 s. Repeated fight-start titles keep only the newest pending one. Every victory is queued in order and takes priority over pending starts; a new fight cannot overwrite a victory. Winner titles fall back to Major if the selected style is GoblinBreach.
-- **Chaos Wand area:** for 6 s, in the area color (`/mobbattle areacolor`): columns of light about 20 blocks tall along the edge plus a translucent floor and see-through wall like a boss attack zone (`both`, default), or one of them (`/mobbattle area`, `/mobbattle height`).
-- **Team look:** tint and/or a mist in the team color (`/mobbattle teamfx`).
-- **Battle end:** `X WINS!`, `RED TEAM WINS!`, `Duel won` or `DRAW!`.
+- **Chaos Wand area:** for 6 s, in the area color (`/mobbattle areacolor`): columns of light about 20 blocks tall along the edge plus a translucent floor like a boss attack zone (`both`, default), with a see-through wall too (`all`), or one of them (`/mobbattle areastyle`, `/mobbattle areaheight`).
+- **Team look:** tint and/or a mist in the team color (`/mobbattle teamlook`).
+- **Battle end:** `X WINS!`, `RED TEAM WINS!`, `Duel won`, `DRAW!`, or for the Chaos Wand left click (everyone vs one mob) `X WINS!` (it survived) / `X IS DEFEATED!`.
 - **Independent battles:** two team battles can use the same names and colors without sharing targets, damage, members or winners. Each battle keeps the team names and colors it started with. Allies never damage each other. With `/mobbattle isolation on` (default) NPCs from outside the battle cannot damage its participants either. At the end, the mod clears its forced target/hostility and returns compatible NPCs to Idle.
 - **Victory timing:** no minimum fight duration. Winners and the 15-minute safety timeout are checked once per second per world, even without NPC combat ticks. A single surviving side wins; several surviving sides at the deadline produce DRAW. The winner title may wait for an already visible title to finish.
 
 ## Command: `/mobbattle`
 
-Settings are saved per world (`Saves/<world>/mods/Dackoro_Mob Battle/fx.properties`) and survive restarts. Every word is a real subcommand, so the chat suggests the next word as you type (`/mobbattle te` shows `teams`, `teamfx`). Values go right after the setting (`/mobbattle radius 20`); the `--value=20` style is not needed.
+Settings are saved per world (`Saves/<world>/mods/Dackoro_Mob Battle/fx.properties`) and survive restarts. Every word is a real subcommand, so the chat suggests the next word as you type (`/mobbattle te` shows `teams`, `teamlook`). Values go right after the setting (`/mobbattle arearadius 20`); the `--value=20` style is not needed.
+
+Old command names still work as aliases: `show`=`settings`, `title`=`starttitle`, `style`=`titlestyle`, `laser`=`fightlaser`, `color`=`fightlasercolor`, `radius`=`arearadius`, `area`=`areastyle`, `height`=`areaheight`, `effect`=`wandeffect`, `teamfx`=`teamlook`.
 
 | Command | What it does |
 |---|---|
-| `/mobbattle show` | Show the current settings. |
+| `/mobbattle help` | Explain the wands and list the commands by group, in chat. In Creative, joining a world shows a one-line hint about it (once per session). |
+| `/mobbattle settings` | Show the current settings. |
 
 ### Titles
 | Command | What it does |
 |---|---|
-| `/mobbattle title on` / `off` | Fight-start title on/off. |
+| `/mobbattle starttitle on` / `off` | Fight-start title on/off. |
 | `/mobbattle wintitle on` / `off` | Winner title (`X WINS!`, `DRAW!`) on/off. The chat message always shows. |
-| `/mobbattle style <name>` | Title style: `Default`, `Major` (default), `GoblinBreach`, `VoidEviction`. Note: `GoblinBreach` shows nothing on 0.7.0-pre.5.1 (even with vanilla `/eventtitle`). |
-| `/mobbattle style random` | Random style each fight (skips `GoblinBreach`). |
+| `/mobbattle titlestyle <name>` | Title style: `Default`, `Major` (default), `GoblinBreach`, `VoidEviction`. Note: `GoblinBreach` shows nothing on 0.7.0-pre.5.1 (even with vanilla `/eventtitle`). |
+| `/mobbattle titlestyle random` | Random style each fight (skips `GoblinBreach`). |
 
-### Laser and area (Chaos Wand)
-Changing `radius`, `area`, `areacolor` or `height` draws the area around you as a preview.
+### Chaos Wand area and fighter laser
+Changing `arearadius`, `areastyle`, `areacolor`, `areaonlywand` or `areaheight` draws the area around you as a preview.
 
 | Command | What it does |
 |---|---|
-| `/mobbattle laser on` / `off` | Laser line between fighters at fight start (default off). Team rings always show. |
-| `/mobbattle color #RRGGBB` / `random` | Color of the fighter laser, e.g. `#2EFFD3`, or a random vivid color each fight. |
-| `/mobbattle radius <2-430>` | Area radius in blocks (default 430; diameter 860). Existing worlds keep their saved radius; use `/mobbattle radius 430` to update it. Only loaded mobs are considered. |
-| `/mobbattle area floor\|zone\|glow\|both\|off` | How the area is shown, for 6 seconds. `floor`: a translucent flat disc on the ground at the center height, like boss attack zones. `zone`: the disc plus a see-through cylinder wall up to `height`. `glow`: columns of rising light about 20 blocks tall, about every 2 blocks of the edge (max 120), visible over hills and trees. `both` (default): `zone` + `glow`. `off`: no marker. Worlds saved with a removed laser style switch to `both`. |
-| `/mobbattle areacolor <color>` / `random` | Area color from the palette: red (default), blue, green, yellow, orange, purple, pink, cyan, white, black, brown, lime, gray, magenta. `random` picks one each time. |
-| `/mobbattle height <3-128>` | Height in blocks of the `zone` wall (default 30). |
+| `/mobbattle fightlaser on` / `off` | Laser line between fighters at fight start (default off). Team rings always show. |
+| `/mobbattle fightlasercolor #RRGGBB` / `random` | Color of the fighter laser, e.g. `#2EFFD3`, or a random vivid color each fight. |
+| `/mobbattle arearadius <2-430>` | Area radius in blocks (default 60). Bigger radii search a much larger sphere on every Chaos Wand click; up to 430 is allowed. Existing worlds keep their saved radius; use `/mobbattle arearadius 60` to update it. Only loaded mobs are considered. |
+| `/mobbattle areastyle floor\|zone\|glow\|both\|all\|off` | How the area is shown, for 6 seconds. `floor`: a translucent flat disc of color (no outlines) on the ground under the center, like boss attack zones. `zone`: the disc plus a see-through cylinder wall up to `areaheight`. `glow`: columns of rising light about 20 blocks tall, about every 2 blocks of the edge (max 120), visible over hills and trees. `both` (default): `floor` + `glow`. `all`: `zone` + `glow`. `off`: no marker. Worlds saved with a removed laser style switch to `both`. |
+| `/mobbattle areaonlywand on` / `off` | `off` (default): everyone sees the area for 6 s. `on`: only you see it, and only while you hold the Chaos Wand (like the Team Wand rings); switching item hides it within about a second, holding the wand again shows your last area again. A new area replaces the previous one. |
+| `/mobbattle areacolor <color>` / `random` | Area color from the palette: red (default), blue, green, yellow, orange, purple, pink, cyan, white, black, brown, lime, gray, magenta. `random` picks one each time. This is separate from `/mobbattle fightlasercolor`, which only colors the fighter laser. Black, gray and brown glow use normal blending, so they really look dark. |
+| `/mobbattle areaheight <3-128>` | Height in blocks of the `zone` wall (default 30). |
 | `/mobbattle maxmobs <2-200>` | Max mobs per Chaos Wand click and per summon (default 40). Above ~60 the server may lag. |
 
-The `floor` / `zone` disc is flat: on slopes it goes into hills and floats over dips. `glow` columns start on the top collision surface in loaded terrain (including roofs and tree tops); unloaded parts use the center height, without loading chunks. Mob selection uses the 3D radius around the clicked mob or player, so height differences affect which mobs are included.
+The `floor` / `zone` disc is flat and sits on the ground under the center (even if you are flying): on slopes it goes into hills and floats over dips. `glow` columns start on the top collision surface in loaded terrain (including roofs and tree tops); unloaded parts use the center height, without loading chunks. Mob selection uses the 3D radius around the clicked mob or player, so height differences affect which mobs are included.
 
 ### Battle rules
 | Command | What it does |
 |---|---|
-| `/mobbattle isolation on` / `off` | `on` (default): mobs in a duel, royale or team battle only hurt their opponents, and mobs outside the battle (wild mobs, other battles) can't hurt them; their hits on players are cancelled too. `off`: outside mobs can join in and battle mobs can hurt players and other mobs. Allies of the same battle never hurt each other, and players can always hit battle mobs. |
+| `/mobbattle isolation on` / `off` | `on` (default): mobs in a duel, royale or team battle only hurt their opponents, and mobs outside the battle (wild mobs, other battles) can't hurt them; their hits on players are cancelled too. Battle mobs also ignore players and wild mobs within 48 blocks: they don't pick them as targets, chase them or keep looking at them (if you hit one, it goes back to its opponent within a second). `off` (takes effect within about 12 s): outside mobs can join in and battle mobs can hurt players and other mobs. Allies of the same battle never hurt each other, and players can always hit battle mobs. |
 
 ### Teams
 | Command | What it does |
@@ -101,8 +105,9 @@ The `floor` / `zone` disc is flat: on slopes it goes into hills and floats over 
 | `/mobbattle teams rename <team> <name>` | Change only the team's name, e.g. `/mobbattle teams rename RED Orcs`. Names use letters, numbers and underscores (max 16), and must be unique. Members, color and summon rules stay with the team. |
 | `/mobbattle teams remove <team>` | Remove a team, its draft/battle members, team effects and summon rules. At least 2 teams stay. |
 | `/mobbattle teams reset` | Back to the 4 default teams; clears current team drafts and team battle membership. |
-| `/mobbattle teamfx both\|tint\|mist\|off` | Team look, visible to everyone: `tint` colors the whole mob, `mist` adds a mist of the team color (like the Enrage effect), `both` (default). Removed when the battle ends or the mob gets a new order. |
-| `/mobbattle teamfx time <seconds>\|infinite` | How long the team look stays after a mob joins a team, e.g. `5` to see the color only for a moment, then the mob looks normal again. `infinite` (default) = the whole battle. Max 600. For no look at all use `teamfx off`. |
+| `/mobbattle teamlook both\|tint\|mist\|off` | Team look, visible to everyone: `tint` colors the whole mob, `mist` adds a mist of the team color (like the Enrage effect), `both` (default). Removed when the battle ends or the mob gets a new order. |
+| `/mobbattle teamlook time <seconds>\|infinite` | How long the team look stays after a mob joins a team, e.g. `5` to see the color only for a moment, then the mob looks normal again. `infinite` (default) = the whole battle. Max 600. For no look at all use `teamlook off`. |
+| `/mobbattle teamlook onlywand on` / `off` | `off` (default): the team look shows as soon as a mob joins a team. `on`: the look shows only while the team's owner holds the Team Wand, like the team rings, and goes away within about a second when they switch item. Everyone sees it while it is on (it is an effect on the mob). |
 | `/mobbattle summon team <role> <team>\|none` | Team rule for a mob type, used by summons and `teams auto`. |
 
 All team colors use prebuilt effects, with no runtime asset loading. Older saved custom colors automatically become the closest fixed palette color for rings, chat, tint and mist; team names and slots are preserved.
@@ -121,12 +126,12 @@ All team colors use prebuilt effects, with no runtime asset loading. Older saved
 ### Effects and morph
 | Command | What it does |
 |---|---|
-| `/mobbattle effect <id>` | Effect Wand effect: any loaded effect ID, including other mods' (e.g. `Potion_Morph_Frog`). |
+| `/mobbattle wandeffect <id>` | Effect Wand effect: any loaded effect ID, including other mods' (e.g. `Potion_Morph_Frog`). |
 | `/mobbattle morph <model>` | Morph Wand model by ID, e.g. `/mobbattle morph Frog_Green`. |
 | `/mobbattle morph list [text]` | Search model IDs, e.g. `/mobbattle morph list skeleton` (first 40). |
 | `/mobbattle morph reset` | Give loaded morphed mobs in your current world/instance their own models back. Originals from other instances remain available when you return there. |
 
-Defaults: laser off, color `#FF4B3E`, title on, win title on, style `Major`, radius 430, area both, areacolor red, isolation on, height 30, maxmobs 40, effect `Burn`, teamfx both, teamfx time infinite.
+Defaults: fightlaser off, fightlasercolor `#FF4B3E`, starttitle on, wintitle on, titlestyle `Major`, arearadius 60, areastyle both, areacolor red, areaonlywand off, isolation on, areaheight 30, maxmobs 40, wandeffect `Burn`, teamlook both, teamlook time infinite, teamlook onlywand off.
 
 ## Install
 

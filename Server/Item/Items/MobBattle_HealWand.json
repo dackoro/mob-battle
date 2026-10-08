@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Heal Wand",
-    "Description": "Left click an entity: restores it to full health."
+    "Name": "server.items.MobBattle_HealWand.name",
+    "Description": "server.items.MobBattle_HealWand.description"
   },
   "Categories": [
     "Items.Weapons"

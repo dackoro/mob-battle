@@ -34,6 +34,11 @@ public final class MorphWand {
     private MorphWand() {
     }
 
+    /** Drops originals of removed mobs (BattleManager.maintain): each Ref keeps its whole world reachable. */
+    static synchronized void prune() {
+        ORIGINALS.keySet().removeIf(r -> !r.isValid());
+    }
+
     public static Copy copyOf(UUID player) {
         return COPIES.get(player);
     }
@@ -88,7 +93,6 @@ public final class MorphWand {
         if (asset == null || current == null) {
             return false;
         }
-        ORIGINALS.keySet().removeIf(r -> !r.isValid());
         ORIGINALS.putIfAbsent(entity, current.getModel());
         float scale = copy.scale() > 0 ? copy.scale() : 1f;
         accessor.putComponent(entity, ModelComponent.getComponentType(),

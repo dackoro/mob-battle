@@ -189,20 +189,20 @@ public final class Teams {
 
     // ---- team look effects ----
 
-    /** Every effect id a team look can use, so TeamFx can remove the old one. */
-    public static List<String> allEffectIds() {
+    /**
+     * Every effect id a team look can use, so TeamFx can remove the old one. Built once: the palette is
+     * fixed, and the old runtime "MobBattle_Custom_*" effects no longer exist, so no mob can have them.
+     */
+    public static final List<String> ALL_EFFECT_IDS;
+
+    static {
         List<String> ids = new ArrayList<>();
         for (String c : PALETTE.keySet()) {
             for (String m : MODES) {
                 ids.add("MobBattle_Team_" + c + "_" + m);
             }
         }
-        for (int i = 0; i < MAX; i++) {
-            for (String m : MODES) {
-                ids.add("MobBattle_Custom_" + i + "_" + m);
-            }
-        }
-        return ids;
+        ALL_EFFECT_IDS = List.copyOf(ids);
     }
 
     /** Prebuilt effect id for the slot's look in the given mode (Both/Tint/Mist). */

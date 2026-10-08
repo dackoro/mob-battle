@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Chaos Wand",
-    "Description": "Left click a mob: every mob around attacks it. Right click: battle royale around the mob you aim at (or you), last one standing wins. Area: /mobbattle radius, /mobbattle area."
+    "Name": "server.items.MobBattle_ChaosWand.name",
+    "Description": "server.items.MobBattle_ChaosWand.description"
   },
   "Categories": [
     "Items.Weapons"

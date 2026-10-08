@@ -35,15 +35,38 @@ public class MobBattleCommand extends CommandBase {
             "MobBattle_KillWand", "MobBattle_EffectWand", "MobBattle_CleanseWand"
     };
 
-    private static final String USAGE = "Usage: /mobbattle show | title | wintitle | style | laser | color | radius | area"
-            + " | height | maxmobs | teams | teamfx | summon | effect | morph | give  (see the README)";
+    /** /mobbattle help: what each wand does and the commands by group. */
+    static final String[] HELP = {
+            "Mob Battle - wands (get all: /mobbattle give)",
+            "- Battle Wand: click a mob, then another: they fight. Chaos Wand: everyone attacks a mob / battle royale.",
+            "- Team Wand: build teams with left click, right click a mob to start. Summon Wand: build a mob list and summon it.",
+            "- Morph Wand: copy and apply models. Heal, Kill, Effect and Cleanse wands: one click on any entity.",
+            "Commands: /mobbattle <command> (the chat suggests the next word)",
+            "- settings | give | help",
+            "- Titles: starttitle on|off, wintitle on|off, titlestyle <style>|random",
+            "- Chaos area: areastyle floor|zone|glow|both|all|off, areacolor <color>|random, areaonlywand on|off, arearadius <n>, areaheight <n>, maxmobs <n>",
+            "- Fighter laser: fightlaser on|off, fightlasercolor #RRGGBB|random",
+            "- Battles: isolation on|off",
+            "- Teams: teams auto|start|clear|list|add|color|rename|remove|reset, teamlook both|tint|mist|off|time <s>|onlywand on|off",
+            "- Summon: summon [list|add|modify|remove|clear|team|random|atleastone]",
+            "- Effects and morph: wandeffect <id>, morph <model>|list [text]|reset",
+    };
+
+    private static final String USAGE = "Usage: /mobbattle help | settings | starttitle | wintitle | titlestyle | fightlaser | fightlasercolor"
+            + " | areastyle | areacolor | arearadius | areaheight | maxmobs | isolation | teams | teamlook | summon"
+            + " | wandeffect | morph | give  (see the README)";
 
     /**
      * One word of the command tree. Every node is a real subcommand so the chat suggests the next word;
      * all of them run the same parser over the raw input, and free values (numbers, IDs, colors) are
-     * allowed as extra arguments ("/mobbattle radius 20").
+     * allowed as extra arguments ("/mobbattle arearadius 20").
      */
     private static final class Sub extends CommandBase {
+        Sub(String name, String alias, String desc, Sub... children) {
+            this(name, desc, children);
+            addAliases(alias);
+        }
+
         Sub(String name, String description, Sub... children) {
             super(name, description);
             if ("give".equals(name)) {
@@ -70,33 +93,52 @@ public class MobBattleCommand extends CommandBase {
         return out;
     }
 
+    /** Old command words keep working: /mobbattle fightlasercolor = fightlasercolor, etc. */
+    private static final java.util.Map<String, String> RENAMED = java.util.Map.of(
+            "settings", "show",
+            "starttitle", "title",
+            "titlestyle", "style",
+            "fightlaser", "laser",
+            "fightlasercolor", "color",
+            "arearadius", "radius",
+            "areastyle", "area",
+            "areaheight", "height",
+            "wandeffect", "effect",
+            "teamlook", "teamfx");
+
     public MobBattleCommand() {
         super("mobbattle", "Mob Battle: wands that make mobs fight. Settings, teams, summon list and morphs.");
         setAllowsExtraArguments(true);
-        addSubCommand(new Sub("show", "Show the current settings"));
+        addSubCommand(new Sub("settings", "show", "Show the current settings"));
+        addSubCommand(new Sub("help", "Explain the wands and list the commands by group"));
         Sub give = new Sub("give", "Receive one of each of the nine Mob Battle wands");
         addSubCommand(give);
-        addSubCommand(new Sub("title", "Fight-start title on/off", words("Fight-start title", "on", "off")));
+        addSubCommand(new Sub("starttitle", "title", "Fight-start title on/off", words("Fight-start title", "on", "off")));
         addSubCommand(new Sub("wintitle", "Winner title on/off", words("Winner title", "on", "off")));
-        addSubCommand(new Sub("style", "Title style", words("Title style", "default", "major", "goblinbreach", "voideviction", "random")));
-        addSubCommand(new Sub("laser", "Laser between fighters on/off", words("Laser", "on", "off")));
-        addSubCommand(new Sub("color", "Laser/area color: #RRGGBB or random", words("Laser color", "random")));
-        addSubCommand(new Sub("radius", "Chaos Wand area radius in blocks (" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS + ")"));
+        addSubCommand(new Sub("titlestyle", "style", "Title style", words("Title style", "default", "major", "goblinbreach", "voideviction", "random")));
+        addSubCommand(new Sub("fightlaser", "laser", "Laser line between fighters at fight start on/off", words("Fighter laser", "on", "off")));
+        addSubCommand(new Sub("fightlasercolor", "color", "Color of the fighter laser: #RRGGBB or random", words("Fighter laser color", "random")));
+        addSubCommand(new Sub("arearadius", "radius", "Chaos Wand area radius in blocks (" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS + ")"));
         addSubCommand(new Sub("isolation", "Battle mobs only fight their opponents; outside mobs can't hurt them",
                 new Sub("on", "Isolated battles (default)"), new Sub("off", "Outside mobs and battle mobs can hurt each other")));
         java.util.List<String> areaColors = new java.util.ArrayList<>();
         Teams.PALETTE.keySet().forEach(n -> areaColors.add(n.toLowerCase(java.util.Locale.ROOT)));
         areaColors.add("random");
+        addSubCommand(new Sub("areaonlywand", "Area only for you, only while you hold the Chaos Wand",
+                new Sub("on", "Only you, only while holding the Chaos Wand"),
+                new Sub("off", "Everyone sees it for 6 s (default)")));
         addSubCommand(new Sub("areacolor", "Area color from the palette, or random",
                 words("Area color", areaColors.toArray(new String[0]))));
-        addSubCommand(new Sub("area", "How the area is drawn", words("Area style", "floor", "zone", "glow", "both", "off")));
-        addSubCommand(new Sub("height", "Beam / wall height in blocks (3-128)"));
+        addSubCommand(new Sub("areastyle", "area", "How the Chaos Wand area is shown", words("Area style", "floor", "zone", "glow", "both", "all", "off")));
+        addSubCommand(new Sub("areaheight", "height", "Height of the zone wall in blocks (3-128)"));
         addSubCommand(new Sub("maxmobs", "Max mobs per Chaos Wand click and per summon (2-200)"));
-        addSubCommand(new Sub("effect", "Effect Wand effect: any effect ID, e.g. Burn or Potion_Morph_Frog"));
-        addSubCommand(new Sub("teamfx", "Team look: both, tint, mist, off, or time <seconds|infinite>",
+        addSubCommand(new Sub("wandeffect", "effect", "Effect Wand effect: any effect ID, e.g. Burn or Potion_Morph_Frog"));
+        addSubCommand(new Sub("teamlook", "teamfx", "Team look: both, tint, mist, off, or time <seconds|infinite>",
                 new Sub("both", "Tint + mist"), new Sub("tint", "Color the whole mob"),
                 new Sub("mist", "Mist of the team color"), new Sub("off", "No team look"),
-                new Sub("time", "How long the look stays: seconds (1-600) or infinite", words("Whole battle", "infinite"))));
+                new Sub("time", "How long the look stays: seconds (1-600) or infinite", words("Whole battle", "infinite")),
+                new Sub("onlywand", "Show the look only while the team owner holds the Team Wand",
+                        words("Only with the Team Wand", "on", "off"))));
         addSubCommand(new Sub("teams", "Team battles and custom teams",
                 new Sub("auto", "Put mobs in range into teams by the team rules"),
                 new Sub("start", "Start the team battle"),
@@ -144,8 +186,15 @@ public class MobBattleCommand extends CommandBase {
     private static void dispatch(CommandContext ctx) {
         String key = settingOf(ctx);
         String val = valueOf(ctx, key);
+        key = RENAMED.getOrDefault(key, key);
 
         switch (key) {
+            case "help" -> {
+                for (String line : HELP) {
+                    reply(ctx, line, line.startsWith("-") ? OK : "#ffd23e");
+                }
+                return;
+            }
             case "give" -> {
                 giveWands(ctx);
                 return;
@@ -157,14 +206,14 @@ public class MobBattleCommand extends CommandBase {
             case "laser" -> {
                 Boolean on = parseOnOff(val);
                 if (on == null) {
-                    reply(ctx, "Usage: /mobbattle laser on|off", ERR);
+                    reply(ctx, "Usage: /mobbattle fightlaser on|off", ERR);
                     return;
                 }
                 FxSettings.laserEnabled = on;
             }
             case "color" -> {
                 if (val == null || !(FxSettings.RANDOM.equalsIgnoreCase(val) || FxSettings.isHexColor(val))) {
-                    reply(ctx, "Usage: /mobbattle color #RRGGBB|random  (e.g. #FFD23E)", ERR);
+                    reply(ctx, "Usage: /mobbattle fightlasercolor #RRGGBB|random  (e.g. #FFD23E)", ERR);
                     return;
                 }
                 FxSettings.laserColor = val.toLowerCase().equals(FxSettings.RANDOM) ? FxSettings.RANDOM : val.toUpperCase();
@@ -172,7 +221,7 @@ public class MobBattleCommand extends CommandBase {
             case "title" -> {
                 Boolean on = parseOnOff(val);
                 if (on == null) {
-                    reply(ctx, "Usage: /mobbattle title on|off", ERR);
+                    reply(ctx, "Usage: /mobbattle starttitle on|off", ERR);
                     return;
                 }
                 FxSettings.titleEnabled = on;
@@ -200,7 +249,7 @@ public class MobBattleCommand extends CommandBase {
                     EventTitleStyle style = val != null ? FxSettings.parseStyle(val) : null;
                     if (style == null) {
                         String names = Arrays.stream(EventTitleStyle.VALUES).map(Enum::name).collect(Collectors.joining(", "));
-                        reply(ctx, "Usage: /mobbattle style <" + names + ", random>", ERR);
+                        reply(ctx, "Usage: /mobbattle titlestyle <" + names + ", random>", ERR);
                         return;
                     }
                     FxSettings.titleStyle = style.name();
@@ -211,10 +260,18 @@ public class MobBattleCommand extends CommandBase {
                 try {
                     r = Integer.parseInt(val == null ? "" : val);
                 } catch (NumberFormatException e) {
-                    reply(ctx, "Usage: /mobbattle radius <" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS + ">", ERR);
+                    reply(ctx, "Usage: /mobbattle arearadius <" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS + ">", ERR);
                     return;
                 }
                 FxSettings.radius = FxSettings.clampRadius(r);
+            }
+            case "areaonlywand" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle areaonlywand on|off", ERR);
+                    return;
+                }
+                FxSettings.areaOnlyWand = on;
             }
             case "areacolor" -> {
                 String color = FxSettings.parseAreaColor(val);
@@ -227,13 +284,24 @@ public class MobBattleCommand extends CommandBase {
             }
             case "area" -> {
                 if (!FxSettings.isAreaStyle(val)) {
-                    reply(ctx, "Usage: /mobbattle area floor|zone|glow|both|off", ERR);
+                    reply(ctx, "Usage: /mobbattle areastyle floor|zone|glow|both|all|off", ERR);
                     return;
                 }
                 FxSettings.areaStyle = FxSettings.parseAreaStyle(val);
             }
             case "teamfx" -> {
-                if ("time".equalsIgnoreCase(val)) {
+                if ("onlywand".equalsIgnoreCase(val)) {
+                    String[] w = argsAfter(ctx, "onlywand");
+                    Boolean on = parseOnOff(w.length > 0 ? w[0] : null);
+                    if (on == null) {
+                        reply(ctx, "Usage: /mobbattle teamlook onlywand on|off", ERR);
+                        return;
+                    }
+                    FxSettings.teamLookOnlyWand = on;
+                    if (!on) {
+                        reply(ctx, "Team look always visible again; mobs get it back on their next team order.", OK);
+                    }
+                } else if ("time".equalsIgnoreCase(val)) {
                     String[] a = argsAfter(ctx, "time");
                     String t = a.length > 0 ? a[0].toLowerCase() : "";
                     int n;
@@ -243,18 +311,18 @@ public class MobBattleCommand extends CommandBase {
                         try {
                             n = Integer.parseInt(t);
                         } catch (NumberFormatException e) {
-                            reply(ctx, "Usage: /mobbattle teamfx time infinite|<1-" + FxSettings.TEAM_FX_MAX_SECONDS
-                                    + "> (infinite = whole battle). No team look at all: /mobbattle teamfx off", ERR);
+                            reply(ctx, "Usage: /mobbattle teamlook time infinite|<1-" + FxSettings.TEAM_FX_MAX_SECONDS
+                                    + "> (infinite = whole battle). No team look at all: /mobbattle teamlook off", ERR);
                             return;
                         }
                         if (n <= 0) {
-                            reply(ctx, "Use a positive duration or infinite. For no team look use /mobbattle teamfx off.", ERR);
+                            reply(ctx, "Use a positive duration or infinite. For no team look use /mobbattle teamlook off.", ERR);
                             return;
                         }
                     }
                     FxSettings.teamFxSeconds = Math.max(0, Math.min(FxSettings.TEAM_FX_MAX_SECONDS, n));
                 } else if (!TeamFx.isMode(val)) {
-                    reply(ctx, "Usage: /mobbattle teamfx both|tint|mist|off  or  /mobbattle teamfx time <seconds>", ERR);
+                    reply(ctx, "Usage: /mobbattle teamlook both|tint|mist|off  or  /mobbattle teamlook time <seconds>", ERR);
                     return;
                 } else {
                     FxSettings.teamFx = val.toLowerCase();
@@ -298,7 +366,7 @@ public class MobBattleCommand extends CommandBase {
                 try {
                     h = Integer.parseInt(val == null ? "" : val);
                 } catch (NumberFormatException e) {
-                    reply(ctx, "Usage: /mobbattle height <" + FxSettings.MIN_HEIGHT + "-" + FxSettings.MAX_HEIGHT + ">", ERR);
+                    reply(ctx, "Usage: /mobbattle areaheight <" + FxSettings.MIN_HEIGHT + "-" + FxSettings.MAX_HEIGHT + ">", ERR);
                     return;
                 }
                 FxSettings.pillarHeight = FxSettings.clampHeight(h);
@@ -309,7 +377,7 @@ public class MobBattleCommand extends CommandBase {
             }
         }
         FxSettings.save();
-        if (key.equals("radius") || key.equals("area") || key.equals("areacolor") || key.equals("height")) {
+        if (key.equals("radius") || key.equals("area") || key.equals("areacolor") || key.equals("height") || key.equals("areaonlywand")) {
             previewArea(ctx);
         }
         reply(ctx, "Saved: " + FxSettings.describe(), OK);
@@ -382,7 +450,7 @@ public class MobBattleCommand extends CommandBase {
                     reply(ctx, "Usage: /mobbattle summon modify <role in the list> <count|random>", ERR);
                     return;
                 }
-                String role = SummonList.ENTRIES.keySet().stream()
+                String role = SummonList.snapshot().keySet().stream()
                         .filter(known -> known.equalsIgnoreCase(a[1])).findFirst().orElse(null);
                 if (role == null) {
                     reply(ctx, "Mob is not in the summon list: " + a[1] + ". Use summon add first.", ERR);

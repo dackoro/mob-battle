@@ -43,26 +43,39 @@ public final class BattleManager {
         final UUID id = UUID.randomUUID();
         final PlayerRef owner;
         final boolean royale;
+        /** Chaos Wand "EVERYONE vs X": the target's name (side 1, alone) vs everyone else (side 0); else null. */
+        final String focusName;
         final String[] names = TEAM_NAMES.clone();
         final String[] colors = TEAM_COLORS.clone();
         com.hypixel.hytale.component.Store<EntityStore> store;
-        /** NPC index -> team. In a royale every NPC has its own team. */
-        final Map<Integer, Integer> teamOf = new ConcurrentHashMap<>();
-        final Map<Integer, Ref<EntityStore>> members = new ConcurrentHashMap<>();
-        /** NPC index -> its current target. */
-        final Map<Integer, Ref<EntityStore>> targets = new ConcurrentHashMap<>();
+        /**
+         * Member -> team (in a royale every NPC has its own team). Keyed by the Ref itself, never by
+         * getIndex(): Store.removeEntity moves the world's last entity into the freed slot, so indexes
+         * change whenever anything else (an arrow, a dead mob, a dropped item) is removed.
+         */
+        final Map<Ref<EntityStore>, Integer> teamOf = new ConcurrentHashMap<>();
+        /** Member -> its current target. */
+        final Map<Ref<EntityStore>, Ref<EntityStore>> targets = new ConcurrentHashMap<>();
+        /** (flock, member) pairs refreshed once per second, so pets can join without scanning every member. */
+        volatile List<Ref<EntityStore>[]> flocks = List.of();
         final long expiresAt = System.currentTimeMillis() + MAX_MILLIS;
+        /** Next winner check; only touched by the battle's own world thread. */
+        long nextCheck;
         volatile boolean over;
 
         Battle(PlayerRef owner, boolean royale) {
+            this(owner, royale, null);
+        }
+
+        Battle(PlayerRef owner, boolean royale, String focusName) {
             this.owner = owner;
             this.royale = royale;
+            this.focusName = focusName;
         }
 
         void add(Ref<EntityStore> npc, int team) {
             if (store == null) store = npc.getStore();
-            members.put(npc.getIndex(), npc);
-            teamOf.put(npc.getIndex(), team);
+            teamOf.put(npc, team);
             MANAGED.add(npc);
         }
 
@@ -70,21 +83,25 @@ public final class BattleManager {
         String color(int team) { return team >= 0 && team < colors.length && colors[team] != null ? colors[team] : "#aaaaaa"; }
 
         boolean has(Ref<EntityStore> npc) {
-            return npc != null && npc.isValid() && members.containsKey(npc.getIndex())
-                    && members.get(npc.getIndex()).isValid()
-                    && members.get(npc.getIndex()).getStore() == npc.getStore();
+            return npc != null && npc.isValid() && teamOf.containsKey(npc);
         }
 
         int team(Ref<EntityStore> npc) {
-            return teamOf.getOrDefault(npc.getIndex(), -1);
+            return teamOf.getOrDefault(npc, -1);
         }
 
+        /** Team Wand battles (team colors, rings, team look); not royales or "EVERYONE vs X". */
         public boolean isTeams() {
-            return !royale;
+            return !royale && focusName == null;
         }
 
-        public Map<Integer, Ref<EntityStore>> members() {
-            return members;
+        public Set<Ref<EntityStore>> members() {
+            return teamOf.keySet();
+        }
+
+        /** One shared snapshot for every member's cleanup, instead of a copy per member. */
+        List<Ref<EntityStore>> snapshot() {
+            return List.copyOf(teamOf.keySet());
         }
 
         public PlayerRef owner() {
@@ -95,8 +112,15 @@ public final class BattleManager {
     private static final List<Battle> BATTLES = new CopyOnWriteArrayList<>();
     private static final Set<Ref<EntityStore>> MANAGED = ConcurrentHashMap.newKeySet();
 
+    /** Some draft has mobs (refreshed by maintain, set right away when one is added). */
+    private static volatile boolean draftMembers;
+    /** Some battle member belongs to a flock, so new pets may need to join (refreshed once per second). */
+    private static volatile boolean anyFlocks;
+
     static boolean isManaged(Ref<EntityStore> npc) { return MANAGED.contains(npc); }
     static Set<Ref<EntityStore>> managed() { return MANAGED; }
+    static boolean hasDraftMembers() { return draftMembers; }
+    static boolean hasFlocks() { return anyFlocks; }
 
     /**
      * NPC hits to cancel. Allies in the same battle never hurt each other. With /mobbattle isolation on
@@ -111,21 +135,68 @@ public final class BattleManager {
         return FxSettings.battleIsolation && (a != null || b != null);
     }
 
-    static void checkAll(com.hypixel.hytale.component.Store<EntityStore> store) {
-        MANAGED.removeIf(npc -> !npc.isValid());
-        FightManager.prunePendingStops();
+    /** Winner/timeout check and pet cache of this world's battles; runs on the world thread once per second. */
+    static void checkAll(com.hypixel.hytale.component.Store<EntityStore> store, long now) {
         for (Battle battle : BATTLES) {
-            if (battle.store == store) checkWinner(battle, store);
+            if (battle.store == store && now >= battle.nextCheck) {
+                battle.nextCheck = now + 1000;
+                checkWinner(battle, store);
+                if (!battle.over) refreshFlocks(battle, store);
+            }
         }
+    }
+
+    /**
+     * Global cleanup, once per second from any world thread. Everything here is keyed by Ref, and a Ref
+     * keeps its whole Store (world) reachable, so dead or unloaded entities must be dropped.
+     */
+    static void maintain() {
+        MANAGED.removeIf(npc -> !npc.isValid());
+        for (Battle battle : BATTLES) {
+            // World unloaded (e.g. a closed instance): its tick will never run checkWinner again. A live world
+            // handles its own empty battles there, with the "DRAW!" announcement.
+            if (battle.store == null || battle.store.isShutdown()) {
+                finish(battle);
+                MobBattlePlugin.log("Battle dropped: its world was unloaded");
+            }
+        }
+        boolean members = false;
+        for (Draft draft : DRAFTS.values()) {
+            draft.prune();
+            members |= draft.teams.stream().anyMatch(t -> !t.isEmpty());
+        }
+        draftMembers = members;
+        anyFlocks = BATTLES.stream().anyMatch(b -> !b.flocks.isEmpty());
+        DRAFT_OWNERS.keySet().retainAll(DRAFTS.keySet());
+        FightManager.prune();
+        TeamFx.prune();
+        MorphWand.prune();
+        FightFx.pruneTitles();
+    }
+
+    private static void refreshFlocks(Battle battle, ComponentAccessor<EntityStore> accessor) {
+        List<Ref<EntityStore>[]> pairs = new ArrayList<>();
+        for (Ref<EntityStore> member : battle.teamOf.keySet()) {
+            Ref<EntityStore> flock = member.isValid()
+                    ? com.hypixel.hytale.server.flock.FlockPlugin.getFlockReference(member, accessor) : null;
+            if (flock != null && flock.isValid()) {
+                @SuppressWarnings("unchecked")
+                Ref<EntityStore>[] pair = new Ref[]{flock, member};
+                pairs.add(pair);
+            }
+        }
+        battle.flocks = pairs;
+        anyFlocks = BATTLES.stream().anyMatch(b -> !b.flocks.isEmpty());
     }
 
     private static void finish(Battle battle) {
         battle.over = true;
         BATTLES.remove(battle);
-        for (Ref<EntityStore> npc : battle.members.values()) {
+        List<Ref<EntityStore>> all = battle.snapshot();
+        for (Ref<EntityStore> npc : all) {
             if (npc.isValid()) {
-                FightManager.queueStop(npc, battle.members.values());
-                if (!battle.royale) TeamFx.clear(npc);
+                FightManager.queueStop(npc, all);
+                if (battle.isTeams()) TeamFx.clear(npc);
             }
         }
     }
@@ -171,13 +242,14 @@ public final class BattleManager {
         // the rest keep fighting (anyone targeting them picks a new enemy, see currentTarget).
         for (Battle b : BATTLES) {
             boolean touched = false;
+            List<Ref<EntityStore>> opponents = null;
             for (Ref<EntityStore> npc : npcs) {
-                if (b.has(npc)) FightManager.queueStop(npc, b.members.values());
-                if (b.has(npc) && b.members.remove(npc.getIndex()) != null) {
-                    b.teamOf.remove(npc.getIndex());
-                    b.targets.remove(npc.getIndex());
-                    touched = true;
-                }
+                if (!b.has(npc)) continue;
+                if (opponents == null) opponents = b.snapshot();
+                FightManager.queueStop(npc, opponents);
+                b.teamOf.remove(npc);
+                b.targets.remove(npc);
+                touched = true;
             }
             if (!touched) {
                 continue;
@@ -203,18 +275,18 @@ public final class BattleManager {
             return null;
         }
         for (Battle b : BATTLES) {
-            if (b.over) {
+            if (b.over || b.store != npc.getStore()) {
                 continue;
             }
-            for (Ref<EntityStore> member : b.members.values()) {
-                if (!member.isValid() || member.getStore() != npc.getStore() || member.getIndex() == npc.getIndex()) {
+            for (Ref<EntityStore>[] pair : b.flocks) {
+                Ref<EntityStore> other = pair[0], member = pair[1];
+                if (member == npc || !b.has(member)) {
                     continue;
                 }
-                Ref<EntityStore> other = com.hypixel.hytale.server.flock.FlockPlugin.getFlockReference(member, buffer);
-                if (other != null && other.isValid() && other.getStore() == flock.getStore()
-                        && other.getIndex() == flock.getIndex()) {
+                if (other == flock || (other.isValid() && other.getStore() == flock.getStore()
+                        && other.getIndex() == flock.getIndex())) {
                     b.add(npc, b.team(member));
-                    if (!b.royale) {
+                    if (b.isTeams()) {
                         TeamFx.show(npc, b.color(b.team(member)));
                     }
                     MobBattlePlugin.log(ChaosWand.nameOf(npc, buffer) + " joined the battle on "
@@ -234,6 +306,23 @@ public final class BattleManager {
         for (int i = 0; i < npcs.size(); i++) {
             battle.add(npcs.get(i), i);
         }
+        BATTLES.add(battle);
+        return battle;
+    }
+
+    /** Chaos Wand focus: every attacker (allies, side 0) vs the target (side 1), so the end gets a winner title. */
+    public static Battle startFocus(PlayerRef owner, Ref<EntityStore> target, String targetName,
+                                    List<Ref<EntityStore>> attackers) {
+        List<Ref<EntityStore>> all = new ArrayList<>(attackers);
+        all.add(target);
+        detach(all);
+        FightManager.endFightsOf(all);
+        Battle battle = new Battle(owner, false, targetName);
+        for (Ref<EntityStore> npc : attackers) {
+            battle.add(npc, 0);
+            battle.targets.put(npc, target);
+        }
+        battle.add(target, 1);
         BATTLES.add(battle);
         return battle;
     }
@@ -273,12 +362,12 @@ public final class BattleManager {
         int myTeam = battle.team(self);
         Ref<EntityStore> best = null;
         double bestDist = Double.MAX_VALUE;
-        for (Ref<EntityStore> other : battle.members.values()) {
-            if (other.getIndex() == self.getIndex() || battle.team(other) == myTeam || !isAlive(other, buffer)) {
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            Ref<EntityStore> other = e.getKey();
+            if (other == self || e.getValue() == myTeam || !isAlive(other, buffer)) {
                 continue;
             }
-            Vector3d pos = ChaosWand.positionOf(other, buffer);
-            double d = me == null || pos == null ? Double.MAX_VALUE - 1 : pos.distanceSquared(me);
+            double d = me == null ? Double.MAX_VALUE - 1 : ChaosWand.distSq(me, other, buffer);
             if (d < bestDist) {
                 bestDist = d;
                 best = other;
@@ -290,23 +379,23 @@ public final class BattleManager {
     /** The NPC's current target, picking a new one if it has none or it died. */
     public static Ref<EntityStore> currentTarget(Battle battle, Ref<EntityStore> self, ComponentAccessor<EntityStore> buffer,
                                                  boolean[] changed) {
-        Ref<EntityStore> target = battle.targets.get(self.getIndex());
+        Ref<EntityStore> target = battle.targets.get(self);
         if (target != null && battle.has(target) && isAlive(target, buffer)) {
             return target;
         }
         target = nearestEnemy(battle, self, buffer);
         if (target != null) {
-            battle.targets.put(self.getIndex(), target);
+            battle.targets.put(self, target);
             changed[0] = true;
         } else {
-            battle.targets.remove(self.getIndex());
+            battle.targets.remove(self);
         }
         return target;
     }
 
     /** Sets the first target of an NPC (used at battle start). */
     public static void setTarget(Battle battle, Ref<EntityStore> self, Ref<EntityStore> target) {
-        battle.targets.put(self.getIndex(), target);
+        battle.targets.put(self, target);
     }
 
     /** Ends the battle and announces the winner once only one side has living members. */
@@ -317,9 +406,10 @@ public final class BattleManager {
         Set<Integer> aliveTeams = new HashSet<>();
         Ref<EntityStore> lastAlive = null;
         int alive = 0;
-        for (Ref<EntityStore> npc : battle.members.values()) {
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            Ref<EntityStore> npc = e.getKey();
             if (isAlive(npc, buffer)) {
-                aliveTeams.add(battle.team(npc));
+                aliveTeams.add(e.getValue());
                 lastAlive = npc;
                 alive++;
             }
@@ -338,9 +428,14 @@ public final class BattleManager {
             main = "DRAW!";
             sub = outcome == BattleOutcome.TIMEOUT ? "Time is up" : "Nobody is left standing";
             color = "#aaaaaa";
+        } else if (battle.focusName != null) {
+            boolean targetWon = aliveTeams.contains(1);
+            main = targetWon ? battle.focusName + " WINS!" : battle.focusName + " IS DEFEATED!";
+            sub = targetWon ? "Survived everyone" : alive + " attackers left standing";
+            color = targetWon ? "#ffd23e" : "#ff6b5e";
         } else if (battle.royale) {
             main = ChaosWand.nameOf(lastAlive, buffer) + " WINS!";
-            sub = battle.members.size() == 2 ? "Duel won" : "Last one standing";
+            sub = battle.teamOf.size() == 2 ? "Duel won" : "Last one standing";
             color = "#ffd23e";
         } else {
             int team = aliveTeams.iterator().next();
@@ -394,18 +489,15 @@ public final class BattleManager {
 
         int teamOf(Ref<EntityStore> npc) {
             for (int t = 0; t < teams.size(); t++) {
-                for (Ref<EntityStore> r : teams.get(t)) {
-                    if (r.isValid() && r.getStore() == npc.getStore() && r.getIndex() == npc.getIndex()) {
-                        return t;
-                    }
+                if (teams.get(t).contains(npc)) {
+                    return t;
                 }
             }
             return -1;
         }
 
         void remove(Ref<EntityStore> npc) {
-            teams.forEach(t -> t.removeIf(r -> !r.isValid()
-                    || (r.getStore() == npc.getStore() && r.getIndex() == npc.getIndex())));
+            teams.forEach(t -> t.removeIf(r -> r == npc || !r.isValid()));
         }
     }
 
@@ -434,8 +526,10 @@ public final class BattleManager {
             affected.addAll(draft.teams.get(slot));
         }
         for (Battle battle : BATTLES) {
-            if (!battle.royale) {
-                battle.members.values().stream().filter(npc -> battle.team(npc) == slot).forEach(affected::add);
+            if (battle.isTeams()) {
+                battle.teamOf.forEach((npc, team) -> {
+                    if (team == slot) affected.add(npc);
+                });
             }
         }
         detach(affected);
@@ -473,6 +567,7 @@ public final class BattleManager {
         }
         draft.teams.get(draft.currentTeam).add(npc);
         MANAGED.add(npc);
+        draftMembers = true;
         return draft.currentTeam;
     }
 
@@ -488,6 +583,7 @@ public final class BattleManager {
         FightManager.endFightsOf(List.of(npc));
         draft.teams.get(team).add(npc);
         MANAGED.add(npc);
+        draftMembers = true;
         TeamFx.show(npc, team);
     }
 

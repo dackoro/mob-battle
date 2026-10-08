@@ -1,0 +1,25 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_AreaGlow_Motes_Black",
+      "PositionOffset": {
+        "Y": 0.1
+      },
+      "LifeSpan": {
+        "Min": 6,
+        "Max": 6
+      }
+    },
+    {
+      "SpawnerId": "MobBattle_AreaGlow_Base_Black",
+      "PositionOffset": {
+        "Y": 0.08
+      },
+      "LifeSpan": {
+        "Min": 6,
+        "Max": 6
+      }
+    }
+  ],
+  "CullDistance": 120
+}

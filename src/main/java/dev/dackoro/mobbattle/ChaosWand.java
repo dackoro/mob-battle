@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Chaos Wand logic: group fights inside a radius (/mobbattle radius).
+ * Chaos Wand logic: group fights inside a radius (/mobbattle arearadius).
  * <ul>
  *   <li>focus: every NPC around the clicked one attacks it.</li>
  *   <li>brawl: battle royale among the NPCs around, until one is left (BattleManager).</li>
@@ -38,17 +38,30 @@ public final class ChaosWand {
     /** NPCs within the configured radius of {@code center}, nearest first, capped at /mobbattle maxmobs. */
     static List<Ref<EntityStore>> npcsAround(Vector3d center, ComponentAccessor<EntityStore> buffer) {
         // getAllEntitiesInSphere returns a thread-local list: copy it right away.
-        List<Ref<EntityStore>> found = new ArrayList<>(
-                TargetUtil.getAllEntitiesInSphere(center, FxSettings.radius, buffer));
-        found.removeIf(r -> r == null || !r.isValid() || buffer.getComponent(r, NPCEntity.getComponentType()) == null
-                || !BattleManager.isAlive(r, buffer));
-        found.sort((x, y) -> Double.compare(distSq(center, x, buffer), distSq(center, y, buffer)));
-        return found.size() > FxSettings.maxMobs ? new ArrayList<>(found.subList(0, FxSettings.maxMobs)) : found;
+        // Distance once per NPC, not once per sort comparison (n log n component reads and copies).
+        List<Near> near = new ArrayList<>();
+        for (Ref<EntityStore> r : TargetUtil.getAllEntitiesInSphere(center, FxSettings.radius, buffer)) {
+            if (r != null && r.isValid() && buffer.getComponent(r, NPCEntity.getComponentType()) != null
+                    && BattleManager.isAlive(r, buffer)) {
+                near.add(new Near(r, distSq(center, r, buffer)));
+            }
+        }
+        near.sort((x, y) -> Double.compare(x.distSq(), y.distSq()));
+        int n = Math.min(near.size(), FxSettings.maxMobs);
+        List<Ref<EntityStore>> out = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            out.add(near.get(i).ref());
+        }
+        return out;
     }
 
-    private static double distSq(Vector3d c, Ref<EntityStore> r, ComponentAccessor<EntityStore> buffer) {
-        Vector3d p = positionOf(r, buffer);
-        return p == null ? Double.MAX_VALUE : p.distanceSquared(c);
+    private record Near(Ref<EntityStore> ref, double distSq) {
+    }
+
+    /** Squared distance without copying the position; MAX_VALUE if it has no transform. */
+    static double distSq(Vector3d c, Ref<EntityStore> r, ComponentAccessor<EntityStore> buffer) {
+        TransformComponent t = buffer.getComponent(r, TransformComponent.getComponentType());
+        return t == null ? Double.MAX_VALUE : t.getPosition().distanceSquared(c);
     }
 
     static String nameOf(Ref<EntityStore> ref, ComponentAccessor<EntityStore> buffer) {
@@ -69,7 +82,7 @@ public final class ChaosWand {
         String targetName = nameOf(target, buffer);
         if (around.isEmpty()) {
             player.sendMessage(Message.raw("No mobs within " + FxSettings.radius + " blocks of " + targetName
-                    + ". Use /mobbattle radius <blocks>.").color(WARN));
+                    + ". Use /mobbattle arearadius <blocks>.").color(WARN));
             return;
         }
 
@@ -92,8 +105,11 @@ public final class ChaosWand {
             FightManager.provoke(npc, target, buffer);
             FightFx.link(playerEntity, npc, target, buffer);
         }
+        // A 2-side battle so the end shows who won (the target or the attackers).
+        BattleManager.Battle battle = BattleManager.startFocus(player, target, targetName, around);
         // The target fights back against the nearest attacker.
         if (firstAttacker != null) {
+            BattleManager.setTarget(battle, target, firstAttacker);
             FightManager.turnAgainst(target, firstAttacker, buffer);
         }
         MobBattlePlugin.log("Chaos focus on " + targetName + ": " + around.size() + " mobs, " + attackers + " aggressive");
@@ -109,7 +125,7 @@ public final class ChaosWand {
         FightFx.area(playerEntity, center, FxSettings.radius, buffer);
         if (around.size() < 2) {
             player.sendMessage(Message.raw("A free-for-all needs at least 2 mobs within " + FxSettings.radius
-                    + " blocks. Use /mobbattle radius <blocks>.").color(WARN));
+                    + " blocks. Use /mobbattle arearadius <blocks>.").color(WARN));
             return;
         }
 

@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Kill Wand",
-    "Description": "Left click an entity: kills it instantly."
+    "Name": "server.items.MobBattle_KillWand.name",
+    "Description": "server.items.MobBattle_KillWand.description"
   },
   "Categories": [
     "Items.Weapons"

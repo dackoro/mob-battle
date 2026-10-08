@@ -7,6 +7,8 @@ import com.hypixel.hytale.server.flock.FlockMembership;
 import com.hypixel.hytale.server.flock.FlockPlugin;
 import com.hypixel.hytale.server.core.asset.type.attitude.Attitude;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.role.support.WorldSupport;
@@ -51,10 +53,21 @@ public final class FightManager {
     private static final Map<Ref<EntityStore>, List<Ref<EntityStore>>> PENDING_STOPS = new ConcurrentHashMap<>();
 
     static boolean hasPendingStops() { return !PENDING_STOPS.isEmpty(); }
-    static void prunePendingStops() { PENDING_STOPS.keySet().removeIf(npc -> !npc.isValid()); }
 
-    static void queueStop(Ref<EntityStore> npc, java.util.Collection<Ref<EntityStore>> opponents) {
-        PENDING_STOPS.put(npc, new java.util.ArrayList<>(opponents));
+    /** @param opponents an immutable list, shared by every member of the same battle */
+    static void queueStop(Ref<EntityStore> npc, List<Ref<EntityStore>> opponents) {
+        PENDING_STOPS.put(npc, opponents);
+    }
+
+    /** Drops state of removed entities and finished fights (BattleManager.maintain, once per second). */
+    static void prune() {
+        PENDING_STOPS.keySet().removeIf(npc -> !npc.isValid());
+        long now = System.currentTimeMillis();
+        PENDING_HEALS.values().removeIf(h -> !h.npc().isValid() || now > h.at() + HEAL_EXPIRE_MS);
+        SELECTION.values().removeIf(npc -> !npc.isValid());
+        if (FIGHTS.removeIf(Fight::isOver)) {
+            reindex();
+        }
     }
 
     /** Runs on the NPC's own world thread; stale hostility must not survive a finished battle. */
@@ -103,10 +116,36 @@ public final class FightManager {
             // Long battles must not lose forced hostility when the initial ten-minute override expires.
             tryOverride(world, target, Attitude.HOSTILE, HOSTILE_SECONDS, hasCombat);
         }
-        if (target != null && BattleManager.isManaged(target)
+        if (FxSettings.battleIsolation && battle != null) {
+            ignoreOutsiders(self, world, hasCombat, accessor);
+        }
+        boolean outsider = target != null && !BattleManager.isManaged(target)
+                && FxSettings.battleIsolation && battle != null;
+        if (outsider || target != null && BattleManager.isManaged(target)
                 && (battle == null ? !isFighting(self, target)
                     : !battle.has(target) || battle.team(target) == battle.team(self))) {
             releaseTarget(self, state, accessor);
+        }
+    }
+
+    /** Range in which battle mobs are told to ignore players and wild mobs (/mobbattle isolation on). */
+    static final double OUTSIDER_RANGE = 48;
+    /** Short override, renewed by every isolation refresh, so turning isolation off takes effect quickly. */
+    static final double OUTSIDER_IGNORE_SECONDS = 12;
+
+    /** Their hits are cancelled anyway; this keeps battle mobs from chasing or swinging at outsiders. */
+    private static void ignoreOutsiders(Ref<EntityStore> self, WorldSupport world, boolean hasCombat,
+                                        ComponentAccessor<EntityStore> accessor) {
+        org.joml.Vector3d pos = ChaosWand.positionOf(self, accessor);
+        if (pos == null) return;
+        // Thread-local list: iterated right away, and nothing in the loop runs another sphere query.
+        for (Ref<EntityStore> other : com.hypixel.hytale.server.core.util.TargetUtil
+                .getAllEntitiesInSphere(pos, OUTSIDER_RANGE, accessor)) {
+            if (other == null || !other.isValid() || other == self || BattleManager.isManaged(other)) continue;
+            // Only things a mob can target: skip arrows, dropped items and other entities.
+            if (accessor.getComponent(other, NPCEntity.getComponentType()) == null
+                    && accessor.getComponent(other, PlayerRef.getComponentType()) == null) continue;
+            tryOverride(world, other, Attitude.IGNORE, OUTSIDER_IGNORE_SECONDS, hasCombat);
         }
     }
 
@@ -150,6 +189,21 @@ public final class FightManager {
     }
 
     private static final List<Fight> FIGHTS = new CopyOnWriteArrayList<>();
+    /** Every NPC in a wand fight, so the per-tick check for the other NPCs is one set lookup. */
+    private static volatile java.util.Set<Ref<EntityStore>> fighters = java.util.Set.of();
+
+    private static void reindex() {
+        java.util.Set<Ref<EntityStore>> set = new java.util.HashSet<>();
+        for (Fight f : FIGHTS) {
+            set.add(f.a());
+            set.add(f.b());
+        }
+        fighters = set;
+    }
+
+    static boolean isFighter(Ref<EntityStore> npc) {
+        return fighters.contains(npc);
+    }
 
     private static boolean same(Ref<EntityStore> x, Ref<EntityStore> y) {
         return x == y || (x.isValid() && y.isValid() && x.getStore() == y.getStore() && x.getIndex() == y.getIndex());
@@ -173,12 +227,15 @@ public final class FightManager {
 
     /** Ends every wand fight of these NPCs (before a free-for-all reshuffles them). */
     public static void endFightsOf(List<Ref<EntityStore>> npcs) {
-        FIGHTS.removeIf(f -> f.isOver() || npcs.stream().anyMatch(f::has));
+        if (FIGHTS.removeIf(f -> f.isOver() || npcs.stream().anyMatch(f::has))) {
+            reindex();
+        }
     }
 
     /** Registers a fight without touching any other fight of a or b. */
     public static void addFight(Ref<EntityStore> a, Ref<EntityStore> b, ComponentAccessor<EntityStore> buffer) {
         FIGHTS.add(new Fight(a, b, System.currentTimeMillis() + (long) (HOSTILE_SECONDS * 1000)));
+        reindex();
 
         // Same flock (e.g. a wolf pack): CombatSupport refuses damage between flock members.
         // Leaving the flock is what the vanilla FlockLeave action does.
@@ -191,12 +248,11 @@ public final class FightManager {
     }
 
     public static boolean isFighting(Ref<EntityStore> x, Ref<EntityStore> y) {
-        if (x == null || y == null || FIGHTS.isEmpty()) {
+        if (x == null || y == null || !isFighter(x)) {
             return false;
         }
-        FIGHTS.removeIf(Fight::isOver);
         for (Fight f : FIGHTS) {
-            if (f.involves(x, y)) {
+            if (!f.isOver() && f.involves(x, y)) {
                 return true;
             }
         }
@@ -240,15 +296,19 @@ public final class FightManager {
         DamageSystems.executeDamage(victim, buffer,
                 new Damage(new Damage.EntitySource(attacker), cause, PROVOKE_DAMAGE));
         // Give the health back a moment later, once the damage pipeline has applied it.
-        PENDING_HEALS.add(new PendingHeal(victim, PROVOKE_DAMAGE, System.currentTimeMillis() + HEAL_DELAY_MS));
+        PENDING_HEALS.merge(victim, new PendingHeal(victim, PROVOKE_DAMAGE, System.currentTimeMillis() + HEAL_DELAY_MS),
+                (old, add) -> new PendingHeal(victim, old.amount() + add.amount(), add.at()));
     }
 
     private static final long HEAL_DELAY_MS = 300;
+    /** A heal for an NPC that never ticked again (unloaded chunk) is dropped after this. */
+    private static final long HEAL_EXPIRE_MS = 10_000;
 
     private record PendingHeal(Ref<EntityStore> npc, float amount, long at) {
     }
 
-    private static final List<PendingHeal> PENDING_HEALS = new CopyOnWriteArrayList<>();
+    /** One entry per NPC (provocations add up), so each NPC's tick is one lookup instead of a list scan. */
+    private static final Map<Ref<EntityStore>, PendingHeal> PENDING_HEALS = new ConcurrentHashMap<>();
 
     public static boolean hasPendingHeals() {
         return !PENDING_HEALS.isEmpty();
@@ -256,20 +316,13 @@ public final class FightManager {
 
     /** Called from the tick system for {@code self}: restores the provocation damage. */
     public static void applyPendingHeals(Ref<EntityStore> self, ComponentAccessor<EntityStore> accessor) {
-        long now = System.currentTimeMillis();
-        for (PendingHeal heal : PENDING_HEALS) {
-            if (!heal.npc().isValid()) {
-                PENDING_HEALS.remove(heal);
-                continue;
-            }
-            if (now < heal.at() || heal.npc().getIndex() != self.getIndex()) {
-                continue;
-            }
-            EntityStatMap stats = accessor.getComponent(self, EntityStatMap.getComponentType());
-            if (stats != null) {
-                stats.addStatValue(DefaultEntityStatTypes.getHealth(), heal.amount());
-            }
-            PENDING_HEALS.remove(heal);
+        PendingHeal heal = PENDING_HEALS.get(self);
+        if (heal == null || System.currentTimeMillis() < heal.at() || !PENDING_HEALS.remove(self, heal)) {
+            return;
+        }
+        EntityStatMap stats = accessor.getComponent(self, EntityStatMap.getComponentType());
+        if (stats != null) {
+            stats.addStatValue(DefaultEntityStatTypes.getHealth(), heal.amount());
         }
     }
 
@@ -285,6 +338,9 @@ public final class FightManager {
 
     /** The current wand opponent of {@code npc}, or null if it isn't in a wand fight. */
     public static Ref<EntityStore> enemyOf(Ref<EntityStore> npc) {
+        if (!isFighter(npc)) {
+            return null;
+        }
         for (Fight f : FIGHTS) {
             if (!f.isOver() && f.has(npc)) {
                 return f.other(npc);
@@ -389,38 +445,46 @@ public final class FightManager {
      */
     private static boolean tryOverride(WorldSupport world, Ref<EntityStore> other, Attitude attitude, double seconds,
                                        boolean createMemory) {
+        // Check the memory first: battle isolation calls this for every pair of managed mobs every 5 s, and
+        // a thrown NPE per call (passive roles have no memory) costs far more than a field read.
+        if (!ensureOverrideMemory(world, createMemory)) {
+            return false;
+        }
         try {
             world.overrideAttitude(other, attitude, seconds);
             return true;
         } catch (NullPointerException e) {
-            if (!createMemory || !ensureOverrideMemory(world)) {
-                return false;
-            }
-            try {
-                world.overrideAttitude(other, attitude, seconds);
-                return true;
-            } catch (NullPointerException again) {
-                return false;
-            }
+            return false;
         }
     }
 
-    private static Field overrideMemoryField;
+    private static volatile Field overrideMemoryField;
+    private static volatile boolean overrideMemoryUnreadable;
 
-    private static boolean ensureOverrideMemory(WorldSupport world) {
+    /** True if the role has an attitude override memory, creating it when {@code create} is set. */
+    private static boolean ensureOverrideMemory(WorldSupport world, boolean create) {
+        if (overrideMemoryUnreadable) {
+            return true; // Field missing in this game version: just try the call (the NPE is still caught).
+        }
         try {
-            if (overrideMemoryField == null) {
-                Field f = WorldSupport.class.getDeclaredField("attitudeOverrideMemory");
+            Field f = overrideMemoryField;
+            if (f == null) {
+                f = WorldSupport.class.getDeclaredField("attitudeOverrideMemory");
                 f.setAccessible(true);
                 overrideMemoryField = f;
             }
-            if (overrideMemoryField.get(world) == null) {
-                overrideMemoryField.set(world, new Int2ObjectOpenHashMap<AttitudeMemoryEntry>());
+            if (f.get(world) != null) {
+                return true;
             }
+            if (!create) {
+                return false;
+            }
+            f.set(world, new Int2ObjectOpenHashMap<AttitudeMemoryEntry>());
             return true;
         } catch (ReflectiveOperationException | RuntimeException e) {
-            MobBattlePlugin.log("Could not create attitude memory: " + e);
-            return false;
+            overrideMemoryUnreadable = true;
+            MobBattlePlugin.log("Could not read the attitude memory: " + e);
+            return true;
         }
     }
 }

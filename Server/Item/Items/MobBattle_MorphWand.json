@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Morph Wand",
-    "Description": "Right click a mob: copy its model. Left click a mob: give it that model (it keeps its AI and attacks). Any model: /mobbattle morph <model>."
+    "Name": "server.items.MobBattle_MorphWand.name",
+    "Description": "server.items.MobBattle_MorphWand.description"
   },
   "Categories": [
     "Items.Weapons"

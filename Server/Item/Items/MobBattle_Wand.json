@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Battle Wand",
-    "Description": "Left click a mob, then another: they fight. Right click: clear selection."
+    "Name": "server.items.MobBattle_Wand.name",
+    "Description": "server.items.MobBattle_Wand.description"
   },
   "Categories": [
     "Items.Weapons"

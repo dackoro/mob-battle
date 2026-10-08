@@ -49,7 +49,7 @@
     "Animation": {
       "0": {
         "Opacity": 0,
-        "Color": "#ffffff"
+        "Color": "#b6ff3e"
       },
       "15": {
         "Opacity": 1
@@ -75,7 +75,7 @@
         }
       },
       "Opacity": 1,
-      "Color": "#ffffff",
+      "Color": "#b6ff3e",
       "FrameIndex": {
         "Min": 0,
         "Max": 0

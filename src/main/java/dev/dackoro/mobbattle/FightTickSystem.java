@@ -11,7 +11,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,21 +18,26 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * About once a second per NPC:
  * <ul>
- *   <li>group battles: if its target died, pick the nearest living enemy; check for a winner;</li>
+ *   <li>group battles: if its target died, pick the nearest living enemy (winners: BattleLifecycleSystem);</li>
  *   <li>1v1 fights: re-lock it onto its wand opponent if its own AI switched to something else;</li>
  *   <li>Team Wand: draw the team color ring under it for the player holding the wand.</li>
  * </ul>
+ * This runs for every NPC of every world on every tick, so the common case (a wild NPC that is in no
+ * battle, fight or draft) must stay a few set lookups: no list scans, no allocations, no timer entries.
  */
 public class FightTickSystem extends EntityTickingSystem<EntityStore> {
 
     private static final long CHECK_INTERVAL_MS = 1000;
     private static final long ISOLATION_INTERVAL_MS = 5000;
-    private final Map<Ref<EntityStore>, Long> lastCheck = new ConcurrentHashMap<>();
-    private final Map<Ref<EntityStore>, Long> lastRing = new ConcurrentHashMap<>();
-    private final Map<Ref<EntityStore>, Long> lastJoin = new ConcurrentHashMap<>();
-    private final Map<Ref<EntityStore>, Long> lastIsolation = new ConcurrentHashMap<>();
-    /** Timers are keyed by entity reference, so removed mobs must be dropped or the maps keep growing. */
+    /** Timers are keyed by entity reference, so removed mobs must be dropped or the map keeps growing. */
     private static final long PRUNE_INTERVAL_MS = 10_000;
+
+    /** Last run of each periodic job for one NPC. */
+    private static final class Timers {
+        long check, ring, join, isolation;
+    }
+
+    private final Map<Ref<EntityStore>, Timers> timers = new ConcurrentHashMap<>();
     private volatile long lastPrune;
 
     @Override
@@ -44,66 +48,75 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
     @Override
     public void tick(float delta, int entityIndex, ArchetypeChunk<EntityStore> chunk,
                      Store<EntityStore> store, CommandBuffer<EntityStore> buffer) {
-        boolean drafts = !BattleManager.drafts().isEmpty();
-        if (!FightManager.hasFights() && !FightManager.hasPendingHeals() && !BattleManager.hasBattles() && !drafts
-                && !TeamFx.hasPending() && !FightManager.hasPendingStops()) {
+        boolean battles = BattleManager.hasBattles();
+        boolean drafts = BattleManager.hasDraftMembers();
+        boolean stops = FightManager.hasPendingStops();
+        boolean heals = FightManager.hasPendingHeals();
+        boolean looks = TeamFx.hasPending();
+        if (!battles && !drafts && !stops && !heals && !looks && !FightManager.hasFights()) {
             return;
         }
         Ref<EntityStore> self = chunk.getReferenceTo(entityIndex);
-        pruneTimers();
-        FightManager.applyPendingStop(self, buffer);
-        if (FightManager.hasPendingHeals()) {
-            FightManager.applyPendingHeals(self, buffer);
-        }
-        if (TeamFx.hasPending()) {
-            TeamFx.apply(self, buffer);
-        }
         long now = System.currentTimeMillis();
+        pruneTimers(now);
+        if (stops) FightManager.applyPendingStop(self, buffer);
+        if (heals) FightManager.applyPendingHeals(self, buffer);
+        if (looks) TeamFx.apply(self, buffer);
 
-        BattleManager.Battle battle = BattleManager.hasBattles() ? BattleManager.battleOf(self) : null;
-        if ((battle != null || BattleManager.isManaged(self)) && due(lastIsolation, self, now, ISOLATION_INTERVAL_MS)) {
+        // Every battle and draft member is managed: wild NPCs skip the battle lookups entirely.
+        boolean managed = BattleManager.isManaged(self);
+        BattleManager.Battle battle = managed && battles ? BattleManager.battleOf(self) : null;
+        if (managed && due(self, now, ISOLATION_INTERVAL_MS, t -> t.isolation, (t, v) -> t.isolation = v)) {
             FightManager.refreshBattleIsolation(self, battle, buffer);
         }
-        if (battle == null && BattleManager.hasBattles() && FightManager.enemyOf(self) == null
-                && due(lastJoin, self, now, CHECK_INTERVAL_MS)) {
+        if (battles && !managed && BattleManager.hasFlocks() && !FightManager.isFighter(self)
+                && due(self, now, CHECK_INTERVAL_MS, t -> t.join, (t, v) -> t.join = v)) {
             // Pets/summons spawned mid-battle (e.g. the Trork Hunter's wolf) join their owner's side.
             battle = BattleManager.joinOwnersSide(self, buffer);
         }
-        if ((drafts || (battle != null && battle.isTeams())) && due(lastRing, self, now, FightFx.TEAM_RING_REFRESH_MS)) {
+        boolean ring = battle != null ? battle.isTeams() : drafts && managed;
+        if (ring && due(self, now, FightFx.TEAM_RING_REFRESH_MS, t -> t.ring, (t, v) -> t.ring = v)) {
             drawTeamRing(self, battle, buffer);
         }
 
         if (battle != null) {
-            if (due(lastCheck, self, now, CHECK_INTERVAL_MS)) {
+            if (due(self, now, CHECK_INTERVAL_MS, t -> t.check, (t, v) -> t.check = v)) {
                 tickBattle(battle, self, buffer);
             }
             return;
         }
-
-        Ref<EntityStore> enemy = FightManager.enemyOf(self);
-        if (enemy == null || !due(lastCheck, self, now, CHECK_INTERVAL_MS)) {
+        if (!FightManager.isFighter(self) || !due(self, now, CHECK_INTERVAL_MS, t -> t.check, (t, v) -> t.check = v)) {
             return;
         }
-        relock(self, enemy, buffer);
+        Ref<EntityStore> enemy = FightManager.enemyOf(self);
+        if (enemy != null) {
+            relock(self, enemy, buffer);
+        }
     }
 
-    private void pruneTimers() {
-        long now = System.currentTimeMillis();
+    private void pruneTimers(long now) {
         if (now - lastPrune < PRUNE_INTERVAL_MS) {
             return;
         }
         lastPrune = now;
-        for (Map<Ref<EntityStore>, Long> times : List.of(lastCheck, lastRing, lastJoin, lastIsolation)) {
-            times.keySet().removeIf(ref -> !ref.isValid());
-        }
+        timers.keySet().removeIf(ref -> !ref.isValid());
     }
 
-    private static boolean due(Map<Ref<EntityStore>, Long> times, Ref<EntityStore> self, long now, long interval) {
-        Long last = times.get(self);
-        if (last != null && now - last < interval) {
+    private interface Getter {
+        long get(Timers t);
+    }
+
+    private interface Setter {
+        void set(Timers t, long value);
+    }
+
+    /** True (and restarts the timer) if this job of {@code self} last ran at least {@code interval} ago. */
+    private boolean due(Ref<EntityStore> self, long now, long interval, Getter get, Setter set) {
+        Timers t = timers.computeIfAbsent(self, k -> new Timers());
+        if (now - get.get(t) < interval) {
             return false;
         }
-        times.put(self, now);
+        set.set(t, now);
         return true;
     }
 
@@ -139,11 +152,15 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
 
     /** Team color ring under this NPC, only for the player who owns the draft/battle and holds the Team Wand. */
     private static void drawTeamRing(Ref<EntityStore> self, BattleManager.Battle battle, CommandBuffer<EntityStore> buffer) {
-        if (battle != null && battle.isTeams()) {
+        if (battle != null) {
             PlayerRef owner = battle.owner();
-            int team = battle.teamOf.getOrDefault(self.getIndex(), -1);
-            if (team >= 0 && FightFx.holdsTeamWand(owner, buffer)) {
+            int team = battle.team(self);
+            boolean holds = team >= 0 && FightFx.holdsTeamWand(owner, buffer);
+            if (holds) {
                 FightFx.teamRing(owner, self, battle.color(team), buffer);
+            }
+            if (team >= 0 && FxSettings.teamLookOnlyWand) {
+                TeamFx.setHeld(self, holds ? battle.color(team) : null);
             }
             return;
         }
@@ -153,8 +170,12 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
                 continue;
             }
             PlayerRef owner = BattleManager.draftOwner(e.getKey());
-            if (FightFx.holdsTeamWand(owner, buffer)) {
+            boolean holds = FightFx.holdsTeamWand(owner, buffer);
+            if (holds) {
                 FightFx.teamRing(owner, self, Teams.color(team), buffer);
+            }
+            if (FxSettings.teamLookOnlyWand) {
+                TeamFx.setHeld(self, holds ? Teams.color(team) : null);
             }
         }
     }

@@ -1,0 +1,85 @@
+{
+  "$Comment": "Mob Battle area edge: a column of rising glow motes, about 20 blocks tall. White, tinted by the packet color.",
+  "RenderMode": "BlendAdd",
+  "ParticleRotationInfluence": "Billboard",
+  "LinearFiltering": true,
+  "LightInfluence": 0,
+  "ParticleRotateWithSpawner": false,
+  "TrailSpawnerPositionMultiplier": 0,
+  "TrailSpawnerRotationMultiplier": 0,
+  "MaxConcurrentParticles": 140,
+  "ParticleLifeSpan": {
+    "Min": 2.6,
+    "Max": 3.0
+  },
+  "SpawnRate": {
+    "Min": 40,
+    "Max": 50
+  },
+  "EmitOffset": {
+    "X": {
+      "Max": 0.25
+    },
+    "Y": {
+      "Min": 0,
+      "Max": 0.3
+    },
+    "Z": {
+      "Max": 0.25
+    }
+  },
+  "InitialVelocity": {
+    "Speed": {
+      "Min": 6.5,
+      "Max": 8.0
+    },
+    "Pitch": {
+      "Min": 88,
+      "Max": 92
+    }
+  },
+  "Particle": {
+    "Texture": "Particles/Textures/Basic/Glow.png",
+    "FrameSize": {
+      "Width": 32,
+      "Height": 32
+    },
+    "ScaleRatioConstraint": "OneToOne",
+    "UVOption": "None",
+    "Animation": {
+      "0": {
+        "Opacity": 0,
+        "Color": "#ff6bd5"
+      },
+      "15": {
+        "Opacity": 1
+      },
+      "70": {
+        "Opacity": 0.8
+      },
+      "100": {
+        "Opacity": 0,
+        "Scale": {
+          "X": {
+            "Min": 0.1,
+            "Max": 0.15
+          }
+        }
+      }
+    },
+    "InitialAnimationFrame": {
+      "Scale": {
+        "X": {
+          "Min": 0.5,
+          "Max": 0.7
+        }
+      },
+      "Opacity": 1,
+      "Color": "#ff6bd5",
+      "FrameIndex": {
+        "Min": 0,
+        "Max": 0
+      }
+    }
+  }
+}

@@ -22,9 +22,22 @@ public final class SummonList {
     public static final String RANDOM = "random";
 
     /** Role name -> count ("3") or "random". Insertion order is kept for /mobbattle summon list. */
-    public static final Map<String, String> ENTRIES = new LinkedHashMap<>();
+    public static final Map<String, String> ENTRIES = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
     /** Role name -> team index (Team Wand colors). Used by summon and /mobbattle teams auto. */
-    public static final Map<String, Integer> TEAMS = new LinkedHashMap<>();
+    public static final Map<String, Integer> TEAMS = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
+
+    /*
+     * Both maps are edited by /mobbattle commands and read by the world thread (Summon Wand, teams auto).
+     * Single calls (get/put/remove/forEach/removeIf) are synchronized by the wrapper; anything that walks
+     * a key/entry view must work on a snapshot() copy instead.
+     */
+
+    /** Copy of the list in its order, safe to iterate while a command edits it. */
+    static Map<String, String> snapshot() {
+        synchronized (ENTRIES) {
+            return new LinkedHashMap<>(ENTRIES);
+        }
+    }
 
     /** Range used by "random" entries. */
     public static int randomMin = 1;
@@ -44,7 +57,7 @@ public final class SummonList {
         if (npc.hasRoleName(name)) {
             return name;
         }
-        for (String known : ENTRIES.keySet()) {
+        for (String known : snapshot().keySet()) {
             if (known.equalsIgnoreCase(name)) {
                 return known;
             }
@@ -115,7 +128,7 @@ public final class SummonList {
         int failed = 0;
         int attempted = 0;
         StringBuilder summary = new StringBuilder();
-        for (Map.Entry<String, String> e : ENTRIES.entrySet()) {
+        for (Map.Entry<String, String> e : snapshot().entrySet()) {
             int n = countOf(e.getValue());
             int ok = 0;
             for (int i = 0; i < n && attempted < FxSettings.maxMobs; i++) {

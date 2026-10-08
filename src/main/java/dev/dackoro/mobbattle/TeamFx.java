@@ -58,7 +58,28 @@ public final class TeamFx {
         }
     }
 
+    /** teamlook onlywand: the color currently shown because the owner holds the Team Wand (absent = hidden). */
+    private static final Map<Ref<EntityStore>, String> HELD = new ConcurrentHashMap<>();
+
+    /**
+     * /mobbattle teamlook onlywand on: show the look while the owner holds the Team Wand ({@code color}),
+     * hide it otherwise ({@code null}). Only queues a change when the state really changes.
+     */
+    public static void setHeld(Ref<EntityStore> npc, String color) {
+        String now = HELD.get(npc);
+        if (color == null ? now == null : color.equals(now)) {
+            return;
+        }
+        if (color == null) {
+            clear(npc);
+        } else {
+            show(npc, color);
+            HELD.put(npc, color);
+        }
+    }
+
     public static void clear(Ref<EntityStore> npc) {
+        HELD.remove(npc);
         SHOWN.remove(npc);
         PENDING.put(npc, new Pending(npc, null));
     }
@@ -67,20 +88,26 @@ public final class TeamFx {
         return !PENDING.isEmpty();
     }
 
+    /** Drops queued looks of removed mobs (BattleManager.maintain): a dead mob never ticks to consume them. */
+    static void prune() {
+        PENDING.keySet().removeIf(npc -> !npc.isValid());
+        SHOWN.keySet().removeIf(npc -> !npc.isValid());
+        HELD.keySet().removeIf(npc -> !npc.isValid());
+    }
+
     /** Applies the queued change for {@code self}, if any. */
     public static void apply(Ref<EntityStore> self, ComponentAccessor<EntityStore> accessor) {
-        Pending p = PENDING.get(self);
-        if (p == null || !p.npc().isValid() || p.npc().getIndex() != self.getIndex()) {
+        Pending p = PENDING.remove(self);
+        if (p == null) {
             return;
         }
-        PENDING.remove(self);
         EffectControllerComponent effects = accessor.getComponent(self, EffectControllerComponent.getComponentType());
         if (effects == null) {
             return;
         }
         var map = EntityEffect.getAssetMap();
         // Remove every team look first (switching team or mode).
-        for (String id : Teams.allEffectIds()) {
+        for (String id : Teams.ALL_EFFECT_IDS) {
             int index = map.getIndex(id);
             if (index >= 0 && effects.hasEffect(index)) {
                 effects.removeEffect(self, index, accessor);

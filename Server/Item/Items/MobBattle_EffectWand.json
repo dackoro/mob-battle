@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Effect Wand",
-    "Description": "Left click an entity: give it the selected effect. Right click: next effect. Any effect: /mobbattle effect <id>."
+    "Name": "server.items.MobBattle_EffectWand.name",
+    "Description": "server.items.MobBattle_EffectWand.description"
   },
   "Categories": [
     "Items.Weapons"

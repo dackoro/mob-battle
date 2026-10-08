@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Summon Wand",
-    "Description": "Left click a mob: add its type to the summon list (again: remove). Right click: summon the list around you. Counts and teams: /mobbattle summon."
+    "Name": "server.items.MobBattle_SummonWand.name",
+    "Description": "server.items.MobBattle_SummonWand.description"
   },
   "Categories": [
     "Items.Weapons"

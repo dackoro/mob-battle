@@ -16,7 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
 
-/** Effect Wand left click: gives the selected effect (/mobbattle effect) to the clicked entity. */
+/** Effect Wand left click: gives the selected effect (/mobbattle wandeffect) to the clicked entity. */
 public class EffectGiveInteraction extends SimpleInstantInteraction {
 
     public static final String TYPE = "MobBattle_EffectGive";
@@ -44,7 +44,7 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
         }
         EntityEffect effect = EffectWand.find(FxSettings.effect);
         if (effect == null) {
-            player.sendMessage(Message.raw("Unknown effect " + FxSettings.effect + ". Use /mobbattle effect <id>.").color("#ffcc55"));
+            player.sendMessage(Message.raw("Unknown effect " + FxSettings.effect + ". Use /mobbattle wandeffect <id>.").color("#ffcc55"));
             return;
         }
         String name = ChaosWand.nameOf(target, buffer);

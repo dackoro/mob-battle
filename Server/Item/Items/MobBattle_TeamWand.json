@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "Team Wand",
-    "Description": "Left click a mob: add it to the current team (again: remove). Right click in the air: next team. Right click a mob: start the battle. Rules and custom teams: /mobbattle teams."
+    "Name": "server.items.MobBattle_TeamWand.name",
+    "Description": "server.items.MobBattle_TeamWand.description"
   },
   "Categories": [
     "Items.Weapons"

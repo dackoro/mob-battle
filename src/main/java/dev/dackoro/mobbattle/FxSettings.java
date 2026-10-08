@@ -33,20 +33,26 @@ public final class FxSettings {
     /** An EventTitleStyle name (Default, Major, GoblinBreach, VoidEviction), or "random". */
     public static String titleStyle = "Major";
 
-    /** Chaos Wand area radius in blocks (/mobbattle radius). */
-    public static int radius = 430;
+    /** Chaos Wand area radius in blocks (/mobbattle arearadius). */
+    public static int radius = 60;
     public static final int MIN_RADIUS = 2;
     public static final int MAX_RADIUS = 430;
 
-    /** How the Chaos Wand marks its area: glow columns, laser styles, or off (/mobbattle area). */
+    /** How the Chaos Wand marks its area: glow columns, laser styles, or off (/mobbattle areastyle). */
     public static String areaStyle = "both";
-    public static final String[] AREA_STYLES = {"floor", "zone", "glow", "both", "off"};
+    public static final String[] AREA_STYLES = {"floor", "zone", "glow", "both", "all", "off"};
     /** Area color: a team palette name (Teams.PALETTE) or "random" (/mobbattle areacolor). */
     public static String areaColor = "Red";
 
+    /** Team look (tint/mist) only while the team's owner holds the Team Wand (/mobbattle teamlook onlywand). */
+    public static boolean teamLookOnlyWand = false;
+
+    /** Area only for its owner, only while holding the Chaos Wand (/mobbattle areaonlywand). Default: off. */
+    public static boolean areaOnlyWand = false;
+
     /** Battle mobs only fight their battle's opponents; outside NPCs can't hurt them (/mobbattle isolation). */
     public static boolean battleIsolation = true;
-    /** Height in blocks of the pillars (/mobbattle height). */
+    /** Height in blocks of the pillars (/mobbattle areaheight). */
     public static int pillarHeight = 30;
     public static final int MIN_HEIGHT = 3;
     public static final int MAX_HEIGHT = 128;
@@ -55,13 +61,13 @@ public final class FxSettings {
     public static int maxMobs = 40;
     public static final int MAX_MOBS_LIMIT = 200;
 
-    /** Team look: both, tint, mist or off (/mobbattle teamfx). */
+    /** Team look: both, tint, mist or off (/mobbattle teamlook). */
     public static String teamFx = "both";
-    /** Seconds the team look stays after a mob joins a team; 0 = while it is in the team (/mobbattle teamfx time). */
+    /** Seconds the team look stays after a mob joins a team; 0 = while it is in the team (/mobbattle teamlook time). */
     public static int teamFxSeconds = 0;
     public static final int TEAM_FX_MAX_SECONDS = 600;
 
-    /** Effect ID the Effect Wand gives (/mobbattle effect). */
+    /** Effect ID the Effect Wand gives (/mobbattle wandeffect). */
     public static String effect = "Burn";
 
     private static Path file;
@@ -137,6 +143,8 @@ public final class FxSettings {
             areaStyle = parseAreaStyle(p.getProperty("chaos.area", areaStyle));
             String savedArea = p.getProperty("chaos.area.color", areaColor);
             areaColor = parseAreaColor(savedArea) != null ? parseAreaColor(savedArea) : areaColor;
+            teamLookOnlyWand = Boolean.parseBoolean(p.getProperty("team.fx.onlywand", String.valueOf(teamLookOnlyWand)));
+            areaOnlyWand = Boolean.parseBoolean(p.getProperty("chaos.area.onlywand", String.valueOf(areaOnlyWand)));
             battleIsolation = Boolean.parseBoolean(p.getProperty("battle.isolation", String.valueOf(battleIsolation)));
             try {
                 pillarHeight = clampHeight(Integer.parseInt(p.getProperty("chaos.height", String.valueOf(pillarHeight))));
@@ -151,7 +159,8 @@ public final class FxSettings {
         }
     }
 
-    public static void save() {
+    /** Synchronized: a command thread and a world thread (Summon Wand) can save at the same time. */
+    public static synchronized void save() {
         if (file == null) {
             return;
         }
@@ -164,6 +173,8 @@ public final class FxSettings {
         p.setProperty("chaos.radius", String.valueOf(radius));
         p.setProperty("chaos.area", areaStyle);
         p.setProperty("chaos.area.color", areaColor);
+        p.setProperty("team.fx.onlywand", String.valueOf(teamLookOnlyWand));
+        p.setProperty("chaos.area.onlywand", String.valueOf(areaOnlyWand));
         p.setProperty("battle.isolation", String.valueOf(battleIsolation));
         p.setProperty("effect.id", effect);
         Teams.save(p);
@@ -222,13 +233,13 @@ public final class FxSettings {
         return null;
     }
 
-    /** Hex of the area color; "random" picks a palette color each time. */
-    public static String pickAreaColor() {
+    /** Palette name of the area color; "random" picks one each time. */
+    public static String pickAreaColorName() {
         if (RANDOM.equals(areaColor)) {
-            var colors = new java.util.ArrayList<>(Teams.PALETTE.values());
-            return colors.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(colors.size()));
+            String[] names = Teams.PALETTE.keySet().toArray(new String[0]);
+            return names[ThreadLocalRandom.current().nextInt(names.length)];
         }
-        return Teams.PALETTE.getOrDefault(areaColor, "#FF4B3E");
+        return Teams.PALETTE.containsKey(areaColor) ? areaColor : "Red";
     }
 
     public static int clampRadius(int value) {
@@ -240,6 +251,6 @@ public final class FxSettings {
                 + " | title " + (titleEnabled ? "on" : "off") + ", style " + titleStyle
                 + " | win title " + (winTitleEnabled ? "on" : "off")
                 + " | isolation " + (battleIsolation ? "on" : "off")
-                + " | chaos radius " + radius + ", area " + areaStyle + " " + areaColor.toLowerCase() + ", height " + pillarHeight + ", max mobs " + maxMobs + " | effect " + effect + " | team fx " + teamFx + (teamFxSeconds > 0 ? " for " + teamFxSeconds + " s" : " (infinite: whole battle)");
+                + " | chaos radius " + radius + ", area " + areaStyle + " " + areaColor.toLowerCase() + ", only with wand " + (areaOnlyWand ? "on" : "off") + ", height " + pillarHeight + ", max mobs " + maxMobs + " | effect " + effect + " | team fx " + teamFx + (teamFxSeconds > 0 ? " for " + teamFxSeconds + " s" : " (infinite: whole battle)") + (teamLookOnlyWand ? ", only with Team Wand" : "");
     }
 }

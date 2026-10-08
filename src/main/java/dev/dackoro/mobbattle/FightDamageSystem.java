@@ -28,6 +28,9 @@ import java.util.Set;
  */
 public class FightDamageSystem extends DamageEventSystem {
 
+    /** Logs every battle hit. One line per hit floods the server log in big battles, so it is off. */
+    private static final boolean LOG_HITS = false;
+
     private final Set<Dependency<EntityStore>> dependencies =
             Set.of(new SystemDependency<>(Order.AFTER, NPCDamageSystems.FilterDamageSystem.class));
 
@@ -63,7 +66,9 @@ public class FightDamageSystem extends DamageEventSystem {
     @Override
     public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                        CommandBuffer<EntityStore> buffer, Damage damage) {
-        if (!(damage.getSource() instanceof Damage.EntitySource source)) {
+        // Every NPC hit in every world passes here: nothing to do while no battle or wand fight exists.
+        if (!BattleManager.hasBattles() && !FightManager.hasFights()
+                || !(damage.getSource() instanceof Damage.EntitySource source)) {
             return;
         }
         Ref<EntityStore> victim = chunk.getReferenceTo(index);
@@ -75,9 +80,11 @@ public class FightDamageSystem extends DamageEventSystem {
         if (!FightManager.isFighting(source.getRef(), victim) && !BattleManager.areEnemies(source.getRef(), victim)) {
             return;
         }
-        // Debug: shows whether fighter hits reach the damage pipeline and if vanilla cancelled them.
-        MobBattlePlugin.log("Fight hit " + roleOf(source.getRef(), buffer) + " -> " + roleOf(victim, buffer) + " "
-                + damage.getAmount() + " (cancelled by vanilla: " + damage.isCancelled() + ")");
+        if (LOG_HITS) {
+            // Debug: shows whether fighter hits reach the damage pipeline and if vanilla cancelled them.
+            MobBattlePlugin.log("Fight hit " + roleOf(source.getRef(), buffer) + " -> " + roleOf(victim, buffer) + " "
+                    + damage.getAmount() + " (cancelled by vanilla: " + damage.isCancelled() + ")");
+        }
         if (damage.isCancelled()) {
             damage.setCancelled(false);
         }
