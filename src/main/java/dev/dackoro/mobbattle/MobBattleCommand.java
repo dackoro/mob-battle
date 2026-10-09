@@ -46,15 +46,16 @@ public class MobBattleCommand extends CommandBase {
                 "  wands - what each wand does",
                 "  titles - start and winner titles",
                 "  chaos - Chaos Wand area and mob count",
-                "  battles - fighter laser and isolation",
+                "  battles - duels, isolation, friendly fire, laser, stop, army",
                 "  teams - Team Wand, teams and team look",
                 "  summon - Summon Wand list",
-                "  morph - Morph and Effect wands",
+                "  morph - Morph, Effect and Kill wands, wand effects",
         });
         HELP.put("wands", new String[] {
                 "Wands (/mobbattle give)",
                 "Battle Wand: click a mob, then another: they fight",
                 "Army Wand: left click a mob: it joins your army (click again: leaves); right click: disband",
+                "  your army follows you, defends you and attacks what you hit (also players)",
                 "Chaos Wand: left click a mob: everyone attacks it",
                 "  right click: battle royale, last one standing wins",
                 "Team Wand: left click adds a mob to the current team",
@@ -63,6 +64,7 @@ public class MobBattleCommand extends CommandBase {
                 "  right click: summon the whole list",
                 "Morph Wand: right click copies a model, left click applies it",
                 "Heal / Kill / Effect / Cleanse: left click any entity",
+                "  Effect Wand right click: next effect; Kill Wand: soul rip, then death with loot",
         });
         HELP.put("titles", new String[] {
                 "Titles",
@@ -221,7 +223,7 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(give);
         addSubCommand(new Sub("starttitle", "title", "Fight-start title on/off", words("Fight-start title", "on", "off")));
         addSubCommand(new Sub("wintitle", "Winner title on/off", words("Winner title", "on", "off")));
-        addSubCommand(new Sub("titlescope", "Who sees fight titles: owner (default), nearby (64 blocks) or world",
+        addSubCommand(new Sub("titlescope", "Who sees fight titles: owner, nearby (default, 64 blocks) or world",
                 words("Title scope", "owner", "nearby", "world")));
         addSubCommand(new Sub("titlestyle", "style", "Title style", words("Title style", "default", "major", "voideviction", "random")));
         addSubCommand(new Sub("fightlaser", "laser", "Laser line between fighters at fight start on/off", words("Fighter laser", "on", "off")));

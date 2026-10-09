@@ -21,6 +21,11 @@ final class Army {
 
     /** Army mob -> owner's UUID. */
     private static final Map<Ref<EntityStore>, UUID> OWNER = new ConcurrentHashMap<>();
+    /**
+     * Army mobs that got a fight order and have not regrouped yet. Rule 4 only moves these: an idle mob that
+     * is just following its owner stays with the owner instead of joining every fight of the army.
+     */
+    private static final java.util.Set<Ref<EntityStore>> FOUGHT = ConcurrentHashMap.newKeySet();
 
     private Army() {
     }
@@ -68,6 +73,7 @@ final class Army {
             release(npc, playerEntity, buffer);
         }
         OWNER.values().removeIf(owner::equals);
+        FOUGHT.retainAll(OWNER.keySet());
         return mobs.size();
     }
 
@@ -82,11 +88,13 @@ final class Army {
         }
         FightManager.endFightsOf(new ArrayList<>(OWNER.keySet()));
         OWNER.clear();
+        FOUGHT.clear();
         return n;
     }
 
     private static void release(Ref<EntityStore> npc, Ref<EntityStore> playerEntity, ComponentAccessor<EntityStore> buffer) {
         OWNER.remove(npc);
+        FOUGHT.remove(npc);
         FightManager.endFightsOf(List.of(npc));
         // Back to its own AI; the owner stays ignored for a while instead of being attacked at once.
         FightManager.queueStop(npc, playerEntity != null ? List.of(playerEntity) : List.of());
@@ -110,12 +118,18 @@ final class Army {
             return;
         }
         List<Ref<EntityStore>> free = new ArrayList<>(), busy = new ArrayList<>();
+        boolean someoneOnIt = false;
         for (Ref<EntityStore> npc : members(owner)) {
             if (npc.getStore() != enemy.getStore() || !BattleManager.isAlive(npc, buffer)) continue;
-            if (FightManager.enemyOf(npc) == enemy) continue; // already on it
+            if (FightManager.enemyOf(npc) == enemy) {
+                someoneOnIt = true; // already on it
+                continue;
+            }
             (isFree(npc, buffer) ? free : busy).add(npc);
         }
-        if (free.isEmpty() && !busy.isEmpty()) {
+        // Only when nobody is on it yet: otherwise every further hit on the same enemy would pull another
+        // half of the busy mobs off their fights, until the whole army had switched.
+        if (free.isEmpty() && !busy.isEmpty() && !someoneOnIt) {
             // Nobody free: the nearest half switches, the rest finish their fight.
             org.joml.Vector3d at = ChaosWand.positionOf(enemy, buffer);
             if (at != null) busy.sort(java.util.Comparator.comparingDouble(n -> ChaosWand.distSq(at, n, buffer)));
@@ -140,9 +154,14 @@ final class Army {
         }
         org.joml.Vector3d at = ChaosWand.positionOf(mob, buffer);
         if (at == null) return;
+        List<Ref<EntityStore>> mates = members(owner);
+        for (Ref<EntityStore> npc : mates) {
+            // One helper: if a mate already fights this attacker, further hits don't pull in more of them.
+            if (npc != mob && FightManager.enemyOf(npc) == attacker) return;
+        }
         Ref<EntityStore> helper = null;
         double best = Double.MAX_VALUE;
-        for (Ref<EntityStore> npc : members(owner)) {
+        for (Ref<EntityStore> npc : mates) {
             if (npc == mob || npc.getStore() != mob.getStore() || !BattleManager.isAlive(npc, buffer)
                     || !isFree(npc, buffer)) continue;
             double d = ChaosWand.distSq(at, npc, buffer);
@@ -165,6 +184,7 @@ final class Army {
         // Group fight: the enemy keeps its other fights, so several army mobs can be on it.
         FightManager.startFight(npc, enemy, buffer, true);
         FightManager.turnAgainst(npc, enemy, buffer, false);
+        FOUGHT.add(npc);
         if (owner != null && owner.isValid() && owner.getStore() == npc.getStore()) {
             FightManager.befriend(npc, owner, buffer);
         }
@@ -178,13 +198,18 @@ final class Army {
             if (!BattleManager.isAlive(npc, buffer)) continue;
             if (isFree(npc, buffer)) {
                 if (FightManager.enemyOf(npc) != null) FightManager.endFightsOf(List.of(npc));
-                free.add(npc);
+                if (FOUGHT.contains(npc)) free.add(npc); // its target died; idle followers stay put
             } else {
                 Ref<EntityStore> e = FightManager.enemyOf(npc);
                 if (!enemies.contains(e)) enemies.add(e);
             }
         }
-        if (enemies.isEmpty() || free.isEmpty()) return;
+        if (free.isEmpty()) return;
+        if (enemies.isEmpty()) {
+            // Nothing left to fight: they follow the owner again.
+            free.forEach(FOUGHT::remove);
+            return;
+        }
         Ref<EntityStore> me = entityOf(owner);
         for (Ref<EntityStore> npc : free) {
             org.joml.Vector3d at = ChaosWand.positionOf(npc, buffer);
@@ -262,5 +287,6 @@ final class Army {
     /** Drops dead or unloaded mobs (BattleManager.maintain). */
     static void prune() {
         OWNER.keySet().removeIf(npc -> !npc.isValid());
+        FOUGHT.retainAll(OWNER.keySet());
     }
 }

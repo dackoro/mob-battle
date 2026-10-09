@@ -21,3 +21,7 @@ out/
 .settings/
 claude.md
 agends.md
+# Local art work (Blockbench projects, reference models)
+art-source/
+# Local deploy paths (see deploy.local.example.json)
+deploy.local.json

@@ -1,3 +1,9 @@
+# Mirrors this repo's Common/ into the dev asset pack (deploy.ps1 -Dev starts it; you don't run it by hand).
+# The server's asset loader does not follow a junction for Common/, so files are copied instead.
+# Every 0.75 s it copies new or changed files (skipping .bbmodel Blockbench projects) and deletes
+# files it copied before that are gone from the repo. It stops when <Pack>\.asset-sync-token no longer
+# holds -Token (a new -Dev run or a plain deploy.ps1 replaces or removes it). -Once copies a single time.
+#   -Source  this repo's Common folder      -Pack  the dev pack folder (Mods\MobBattle.AssetsDev)
 param(
     [Parameter(Mandatory=$true)][string]$Source,
     [Parameter(Mandatory=$true)][string]$Pack,

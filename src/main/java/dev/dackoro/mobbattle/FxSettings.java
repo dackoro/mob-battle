@@ -32,8 +32,8 @@ public final class FxSettings {
     public static boolean winTitleEnabled = true;
     /** An EventTitleStyle name (Default, Major, GoblinBreach, VoidEviction), or "random". */
     public static String titleStyle = "Major";
-    /** Who sees the big titles (countdown, start, winner): owner (default), nearby (same world, 64 blocks) or world. */
-    public static String titleScope = "owner";
+    /** Who sees the big titles (countdown, start, winner): owner, nearby (default: same world, 64 blocks) or world. */
+    public static String titleScope = "nearby";
     public static final String[] TITLE_SCOPES = {"owner", "nearby", "world"};
     public static final double TITLE_NEARBY_BLOCKS = 64;
 
@@ -196,7 +196,7 @@ public final class FxSettings {
             winTitleEnabled = Boolean.parseBoolean(p.getProperty("wintitle.enabled", String.valueOf(winTitleEnabled)));
             titleStyle = p.getProperty("title.style", titleStyle);
             String scope = p.getProperty("title.scope", titleScope).toLowerCase();
-            titleScope = java.util.Arrays.asList(TITLE_SCOPES).contains(scope) ? scope : "owner";
+            titleScope = java.util.Arrays.asList(TITLE_SCOPES).contains(scope) ? scope : "nearby";
             accumulateDuels = "accumulate".equalsIgnoreCase(p.getProperty("duel.mode", "exclusive"));
             if (!RANDOM.equalsIgnoreCase(titleStyle) && parseStyle(titleStyle) == null) {
                 titleStyle = "Major";

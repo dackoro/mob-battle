@@ -25,10 +25,10 @@ Each wand's tooltip explains what it does (English and Spanish). Get all ten at 
 | Item ID | Name | Left click | Right click |
 |---|---|---|---|
 | `MobBattle_HealWand` | Heal Wand | Restore the entity to 100% health. | — |
-| `MobBattle_KillWand` | Kill Wand | Kill the entity instantly (any amount of health). | — |
+| `MobBattle_KillWand` | Kill Wand | Kill the entity (any amount of health). Mobs disintegrate first for `killDelay` and drop their loot (`killLoot`); players and other entities die at once. | — |
 | `MobBattle_EffectWand` | Effect Wand | Give the entity the selected effect (default `Burn`). | Next effect: Burn, Poison_T2, Freeze, Slow, Stun, Root, Vulnerable, Ability_Enrage_Buff, Potion_Health_Regen, Immune. |
 | `MobBattle_CleanseWand` | Cleanse Wand | Remove every effect from the entity and undo a morph. | — |
-| `MobBattle_ArmyWand` | Army Wand | Add the mob to your army (click it again to remove it). | Disband your army. |
+| `MobBattle_ArmyWand` | Army Wand | Add the mob to your army (click it again to remove it). Your army follows you, defends you and attacks what you hit. | Disband your army. |
 
 ### Notes
 - A passive mob (no attack) only runs away. The aggressive one still attacks.
@@ -53,7 +53,7 @@ Each wand's tooltip explains what it does (English and Spanish). Get all ten at 
 - **Chaos Wand area:** for 6 s, in the area color (`/mobbattle areaColor`): columns of light about 20 blocks tall along the edge plus a translucent floor like a boss attack zone (`both`, default), with a see-through wall too (`all`), or one of them (`/mobbattle areaStyle`, `/mobbattle areaHeight`).
 - **Team look:** tint and/or a mist in the team color (`/mobbattle teamLook`).
 - **Clicking the same mob again** replays its wand effect (it is restarted, not just extended).
-- **Army Wand orders**, most urgent first: (1) an army mob that gets hit fights back, and the nearest free mate helps; (2) whoever hits you is attacked by every free army mob; (3) whoever you hit is attacked by every free army mob; if nobody is free in (2) or (3), the nearest half switches and the rest finish their fight; (4) a mob whose target died joins the nearest enemy the army still fights, or follows you again. "Free" = not fighting, or its target is dead. Army mobs never ignore an old target that keeps hitting them. **PvP:** rules 1-3 also count players: a player who hits you or your army mobs is attacked by your army, and a player you hit is attacked by it too. Hits that the world's PvP rules already cancelled don't count. Several players each have their own army; army mobs of different owners can fight each other.
+- **Army Wand orders**, most urgent first: (1) an army mob that gets hit fights back, and the nearest free mate helps (one helper: further hits from the same attacker don't pull in more); (2) whoever hits you is attacked by every free army mob; (3) whoever you hit is attacked by every free army mob; if nobody is free in (2) or (3) and no army mob is on that enemy yet, the nearest half switches and the rest finish their fight (hitting the same enemy again does not pull more); (4) a mob whose target died joins the nearest enemy the army still fights, or follows you again when there is none. Mobs that were just following you stay with you. "Free" = not fighting, or its target is dead. Army mobs never ignore an old target that keeps hitting them. **PvP:** rules 1-3 also count players: a player who hits you or your army mobs is attacked by your army, and a player you hit is attacked by it too. Hits that the world's PvP rules cancel don't count (the army check runs after the game's PvP filter). Several players each have their own army; army mobs of different owners can fight each other.
 - **Army Wand:** your army mobs never attack you and can't be hurt by you or by each other. Joining an army takes the mob out of any battle, fight or team. Leaving or disbanding gives each mob its own AI back, and it ignores you for a while instead of attacking at once. Your army follows you: each mob's home (leash point) moves to you every second, so mobs whose role returns home walk after you, and any army mob more than 20 blocks away that isn't fighting is teleported next to you with a summon burst. Armies are kept in memory only: gone after a server restart. Joining flashes the mob green with a green burst ring, leaving flashes it red with a red ring.
 - **Tint colors** are saturated on purpose: a light (pastel) tint color makes the mob look washed out or white.
 - **One wand tint at a time:** a new wand effect removes the previous wand tint on that mob (two tints mixed into a pale white). Effects without a tint (Unmorph, Effect Wand) stack on top. The Kill Wand soul rip and team colors are never removed.
@@ -68,7 +68,7 @@ Each wand's tooltip explains what it does (English and Spanish). Get all ten at 
   - Effect Wand: the same burst in purple when the effect lands.
   - Morph Wand: copying (right click) and transforming both flash the mob like the Cleanse Wand, in blue (blue tint + the burst ring in blue). The transform burst also plays in the world at the mob, since the model swap can drop particles attached to the old model. Applying the model the mob already has does nothing: an error flash (grey-red tint, fizzle, error sound) and a chat message.
 - **Battle end:** `X WINS!`, `RED TEAM WINS!`, `Duel won`, `DRAW!`, or for the Chaos Wand left click (everyone vs one mob) `X WINS!` (it survived) / `X IS DEFEATED!`.
-- **Independent battles:** two team battles can use the same names and colors without sharing targets, damage, members or winners. Each battle keeps the team names and colors it started with. Allies never damage each other. With `/mobbattle isolation on` (default) NPCs from outside the battle cannot damage its participants either. At the end, the mod clears its forced target/hostility and returns compatible NPCs to Idle.
+- **Independent battles:** two team battles can use the same names and colors without sharing targets, damage, members or winners. Each battle keeps the team names and colors it started with. Allies never damage each other. With `/mobbattle battleIsolation` on (default for every kind) NPCs from outside the battle cannot damage its participants either. At the end, the mod clears its forced target/hostility and returns compatible NPCs to Idle.
 - **Victory timing:** no minimum fight duration. Winners and the 15-minute safety timeout are checked once per second per world, even without NPC combat ticks. A single surviving side wins; several surviving sides at the deadline produce DRAW. The winner title may wait for an already visible title to finish.
 
 ## Command: `/mobbattle`
@@ -85,7 +85,7 @@ Commands are written in camelCase in help (`areaRadius`, `teamLook onlyWand`) to
 ### Titles
 | Command | What it does |
 |---|---|
-| `/mobbattle titlescope owner\|nearby\|world` | Who sees the big fight titles (countdown, start, winner): `owner` (default) only the player who started the fight, `nearby` every player in the same world within 64 blocks, `world` every player in that world. Each player has their own title queue, so fights of different players never cancel each other's titles: start titles are merged, winner titles all play. A countdown number shows at once and replaces whatever title that player had on screen. |
+| `/mobbattle titleScope owner\|nearby\|world` | Who sees the big fight titles (countdown, start, winner): `owner` only the player who started the fight, `nearby` (default) every player in the same world within 64 blocks, `world` every player in that world. Each player has their own title queue, so fights of different players never cancel each other's titles: start titles are merged, winner titles all play. A countdown number shows at once and replaces whatever title that player had on screen. |
 | `/mobbattle countdown <seconds>` | Countdown before any fight starts (duel, everyone vs one, battle royale, teams): a `3`, `2`, `1` title, one per second, then the fight and its start title. 0-10; `0` (default) starts at once. The chat also counts `[DUEL: A vs B] 3`, `2`, `1`. Several countdowns can run at once, like fights without one; a new order cancels only the countdowns that share a mob with it, and the big titles follow your newest countdown. If mobs die during the countdown the fight starts without them, or is cancelled. |
 | `/mobbattle startTitle on` / `off` | Fight-start title on/off. |
 | `/mobbattle winTitle on` / `off` | Winner title (`X WINS!`, `DRAW!`) on/off. The chat message always shows. |
@@ -112,6 +112,8 @@ The `floor` / `zone` disc is flat and sits on the ground under the center (even 
 | Command | What it does |
 |---|---|
 | `/mobbattle battleIsolation <duel\|allVsOne\|royale\|teams\|all> on\|off` | Per battle kind. `on` (default for all): the battle's mobs only hurt their opponents, mobs outside it (wild mobs, other battles) can't hurt them, and their hits on players are cancelled. `off`: outside mobs can join in and battle mobs can hurt players and other mobs. Players can always hit battle mobs. Kinds: `duel` (Battle Wand), `allVsOne` (Chaos Wand left click, everyone vs one), `royale` (Chaos Wand right click), `teams` (Team Wand). `all` sets every kind; a bare `on`/`off` means `all`. |
+| `/mobbattle duelMode exclusive\|accumulate` | Battle Wand: `exclusive` (default) replaces a mob's duel, `accumulate` merges connected duels (see Notes). |
+| `/mobbattle debug` | Combat snapshots of the 4 nearest NPCs and a 10 s hit log (see Notes). Changes nothing. |
 | `/mobbattle friendlyFire <allVsOne\|teams\|all> on\|off` | Hits between allies of the same battle. `allVsOne`: the attackers ganging up on one mob (default `on`: stray hits and area attacks hurt each other). `teams`: teammates (default `off`: their hits on each other are cancelled). Either way allies never pick each other as targets. Duels and royales have no allies. If the game itself cancels a hit (for example between mobs of the same pack), it stays cancelled. |
 
 ### Teams
@@ -165,7 +167,7 @@ All team colors use prebuilt effects, with no runtime asset loading. Older saved
 | `/mobbattle army clearAll` | Disband every player's army. |
 | `/mobbattle resetAll` | `stop` + `teams clearAll` + `army clearAll` + `morph reset` in one command. |
 
-Defaults: countdown 0, fightLaser off, fightLaserColor `#FF4B3E`, startTitle on, winTitle on, titleStyle `Major`, areaRadius 60, areaStyle both, areaColor red, areaOnlyWand off, battleIsolation on (all kinds), friendlyFire on for allVsOne / off for teams, areaHeight 30, maxMobs 200, summonRadius auto, wandEffect `Burn`, wandFx on, killDelay 0.5, killLoot on, teamLook tint, teamLook time infinite, teamLook onlyWand off.
+Defaults: countdown 0, titleScope owner, duelMode exclusive, fightLaser off, fightLaserColor `#FF4B3E`, startTitle on, winTitle on, titleStyle `Major`, areaRadius 60, areaStyle both, areaColor red, areaOnlyWand off, battleIsolation on (all kinds), friendlyFire on for allVsOne / off for teams, areaHeight 30, maxMobs 200, summonRadius auto, wandEffect `Burn`, wandFx on, killDelay 0.5, killLoot on, teamLook tint, teamLook time infinite, teamLook onlyWand off.
 
 ## Install
 
@@ -187,7 +189,26 @@ Requirements: JDK 25 and a Hytale install (the plugin compiles against the game'
 
 Without `-PhytaleServerJar` the build uses `com.hypixel.hytale:Server` from `https://maven.hytale.com/release` (release patchline). The jar ends up in `build/libs/` and bundles `manifest.json`, `README.md`, `Common/` and `Server/`, so assets and plugin ship as one file.
 
-`deploy.ps1` (Windows) builds, waits until the game releases the jar (exit to the main menu) and copies it into the pre-release Mods folder.
+`deploy.ps1` (Windows PowerShell) builds, waits until the game releases the jar (exit to the main menu) and copies it into your Mods folder as `MobBattle.jar`. Never overwrite the jar while a world uses it: the script waits, or with `-NoWait` only builds.
+
+### Where it builds against and installs
+
+By default it uses the **pre-release** patchline at the Hytale launcher's default folders. Change that in any of these ways (first match wins):
+
+| Way | Example |
+|---|---|
+| Parameters | `.\deploy.ps1 -Patchline release` or `.\deploy.ps1 -ServerJar D:\Hytale\Server\HytaleServer.jar -ModsDir D:\Hytale\Mods` |
+| `deploy.local.json` (git-ignored, per developer) | Copy `deploy.local.example.json` to `deploy.local.json` and set `patchline`, `serverJar` and/or `modsDir`. |
+| Default (`-Patchline`) | `pre-release`: `%APPDATA%\Hytale\install\pre-release\...\HytaleServer.jar` and `%APPDATA%\Hytale\data\pre-release\Mods`. `release`: `%APPDATA%\Hytale\install\release\...\HytaleServer.jar` and `%APPDATA%\Hytale\UserData\Mods`. |
+
+- If the server jar doesn't exist, Gradle compiles against the release artifact from Maven.
+- `manifest.json` `ServerVersion` must match the server you run (`>=0.7.0-pre <0.8.0` targets the 0.7 pre-release). For release, change it to the release version, or the game refuses the mod.
+- The script prints the patchline and Mods folder it uses before building.
+
+### Repository layout notes
+
+- `art-source/` is git-ignored: local Blockbench projects and reference models (e.g. attachments). Only what is in `Common/` ships.
+- `scripts/sync-common-assets.ps1` is the helper `deploy.ps1 -Dev` starts in the background; you never run it yourself (see its header).
 
 ### Asset hot reload (models, textures, effects)
 

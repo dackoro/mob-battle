@@ -24,6 +24,25 @@ public class ArmyPlayerDamageSystem extends DamageEventSystem {
         return DamageModule.get().getFilterDamageGroup();
     }
 
+    /**
+     * After the vanilla player filters, so damage.isCancelled() already includes the world's PvP rule
+     * (PlayerDamageFilterSystem cancels PvP when WorldConfig.isPvpEnabled() is false). Without this the order
+     * inside the filter group is undefined and a hit the PvP rule cancels could still trigger the army.
+     */
+    private static final java.util.Set<com.hypixel.hytale.component.dependency.Dependency<EntityStore>> DEPENDENCIES =
+            java.util.Set.of(
+                    new com.hypixel.hytale.component.dependency.SystemDependency<>(
+                            com.hypixel.hytale.component.dependency.Order.AFTER,
+                            com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems.PlayerDamageFilterSystem.class),
+                    new com.hypixel.hytale.component.dependency.SystemDependency<>(
+                            com.hypixel.hytale.component.dependency.Order.AFTER,
+                            com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems.FilterPlayerWorldConfig.class));
+
+    @Override
+    public java.util.Set<com.hypixel.hytale.component.dependency.Dependency<EntityStore>> getDependencies() {
+        return DEPENDENCIES;
+    }
+
     @Override
     public Query<EntityStore> getQuery() {
         return PlayerRef.getComponentType();

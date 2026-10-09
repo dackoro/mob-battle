@@ -1,4 +1,4 @@
-# Builds Mob Battle against the pre-release server and installs the jar.
+# Builds Mob Battle and installs the jar into a Hytale Mods folder (Windows, PowerShell).
 #
 #   .\deploy.ps1          full jar (code + assets), then wait until Hytale releases it and install.
 #                         Also removes the dev asset pack if it is installed.
@@ -9,20 +9,40 @@
 #   .\deploy.ps1 -NoWait  build and install only if the jar is free (no world open)
 #   .\deploy.ps1 -Force   install even with Hytale open: ONLY after "/plugin unload Dackoro:Mob Battle"
 #                         in game (experimental hot reload; then "/plugin load Dackoro:Mob Battle")
+#
+# Where to build against and install (first match wins):
+#   1. -ServerJar <path> / -ModsDir <path> parameters
+#   2. deploy.local.json next to this script (git-ignored; copy deploy.local.example.json)
+#   3. -Patchline release|pre-release (default pre-release): the Hytale launcher's default folders
+#      release:     %APPDATA%\Hytale\install\release\...\HytaleServer.jar     + %APPDATA%\Hytale\UserData\Mods
+#      pre-release: %APPDATA%\Hytale\install\pre-release\...\HytaleServer.jar + %APPDATA%\Hytale\data\pre-release\Mods
+#   If the server jar does not exist, Gradle compiles against the release artifact from Maven instead.
 param(
     [switch]$Dev,
     [switch]$NoWait,
-    [switch]$Force
+    [switch]$Force,
+    [ValidateSet('release', 'pre-release')][string]$Patchline,
+    [string]$ServerJar,
+    [string]$ModsDir
 )
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
-$serverJar = "$env:APPDATA\Hytale\install\pre-release\package\game\latest\Server\HytaleServer.jar"
-$mods      = "$env:APPDATA\Hytale\data\pre-release\Mods"
+$local = Join-Path $PSScriptRoot 'deploy.local.json'
+$cfg = if (Test-Path $local) { Get-Content $local -Raw | ConvertFrom-Json } else { $null }
+if (-not $Patchline) { $Patchline = if ($cfg -and $cfg.patchline) { $cfg.patchline } else { 'pre-release' } }
+$defaultJar  = "$env:APPDATA\Hytale\install\$Patchline\package\game\latest\Server\HytaleServer.jar"
+$defaultMods = if ($Patchline -eq 'release') { "$env:APPDATA\Hytale\UserData\Mods" } else { "$env:APPDATA\Hytale\data\pre-release\Mods" }
+$serverJar = if ($ServerJar) { $ServerJar } elseif ($cfg -and $cfg.serverJar) { $cfg.serverJar } else { $defaultJar }
+$mods      = if ($ModsDir) { $ModsDir } elseif ($cfg -and $cfg.modsDir) { $cfg.modsDir } else { $defaultMods }
+if (-not (Test-Path $mods)) { Write-Host "Mods folder not found: $mods (use -ModsDir or deploy.local.json)" -ForegroundColor Red; exit 1 }
 $target    = "$mods\MobBattle.jar"
 $devPack   = "$mods\MobBattle.AssetsDev"
 
-$gradleArgs = @('build', '--console=plain', '-q', "-PhytaleServerJar=$serverJar")
+$gradleArgs = @('build', '--console=plain', '-q')
+if (Test-Path $serverJar) { $gradleArgs += "-PhytaleServerJar=$serverJar" }
+else { Write-Host "Server jar not found ($serverJar): compiling against the release artifact from Maven." -ForegroundColor Yellow }
+Write-Host "Patchline $Patchline -> $mods" -ForegroundColor DarkGray
 if ($Dev) { $gradleArgs += '-PcodeOnly' }
 Write-Host ($(if ($Dev) { "Building (code only, assets from the dev pack)..." } else { "Building (code + assets)..." })) -ForegroundColor Cyan
 & .\gradlew.bat @gradleArgs
