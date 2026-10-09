@@ -46,11 +46,23 @@ final class WandFx {
     /** Floating marker over the lone target (no tint: not in ALL_FX, so new wand tints keep it). */
     static final String LONE_MARK = "LoneMark";
     /** Every wand effect except SOUL_RIP, removed before a new one is put on (their tints would mix). */
-    private static final String[] ALL_FX = {HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, CLEANSE, EFFECT,
-            COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, ARMY_ADD, ARMY_REMOVE};
+    /** Swirl (remolino) in a palette color, no tint: MobBattle_Fx_Swirl_<Color> (Team Wand pick). */
+    static final String SWIRL = "Swirl_";
+    /** Battle mark in a palette color (/mobbattle mobFx): MobBattle_Fx_Mark_<Color>. */
+    static final String MARK = "Mark_";
+    private static final String[] ALL_FX = java.util.stream.Stream.concat(
+            java.util.stream.Stream.of(HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, CLEANSE, EFFECT,
+                    COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, ARMY_ADD, ARMY_REMOVE),
+            Teams.PALETTE.keySet().stream().map(c -> MARK + c)).toArray(String[]::new);
 
     static final String SUMMON_PARTICLE = "Praetorian_Summon_Spawn";
-    static final String SUMMON_SOUND = "SFX_Eye_Void_Attack_Summon";
+    /** Summon Wand right click, played at the player when the mobs appear. Vanilla magic sound until we have our own. */
+    static final String SUMMON_SOUND = "SFX_Divine_Respawn";
+    /**
+     * Chaos Wand (battle royale and everyone vs one): the ritual circle opening at the area center when the
+     * countdown starts. Vanilla portal sound until we have our own.
+     */
+    static final String CHAOS_SOUND = "SFX_Portal_Neutral_Open";
 
     /** Effects that have no tint: they only restart themselves instead of clearing the other wand tints. */
     private static final java.util.Set<String> TINTLESS = java.util.Set.of(UNMORPH, EFFECT, LONE_MARK);
@@ -71,6 +83,11 @@ final class WandFx {
         if (!FxSettings.wandFx || target == null || !target.isValid()) {
             return;
         }
+        // A mob already disintegrating (Kill Wand soul rip, Snap ash) keeps that look: any newer tint (e.g. the
+        // duel's Charm, a battle mark) would show over the black/ash and hide it until it is removed.
+        if (!SOUL_RIP.equals(fx) && !SNAP_DUST.equals(fx) && (isDying(target) || PLAYER_KILLS.containsKey(target))) {
+            return;
+        }
         EffectControllerComponent effects = buffer.getComponent(target, EffectControllerComponent.getComponentType());
         String id = "MobBattle_Fx_" + fx;
         EntityEffect effect = EntityEffect.getAssetMap().getAsset(id);
@@ -80,7 +97,7 @@ final class WandFx {
             // Two tints at once mix (e.g. green + red = a washed-out white): remove every other wand tint
             // first, so only the newest one shows (tintless ones, e.g. Unmorph on top of Cleanse, only restart
             // themselves). The soul rip (pending kill) is never replaced.
-            boolean tinted = !TINTLESS.contains(fx);
+            boolean tinted = !TINTLESS.contains(fx) && !fx.startsWith(SWIRL);
             for (String other : ALL_FX) {
                 if (!tinted && !other.equals(fx)) continue;
                 int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + other);
@@ -98,6 +115,41 @@ final class WandFx {
                 effects.addEffect(target, effect, buffer);
             }
         }
+    }
+
+    /** The swirl in the palette color {@code hex} (#RRGGBB of Teams.PALETTE); nothing for other colors. */
+    static void swirl(Ref<EntityStore> target, String hex, ComponentAccessor<EntityStore> buffer) {
+        for (var e : Teams.PALETTE.entrySet()) {
+            if (e.getValue().equalsIgnoreCase(hex)) {
+                onTarget(target, SWIRL + e.getKey(), buffer);
+                return;
+            }
+        }
+    }
+
+    /** Removes wand effect {@code fx} from those entities that have it, on their world thread. */
+    static void removeLater(java.util.List<Ref<EntityStore>> entities, String fx) {
+        int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + fx);
+        if (index < 0) return;
+        // One task per world, not one per entity (an everyone vs one can hold 200 mobs).
+        Map<com.hypixel.hytale.component.Store<EntityStore>, java.util.List<Ref<EntityStore>>> byStore = new java.util.HashMap<>();
+        for (Ref<EntityStore> ref : entities) {
+            if (ref == null || !ref.isValid() || ref.getStore().isShutdown()) continue;
+            byStore.computeIfAbsent(ref.getStore(), k -> new java.util.ArrayList<>()).add(ref);
+        }
+        byStore.forEach((store, refs) -> store.getExternalData().getWorld().execute(() -> {
+            if (store.isShutdown()) return;
+            for (Ref<EntityStore> ref : refs) {
+                if (!ref.isValid()) continue;
+                // Picked again meanwhile (the lone target of a new everyone vs one): it keeps its new crown.
+                if (LONE_MARK.equals(fx)) {
+                    BattleManager.Battle now = BattleManager.battleOf(ref);
+                    if (now != null && now.kind == BattleManager.Kind.ALL_VS_ONE && now.team(ref) == 1) continue;
+                }
+                EffectControllerComponent effects = store.getComponent(ref, EffectControllerComponent.getComponentType());
+                if (effects != null && effects.hasEffect(index)) effects.removeEffect(ref, index, store);
+            }
+        }));
     }
 
     /** A one-shot particle system and sound at {@code pos} (either may be null). */
@@ -121,6 +173,12 @@ final class WandFx {
     /** The Kill Wand's sound when its effect lands, at the player (Common/Sounds/MobBattle/Hakai.ogg, random pitch). */
     static final String HAKAI_SOUND = "SFX_MobBattle_Hakai";
 
+    /** Snap: played at the player when the snap is activated (Common/Sounds/MobBattle/Snap.ogg, random pitch). */
+    static final String SNAP_SOUND = "SFX_MobBattle_Snap";
+
+    /** Snap: played at each mob or player that fades to dust (Common/Sounds/MobBattle/SnapFade.ogg, random pitch). */
+    static final String SNAP_FADE_SOUND = "SFX_MobBattle_SnapFade";
+
     /** Kills {@code target} now, or after /mobbattle killdelay with the soul rip effect (NPCs only). */
     /** Snap Wand: an NPC turns to ash over {@link #SNAP_DUST_MS}, then is removed (loot per killLoot). */
     static void snapKill(Ref<EntityStore> target, CommandBuffer<EntityStore> buffer) {
@@ -142,11 +200,30 @@ final class WandFx {
             MobBattlePlugin.debug("snap dust on " + ChaosWand.nameOf(target, buffer) + ": effect controller "
                     + (fx != null ? "yes, active [" + active.toString().trim() + "]" : "NO"));
         }
+        burst(null, SNAP_FADE_SOUND, ChaosWand.positionOf(target, buffer), buffer);
         deathSound(target, buffer);
         KILLS.put(target, System.currentTimeMillis() + SNAP_DUST_MS);
+        ashDrift(target, buffer);
     }
 
-    static void kill(Ref<EntityStore> target, Ref<EntityStore> killer, boolean npc, CommandBuffer<EntityStore> buffer) {
+    /** Snap: the ash cloud left behind, carried off by the wind (Server/Particles/MobBattle/MobBattle_Ash_Drift). */
+    static final String ASH_DRIFT = "MobBattle_Ash_Drift";
+    /** It starts this long before the mob is gone, so the cloud is already rising while the last of the body crumbles
+     * (the particles take a moment to build up: at 500 ms it only showed once the mob was gone). */
+    private static final long ASH_LEAD_MS = 900;
+
+    /** Spawns the ash cloud at {@code target}'s position (re-read then) shortly before it is removed. */
+    static void ashDrift(Ref<EntityStore> target, ComponentAccessor<EntityStore> buffer) {
+        if (!FxSettings.wandFx) return;
+        var store = target.getStore();
+        var world = buffer.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown() || !target.isValid()) return;
+            burst(ASH_DRIFT, null, ChaosWand.positionOf(target, store), store);
+        }), Math.max(0, SNAP_DUST_MS - ASH_LEAD_MS), java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    static void kill(Ref<EntityStore> target, Ref<EntityStore> killer, boolean npc, ComponentAccessor<EntityStore> buffer) {
         // The wand's own sound, from the player, when its effect lands (the mob keeps its own death sound).
         if (killer != null && killer.isValid()) {
             burst(null, HAKAI_SOUND, ChaosWand.positionOf(killer, buffer), buffer);

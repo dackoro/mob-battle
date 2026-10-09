@@ -66,9 +66,12 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
                 return;
             }
             BattleManager.markPlayer(me, player.getUuid());
-            WandFx.onTarget(mob, WandFx.CHARM, buffer);
-            Countdown.run(player, buffer, "DUEL: " + nameOf(mob, buffer) + " vs you", java.util.List.of(mob, me),
+            String duelFx = ActionFx.mobFx(ActionFx.Role.DUEL);
+            if (duelFx != null) WandFx.onTarget(mob, duelFx, buffer);
+            Countdown.run(BattleManager.Kind.DUEL, player, buffer, "DUEL: " + nameOf(mob, buffer) + " vs you", java.util.List.of(mob, me),
                     acc -> duel(player, me, mob, me, acc));
+            // Clicking the air (the selected mob vs you): the Snap Wand's ground slam, only as a look.
+            if (target != mob) slam(me, buffer);
             return;
         }
         // Another player (/mobbattle playerFights duel): picked like a mob.
@@ -79,8 +82,8 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             return;
         }
         if (!targetIsPlayer && !isLivingNpc(target, buffer)) {
+            // Clicking the air: not Failed, so the wand still plays its swing.
             player.sendMessage(Message.raw("Look at a living mob and click it.").color(COLOR_WARN));
-            context.getState().state = InteractionState.Failed;
             return;
         }
 
@@ -97,8 +100,12 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             player.sendMessage(Message.raw("Selected: " + targetName + ". Now click its opponent.").color(COLOR_INFO));
             return;
         }
-        if (first.getIndex() == target.getIndex()) {
-            player.sendMessage(Message.raw(targetName + " is already selected. Click another mob.").color(COLOR_WARN));
+        if (first == target) {
+            // Clicking the selected mob again deselects it.
+            FightManager.clear(player.getUuid());
+            // The grey tint and burst ring, as the right click's clear.
+            WandFx.onTarget(target, WandFx.UNSELECT, buffer);
+            player.sendMessage(Message.raw("Deselected: " + targetName + ".").color(COLOR_INFO));
             return;
         }
 
@@ -118,10 +125,38 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         }
         if (PlayerFighters.isPlayer(picked, buffer)) BattleManager.markPlayer(picked, player.getUuid());
         if (targetIsPlayer) BattleManager.markPlayer(target, player.getUuid());
-        WandFx.onTarget(target, WandFx.CHARM, buffer);
-        FightCamera.duel(player, picked, target, buffer);
-        Countdown.run(player, buffer, "DUEL: " + nameOf(picked, buffer) + " vs " + targetName, java.util.List.of(picked, target),
+        // /mobbattle mobFx duel: both fighters (default: the Charm look on the second one, as before).
+        String duelFx = ActionFx.mobFx(ActionFx.Role.DUEL);
+        if (duelFx != null) {
+            if (!WandFx.CHARM.equals(duelFx)) WandFx.onTarget(picked, duelFx, buffer);
+            WandFx.onTarget(target, duelFx, buffer);
+        }
+        FightCamera.intro(BattleManager.Kind.DUEL, player, null, java.util.List.of(java.util.List.of(picked), java.util.List.of(target)), buffer);
+        Countdown.run(BattleManager.Kind.DUEL, player, buffer, "DUEL: " + nameOf(picked, buffer) + " vs " + targetName, java.util.List.of(picked, target),
                 acc -> duel(player, playerEntity, picked, target, acc));
+    }
+
+    /** Snap Wand radius of the purple ground shockwave of the slam (look only). */
+    private static final double SLAM_RING = 8;
+
+    /**
+     * The Snap Wand's ground slam on {@code me}: its SnapSlam animation (MobBattle_SnapWand set, as the item plays
+     * it) and, when the slam lands (snapHitDelay), the snap's purple shockwave. Only a look: nothing else changes.
+     */
+    static void slam(Ref<EntityStore> me, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        if (!FxSettings.wandFx || me == null || !me.isValid()) return;
+        com.hypixel.hytale.server.core.entity.AnimationUtils.playAnimation(me,
+                com.hypixel.hytale.protocol.AnimationSlot.Action, "MobBattle_SnapWand", "SnapSlam", buffer);
+        var store = me.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown() || !me.isValid()) return;
+            org.joml.Vector3d at = ChaosWand.positionOf(me, store);
+            if (at != null) {
+                ActionFx.shockwave(ActionFx.Action.SLAM, at, SLAM_RING, store);
+                ActionFx.glowRing(ActionFx.Action.SLAM, at, SLAM_RING, store);
+            }
+        }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** The duel itself, right away or after /mobbattle countdown. */

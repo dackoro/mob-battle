@@ -84,7 +84,8 @@ public class MobBattlePlugin extends JavaPlugin {
                             : null;
                     if (ref != null && WELCOMED.add(ref.getUuid())) {
                         ref.sendMessage(com.hypixel.hytale.server.core.Message.raw(
-                                "Dackoro's Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all ten wands.")
+                                "Dackoro's Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all ten wands. "
+                                + "Besides help, everything is configurable: effects, timers, results and more (see /mobbattle settings).")
                                 .color("#ffd23e"));
                     }
                 });

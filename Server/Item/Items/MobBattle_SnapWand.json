@@ -12,7 +12,7 @@
   "MaxStack": 1,
   "Model": "Items/MobBattle/SnapWand/MobBattle_SnapWand.blockymodel",
   "Texture": "Items/MobBattle/SnapWand/MobBattle_SnapWand_Texture.png",
-  "PlayerAnimationsId": "Wand",
+  "PlayerAnimationsId": "MobBattle_SnapWand",
   "Utility": {
     "Compatible": true
   },
@@ -26,18 +26,18 @@
             {
               "Type": "MobBattle_Snap",
               "Effects": {
-                "ItemAnimationId": "CastLeftCharging",
+                "ItemAnimationId": "SnapSlam",
                 "ClearAnimationOnFinish": true
               },
-              "RunTime": 0.6
+              "RunTime": 0.7
             },
             {
               "Type": "MobBattle_Snap",
               "Effects": {
-                "ItemAnimationId": "CastLeftCharging",
+                "ItemAnimationId": "SnapSlam",
                 "ClearAnimationOnFinish": true
               },
-              "RunTime": 0.6
+              "RunTime": 0.7
             }
           ]
         }

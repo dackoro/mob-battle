@@ -88,11 +88,14 @@ public final class BattleManager {
         final Map<Integer, Double> damageBy = new ConcurrentHashMap<>();
         /** Kills per fighter (KillTracker), with its name and side kept for after it dies or leaves. */
         final Map<Ref<EntityStore>, Kills> kills = new ConcurrentHashMap<>();
+        /** Who scored the latest kill (endCamera lasthit: the final blow). */
+        volatile Ref<EntityStore> lastKiller;
         /** Kills per side, for /mobbattle tieBreak kills. */
         final Map<Integer, Integer> killsBy = new ConcurrentHashMap<>();
 
         /** A kill by {@code killer} (side {@code team}) in this battle. */
         void recordKill(Ref<EntityStore> killer, String name, int team) {
+            lastKiller = killer;
             kills.compute(killer, (k, old) -> new Kills(name, team, old == null ? 1 : old.count() + 1));
             killsBy.merge(team, 1, Integer::sum);
         }
@@ -237,7 +240,7 @@ public final class BattleManager {
     static boolean hasFlocks() { return anyFlocks; }
 
     /**
-     * NPC hits to cancel. Allies in the same battle never hurt each other. With /mobbattle isolation on
+     * NPC hits to cancel. Allies in the same battle never hurt each other. With /mobbattle battleIsolation on
      * (default), battle mobs also can't hurt or be hurt by NPCs outside their battle (wild mobs, other
      * battles, or players for the mobs' hits). Players can always hit battle mobs: only NPC sources get here.
      */
@@ -271,6 +274,7 @@ public final class BattleManager {
         WandFx.prune();
         Snap.prune();
         Army.prune();
+        TargetBuff.prune();
         BattleMusic.maintain();
         for (Battle battle : BATTLES) {
             // World unloaded (e.g. a closed instance): its tick will never run checkWinner again. A live world
@@ -280,6 +284,8 @@ public final class BattleManager {
                 MobBattlePlugin.log("Battle dropped: its world was unloaded");
             }
         }
+        // A draft keeps its world (EntityStore) reachable: drop it once that world is unloaded.
+        DRAFTS.values().removeIf(d -> d.entityStore.getStore().isShutdown());
         boolean members = false;
         for (Draft draft : DRAFTS.values()) {
             draft.prune();
@@ -287,7 +293,6 @@ public final class BattleManager {
         }
         draftMembers = members;
         anyFlocks = BATTLES.stream().anyMatch(b -> !b.flocks.isEmpty());
-        DRAFT_OWNERS.keySet().retainAll(DRAFTS.keySet());
         if (!PLAYER_FIGHTERS.isEmpty()) {
             // A player marked by a wand or command waits in a countdown before their battle exists: keep them.
             PLAYER_FIGHTERS.keySet().removeIf(p -> !p.isValid()
@@ -330,6 +335,9 @@ public final class BattleManager {
         BATTLES.remove(battle);
         killSummary(battle);
         List<Ref<EntityStore>> all = battle.snapshot();
+        // Everyone vs one: the lone target's buff and crown go (formerMembers: it may have just been detached).
+        for (Ref<EntityStore> r : formerMembers) TargetBuff.clear(r);
+        if (battle.kind == Kind.ALL_VS_ONE) WandFx.removeLater(formerMembers, WandFx.LONE_MARK);
         for (Ref<EntityStore> npc : all) {
             if (!npc.isValid()) continue;
             if (isPlayerFighter(npc)) {
@@ -384,7 +392,6 @@ public final class BattleManager {
             }
         }
         DRAFTS.clear();
-        DRAFT_OWNERS.clear();
         draftMembers = false;
         return n;
     }
@@ -528,6 +535,23 @@ public final class BattleManager {
         duel.targets.put(b, a);
         BATTLES.add(duel);
         return duel;
+    }
+
+    /**
+     * A new Chaos Wand battle (everyone vs one, royale) ends, whole, every other everyone-vs-one or royale battle
+     * that shares a mob with it: two chaos battles in the same area would fight over the same mobs. (detach alone
+     * only takes the shared mobs out, leaving the rest of the old battle, and its looks, running.)
+     */
+    public static void endChaosBattlesOf(List<Ref<EntityStore>> npcs) {
+        java.util.Set<Ref<EntityStore>> mine = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        mine.addAll(npcs);
+        for (Battle b : new ArrayList<>(BATTLES)) {
+            if (b.kind != Kind.ALL_VS_ONE && b.kind != Kind.ROYALE) continue;
+            if (b.snapshot().stream().anyMatch(mine::contains)) {
+                finish(b);
+                MobBattlePlugin.log("Battle ended: a new Chaos Wand battle took its mobs");
+            }
+        }
     }
 
     /** Starts a battle royale: every NPC for itself. */
@@ -681,11 +705,50 @@ public final class BattleManager {
             sub = alive + " left standing";
             color = battle.color(team);
         }
+        // endCamera winner / lasthit: film that fighter, and say its kill count.
+        Ref<EntityStore> focus = null;
+        String endMode = KindFx.endCamera(battle.kind);
+        if (outcome == BattleOutcome.WIN && !"off".equals(endMode)) {
+            focus = endFocus(battle, endMode, aliveTeams, lastAlive, buffer);
+            if (focus != null) {
+                Kills k = battle.kills.get(focus);
+                int n = k != null ? k.count() : 0;
+                sub += " | " + ("lasthit".equals(endMode) ? "Final blow: " : "") + ChaosWand.nameOf(focus, buffer).replace('_', ' ')
+                        + ", " + n + (n == 1 ? " kill" : " kills");
+            }
+        }
         MobBattlePlugin.log("Battle over: " + main + " (" + sub + ")");
         if (battle.owner != null && battle.owner.isValid()) {
             battle.owner.sendMessage(Message.raw(main + " " + sub).color(color));
-            FightFx.winnerTitle(battle.owner, main, sub);
+            FightFx.winnerTitle(battle.kind, battle.owner, main, sub);
+            if (focus != null) FightCamera.ending(battle.kind, battle.owner, focus, buffer);
         }
+    }
+
+    /**
+     * Who the end camera films. lasthit: the fighter that scored the latest kill (the final blow), if still
+     * standing. Else the winner: the last one standing (duel, royale), or the winning side's top killer still
+     * standing (everyone vs one, teams). Null if there is nobody to show.
+     */
+    private static Ref<EntityStore> endFocus(Battle battle, String mode, Set<Integer> aliveTeams, Ref<EntityStore> lastAlive,
+                                             ComponentAccessor<EntityStore> buffer) {
+        Ref<EntityStore> last = battle.lastKiller;
+        if ("lasthit".equals(mode) && last != null && isAlive(last, buffer)) return last;
+        if (aliveTeams.size() != 1) return null;
+        if (battle.royale) return lastAlive;
+        int team = aliveTeams.iterator().next();
+        Ref<EntityStore> best = null;
+        int bestKills = -1;
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            if (e.getValue() != team || !isAlive(e.getKey(), buffer)) continue;
+            Kills k = battle.kills.get(e.getKey());
+            int n = k != null ? k.count() : 0;
+            if (n > bestKills) {
+                best = e.getKey();
+                bestKills = n;
+            }
+        }
+        return best;
     }
 
     /** The arena timer reached 0 (Arena.tick): draw, kill everyone, keep fighting, or the healthiest side wins. */
@@ -873,7 +936,7 @@ public final class BattleManager {
         MobBattlePlugin.log("Battle: " + main + " (" + sub + ")");
         if (battle.owner != null && battle.owner.isValid()) {
             battle.owner.sendMessage(Message.raw(main + " " + sub).color(color));
-            FightFx.winnerTitle(battle.owner, main, sub);
+            FightFx.winnerTitle(battle.kind, battle.owner, main, sub);
         }
     }
 
@@ -928,12 +991,10 @@ public final class BattleManager {
         }
     }
 
-    /** Player UUID -> draft, plus the PlayerRef to draw the team rings for. */
+    /** Player UUID -> draft. Its owner is looked up by UUID (draftOwner): a PlayerRef is never kept. */
     private static final Map<UUID, Draft> DRAFTS = new ConcurrentHashMap<>();
-    private static final Map<UUID, PlayerRef> DRAFT_OWNERS = new ConcurrentHashMap<>();
 
     public static Draft draft(PlayerRef player) {
-        DRAFT_OWNERS.put(player.getUuid(), player);
         EntityStore current = player.getReference().getStore().getExternalData();
         return DRAFTS.compute(player.getUuid(), (id, old) -> {
             if (old != null && old.entityStore == current) {
@@ -967,7 +1028,6 @@ public final class BattleManager {
             removeConfiguredTeam(slot);
         }
         DRAFTS.clear();
-        DRAFT_OWNERS.clear();
     }
 
     public static Map<UUID, Draft> drafts() {
@@ -975,12 +1035,12 @@ public final class BattleManager {
     }
 
     public static PlayerRef draftOwner(UUID id) {
-        return DRAFT_OWNERS.get(id);
+        // Looked up, not stored: a reconnect makes a new PlayerRef and the old one keeps a gone player's data.
+        return com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(id);
     }
 
     public static void clearDraft(UUID player) {
         DRAFTS.remove(player);
-        DRAFT_OWNERS.remove(player);
     }
 
     /** Toggles the NPC in the player's current team. Returns the team it is now in, or -1 if removed. */

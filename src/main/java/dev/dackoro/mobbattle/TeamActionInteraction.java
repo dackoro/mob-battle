@@ -75,7 +75,8 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                     + "right click in the air to switch team.").color("#ffcc55"));
             return;
         }
-        Countdown.run(player, buffer, "TEAM BATTLE", teams.stream().flatMap(List::stream).toList(), acc -> startNow(player, playerEntity, teams, colors, acc));
+        FightCamera.intro(BattleManager.Kind.TEAMS, player, null, teams, buffer);
+        Countdown.run(BattleManager.Kind.TEAMS, player, buffer, "TEAM BATTLE", teams.stream().flatMap(List::stream).toList(), acc -> startNow(player, playerEntity, teams, colors, acc));
     }
 
     private static void startNow(PlayerRef player, Ref<EntityStore> playerEntity, List<List<Ref<EntityStore>>> teams,
@@ -115,7 +116,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                 aggressive++;
             }
             FightManager.provoke(npc, enemy, buffer);
-            FightFx.link(playerEntity, npc, enemy, battle.color(battle.team(npc)), buffer);
+            FightFx.link(BattleManager.Kind.TEAMS, playerEntity, npc, enemy, battle.color(battle.team(npc)), buffer);
         }
 
         String versus = colors.stream()
@@ -123,6 +124,6 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                 .collect(Collectors.joining(" vs "));
         MobBattlePlugin.log("Team battle: " + versus + ", " + aggressive + " aggressive");
         player.sendMessage(Message.raw("TEAM BATTLE! " + versus + ". Last team standing wins.").color("#ff6b5e"));
-        FightFx.title(player, "TEAM BATTLE!", versus);
+        FightFx.title(BattleManager.Kind.TEAMS, player, "TEAM BATTLE!", versus);
     }
 }

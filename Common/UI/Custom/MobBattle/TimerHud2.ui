@@ -1,0 +1,47 @@
+// Mob Battle fight timer (TimerHud.java), 2 subtitle lines (generated from TimerHud.ui: keep them in sync). Same panel textures as the game's containers (Common.ui:
+// @DecoratedContainer header + ContainerPatch body). Paths are relative to this file. Edit and save: the dev
+// pack reloads it; a malformed property makes the client reject the whole HUD ("Failed to apply custom ui hud
+// commands"), so change one thing at a time.
+Group {
+  Anchor: (Right: 24, Top: 110, Width: 250, Height: 130);
+  LayoutMode: Top;
+
+  Group #Header {
+    Anchor: (Height: 38);
+    Background: (TexturePath: "../Common/ContainerHeader.png", HorizontalBorder: 50, VerticalBorder: 0);
+    Padding: (Top: 7);
+
+    Label #Title {
+      Text: "";
+      Style: (FontSize: 15, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
+              HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+  }
+
+  Group #Body {
+    Anchor: (Height: 92);
+    LayoutMode: Top;
+    Padding: (Horizontal: 16, Vertical: 8);
+    Background: (TexturePath: "../Common/ContainerPatch.png", Border: 23);
+
+    Label #Sub {
+      Anchor: (Height: 18);
+      Text: "";
+      Style: (FontSize: 12, TextColor: #96a9be, RenderUppercase: true, RenderBold: true,
+              HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+    Label #Sub2 {
+      Anchor: (Height: 18);
+      Text: "";
+      Style: (FontSize: 12, TextColor: #96a9be, RenderUppercase: true, RenderBold: true,
+              HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+
+    Label #Time {
+      Anchor: (Height: 38);
+      Text: "";
+      Style: (FontSize: 28, TextColor: #ffffff, RenderBold: true,
+              HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+  }
+}

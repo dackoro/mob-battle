@@ -1,0 +1,14 @@
+{
+  "$Comment": "Snap Wand: the wand's usual poses (Parent Wand) plus SnapSlam, a ground slam (the mace Swing_Down, edited in Blockbench) played on the player's skeleton; while moving, SnapSlam_Moving (the same without Pelvis and legs, as vanilla *_Moving anims) so the legs keep walking/running. First person uses the vanilla mace Swing_Down_FPS (its own arms rig; hit at frame ~32 of 60). The hit lands around frame 30 of 60 (about 0.31 s at Speed 1.6; /mobbattle snapHitDelay (default 310) makes the snap wait for it).",
+  "Parent": "Wand",
+  "UseFirstPersonOverrides": false,
+  "Animations": {
+    "SnapSlam": {
+      "ThirdPerson": "Characters/Animations/Items/MobBattle/SnapSlam/SnapSlam.blockyanim",
+      "ThirdPersonMoving": "Characters/Animations/Items/MobBattle/SnapSlam/SnapSlam_Moving.blockyanim",
+      "FirstPerson": "Characters/Animations/Items/Dual_Handed/Mace/Attacks/Swing_Down/Swing_Down_FPS.blockyanim",
+      "ThirdPersonFace": "Characters/Animations/Expressions/Rage.blockyanim",
+      "Speed": 1.6
+    }
+  }
+}

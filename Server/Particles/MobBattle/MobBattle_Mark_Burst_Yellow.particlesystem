@@ -1,0 +1,15 @@
+{
+  "LifeSpan": 2.0,
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Mark_Implosion_Yellow"
+    },
+    {
+      "SpawnerId": "MobBattle_Mark_Sparks_Yellow",
+      "PositionOffset": {
+        "Y": 0.25
+      }
+    }
+  ],
+  "CullDistance": 120
+}

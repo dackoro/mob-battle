@@ -34,7 +34,7 @@
             {
               "Type": "MobBattle_Select",
               "Effects": {
-                "ItemAnimationId": "SwingRight",
+                "ItemAnimationId": "SwingLeft",
                 "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
               },
               "RunTime": 0.1

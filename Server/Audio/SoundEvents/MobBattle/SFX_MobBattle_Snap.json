@@ -1,0 +1,17 @@
+{
+  "$Comment": "Snap Wand and /mobbattle snap: the sound when the snap is activated, played at the player. Random pitch so it never sounds the same twice.",
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/MobBattle/Snap.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -2.0,
+        "MaxPitch": 2.0
+      }
+    }
+  ],
+  "Volume": 0,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Moderate"
+}

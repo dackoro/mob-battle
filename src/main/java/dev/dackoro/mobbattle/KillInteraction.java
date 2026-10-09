@@ -47,9 +47,37 @@ public class KillInteraction extends SimpleInstantInteraction {
         NPCEntity npc = buffer.getComponent(target, NPCEntity.getComponentType());
         String name = npc != null ? npc.getRoleName() : "target";
         PlayerRef player = buffer.getComponent(context.getEntity(), PlayerRef.getComponentType());
+        // Players only with /mobbattle killPlayers on (default off): the wand's error look and a message.
+        if (!FxSettings.killPlayers && buffer.getComponent(target, PlayerRef.getComponentType()) != null) {
+            WandFx.onTarget(target, WandFx.FAIL, buffer);
+            if (player != null) {
+                player.sendMessage(Message.raw("The Kill Wand doesn't work on players. Turn it on with /mobbattle killPlayers on")
+                        .color("#ffcc55"));
+            }
+            return;
+        }
         // NPCs get the soul rip first and die after /mobbattle killdelay; anything else dies right away.
-        WandFx.kill(target, context.getEntity(), npc != null, buffer);
-        if (player != null) {
+        Ref<EntityStore> self = context.getEntity();
+        boolean isNpc = npc != null;
+        int hit = FxSettings.wandFx ? FxSettings.killHitDelayMs : 0;
+        if (hit <= 0) {
+            hitNow(target, self, isNpc, player, name, buffer);
+            return;
+        }
+        // The cast lands its hit /mobbattle killHitDelay ms in (default 175: the hit at 0.175 s of KillCast): the Hakai
+        // sound and the disintegration wait for it, like the Snap Wand's slam (snapHitDelay).
+        var store = self.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown() || !target.isValid() || !BattleManager.isAlive(target, store)) return;
+            hitNow(target, self.isValid() ? self : null, isNpc, player, name, store);
+        }), hit, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    private static void hitNow(Ref<EntityStore> target, Ref<EntityStore> killer, boolean npc, PlayerRef player,
+                               String name, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        WandFx.kill(target, killer, npc, buffer);
+        if (player != null && player.isValid()) {
             player.sendMessage(Message.raw("Killed " + name + ".").color("#ff5555"));
         }
     }

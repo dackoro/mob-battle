@@ -17,7 +17,7 @@ import org.joml.Vector3d;
 
 import javax.annotation.Nonnull;
 
-/** Morph Wand left click: give the clicked mob the copied model. */
+/** Morph Wand left click: give the clicked mob (or, with morphPlayers, player) the copied model. */
 public class MorphApplyInteraction extends SimpleInstantInteraction {
 
     public static final String TYPE = "MobBattle_MorphApply";
@@ -36,13 +36,26 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
             return;
         }
         Ref<EntityStore> target = context.getTargetEntity();
-        if (target == null || !target.isValid() || buffer.getComponent(target, NPCEntity.getComponentType()) == null) {
-            player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
+        String look = FxSettings.morphPlayers ? "Look at a mob or player and click it." : "Look at a mob and click it.";
+        if (target == null || !target.isValid()) {
+            player.sendMessage(Message.raw(look).color("#ffcc55"));
+            context.getState().state = InteractionState.Failed;
+            return;
+        }
+        boolean isPlayer = PlayerFighters.isPlayer(target, buffer);
+        if (isPlayer && !FxSettings.morphPlayers) {
+            player.sendMessage(Message.raw("Players can't be morphed. Turn it on with /mobbattle morphPlayers on").color("#ffcc55"));
+            context.getState().state = InteractionState.Failed;
+            return;
+        }
+        if (!isPlayer && buffer.getComponent(target, NPCEntity.getComponentType()) == null) {
+            player.sendMessage(Message.raw(look).color("#ffcc55"));
             context.getState().state = InteractionState.Failed;
             return;
         }
         MorphWand.Copy copy = MorphWand.copyOf(player.getUuid());
         if (copy == null) {
+            WandFx.onTarget(target, WandFx.FAIL, buffer);
             player.sendMessage(Message.raw("No model copied yet. Right click a mob, or use /mobbattle morph <model>.").color("#ffcc55"));
             return;
         }
@@ -63,6 +76,7 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         Vector3d at = ChaosWand.positionOf(target, buffer);
         if (at != null) WandFx.burst("MobBattle_Copy_Burst", null, at.add(0, 0.8, 0), buffer);
         player.sendMessage(Message.raw(name + " now looks like " + copy.modelId()
-                + ". It keeps its own AI and attacks. Cleanse Wand or /mobbattle morph reset to undo.").color("#c88bff"));
+                + (isPlayer ? ". Cleanse Wand or /mobbattle morph reset to undo."
+                : ". It keeps its own AI and attacks. Cleanse Wand or /mobbattle morph reset to undo.")).color("#c88bff"));
     }
 }

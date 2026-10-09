@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
+import com.hypixel.hytale.server.core.modules.entity.player.PlayerSkinComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.util.ArrayList;
@@ -15,8 +16,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Morph Wand: copy a mob's model (right click) and put it on other mobs (left click), or pick any
- * model by ID with /mobbattle morph. Same mechanism the vanilla Potion_Morph_Frog effect uses
+ * Morph Wand: copy a mob's model (right click) and put it on other mobs (and players, /mobbattle morphPlayers)
+ * (left click), or pick any model by ID with /mobbattle morph. Same mechanism the vanilla Potion_Morph_Frog effect uses
  * (a new ModelComponent; NPCSystems.ModelChangeSystem updates hitbox and movement), but it lasts
  * until restored. The mob keeps its role: AI, weapon, attacks and health.
  */
@@ -107,6 +108,9 @@ public final class MorphWand {
             return false;
         }
         accessor.putComponent(entity, ModelComponent.getComponentType(), new ModelComponent(original));
+        // A player's look comes from their skin: flag it so it is resent (as EffectControllerComponent.tryResetModelChange).
+        PlayerSkinComponent skin = accessor.getComponent(entity, PlayerSkinComponent.getComponentType());
+        if (skin != null) skin.setNetworkOutdated();
         return true;
     }
 

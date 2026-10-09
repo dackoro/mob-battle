@@ -26,14 +26,16 @@
             {
               "Type": "MobBattle_TeamSelect",
               "Effects": {
-                "ItemAnimationId": "SwingLeft"
+                "ItemAnimationId": "SwingLeft",
+                "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
               },
               "RunTime": 0.35
             },
             {
               "Type": "MobBattle_TeamSelect",
               "Effects": {
-                "ItemAnimationId": "SwingRight"
+                "ItemAnimationId": "SwingLeft",
+                "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
               },
               "RunTime": 0.35
             }

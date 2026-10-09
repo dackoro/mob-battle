@@ -12,7 +12,7 @@
   "MaxStack": 1,
   "Model": "Items/MobBattle/KillWand/MobBattle_KillWand.blockymodel",
   "Texture": "Items/MobBattle/KillWand/MobBattle_KillWand_Texture.png",
-  "PlayerAnimationsId": "Wand",
+  "PlayerAnimationsId": "MobBattle_KillWand",
   "Utility": {
     "Compatible": true
   },
@@ -26,7 +26,7 @@
             {
               "Type": "MobBattle_Kill",
               "Effects": {
-                "ItemAnimationId": "CastLeftCharging",
+                "ItemAnimationId": "KillCast",
                 "ClearAnimationOnFinish": true
               },
               "RunTime": 0.5
@@ -34,7 +34,7 @@
             {
               "Type": "MobBattle_Kill",
               "Effects": {
-                "ItemAnimationId": "CastLeftCharging",
+                "ItemAnimationId": "KillCast",
                 "ClearAnimationOnFinish": true
               },
               "RunTime": 0.5

@@ -1,0 +1,10 @@
+{
+  "$Comment": "Snap Wand: ash cloud drifting away in the wind where a snapped mob vanished (WandFx, with SNAP_FADE_SOUND).",
+  "LifeSpan": 1.2,
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Ash_Drift"
+    }
+  ],
+  "CullDistance": 120
+}

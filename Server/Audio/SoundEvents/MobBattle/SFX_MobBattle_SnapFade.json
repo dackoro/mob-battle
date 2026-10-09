@@ -1,0 +1,17 @@
+{
+  "$Comment": "Snap Wand and /mobbattle snap: played at each mob (or player) when it fades to dust. Random pitch so a crowd of fades doesn't sound identical.",
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/MobBattle/SnapFade.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -3.0,
+        "MaxPitch": 3.0
+      }
+    }
+  ],
+  "Volume": 0,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Moderate"
+}

@@ -34,7 +34,7 @@
             {
               "Type": "MobBattle_ChaosFocus",
               "Effects": {
-                "ItemAnimationId": "SwingRight",
+                "ItemAnimationId": "SwingLeft",
                 "WorldSoundEventId": "SFX_Wand_Fire_Shoot"
               },
               "RunTime": 0.35
@@ -48,8 +48,8 @@
         {
           "Type": "MobBattle_ChaosBrawl",
           "Effects": {
-            "ItemPlayerAnimationsId": "Spellbook",
-            "ItemAnimationId": "CastPushCharged",
+            "ItemPlayerAnimationsId": "MobBattle_SnapWand",
+            "ItemAnimationId": "SnapSlam",
             "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Charge",
             "CameraEffect": "Ability_Cast_Generic"
           },

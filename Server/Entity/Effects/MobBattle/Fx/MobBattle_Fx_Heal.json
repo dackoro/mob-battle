@@ -1,5 +1,5 @@
 {
-  "$Comment": "Heal Wand: green burst, vanilla healing aura and the Healing Totem particles and sound, green tint.",
+  "$Comment": "Heal Wand: green burst, the Healing Totem fireflies and sound, green tint (no floating cross, no ground aura).",
   "Duration": 1.5,
   "ApplicationEffects": {
     "EntityTopTint": "#00e040",
@@ -11,17 +11,8 @@
         "TargetNodeName": "Pelvis"
       },
       {
-        "SystemId": "Aura_Heal",
-        "TargetEntityPart": "Entity"
-      },
-      {
         "SystemId": "Totem_Heal_Extra",
         "TargetEntityPart": "Entity"
-      },
-      {
-        "SystemId": "Totem_Heal_TopIcon",
-        "TargetEntityPart": "Entity",
-        "TargetNodeName": "Head"
       }
     ],
     "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Spawn"

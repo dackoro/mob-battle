@@ -1,7 +1,7 @@
 {
-  "$Comment": "Kill Wand disintegration: the model disappears bottom-up with a purple edge (Disappear, as Cinematic_Dissolve_Out).",
+  "$Comment": "Kill Wand disintegration: the model disappears from the head down to the feet with a purple edge (Disappear, as Cinematic_Dissolve_Out).",
   "SwitchTo": "Disappear",
-  "EffectDirection": "BottomUp",
+  "EffectDirection": "TopDown",
   "HighlightColor": "#9b4dff",
   "HighlightThickness": 2.0,
   "UseBloomOnHighlight": true,

@@ -37,11 +37,12 @@ final class BattleMusic {
     }
 
     /** Music for {@code owner}'s fight and its title viewers. From a world thread (the wand or tick buffer). */
-    static void start(PlayerRef owner, ComponentAccessor<EntityStore> buffer) {
-        if (!FxSettings.battleMusic || owner == null || !owner.isValid()) {
+    static void start(BattleManager.Kind kind, PlayerRef owner, ComponentAccessor<EntityStore> buffer) {
+        String track = KindFx.musicTrack(kind);
+        if (track == null || owner == null || !owner.isValid()) {
             return;
         }
-        int index = MusicContainer.getAssetMap().getIndex(FxSettings.musicTrack);
+        int index = MusicContainer.getAssetMap().getIndex(track);
         if (index <= 0) {
             return;
         }

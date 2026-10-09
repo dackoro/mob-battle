@@ -42,12 +42,6 @@ public final class ChaosWand {
     }
 
     /** The color of the area just drawn for this player, as hex (red if unknown). */
-    private static String areaHex(PlayerRef player) {
-        String name = FightFx.lastAreaColor(player);
-        String hex = name != null ? Teams.PALETTE.get(name) : null;
-        return hex != null ? hex : "#ff4b3e";
-    }
-
     /** NPCs within the configured radius of {@code center}, nearest first, capped at /mobbattle maxmobs. */
     static List<Ref<EntityStore>> npcsAround(Vector3d center, ComponentAccessor<EntityStore> buffer) {
         return npcsAround(center, FxSettings.radius, buffer);
@@ -140,18 +134,25 @@ public final class ChaosWand {
                     + ". Use /mobbattle areaRadius <blocks>.").color(WARN));
             return;
         }
-        FightFx.area(playerEntity, center, FxSettings.radius, buffer);
-        // A shockwave out to the area edge, in the area color (same reach as the arena).
-        FightFx.shockwave(center, FxSettings.radius, areaHex(player), buffer);
+        BattleManager.Kind kind = BattleManager.Kind.ALL_VS_ONE;
+        FightFx.area(ActionFx.Action.ALL_VS_ONE, kind, playerEntity, center, FxSettings.radius, FightFx.areaSeconds(), buffer);
+        // A shockwave out to the area edge (/mobbattle wave allVsOne, default gold), with the Snap Wand's sound.
+        ActionFx.shockwave(ActionFx.Action.ALL_VS_ONE, center, FxSettings.radius, buffer);
+        WandFx.burst(null, WandFx.SNAP_SOUND, center, buffer);
         warnLeftOut(player);
-        // The lone target in gold, everyone against it in red.
-        WandFx.onTarget(target, WandFx.LONE, FxSettings.countdownSeconds, buffer);
-        for (Ref<EntityStore> npc : around) {
-            WandFx.onTarget(npc, WandFx.RAGE, FxSettings.countdownSeconds, buffer);
+        // The lone target in gold, everyone against it in red (with their runes; /mobbattle runes).
+        if (KindFx.runes(kind)) {
+            // /mobbattle mobFx allVsOne / attackers.
+            String lone = ActionFx.mobFx(ActionFx.Role.LONE);
+            String rage = ActionFx.mobFx(ActionFx.Role.ATTACKERS);
+            if (lone != null) WandFx.onTarget(target, lone, KindFx.countdown(kind), buffer);
+            for (Ref<EntityStore> npc : around) {
+                if (rage != null) WandFx.onTarget(npc, rage, KindFx.countdown(kind), buffer);
+            }
         }
-        FightFx.summonRune(center, buffer);
-        FightCamera.overview(player, center, withTarget(around, target), buffer);
-        Countdown.run(player, buffer, "EVERYONE vs " + targetName, withTarget(around, target),
+        FightFx.summonRune(kind, center, buffer);
+        FightCamera.intro(kind, player, center, List.of(List.of(target), new ArrayList<>(around)), buffer);
+        Countdown.run(kind, player, buffer, "EVERYONE vs " + targetName, withTarget(around, target),
                 acc -> focusNow(player, playerEntity, target, targetName, around, center, acc));
     }
 
@@ -167,6 +168,7 @@ public final class ChaosWand {
         // A new order replaces any group battle they were in (e.g. a running battle royale).
         List<Ref<EntityStore>> involved = new ArrayList<>(around);
         involved.add(target);
+        BattleManager.endChaosBattlesOf(involved);
         BattleManager.detach(involved);
 
         int attackers = 0;
@@ -181,12 +183,14 @@ public final class ChaosWand {
             }
             // Each one "feels" a hit from the target, so roles from any mod react.
             FightManager.provoke(npc, target, buffer);
-            FightFx.link(playerEntity, npc, target, buffer);
+            FightFx.link(BattleManager.Kind.ALL_VS_ONE, playerEntity, npc, target, buffer);
         }
         // A 2-side battle so the end shows who won (the target or the attackers).
         BattleManager.Battle battle = BattleManager.startFocus(player, target, targetName, around);
         Arena.setup(battle, center, FxSettings.radius, FightFx.lastAreaColor(player), buffer);
-        WandFx.onTarget(target, WandFx.LONE_MARK, buffer);
+        if (ActionFx.crown) WandFx.onTarget(target, WandFx.LONE_MARK, buffer);
+        // /mobbattle targetBuff: bigger, more health, harder hits, fewer taken (undone in BattleManager.finish).
+        TargetBuff.apply(target, buffer);
         // The target fights back against the nearest attacker.
         if (firstAttacker != null) {
             BattleManager.setTarget(battle, target, firstAttacker);
@@ -195,7 +199,7 @@ public final class ChaosWand {
         MobBattlePlugin.log("Chaos focus on " + targetName + ": " + around.size() + " mobs, " + attackers + " aggressive");
         player.sendMessage(Message.raw("EVERYONE vs " + targetName + "! " + attackers + " of " + around.size()
                 + " mobs attack (radius " + FxSettings.radius + ").").color(FIGHT));
-        FightFx.title(player, "EVERYONE vs " + targetName, attackers + " attackers");
+        FightFx.title(BattleManager.Kind.ALL_VS_ONE, player, "EVERYONE vs " + targetName, attackers + " attackers");
     }
 
     /** Free-for-all: every NPC around {@code center} gets a random opponent. */
@@ -210,16 +214,29 @@ public final class ChaosWand {
                     + " blocks. Use /mobbattle areaRadius <blocks>.").color(WARN));
             return;
         }
-        FightFx.area(playerEntity, center, FxSettings.radius, buffer);
-        // A shockwave out to the area edge, in the area color (same reach as the arena).
-        FightFx.shockwave(center, FxSettings.radius, areaHex(player), buffer);
+        BattleManager.Kind kind = BattleManager.Kind.ROYALE;
+        FightFx.area(ActionFx.Action.ROYALE, kind, playerEntity, center, FxSettings.radius, FightFx.areaSeconds(), buffer);
+        // A shockwave out to the area edge, in the area color (same reach as the arena), when the right click's
+        // ground slam (SnapSlam) lands: snapHitDelay after the click, like the Snap Wand.
+        // /mobbattle wave royale (default purple), with the snap's sound.
+        var world = buffer.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            var store = world.getEntityStore().getStore();
+            if (store.isShutdown()) return;
+            ActionFx.shockwave(ActionFx.Action.ROYALE, center, FxSettings.radius, store);
+            WandFx.burst(null, WandFx.SNAP_SOUND, center, store);
+        }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
         warnLeftOut(player);
-        for (Ref<EntityStore> npc : around) {
-            WandFx.onTarget(npc, WandFx.BRAWL, FxSettings.countdownSeconds, buffer);
+        if (KindFx.runes(kind)) {
+            // /mobbattle mobFx royale (default purple).
+            String brawl = ActionFx.mobFx(ActionFx.Role.ROYALE);
+            for (Ref<EntityStore> npc : around) {
+                if (brawl != null) WandFx.onTarget(npc, brawl, KindFx.countdown(kind), buffer);
+            }
         }
-        FightFx.summonRune(center, buffer);
-        FightCamera.overview(player, center, around, buffer);
-        Countdown.run(player, buffer, "BATTLE ROYALE", around, acc -> brawlNow(player, playerEntity, around, center, acc));
+        FightFx.summonRune(kind, center, buffer);
+        FightCamera.intro(kind, player, center, List.of(new ArrayList<>(around)), buffer);
+        Countdown.run(kind, player, buffer, "BATTLE ROYALE", around, acc -> brawlNow(player, playerEntity, around, center, acc));
     }
 
     /** How many of the closest opponents a royale fighter picks its first one from. */
@@ -249,6 +266,7 @@ public final class ChaosWand {
 
         // Battle royale: each one starts on a random opponent; when its target dies it goes for
         // the nearest one still standing, until only one is left (FightTickSystem).
+        BattleManager.endChaosBattlesOf(around);
         BattleManager.Battle battle = BattleManager.startRoyale(player, around);
         Arena.setup(battle, center, FxSettings.radius, FightFx.lastAreaColor(player), buffer);
         FightManager.splitFlocksAcrossSides(battle, buffer);
@@ -266,11 +284,11 @@ public final class ChaosWand {
                 aggressive++;
             }
             FightManager.provoke(npc, enemy, buffer);
-            FightFx.link(playerEntity, npc, enemy, buffer);
+            FightFx.link(BattleManager.Kind.ROYALE, playerEntity, npc, enemy, buffer);
         }
         MobBattlePlugin.log("Chaos brawl: " + around.size() + " mobs, " + aggressive + " aggressive");
         player.sendMessage(Message.raw("BATTLE ROYALE! " + aggressive + " of " + around.size()
                 + " mobs fight until one is left (radius " + FxSettings.radius + ").").color(FIGHT));
-        FightFx.title(player, "BATTLE ROYALE!", around.size() + " mobs, last one standing wins");
+        FightFx.title(BattleManager.Kind.ROYALE, player, "BATTLE ROYALE!", around.size() + " mobs, last one standing wins");
     }
 }

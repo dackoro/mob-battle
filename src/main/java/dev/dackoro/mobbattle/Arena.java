@@ -45,6 +45,13 @@ final class Arena {
 
     private static final long DRAW_MS = 1000;
     private static final float DRAW_SECONDS = 1.05f;
+    /**
+     * The border glow of each redraw emits this long. Arena.tick runs every 250 ms, so a redraw can land up to
+     * ~1.25 s after the last one: with DRAW_SECONDS the columns stopped emitting for a moment every second and
+     * looked cut into pulses. Particles overlap without showing it; the floor disc would get darker, so it keeps
+     * DRAW_SECONDS. Still HELD_AREA_SECONDS at most, so the short glow is used.
+     */
+    private static final float GLOW_SECONDS = FightFx.HELD_AREA_SECONDS;
     private static final long WALL_MS = 250;
     /** Pushed back from this close to the edge; teleported back beyond this far outside it. */
     private static final double EDGE_MARGIN = 1.0;
@@ -62,10 +69,13 @@ final class Arena {
         final double endRadius;
         final long shrinkFrom;
         final long shrinkUntil;
+        /** Glow columns for the whole battle (those of the starting radius), so a closing edge keeps its angles. */
+        final int glowPoints;
         final boolean show;
         final boolean wall;
         final String style;
         final String color;
+        final String glowColor;
         final int seconds;
         final String titleKey;
         /** timerStyle portal: the game's portal box instead of our TimerHud. */
@@ -75,7 +85,7 @@ final class Arena {
         volatile long endsAt;
         long nextDraw;
         long nextWall;
-        long nextTimer;
+        volatile long nextTimer;
 
         State(BattleManager.Battle battle, Store<EntityStore> store, Vector3d center, double radius, Arena.Mode mode,
               String color, int seconds) {
@@ -83,6 +93,7 @@ final class Arena {
             this.store = store;
             this.center = center;
             this.startRadius = radius;
+            this.glowPoints = FightFx.glowPoints(radius);
             boolean shrink = FxSettings.shrinks(battle.kind) && radius > FxSettings.shrinkTo;
             this.endRadius = shrink ? FxSettings.shrinkTo : radius;
             long now = System.currentTimeMillis();
@@ -92,8 +103,21 @@ final class Arena {
             // A closing zone is always drawn and always a wall: that is what brings the fighters together.
             this.show = mode.shows() || shrink;
             this.wall = mode.walls() || shrink;
-            this.style = "off".equals(FxSettings.areaStyle) ? "glow" : FxSettings.areaStyle;
+            // The ground per areaStyle in the area color; the border glow (if the style has one) in the action's
+            // borderColor: allVsOne and royale use theirs, duels and team battles the area color. A shown arena
+            // whose style draws nothing still gets its border, in the area color.
             this.color = color;
+            String borderColor = switch (battle.kind) {
+                case ALL_VS_ONE -> ActionFx.glowColor(ActionFx.Action.ALL_VS_ONE, color);
+                case ROYALE -> ActionFx.glowColor(ActionFx.Action.ROYALE, color);
+                default -> color;
+            };
+            String areaStyle = KindFx.areaStyle(battle.kind);
+            String ground = FxSettings.groundOf(areaStyle);
+            String border = FxSettings.hasBorder(areaStyle) ? borderColor : null;
+            if ("off".equals(ground) && border == null) border = color;
+            this.style = ground;
+            this.glowColor = border;
             this.seconds = seconds;
             this.titleKey = "server.mobbattle.timer." + battle.kind.key;
             this.endsAt = seconds > 0 ? System.currentTimeMillis() + seconds * 1000L : 0;
@@ -115,6 +139,22 @@ final class Arena {
 
     static boolean any() {
         return !ARENAS.isEmpty();
+    }
+
+    /**
+     * /mobbattle skipTimer: every running timer jumps to 0, so on its next tick (world thread) each battle ends by
+     * its own timeUp rule, as if the time had run out. Returns how many timers were skipped.
+     */
+    static int skipTimers() {
+        long now = System.currentTimeMillis();
+        int n = 0;
+        for (State s : ARENAS) {
+            if (s.endsAt <= 0 || s.battle.over) continue;
+            s.endsAt = now;
+            s.nextTimer = 0;
+            n++;
+        }
+        return n;
     }
 
     /**
@@ -221,7 +261,9 @@ final class Arena {
             }
             if (s.show && now >= s.nextDraw) {
                 s.nextDraw = now + DRAW_MS;
-                FightFx.drawArea(s.center, s.radius(now), s.style, s.color, DRAW_SECONDS, null, store);
+                double r = s.radius(now);
+                FightFx.drawArea(s.center, r, s.style, s.color, null, DRAW_SECONDS, null, s.glowPoints, store);
+                FightFx.drawArea(s.center, r, "off", s.color, s.glowColor, GLOW_SECONDS, null, s.glowPoints, store);
             }
             if (s.wall && now >= s.nextWall) {
                 s.nextWall = now + WALL_MS;
@@ -330,6 +372,12 @@ final class Arena {
         if (battle.kind == BattleManager.Kind.ALL_VS_ONE && battle.focusName != null) {
             int n = Math.max(0, alive - 1);
             return n + (n == 1 ? " attacker" : " attackers") + " vs " + pretty(battle.focusName);
+        }
+        if (battle.kind == BattleManager.Kind.TEAMS && buffer instanceof Store<EntityStore> st) {
+            // Compact: alive per team, "RED 5 · BLUE 3" (the scoreboard has the full rows).
+            java.util.List<String> parts = new java.util.ArrayList<>();
+            Scoreboard.sides(battle, st).forEach((team, c) -> parts.add(battle.name(team) + " " + c[0]));
+            return String.join(" · ", parts);
         }
         // Only the leader: one short line however many fight (hundreds of mobs would not fit).
         BattleManager.Kills leader = battle.topKiller();

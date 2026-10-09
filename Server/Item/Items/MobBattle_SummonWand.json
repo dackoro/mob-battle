@@ -33,7 +33,7 @@
             {
               "Type": "MobBattle_SummonToggle",
               "Effects": {
-                "ItemAnimationId": "SwingRight"
+                "ItemAnimationId": "SwingLeft"
               },
               "RunTime": 0.35
             }

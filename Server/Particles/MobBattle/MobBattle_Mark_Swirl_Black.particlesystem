@@ -1,0 +1,9 @@
+{
+  "LifeSpan": 2.0,
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Mark_Implosion_Black"
+    }
+  ],
+  "CullDistance": 120
+}

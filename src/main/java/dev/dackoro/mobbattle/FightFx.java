@@ -32,10 +32,10 @@ public final class FightFx {
     public static void showFightStart(PlayerRef player, Ref<EntityStore> playerEntity, String a, String b,
                                       Ref<EntityStore> first, Ref<EntityStore> second,
                                       ComponentAccessor<EntityStore> buffer) {
-        if (FxSettings.titleEnabled) {
+        if (KindFx.startTitle(BattleManager.Kind.DUEL)) {
             showTitle(player, "FIGHT!", a + "  vs  " + b);
         }
-        if (FxSettings.laserEnabled) {
+        if (KindFx.laser(BattleManager.Kind.DUEL)) {
             laser(playerEntity, first, second, buffer);
         }
     }
@@ -49,7 +49,7 @@ public final class FightFx {
 
     /** The last area of a player, redrawn while they hold the Chaos Wand (areaonlywand mode). */
     private record HeldArea(PlayerRef player, com.hypixel.hytale.component.Store<EntityStore> store,
-                            org.joml.Vector3d center, double radius, String style, String colorName) {
+                            org.joml.Vector3d center, double radius, String style, String colorName, String glowColor) {
     }
 
     private static final java.util.Map<java.util.UUID, HeldArea> HELD_AREAS = new java.util.concurrent.ConcurrentHashMap<>();
@@ -65,22 +65,50 @@ public final class FightFx {
         area(owner, center, radius, RING_MILLIS / 1000f, buffer);
     }
 
+    /** The area of a {@code kind} battle, in that kind's areaStyle (KindFx). */
+    public static void area(BattleManager.Kind kind, Ref<EntityStore> owner, org.joml.Vector3d center, double radius,
+                            ComponentAccessor<EntityStore> buffer) {
+        String name = FxSettings.pickAreaColorName();
+        area(owner, center, radius, RING_MILLIS / 1000f, KindFx.areaStyle(kind), name, name, buffer);
+    }
+
+    /** The area of a wand action (ActionFx glow: strips or adds the glow, maybe in its own color). */
+    static void area(ActionFx.Action action, BattleManager.Kind kind, Ref<EntityStore> owner, org.joml.Vector3d center,
+                     double radius, float seconds, ComponentAccessor<EntityStore> buffer) {
+        // The ground in the area color (areaStyle, areaColor); the border glow in the action's borderColor.
+        String style = kind != null ? KindFx.areaStyle(kind) : FxSettings.areaStyle;
+        String name = FxSettings.pickAreaColorName();
+        area(owner, center, radius, seconds, style, name, ActionFx.glowColor(action, name), buffer);
+    }
+
+    static float areaSeconds() {
+        return RING_MILLIS / 1000f;
+    }
+
     /** Same, shown for {@code seconds} (the summon area: 3 s). The long glow system is cut at that time. */
     public static void area(Ref<EntityStore> owner, org.joml.Vector3d center, double radius, float seconds,
                             ComponentAccessor<EntityStore> buffer) {
-        String style = FxSettings.areaStyle;
+        // Previews (/mobbattle areaRadius, areaStyle...): the areaStyle, ground and border in the area color.
         String name = FxSettings.pickAreaColorName();
+        area(owner, center, radius, seconds, FxSettings.areaStyle, name, name, buffer);
+    }
+
+    private static void area(Ref<EntityStore> owner, org.joml.Vector3d center, double radius, float seconds,
+                             String style, String name, String glowColor, ComponentAccessor<EntityStore> buffer) {
         PlayerRef ownerPlayer = owner != null && owner.isValid() ? buffer.getComponent(owner, PlayerRef.getComponentType()) : null;
         if (ownerPlayer != null) LAST_AREA_COLOR.put(ownerPlayer.getUuid(), name);
-        if ("off".equals(style)) return;
+        // areaStyle -> the ground drawArea takes (floor/zone/off) and the border glow, if the style has one.
+        if (!FxSettings.hasBorder(style)) glowColor = null;
+        style = FxSettings.groundOf(style);
+        if ("off".equals(style) && glowColor == null) return;
         if (FxSettings.areaOnlyWand) {
             PlayerRef player = owner != null && owner.isValid()
                     ? buffer.getComponent(owner, PlayerRef.getComponentType()) : null;
             if (player == null) return;
-            HeldArea held = new HeldArea(player, owner.getStore(), new org.joml.Vector3d(center), radius, style, name);
+            HeldArea held = new HeldArea(player, owner.getStore(), new org.joml.Vector3d(center), radius, style, name, glowColor);
             HELD_AREAS.put(player.getUuid(), held);
             if (holdsItem(player, CHAOS_WAND_ID, buffer)) {
-                drawArea(held.center(), radius, style, name, HELD_AREA_SECONDS, player, buffer);
+                drawArea(held.center(), radius, style, name, glowColor, HELD_AREA_SECONDS, player, buffer);
             }
             return;
         }
@@ -93,7 +121,10 @@ public final class FightFx {
             if (prev != null) cancelGlow(prev[0], prev[1], prev[2], prev[3], buffer);
         }
         cancelGlow(center.x(), center.y(), center.z(), radius, buffer);
-        drawArea(center, radius, style, name, seconds, null, buffer);
+        // A disc can't be cancelled on its own (DebugUtils shapes have no id): a new one clears every shape of the
+        // world first, so summons don't pile discs up. Arenas and rings redraw themselves within a second.
+        if (!"off".equals(style)) com.hypixel.hytale.server.core.modules.debug.DebugUtils.clear(buffer.getExternalData().getWorld());
+        drawArea(center, radius, style, name, glowColor, seconds, null, buffer);
     }
 
     /** Per owner: center and radius of the last area drawn (for cancelling its glow). */
@@ -117,7 +148,7 @@ public final class FightFx {
     static void refreshHeldAreas(com.hypixel.hytale.component.Store<EntityStore> store) {
         for (HeldArea h : HELD_AREAS.values()) {
             if (h.store() == store && holdsItem(h.player(), CHAOS_WAND_ID, store)) {
-                drawArea(h.center(), h.radius(), h.style(), h.colorName(), HELD_AREA_SECONDS, h.player(), store);
+                drawArea(h.center(), h.radius(), h.style(), h.colorName(), h.glowColor(), HELD_AREA_SECONDS, h.player(), store);
             }
         }
     }
@@ -148,9 +179,27 @@ public final class FightFx {
         return owner != null ? LAST_AREA_COLOR.get(owner.getUuid()) : null;
     }
 
-    /** Draws the area for {@code seconds}, to everyone in the world, or only to {@code only} when not null. */
-    static void drawArea(org.joml.Vector3d center, double radius, String style, String colorName, float seconds,
-                                 PlayerRef only, ComponentAccessor<EntityStore> buffer) {
+    /**
+     * Draws the area for {@code seconds}, to everyone in the world, or only to {@code only} when not null:
+     * {@code style} floor/zone in {@code colorName}, and the border glow in {@code glowColor} (null = none).
+     */
+    static void drawArea(org.joml.Vector3d center, double radius, String style, String colorName, String glowColor,
+                         float seconds, PlayerRef only, ComponentAccessor<EntityStore> buffer) {
+        drawArea(center, radius, style, colorName, glowColor, seconds, only, 0, buffer);
+    }
+
+    /** Glow columns for a circle of {@code radius}: about every 2 blocks of the edge, between 12 and GLOW_MAX_POINTS. */
+    static int glowPoints(double radius) {
+        return Math.max(12, Math.min(GLOW_MAX_POINTS, (int) Math.ceil(Math.PI * radius)));
+    }
+
+    /**
+     * Same, with a fixed number of glow columns ({@code glowPoints}, 0 = by radius). A closing arena passes the count
+     * of its starting radius, so every redraw puts each column on the same angle and it only slides inward, instead
+     * of the whole ring reshuffling (and every column "growing out of the ground" again) as the radius shrinks.
+     */
+    static void drawArea(org.joml.Vector3d center, double radius, String style, String colorName, String glowColor,
+                         float seconds, PlayerRef only, int glowPoints, ComponentAccessor<EntityStore> buffer) {
         java.util.List<com.hypixel.hytale.protocol.ToClientPacket> packets = new java.util.ArrayList<>();
         var top = groundOf(buffer);
         var below = floorBelow(center.y(), buffer);
@@ -164,12 +213,11 @@ public final class FightFx {
             y = top.applyAsDouble(x, z);
             return Double.isFinite(y) && y > cy + ROOF_MARGIN ? Double.NaN : y;
         };
-        boolean all = "all".equals(style);
-        if (all || "both".equals(style) || "zone".equals(style) || "floor".equals(style)) {
-            zone(center, radius, Teams.PALETTE.get(colorName), all || "zone".equals(style), seconds, ground, packets);
+        if ("zone".equals(style) || "floor".equals(style)) {
+            zone(center, radius, Teams.PALETTE.get(colorName), "zone".equals(style), seconds, ground, packets);
         }
-        if (all || "both".equals(style) || "glow".equals(style)) {
-            glow(center, radius, colorName, seconds, ground, packets);
+        if (glowColor != null && Teams.PALETTE.containsKey(glowColor)) {
+            glow(center, radius, glowColor, seconds, glowPoints, ground, packets);
         }
         if (packets.isEmpty()) return;
         if (only != null) {
@@ -186,25 +234,39 @@ public final class FightFx {
      * A summoning rune on the ground at {@code center} for the countdown (at least 2 s), to everyone in the
      * world. The fighters get their own small runes from their Rage / Lone / Brawl effects.
      */
-    static void summonRune(org.joml.Vector3d center, ComponentAccessor<EntityStore> buffer) {
-        if (!FxSettings.wandFx || center == null) return;
+    static void summonRune(BattleManager.Kind kind, org.joml.Vector3d center, ComponentAccessor<EntityStore> buffer) {
+        if (!FxSettings.wandFx || !KindFx.runes(kind) || center == null) return;
         double y = floorBelow(center.y(), buffer).applyAsDouble(center.x(), center.z());
         y = Double.isFinite(y) ? y - 0.25 : center.y();
-        float seconds = Math.max(2, FxSettings.countdownSeconds);
+        float seconds = Math.max(2, KindFx.countdown(kind));
         PlayerUtil.broadcastPacketToPlayers(buffer, new com.hypixel.hytale.protocol.packets.world.SpawnParticleSystem(
                 RUNE_CENTER_ID, new com.hypixel.hytale.protocol.Position(center.x(), y, center.z()), null, 1f, null, seconds));
+        WandFx.burst(null, WandFx.CHAOS_SOUND, new org.joml.Vector3d(center.x(), y, center.z()), buffer);
     }
 
-    private static final int WAVE_STEPS = 14;
     private static final long WAVE_STEP_MS = 50;
     private static final float WAVE_RING = 1.5f;
+    /** Radius up to which the wave lasts {@link #WAVE_MIN_MS}; beyond it, {@link #WAVE_MS_PER_BLOCK} more per block. */
+    private static final double WAVE_BASE_RADIUS = 30;
+    private static final long WAVE_MIN_MS = 700;
+    private static final long WAVE_MAX_MS = 2200;
+    private static final long WAVE_MS_PER_BLOCK = 15;
+    /** Ease-in exponent: the ring leaves the center slowly and speeds up toward the edge (1 = constant speed). */
+    private static final double WAVE_EASE = 1.7;
 
     /**
-     * A shockwave: a thin ring on the ground growing from {@code center} out to {@code radius} in about 0.7 s
-     * (one DisplayDebug disc with a hole per step, like the zone floor), then the full area edge for a moment.
-     * Shows how far the Snap Wand reached. To everyone in the world.
+     * A shockwave: a ring on the ground growing from {@code center} out to {@code radius} (one DisplayDebug disc
+     * with a hole per step, like the zone floor), then the full area edge for a moment. It leaves the center slowly
+     * and accelerates (WAVE_EASE); it lasts 0.7 s up to 30 blocks and longer for bigger radii (up to 2.2 s), so a
+     * large reach stays visible. The ring is at least as thick as one step's advance, so it never breaks into
+     * flashes. Shows how far the Snap Wand reached. To everyone in the world.
      */
     static void shockwave(org.joml.Vector3d center, double radius, String hex, ComponentAccessor<EntityStore> buffer) {
+        if (FxSettings.debug) {
+            MobBattlePlugin.debug("shockwave at " + Math.round(center == null ? 0 : center.x()) + ", "
+                    + Math.round(center == null ? 0 : center.y()) + ", " + Math.round(center == null ? 0 : center.z())
+                    + " radius " + radius + " color " + hex + (FxSettings.wandFx ? "" : " (skipped: wandFx off)"));
+        }
         if (!FxSettings.wandFx || center == null || radius <= 0) return;
         double y = floorBelow(center.y(), buffer).applyAsDouble(center.x(), center.z());
         double baseY = (Double.isFinite(y) ? y - 0.25 : center.y()) + 0.15;
@@ -214,13 +276,22 @@ public final class FightFx {
         var world = buffer.getExternalData().getWorld();
         float[] matrix = com.hypixel.hytale.math.matrix.Matrix4dUtil.asFloatData(
                 new org.joml.Matrix4d().translate(center.x(), baseY, center.z()));
-        for (int i = 1; i <= WAVE_STEPS; i++) {
-            boolean last = i == WAVE_STEPS;
-            float outer = (float) (radius * i / WAVE_STEPS);
+        long duration = Math.max(WAVE_MIN_MS, Math.min(WAVE_MAX_MS,
+                WAVE_MIN_MS + Math.round((radius - WAVE_BASE_RADIUS) * WAVE_MS_PER_BLOCK)));
+        int steps = (int) Math.max(1, duration / WAVE_STEP_MS);
+        // Thin for a small wave, thick for a big one: the base width scales with the radius (30 blocks = 1x).
+        double width = WAVE_RING * Math.max(0.3, Math.min(2.5, radius / WAVE_BASE_RADIUS));
+        double previous = 0;
+        for (int i = 1; i <= steps; i++) {
+            boolean last = i == steps;
+            double reach = radius * Math.pow((double) i / steps, WAVE_EASE);
+            float outer = (float) reach;
+            float ring = (float) Math.max(width, Math.min(width * 2, (reach - previous) * 1.3));
+            previous = reach;
             float[] disc = new float[16];
             disc[0] = outer;
             disc[1] = ZONE_DISC_SEGMENTS;
-            disc[2] = Math.max(0, outer - WAVE_RING);
+            disc[2] = Math.max(0, outer - ring);
             var packet = new com.hypixel.hytale.protocol.packets.player.DisplayDebug(com.hypixel.hytale.protocol.DebugShape.Disc,
                     matrix, color, last ? 0.8f : (WAVE_STEP_MS + 30) / 1000f, flags, disc, last ? 0.45f : 0.6f);
             com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
@@ -404,12 +475,12 @@ public final class FightFx {
     public static final int GLOW_MAX_POINTS = 120;
 
     /** "glow" area: tall columns of rising light along the edge, one SpawnParticleSystem packet each. */
-    private static void glow(org.joml.Vector3d c, double radius, String colorName, float seconds,
+    private static void glow(org.joml.Vector3d c, double radius, String colorName, float seconds, int fixedPoints,
                              java.util.function.DoubleBinaryOperator ground,
                              java.util.List<com.hypixel.hytale.protocol.ToClientPacket> out) {
         var tint = ColorParseUtil.hexStringToColor(Teams.PALETTE.get(colorName));
         String glowId = (seconds <= HELD_AREA_SECONDS ? AREA_GLOW_SHORT_ID : AREA_GLOW_ID) + colorName;
-        int points = Math.max(12, Math.min(GLOW_MAX_POINTS, (int) Math.ceil(Math.PI * radius)));
+        int points = fixedPoints > 0 ? fixedPoints : glowPoints(radius);
         for (int i = 0; i < points; i++) {
             double a = 2 * Math.PI * i / points;
             double x = c.x() + Math.cos(a) * radius;
@@ -484,9 +555,9 @@ public final class FightFx {
     }
 
     /** Laser between two entities in a fixed color (team battles). */
-    public static void link(Ref<EntityStore> owner, Ref<EntityStore> from, Ref<EntityStore> to, String color,
-                            ComponentAccessor<EntityStore> buffer) {
-        if (!FxSettings.laserEnabled) {
+    public static void link(BattleManager.Kind kind, Ref<EntityStore> owner, Ref<EntityStore> from, Ref<EntityStore> to,
+                            String color, ComponentAccessor<EntityStore> buffer) {
+        if (!KindFx.laser(kind)) {
             return;
         }
         TransformComponent a = buffer.getComponent(from, TransformComponent.getComponentType());
@@ -534,16 +605,16 @@ public final class FightFx {
                 rgb, LASER_STEP_MILLIS + 50));
     }
 
-    /** Big title for group fights. */
-    public static void title(PlayerRef player, String main, String sub) {
-        if (FxSettings.titleEnabled) {
+    /** Big start title for group fights (startTitle of that kind). */
+    public static void title(BattleManager.Kind kind, PlayerRef player, String main, String sub) {
+        if (KindFx.startTitle(kind)) {
             for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub);
         }
     }
 
-    /** Winner titles have their own switch, independent of fight-start titles. */
-    public static void winnerTitle(PlayerRef player, String main, String sub) {
-        if (FxSettings.winTitleEnabled) {
+    /** Winner titles have their own switch (winTitle of that kind), independent of fight-start titles. */
+    public static void winnerTitle(BattleManager.Kind kind, PlayerRef player, String main, String sub) {
+        if (KindFx.winTitle(kind)) {
             for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub, true);
         }
     }
@@ -573,12 +644,21 @@ public final class FightFx {
 
     /** The owner and, per /mobbattle titleScope, the players near them or in their world. */
     private static java.util.List<PlayerRef> scopeViewers(PlayerRef owner) {
-        if ("owner".equals(FxSettings.titleScope) || owner == null || !owner.isValid()) {
+        return scopeViewers(owner, FxSettings.titleScope);
+    }
+
+    /** /mobbattle cameraScope: who gets {@code owner}'s fight cameras (owner, nearby or world). */
+    static java.util.List<PlayerRef> cameraViewers(PlayerRef owner) {
+        return scopeViewers(owner, FxSettings.cameraScope);
+    }
+
+    private static java.util.List<PlayerRef> scopeViewers(PlayerRef owner, String scope) {
+        if ("owner".equals(scope) || owner == null || !owner.isValid()) {
             return owner == null ? java.util.List.of() : java.util.List.of(owner);
         }
         java.util.UUID world = owner.getWorldUuid();
         var center = owner.getTransform() != null ? owner.getTransform().getPosition() : null;
-        boolean nearby = "nearby".equals(FxSettings.titleScope);
+        boolean nearby = "nearby".equals(scope);
         double max = FxSettings.TITLE_NEARBY_BLOCKS * FxSettings.TITLE_NEARBY_BLOCKS;
         java.util.List<PlayerRef> out = new java.util.ArrayList<>();
         out.add(owner);
@@ -684,9 +764,9 @@ public final class FightFx {
     }
 
     /** Laser between two entities (public for the Chaos Wand). */
-    public static void link(Ref<EntityStore> owner, Ref<EntityStore> from, Ref<EntityStore> to,
+    public static void link(BattleManager.Kind kind, Ref<EntityStore> owner, Ref<EntityStore> from, Ref<EntityStore> to,
                             ComponentAccessor<EntityStore> buffer) {
-        if (FxSettings.laserEnabled) {
+        if (KindFx.laser(kind)) {
             laser(owner, from, to, buffer);
         }
     }

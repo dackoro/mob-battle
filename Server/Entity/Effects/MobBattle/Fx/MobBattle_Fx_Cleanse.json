@@ -1,14 +1,27 @@
 {
-  "$Comment": "Cleanse Wand: light blue burst like the Morph/Heal ones, white-blue flash.",
-  "Duration": 1.0,
+  "$Comment": "Cleanse Wand: the everyone-vs-one target's look in white: the crown with its rays of light from above (MobBattle_Crown_White, a white copy of vanilla Effect_Crown_Gold), burst, aura and rune at the feet, with the totem sound.",
+  "Duration": 2.5,
   "ApplicationEffects": {
     "EntityTopTint": "#ffffff",
-    "EntityBottomTint": "#7fd3ff",
+    "EntityBottomTint": "#bfbfbf",
     "Particles": [
       {
-        "SystemId": "MobBattle_Cleanse_Burst",
+        "SystemId": "MobBattle_Crown_White",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Head"
+      },
+      {
+        "SystemId": "MobBattle_Mark_Burst_White",
         "TargetEntityPart": "Entity",
         "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "MobBattle_Mark_Aura_White",
+        "TargetEntityPart": "Entity"
+      },
+      {
+        "SystemId": "MobBattle_Mark_Rune_White",
+        "TargetEntityPart": "Entity"
       }
     ],
     "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Despawn"

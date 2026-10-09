@@ -1,0 +1,13 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Mark_Aura_Pink",
+      "PositionOffset": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    }
+  ],
+  "CullDistance": 120
+}

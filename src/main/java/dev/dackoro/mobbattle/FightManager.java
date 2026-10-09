@@ -142,7 +142,7 @@ public final class FightManager {
         }
     }
 
-    /** Range in which battle mobs are told to ignore players and wild mobs (/mobbattle isolation on). */
+    /** Range in which battle mobs are told to ignore players and wild mobs (/mobbattle battleIsolation on). */
     static final double OUTSIDER_RANGE = 48;
     /** Short override, renewed by every isolation refresh, so turning isolation off takes effect quickly. */
     static final double OUTSIDER_IGNORE_SECONDS = 12;

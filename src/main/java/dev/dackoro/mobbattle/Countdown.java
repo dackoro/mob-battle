@@ -60,13 +60,13 @@ final class Countdown {
     private Countdown() {
     }
 
-    static void run(PlayerRef player, ComponentAccessor<EntityStore> buffer, String label,
+    static void run(BattleManager.Kind kind, PlayerRef player, ComponentAccessor<EntityStore> buffer, String label,
                     Collection<Ref<EntityStore>> mobs, Consumer<ComponentAccessor<EntityStore>> start) {
         Set<Ref<EntityStore>> set = ConcurrentHashMap.newKeySet();
         set.addAll(mobs);
         cancelSharing(set);
-        BattleMusic.start(player, buffer);
-        int seconds = FxSettings.countdownSeconds;
+        BattleMusic.start(kind, player, buffer);
+        int seconds = KindFx.countdown(kind);
         if (seconds <= 0) {
             start.accept(buffer);
             return;

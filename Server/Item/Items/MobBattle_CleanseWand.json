@@ -33,7 +33,7 @@
             {
               "Type": "MobBattle_Cleanse",
               "Effects": {
-                "ItemAnimationId": "SwingRight"
+                "ItemAnimationId": "SwingLeft"
               },
               "RunTime": 0.1
             }

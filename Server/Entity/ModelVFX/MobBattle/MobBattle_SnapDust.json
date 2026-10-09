@@ -1,7 +1,7 @@
 {
-  "$Comment": "Snap Wand ash: the model crumbles top-down with a pale ash edge (Disappear, as MobBattle_Disintegrate).",
+  "$Comment": "Snap Wand ash: the model crumbles from the feet up to the head with a pale ash edge (Disappear, as MobBattle_Disintegrate).",
   "SwitchTo": "Disappear",
-  "EffectDirection": "TopDown",
+  "EffectDirection": "BottomUp",
   "HighlightColor": "#e8dcc8",
   "HighlightThickness": 2.0,
   "UseBloomOnHighlight": false,

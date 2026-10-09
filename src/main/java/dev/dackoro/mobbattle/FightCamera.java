@@ -27,6 +27,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import org.joml.Vector3d;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,8 +36,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * /mobbattle camera: during a fight countdown the owner's camera films the fight, then comes back to them as the
- * fight starts.
+ * /mobbattle camera: the owner's camera films the fight's intro (countdown or cameraTime) and, with endCamera, its
+ * winner, then comes back to them. Per battle kind (KindFx): orbit, duel (western), showcase (close-ups), teams
+ * (team by team sweep), focus (the lone target, then around it through the crowd), drone (flight over the battle).
  * <p>
  * Uses the game's own camera sequences (CameraSequenceBuilder, as vanilla /tpcinematic's CinematicTeleport does):
  * keyframes with a position, a look-at point, a duration and an easing, played smoothly by the client. Flags
@@ -60,81 +62,449 @@ final class FightCamera {
     private FightCamera() {
     }
 
-    /** Wide circling shot of the area around {@code center} for the countdown (no-op with camera off or no countdown). */
-    static void overview(PlayerRef player, Vector3d center, List<Ref<EntityStore>> mobs,
-                         ComponentAccessor<EntityStore> buffer) {
+    /**
+     * The intro camera of a fight, per its kind's settings (KindFx): camera, cameraStyle, cameraTime (else the
+     * countdown), cameraShots. {@code sides}: the fighters of each side (a royale passes one list with everyone).
+     * The owner never gets it while fighting themselves (their own view stays theirs).
+     */
+    static void intro(BattleManager.Kind kind, PlayerRef owner, Vector3d center, List<List<Ref<EntityStore>>> sides,
+                      ComponentAccessor<EntityStore> buffer) {
+        // cameraScope: the owner, or every player nearby / in the world; each gets the shot from their own side.
+        for (PlayerRef viewer : FightFx.cameraViewers(owner)) introFor(kind, viewer, center, sides, buffer);
+    }
+
+    private static void introFor(BattleManager.Kind kind, PlayerRef player, Vector3d center,
+                                 List<List<Ref<EntityStore>>> sides, ComponentAccessor<EntityStore> buffer) {
         // Never let a camera problem break the fight that called it.
         try {
-            int seconds = FxSettings.countdownSeconds;
-            if (!FxSettings.fightCamera || seconds <= 0 || player == null || !player.isValid() || center == null
-                    || mobs.isEmpty()) {
-                return;
+            int seconds = KindFx.introSeconds(kind);
+            if (seconds <= 0 || player == null || !player.isValid()) return;
+            List<List<Ref<EntityStore>>> live = new ArrayList<>();
+            List<Ref<EntityStore>> all = new ArrayList<>();
+            for (List<Ref<EntityStore>> side : sides) {
+                List<Ref<EntityStore>> ok = new ArrayList<>();
+                for (Ref<EntityStore> r : side) if (r != null && r.isValid()) ok.add(r);
+                if (!ok.isEmpty()) {
+                    live.add(ok);
+                    all.addAll(ok);
+                }
             }
-            Eye eye = eyeOf(player, buffer);
-            if (eye == null) return;
-            double radius = Math.max(MIN_RADIUS, FxSettings.radius * EDGE);
-            double height = radius * 0.5 + 4;
-            Vector3d look = new Vector3d(center.x, center.y + 1, center.z);
-            // Start on the player's side of the battlefield, so the shot opens from where they stand.
-            double start = Math.atan2(eye.pos.z - center.z, eye.pos.x - center.x);
-            float orbit = Math.max(0.5f, seconds - OUT_S - BACK_S);
-
-            CameraSequenceBuilder seq = new CameraSequenceBuilder();
-            for (int i = 0; i <= ORBIT_KEYS; i++) {
-                double a = start + SWEEP * i / ORBIT_KEYS;
-                Vector3d at = new Vector3d(center.x + Math.cos(a) * radius, center.y + height, center.z + Math.sin(a) * radius);
-                if (i == 0) seq.keyframeLookingAt(at, look, OUT_S, EasingType.SineOut);
-                else seq.keyframeLookingAt(at, look, orbit / ORBIT_KEYS, EasingType.Linear);
+            if (all.isEmpty() || all.contains(player.getReference())) return;
+            if (center == null) center = centroid(all, buffer);
+            if (center == null) return;
+            long total = seconds * 1000L;
+            String style = KindFx.cameraStyle(kind);
+            if (("duel".equals(style) || "focus".equals(style)) && live.size() < 2) style = "showcase";
+            if ("teams".equals(style) && live.size() < 2) style = "showcase";
+            MobBattlePlugin.debug("intro camera " + style + " for " + (kind != null ? kind.key : "?") + ", " + seconds + " s, "
+                    + all.size() + " fighters in " + live.size() + " sides");
+            switch (style) {
+                case "orbit" -> orbit(player, center, seconds, buffer);
+                case "duel" -> duel(player, live.get(0).get(0), live.get(1).get(0), total, buffer);
+                case "teams" -> teams(player, center, live, total, buffer);
+                case "focus" -> {
+                    // The first side's first fighter (everyone vs one: the target) against all the others.
+                    Ref<EntityStore> target = live.get(0).get(0);
+                    List<Ref<EntityStore>> crowd = new ArrayList<>(all);
+                    crowd.remove(target);
+                    focus(player, target, crowd, total, buffer);
+                }
+                case "drone" -> drone(player, center, all, total, buffer);
+                default -> showcase(player, all, KindFx.cameraShots(kind), total, buffer);
             }
-            play(player, seq, eye);
-            ORBITS.put(player.getUuid(), System.currentTimeMillis() + seconds * 1000L);
         } catch (RuntimeException e) {
             MobBattlePlugin.log("Fight camera failed: " + e);
+            reset(player);
         }
     }
 
     /**
-     * Duel standoff, like a western: a close shot of each fighter seen from its opponent's side, then a wide side
-     * shot of both facing each other, then back to the player. Unlike the orbit (a fixed path), it follows the
-     * fighters as they move: a server camera frame (SetServerCamera) every {@link #STEP_MS} from their current
-     * positions, the client gliding between frames.
+     * End of a battle (KindFx endCamera winner / lasthit): a slow half-circle around {@code focus} for
+     * endCameraTime seconds, then back to the player. No-op with endCamera off.
      */
-    static void duel(PlayerRef player, Ref<EntityStore> a, Ref<EntityStore> b, ComponentAccessor<EntityStore> buffer) {
+    static void ending(BattleManager.Kind kind, PlayerRef owner, Ref<EntityStore> focus,
+                       ComponentAccessor<EntityStore> buffer) {
+        for (PlayerRef viewer : FightFx.cameraViewers(owner)) endingFor(kind, viewer, focus, buffer);
+    }
+
+    private static void endingFor(BattleManager.Kind kind, PlayerRef player, Ref<EntityStore> focus,
+                                  ComponentAccessor<EntityStore> buffer) {
         try {
-            int seconds = FxSettings.countdownSeconds;
-            if (!FxSettings.fightCamera || seconds <= 0 || player == null || !player.isValid()) return;
-            Vector3d pa = ChaosWand.positionOf(a, buffer), pb = ChaosWand.positionOf(b, buffer);
-            if (pa == null || pb == null) return;
-            long total = seconds * 1000L;
-            long shots = Math.max(STEP_MS * 3, total - BACK_MS);
-            long id = SEQ.incrementAndGet();
-            UUID uuid = player.getUuid();
-            SHOT.put(uuid, id);
-            Vector3d[] last = {pa, pb};
-            var world = buffer.getExternalData().getWorld();
-            for (long t = 0; t < shots; t += STEP_MS) {
-                int shot = (int) Math.min(2, t * 3 / shots);
-                schedule(uuid, id, t, () -> world.execute(() -> {
-                    if (!Long.valueOf(id).equals(SHOT.get(uuid))) return;
-                    // Where they are now (the last known place if one is gone).
-                    Vector3d na = a.isValid() ? ChaosWand.positionOf(a, a.getStore()) : null;
-                    Vector3d nb = b.isValid() ? ChaosWand.positionOf(b, b.getStore()) : null;
-                    if (na != null) last[0] = na;
-                    if (nb != null) last[1] = nb;
-                    send(player, duelFrame(last[0], last[1], shot));
-                }));
-            }
-            schedule(uuid, id, shots, () -> {
-                ServerCameraSettings back = behindPlayer(player);
-                if (back != null) send(player, back);
-            });
-            schedule(uuid, id, total, () -> {
-                if (SHOT.remove(uuid, id)) reset(player);
-            });
+            if ("off".equals(KindFx.endCamera(kind)) || player == null || !player.isValid()
+                    || focus == null || !focus.isValid()) return;
+            Ref<EntityStore> me = player.getReference();
+            // Dead (respawn screen) or in another world: nothing to film for them.
+            if (me == null || !me.isValid() || me.getStore() != focus.getStore() || !BattleManager.isAlive(me, buffer)) return;
+            long total = KindFx.endCameraSeconds(kind) * 1000L;
+            Track track = new Track();
+            List<Shot> shots = List.of(new Shot(total, (t, acc) -> {
+                Vector3d p = track.pos(focus, acc);
+                if (p == null) return null;
+                double eye = track.eye(focus, acc);
+                double swing = -0.6 + 1.2 * t / total;
+                return closeUp(p, track.yaw(focus, acc), eye, swing, Math.max(4, eye * 2.6), eye * 0.6 + 1.2);
+            }));
+            playShots(player, buffer.getExternalData().getWorld(), shots);
         } catch (RuntimeException e) {
-            MobBattlePlugin.log("Duel camera failed: " + e);
+            MobBattlePlugin.log("End camera failed: " + e);
             reset(player);
         }
+    }
+
+    /** Wide circling shot of the area around {@code center} (keyframes the client plays by itself). */
+    private static void orbit(PlayerRef player, Vector3d center, int seconds, ComponentAccessor<EntityStore> buffer) {
+        Eye eye = eyeOf(player, buffer);
+        if (eye == null) return;
+        double radius = Math.max(MIN_RADIUS, FxSettings.radius * EDGE);
+        double height = radius * 0.5 + 4;
+        Vector3d look = new Vector3d(center.x, center.y + 1, center.z);
+        // Start on the player's side of the battlefield, so the shot opens from where they stand.
+        double start = Math.atan2(eye.pos.z - center.z, eye.pos.x - center.x);
+        float orbit = Math.max(0.5f, seconds - OUT_S - BACK_S);
+
+        CameraSequenceBuilder seq = new CameraSequenceBuilder();
+        for (int i = 0; i <= ORBIT_KEYS; i++) {
+            double a = start + SWEEP * i / ORBIT_KEYS;
+            Vector3d at = new Vector3d(center.x + Math.cos(a) * radius, center.y + height, center.z + Math.sin(a) * radius);
+            if (i == 0) seq.keyframeLookingAt(at, look, OUT_S, EasingType.SineOut);
+            else seq.keyframeLookingAt(at, look, orbit / ORBIT_KEYS, EasingType.Linear);
+        }
+        // A server camera shot of this player (an older intro or end shot) stops sending frames.
+        SHOT.remove(player.getUuid());
+        play(player, seq, eye);
+        ORBITS.put(player.getUuid(), System.currentTimeMillis() + seconds * 1000L);
+    }
+
+    /**
+     * Duel standoff, like a western: a close shot of each fighter seen from its opponent's side, then a wide side
+     * shot of both facing each other, then back to the player. Follows the fighters as they move.
+     */
+    private static void duel(PlayerRef player, Ref<EntityStore> a, Ref<EntityStore> b, long total,
+                             ComponentAccessor<EntityStore> buffer) {
+        long each = Math.max(STEP_MS, (total - BACK_MS) / 3);
+        Track track = new Track();
+        List<Shot> shots = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            int shot = i;
+            shots.add(new Shot(each, (t, acc) -> {
+                Vector3d pa = track.pos(a, acc), pb = track.pos(b, acc);
+                return pa == null || pb == null ? null : duelFrame(pa, pb, shot);
+            }));
+        }
+        playShots(player, buffer.getExternalData().getWorld(), shots);
+    }
+
+    /**
+     * Royale showcase: close-ups of {@code count} fighters picked at random (fewer if the time is short), each
+     * seen from the front with a slow sideways drift.
+     */
+    private static void showcase(PlayerRef player, List<Ref<EntityStore>> fighters, int count, long total,
+                                 ComponentAccessor<EntityStore> buffer) {
+        long usable = Math.max(STEP_MS, total - BACK_MS);
+        int n = (int) Math.max(1, Math.min(Math.min(count, fighters.size()), usable / MIN_SHOT_MS));
+        List<Ref<EntityStore>> picked = new ArrayList<>(fighters);
+        java.util.Collections.shuffle(picked);
+        picked = picked.subList(0, n);
+        long each = usable / n;
+        Track track = new Track();
+        List<Shot> shots = new ArrayList<>();
+        for (Ref<EntityStore> mob : picked) {
+            shots.add(new Shot(each, (t, acc) -> {
+                Vector3d p = track.pos(mob, acc);
+                if (p == null) return null;
+                double eye = track.eye(mob, acc);
+                double swing = -0.35 + 0.7 * t / each;
+                return closeUp(p, track.yaw(mob, acc), eye, swing, Math.max(3, eye * 2.2), eye * 0.9 + 0.4);
+            }));
+        }
+        playShots(player, buffer.getExternalData().getWorld(), shots);
+    }
+
+    /**
+     * Team by team: one shot per side, from between the side and the battle's center (where they face). It holds
+     * on one member, then sweeps across the others, left to right.
+     */
+    private static void teams(PlayerRef player, Vector3d center, List<List<Ref<EntityStore>>> sides, long total,
+                              ComponentAccessor<EntityStore> buffer) {
+        List<List<Ref<EntityStore>>> shown = sides.size() > MAX_TEAM_SHOTS ? sides.subList(0, MAX_TEAM_SHOTS) : sides;
+        long each = Math.max(STEP_MS, (total - BACK_MS) / shown.size());
+        Track track = new Track();
+        List<Shot> shots = new ArrayList<>();
+        for (List<Ref<EntityStore>> side : shown) {
+            List<Ref<EntityStore>> members = sortedAcross(side, center, buffer);
+            shots.add(new Shot(each, (t, acc) -> {
+                double cx = 0, cy = 0, cz = 0;
+                int k = 0;
+                for (Ref<EntityStore> m : members) {
+                    Vector3d p = track.pos(m, acc);
+                    if (p == null) continue;
+                    cx += p.x; cy += p.y; cz += p.z;
+                    k++;
+                }
+                if (k == 0) return null;
+                Vector3d c = new Vector3d(cx / k, cy / k, cz / k);
+                double spread = 1.5;
+                for (Ref<EntityStore> m : members) {
+                    Vector3d p = track.pos(m, acc);
+                    if (p != null) spread = Math.max(spread, Math.hypot(p.x - c.x, p.z - c.z));
+                }
+                double dx = center.x - c.x, dz = center.z - c.z;
+                double len = Math.hypot(dx, dz);
+                if (len < 1) { dx = 1; dz = 0; len = 1; }
+                double dist = Math.min(spread + 5, 40);
+                Vector3d at = new Vector3d(c.x + dx / len * dist, c.y + 2.5 + spread * 0.25, c.z + dz / len * dist);
+                // Hold on the first one, then sweep across the rest.
+                double u = (double) t / each;
+                int idx = members.size() == 1 || u < HOLD ? 0
+                        : 1 + (int) Math.min(members.size() - 2, (u - HOLD) / (1 - HOLD) * (members.size() - 1));
+                Vector3d look = track.pos(members.get(idx), acc);
+                if (look == null) look = c;
+                return frame(at, new Vector3d(look.x, look.y + 1.2, look.z), DUEL_LERP);
+            }));
+        }
+        playShots(player, buffer.getExternalData().getWorld(), shots);
+    }
+
+    /**
+     * Everyone vs one: a close-up of the target, then a circle around it at the crowd's distance, the camera
+     * low and outside the crowd, always looking at the attacker in front of it (one after another as it turns),
+     * with the target behind.
+     */
+    private static void focus(PlayerRef player, Ref<EntityStore> target, List<Ref<EntityStore>> crowd, long total,
+                              ComponentAccessor<EntityStore> buffer) {
+        long usable = Math.max(STEP_MS * 2, total - BACK_MS);
+        long first = Math.max(Math.min(MIN_SHOT_MS, usable / 2), usable * 35 / 100);
+        long circle = Math.max(STEP_MS, usable - first);
+        Vector3d t0 = ChaosWand.positionOf(target, buffer);
+        if (t0 == null) return;
+        // Ring just outside the crowd's average distance; start behind the first attacker found.
+        double sum = 0, start = 0;
+        int n = 0;
+        for (Ref<EntityStore> r : crowd) {
+            Vector3d q = ChaosWand.positionOf(r, buffer);
+            if (q == null) continue;
+            if (n == 0) start = Math.atan2(q.z - t0.z, q.x - t0.x);
+            sum += Math.hypot(q.x - t0.x, q.z - t0.z);
+            n++;
+        }
+        double ring = Math.max(6, Math.min(40, (n > 0 ? sum / n : 4) + 4));
+        double a0 = start;
+        Track track = new Track();
+        List<Shot> shots = new ArrayList<>();
+        shots.add(new Shot(first, (t, acc) -> {
+            Vector3d q = track.pos(target, acc);
+            if (q == null) return null;
+            double eye = track.eye(target, acc);
+            return closeUp(q, track.yaw(target, acc), eye, -0.3 + 0.6 * t / first, Math.max(3, eye * 2.2), eye * 0.9 + 0.4);
+        }));
+        shots.add(new Shot(circle, (t, acc) -> {
+            Vector3d c = track.pos(target, acc);
+            if (c == null) return null;
+            double a = a0 + FOCUS_SWEEP * t / circle;
+            double x = c.x + Math.cos(a) * ring, z = c.z + Math.sin(a) * ring;
+            double y = Math.max(c.y + 2.5 + ring * 0.15, ground(x, z, c.y, acc) + 2.5);
+            // The living attacker whose direction from the target is closest to the camera's.
+            Vector3d look = c;
+            double best = Double.MAX_VALUE;
+            for (Ref<EntityStore> m : crowd) {
+                if (!m.isValid() || !BattleManager.isAlive(m, acc)) continue;
+                Vector3d q = track.pos(m, acc);
+                if (q == null) continue;
+                double d = Math.abs(Math.IEEEremainder(Math.atan2(q.z - c.z, q.x - c.x) - a, Math.PI * 2));
+                if (d < best) {
+                    best = d;
+                    look = q;
+                }
+            }
+            return frame(new Vector3d(x, y, z), new Vector3d(look.x, look.y + 1.2, look.z), DUEL_LERP);
+        }));
+        playShots(player, buffer.getExternalData().getWorld(), shots);
+    }
+
+    /**
+     * Drone: one flight across the battle, from the player's side to the far side, high above the ground. It dives
+     * past a few fighters picked at random (one every ~3 s, up to 4), looking at each as it goes by, then climbs
+     * again and heads for the next. Never lower than {@link #DRONE_CLEAR} blocks over the ground under it and just
+     * ahead of it (hills); tree leaves may still get in the way.
+     */
+    private static void drone(PlayerRef player, Vector3d center, List<Ref<EntityStore>> fighters, long total,
+                              ComponentAccessor<EntityStore> buffer) {
+        long usable = Math.max(STEP_MS * 2, total - BACK_MS);
+        double spread = 0;
+        for (Ref<EntityStore> r : fighters) {
+            Vector3d q = ChaosWand.positionOf(r, buffer);
+            if (q != null) spread = Math.max(spread, Math.hypot(q.x - center.x, q.z - center.z));
+        }
+        double r = Math.max(12, Math.min(80, spread + 8));
+        double cruise = center.y + r * 0.35 + 8;
+        Eye eye = eyeOf(player, buffer);
+        double aS = eye != null ? Math.atan2(eye.pos.z - center.z, eye.pos.x - center.x) : 0;
+        double ux = -Math.cos(aS), uz = -Math.sin(aS);    // flight direction (toward the far side)
+        double px = -uz, pz = ux;                          // sideways
+        Vector3d from = new Vector3d(center.x - ux * r, cruise, center.z - uz * r);
+        Vector3d to = new Vector3d(center.x + ux * r, cruise, center.z + uz * r);
+        // The fighters it dives past, in flight order.
+        int dives = (int) Math.max(1, Math.min(4, Math.min(fighters.size(), usable / 3000)));
+        List<Ref<EntityStore>> picked = new ArrayList<>(fighters);
+        java.util.Collections.shuffle(picked);
+        picked = new ArrayList<>(picked.subList(0, dives));
+        Map<Ref<EntityStore>, Double> along = new java.util.HashMap<>();
+        for (Ref<EntityStore> f : picked) {
+            Vector3d q = ChaosWand.positionOf(f, buffer);
+            along.put(f, q == null ? 0 : (q.x - center.x) * ux + (q.z - center.z) * uz);
+        }
+        picked.sort(java.util.Comparator.comparingDouble(along::get));
+        List<Ref<EntityStore>> stops = picked;
+        Track track = new Track();
+        List<Shot> shots = List.of(new Shot(usable, (t, acc) -> {
+            // Waypoints: start edge, each dive (beside the fighter, low), far edge.
+            int n = stops.size() + 2;
+            Vector3d[] pts = new Vector3d[n];
+            Vector3d[] watch = new Vector3d[n];
+            pts[0] = from;
+            pts[n - 1] = to;
+            for (int i = 0; i < stops.size(); i++) {
+                Vector3d q = track.pos(stops.get(i), acc);
+                if (q == null) q = center;
+                pts[i + 1] = new Vector3d(q.x + px * DRONE_SIDE, q.y + DRONE_LOW, q.z + pz * DRONE_SIDE);
+                watch[i + 1] = new Vector3d(q.x, q.y + 1, q.z);
+            }
+            double u = (double) t / usable * (n - 1);
+            int i = (int) Math.min(n - 2, Math.floor(u));
+            double f = u - i;
+            double e = f * f * (3 - 2 * f);   // ease in and out of each stop
+            Vector3d a = pts[i], b = pts[i + 1];
+            double x = a.x + (b.x - a.x) * e, z = a.z + (b.z - a.z) * e;
+            // Low at the dives, back up to cruise height between them.
+            double base = a.y + (b.y - a.y) * e;
+            double y = base + Math.max(0, cruise - base) * Math.sin(Math.PI * f);
+            double ax = x + (b.x - a.x) * 0.15, az = z + (b.z - a.z) * 0.15;
+            y = Math.max(y, Math.max(ground(x, z, y, acc), ground(ax, az, y, acc)) + DRONE_CLEAR);
+            // Watch the fighter just passed for a moment, then the next stop (the battle's center at the end).
+            Vector3d look = f < 0.35 && watch[i] != null ? watch[i]
+                    : watch[i + 1] != null ? watch[i + 1] : new Vector3d(center.x, center.y + 1, center.z);
+            return frame(new Vector3d(x, y, z), look, DUEL_LERP);
+        }));
+        playShots(player, buffer.getExternalData().getWorld(), shots);
+    }
+
+    /** Height of the ground at (x, z), searched from a bit above {@code fromY} down; {@code fromY} if none found. */
+    private static double ground(double x, double z, double fromY, ComponentAccessor<EntityStore> acc) {
+        double g = FightFx.floorBelow(fromY + GROUND_SCAN, acc).applyAsDouble(x, z);
+        return Double.isFinite(g) ? g : fromY - DRONE_CLEAR;
+    }
+
+    /** The side's members ordered left to right as seen from the battle's center. */
+    private static List<Ref<EntityStore>> sortedAcross(List<Ref<EntityStore>> side, Vector3d center,
+                                                       ComponentAccessor<EntityStore> buffer) {
+        Vector3d c = centroid(side, buffer);
+        List<Ref<EntityStore>> out = new ArrayList<>(side);
+        if (c == null) return out;
+        double dx = c.x - center.x, dz = c.z - center.z;
+        double px = -dz, pz = dx;   // sideways
+        Map<Ref<EntityStore>, Double> across = new java.util.HashMap<>();
+        for (Ref<EntityStore> r : side) {
+            Vector3d p = ChaosWand.positionOf(r, buffer);
+            across.put(r, p == null ? 0 : (p.x - c.x) * px + (p.z - c.z) * pz);
+        }
+        out.sort(java.util.Comparator.comparingDouble(across::get));
+        return out;
+    }
+
+    private static Vector3d centroid(List<Ref<EntityStore>> refs, ComponentAccessor<EntityStore> buffer) {
+        double x = 0, y = 0, z = 0;
+        int n = 0;
+        for (Ref<EntityStore> r : refs) {
+            Vector3d p = r.isValid() ? ChaosWand.positionOf(r, buffer) : null;
+            if (p == null) continue;
+            x += p.x; y += p.y; z += p.z;
+            n++;
+        }
+        return n == 0 ? null : new Vector3d(x / n, y / n, z / n);
+    }
+
+    /**
+     * Close-up of someone at {@code p} facing {@code yaw}: from the front, turned {@code swing} radians to the
+     * side, {@code dist} away and {@code up} above the feet, looking at about chest height.
+     */
+    private static ServerCameraSettings closeUp(Vector3d p, float yaw, double eye, double swing, double dist, double up) {
+        double fx = -Math.sin(yaw), fz = -Math.cos(yaw);   // forward (PhysicsMath.headingX/Z)
+        double cos = Math.cos(swing), sin = Math.sin(swing);
+        double rx = fx * cos - fz * sin, rz = fx * sin + fz * cos;
+        return frame(new Vector3d(p.x + rx * dist, p.y + up, p.z + rz * dist),
+                new Vector3d(p.x, p.y + eye * 0.75, p.z), DUEL_LERP);
+    }
+
+    /** One shot of a server camera sequence: {@code ms} long, framed by {@code frame} (world thread). */
+    private record Shot(long ms, Framer frame) {
+    }
+
+    @FunctionalInterface
+    private interface Framer {
+        /** The camera {@code t} ms into the shot, or null to keep the last frame. */
+        ServerCameraSettings at(long t, ComponentAccessor<EntityStore> accessor);
+    }
+
+    /** Live positions, facing and eye height of the filmed entities, remembering the last known ones. */
+    private static final class Track {
+        private final Map<Ref<EntityStore>, Vector3d> last = new java.util.HashMap<>();
+        private final Map<Ref<EntityStore>, Float> yaw = new java.util.HashMap<>();
+        private final Map<Ref<EntityStore>, Double> eye = new java.util.HashMap<>();
+
+        Vector3d pos(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
+            Vector3d p = r.isValid() && r.getStore() == acc ? ChaosWand.positionOf(r, acc) : null;
+            if (p != null) last.put(r, p);
+            return last.get(r);
+        }
+
+        float yaw(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
+            TransformComponent t = r.isValid() && r.getStore() == acc
+                    ? acc.getComponent(r, TransformComponent.getComponentType()) : null;
+            if (t != null) yaw.put(r, t.getRotation().yaw());
+            return yaw.getOrDefault(r, 0f);
+        }
+
+        double eye(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
+            return eye.computeIfAbsent(r, k -> {
+                ModelComponent mc = k.isValid() && k.getStore() == acc
+                        ? acc.getComponent(k, ModelComponent.getComponentType()) : null;
+                Model m = mc != null ? mc.getModel() : null;
+                double h = m != null ? m.getEyeHeight(k, acc) : 1.6;
+                return Math.max(0.6, Math.min(12, h));
+            });
+        }
+    }
+
+    /**
+     * Plays the shots one after another for this player: a server camera frame every {@link #STEP_MS}, read on
+     * the world thread, then a glide back behind the player and their normal camera. A newer sequence for the
+     * same player replaces this one (its frames stop).
+     */
+    private static void playShots(PlayerRef player, com.hypixel.hytale.server.core.universe.world.World world,
+                                  List<Shot> shots) {
+        UUID uuid = player.getUuid();
+        long id = SEQ.incrementAndGet();
+        SHOT.put(uuid, id);
+        ORBITS.remove(uuid);
+        long start = 0;
+        for (Shot shot : shots) {
+            for (long t = 0; t < shot.ms(); t += STEP_MS) {
+                long local = t;
+                schedule(uuid, id, start + t, () -> world.execute(() -> {
+                    if (!Long.valueOf(id).equals(SHOT.get(uuid))) return;
+                    ServerCameraSettings s = shot.frame().at(local, world.getEntityStore().getStore());
+                    if (s != null) send(player, s);
+                }));
+            }
+            start += shot.ms();
+        }
+        schedule(uuid, id, start, () -> {
+            ServerCameraSettings back = behindPlayer(player);
+            if (back != null) send(player, back);
+        });
+        schedule(uuid, id, start + BACK_MS, () -> {
+            if (SHOT.remove(uuid, id)) reset(player);
+        });
     }
 
     /** Shot 0: close on A from B's side; 1: close on B from A's side; 2: both from the side. */
@@ -162,6 +532,19 @@ final class FightCamera {
 
     private static final long STEP_MS = 50;
     private static final long BACK_MS = 900;
+    /** Showcase: shortest close-up; fewer fighters are shown when the time is short. */
+    private static final long MIN_SHOT_MS = 1200;
+    /** Team sweep: share of each team's shot spent on its first member before sweeping. */
+    private static final double HOLD = 0.3;
+    private static final int MAX_TEAM_SHOTS = 6;
+    /** Focus: how far the camera circles the target (radians, about 200 degrees). */
+    private static final double FOCUS_SWEEP = 3.5;
+    /** Drone: height over a fighter it dives past, side offset (so it passes beside, not over), ground clearance. */
+    private static final double DRONE_LOW = 3.5;
+    private static final double DRONE_SIDE = 5;
+    private static final double DRONE_CLEAR = 3;
+    /** Ground search starts this far above the camera (hills taller than that are missed). */
+    private static final double GROUND_SCAN = 30;
     /** Glide between frames: follows a walking mob, and moves between shots in about half a second. */
     private static final float DUEL_LERP = 0.15f;
     private static final float LERP_BACK = 0.1f;

@@ -183,7 +183,9 @@ public final class SummonList {
             summary.setLength(summary.length() - 2);
         }
         if (spawned > 0) {
-            FightFx.area(owner, center, ring, SUMMON_AREA_SECONDS, store);
+            FightFx.area(ActionFx.Action.SUMMON, null, owner, center, ring, SUMMON_AREA_SECONDS, store);
+            // A shockwave out to the summoning ring (/mobbattle wave summon, default green).
+            ActionFx.shockwave(ActionFx.Action.SUMMON, center, ring, store);
             WandFx.burst(null, WandFx.SUMMON_SOUND, center, store);
         }
         player.sendMessage(Message.raw("Summoned " + spawned + " mobs: " + summary
