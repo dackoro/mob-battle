@@ -28,9 +28,6 @@ import java.util.Set;
  */
 public class FightDamageSystem extends DamageEventSystem {
 
-    /** Logs every battle hit. One line per hit floods the server log in big battles, so it is off. */
-    private static final boolean LOG_HITS = false;
-
     private final Set<Dependency<EntityStore>> dependencies =
             Set.of(new SystemDependency<>(Order.AFTER, NPCDamageSystems.FilterDamageSystem.class));
 
@@ -63,9 +60,38 @@ public class FightDamageSystem extends DamageEventSystem {
         return dependencies;
     }
 
+    /**
+     * Army Wand, hits on NPCs: the owner and army mobs never hurt their own army (cancelled, returns true);
+     * when the owner hits another mob, the whole army attacks it.
+     */
+    private static boolean armyHit(Ref<EntityStore> attacker, Ref<EntityStore> victim, Damage damage,
+                                   CommandBuffer<EntityStore> buffer) {
+        if (attacker == null || !attacker.isValid()) {
+            return false;
+        }
+        java.util.UUID victimOwner = Army.ownerOf(victim);
+        var player = buffer.getComponent(attacker, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
+        java.util.UUID attackerOwner = player != null ? player.getUuid() : Army.ownerOf(attacker);
+        if (victimOwner != null && victimOwner.equals(attackerOwner)) {
+            damage.setCancelled(true);
+            return true;
+        }
+        if (player != null && !damage.isCancelled()) {
+            Army.order(player.getUuid(), victim, buffer);
+        }
+        if (victimOwner != null && !damage.isCancelled()) {
+            Army.defend(victim, attacker, buffer);
+        }
+        return false;
+    }
+
     @Override
     public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                        CommandBuffer<EntityStore> buffer, Damage damage) {
+        if (Army.any() && damage.getSource() instanceof Damage.EntitySource armySource && armyHit(armySource.getRef(),
+                chunk.getReferenceTo(index), damage, buffer)) {
+            return;
+        }
         // Every NPC hit in every world passes here: nothing to do while no battle or wand fight exists.
         if (!BattleManager.hasBattles() && !FightManager.hasFights()
                 || !(damage.getSource() instanceof Damage.EntitySource source)) {
@@ -80,7 +106,7 @@ public class FightDamageSystem extends DamageEventSystem {
         if (!FightManager.isFighting(source.getRef(), victim) && !BattleManager.areEnemies(source.getRef(), victim)) {
             return;
         }
-        if (LOG_HITS) {
+        if (BattleDebug.tracing(source.getRef(), victim)) {
             // Debug: shows whether fighter hits reach the damage pipeline and if vanilla cancelled them.
             MobBattlePlugin.log("Fight hit " + roleOf(source.getRef(), buffer) + " -> " + roleOf(victim, buffer) + " "
                     + damage.getAmount() + " (cancelled by vanilla: " + damage.isCancelled() + ")");

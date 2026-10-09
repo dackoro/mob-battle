@@ -1,0 +1,15 @@
+{
+  "$Comment": "Chaos Wand everyone vs one: a small golden crown over the lone target while the fight goes on (no tint, so other wand tints don't remove it).",
+  "Duration": 20.0,
+  "ApplicationEffects": {
+    "Particles": [
+      {
+        "SystemId": "Effect_Crown_Gold",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Head"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

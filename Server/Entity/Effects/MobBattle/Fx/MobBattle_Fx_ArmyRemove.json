@@ -1,0 +1,18 @@
+{
+  "$Comment": "Army Wand: the mob leaves your army (red tint, red burst ring).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff1a1a",
+    "EntityBottomTint": "#7a0000",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Remove_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Despawn"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

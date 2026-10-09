@@ -42,7 +42,9 @@ public class CleanseInteraction extends SimpleInstantInteraction {
             return;
         }
         effects.clearEffects(target, buffer);
-        MorphWand.restore(target, buffer);
+        boolean unmorphed = MorphWand.restore(target, buffer);
+        WandFx.onTarget(target, WandFx.CLEANSE, buffer);
+        if (unmorphed) WandFx.onTarget(target, WandFx.UNMORPH, buffer);
         player.sendMessage(Message.raw("Removed every effect from " + ChaosWand.nameOf(target, buffer) + ".").color("#7fd3ff"));
     }
 }

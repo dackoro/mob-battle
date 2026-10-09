@@ -49,6 +49,7 @@ public class HealInteraction extends SimpleInstantInteraction {
         String name = npc != null ? npc.getRoleName() : "target";
         PlayerRef player = buffer.getComponent(context.getEntity(), PlayerRef.getComponentType());
         stats.maximizeStatValue(health);
+        WandFx.onTarget(target, WandFx.HEAL, buffer);
         if (player != null) {
             player.sendMessage(Message.raw("Healed " + name + " to full health.").color("#55ff77"));
         }

@@ -10,8 +10,8 @@
   "Quality": "Epic",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/Weapons/Wand/Wood.blockymodel",
-  "Texture": "Items/Weapons/Wand/Wood_Texture.png",
+  "Model": "Items/MobBattle/MorphWand/MobBattle_MorphWand.blockymodel",
+  "Texture": "Items/MobBattle/MorphWand/MobBattle_MorphWand_Texture.png",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true
@@ -20,14 +20,48 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "MobBattle_MorphApply"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_MorphApply",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            },
+            {
+              "Type": "MobBattle_MorphApply",
+              "Effects": {
+                "ItemAnimationId": "SwingRight"
+              },
+              "RunTime": 0.1
+            }
+          ]
         }
       ]
     },
     "Secondary": {
       "Interactions": [
         {
-          "Type": "MobBattle_MorphCopy"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_MorphCopy",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            },
+            {
+              "Type": "MobBattle_MorphCopy",
+              "Effects": {
+                "ItemAnimationId": "SwingRight"
+              },
+              "RunTime": 0.1
+            }
+          ]
         }
       ]
     }

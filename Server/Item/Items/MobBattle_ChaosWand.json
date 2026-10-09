@@ -10,8 +10,8 @@
   "Quality": "Legendary",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/Weapons/Wand/Wood.blockymodel",
-  "Texture": "Items/Weapons/Wand/Wood_Texture.png",
+  "Model": "Items/MobBattle/ChaosWand/MobBattle_ChaosWand.blockymodel",
+  "Texture": "Items/MobBattle/ChaosWand/MobBattle_ChaosWand_Texture.png",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true
@@ -20,14 +20,40 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "MobBattle_ChaosFocus"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_ChaosFocus",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft",
+                "WorldSoundEventId": "SFX_Wand_Fire_Shoot"
+              },
+              "RunTime": 0.35
+            },
+            {
+              "Type": "MobBattle_ChaosFocus",
+              "Effects": {
+                "ItemAnimationId": "SwingRight",
+                "WorldSoundEventId": "SFX_Wand_Fire_Shoot"
+              },
+              "RunTime": 0.35
+            }
+          ]
         }
       ]
     },
     "Secondary": {
       "Interactions": [
         {
-          "Type": "MobBattle_ChaosBrawl"
+          "Type": "MobBattle_ChaosBrawl",
+          "Effects": {
+            "ItemPlayerAnimationsId": "Spellbook",
+            "ItemAnimationId": "CastPushCharged",
+            "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Charge",
+            "CameraEffect": "Ability_Cast_Generic"
+          },
+          "RunTime": 0.6
         }
       ]
     }

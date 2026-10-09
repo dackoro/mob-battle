@@ -1,0 +1,64 @@
+package dev.dackoro.mobbattle;
+
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.SystemGroup;
+import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
+import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+
+/**
+ * Army Wand, hits on players: your own army mobs can't hurt you, and any other mob or player that hits
+ * you gets attacked by your army; a player you hit gets attacked by your army (PvP). (Hits on NPCs are handled in FightDamageSystem.)
+ */
+public class ArmyPlayerDamageSystem extends DamageEventSystem {
+
+    @Override
+    public SystemGroup<EntityStore> getGroup() {
+        return DamageModule.get().getFilterDamageGroup();
+    }
+
+    @Override
+    public Query<EntityStore> getQuery() {
+        return PlayerRef.getComponentType();
+    }
+
+    @Override
+    public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
+                       CommandBuffer<EntityStore> buffer, Damage damage) {
+        if (!Army.any() || !(damage.getSource() instanceof Damage.EntitySource source)) {
+            return;
+        }
+        Ref<EntityStore> attacker = source.getRef();
+        Ref<EntityStore> victim = chunk.getReferenceTo(index);
+        if (attacker == null || !attacker.isValid() || attacker == victim) {
+            return;
+        }
+        PlayerRef player = buffer.getComponent(victim, PlayerRef.getComponentType());
+        if (player == null) {
+            return;
+        }
+        if (buffer.getComponent(attacker, NPCEntity.getComponentType()) != null) {
+            if (Army.isMember(player.getUuid(), attacker)) {
+                damage.setCancelled(true);
+            } else if (!damage.isCancelled()) {
+                Army.order(player.getUuid(), attacker, buffer);
+            }
+            return;
+        }
+        // PvP: a player hit another player. Only real hits count (not ones PvP rules already cancelled).
+        PlayerRef hitter = buffer.getComponent(attacker, PlayerRef.getComponentType());
+        if (hitter == null || damage.isCancelled()) {
+            return;
+        }
+        // Bodyguard: the victim's army goes for the hitter; owner's order: the hitter's army goes for the victim.
+        Army.order(player.getUuid(), attacker, buffer);
+        Army.order(hitter.getUuid(), victim, buffer);
+    }
+}

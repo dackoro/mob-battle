@@ -1,0 +1,22 @@
+{
+  "$Comment": "Summon Wand: mob type added to the summon list (burst ring, green tint + ring).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#00e040",
+    "EntityBottomTint": "#007a1f",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Heal_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "Aura_Heal",
+        "TargetEntityPart": "Entity"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Eye_Void_Attack_Summon"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

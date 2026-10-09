@@ -29,13 +29,20 @@ dependencies {
     }
 }
 
+// -PcodeOnly: jar without Common/ and Server/ (deploy.ps1 -Dev). The assets then come from the
+// "Mob Battle Assets DEV" folder pack, which links to this repo and hot-reloads in game.
+val codeOnly = providers.gradleProperty("codeOnly").isPresent
+
 tasks.jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     archiveBaseName.set("MobBattle")
+    inputs.property("codeOnly", codeOnly)
     from(".") {
         include("manifest.json")
         include("README.md")
-        include("Common/**")
-        include("Server/**")
+        if (!codeOnly) {
+            include("Common/**")
+            include("Server/**")
+        }
     }
 }

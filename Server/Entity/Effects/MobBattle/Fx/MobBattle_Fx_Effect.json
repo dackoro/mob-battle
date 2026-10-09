@@ -1,0 +1,16 @@
+{
+  "$Comment": "Effect Wand: purple burst and sound when the effect lands. No tint, so it does not hide the tint of the effect given (e.g. Burn).",
+  "Duration": 1.2,
+  "ApplicationEffects": {
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Effect_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

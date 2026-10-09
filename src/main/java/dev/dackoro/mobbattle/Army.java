@@ -1,0 +1,266 @@
+package dev.dackoro.mobbattle;
+
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Army Wand: each player's own mobs. Army mobs don't attack their owner and can't be hurt by the owner
+ * or by each other. They defend themselves and their owner and attack what the owner hits (see order()).
+ * Kept in memory only (like the team drafts): the army is gone after a server restart.
+ */
+final class Army {
+
+    /** Army mob -> owner's UUID. */
+    private static final Map<Ref<EntityStore>, UUID> OWNER = new ConcurrentHashMap<>();
+
+    private Army() {
+    }
+
+    static boolean any() {
+        return !OWNER.isEmpty();
+    }
+
+    static UUID ownerOf(Ref<EntityStore> npc) {
+        return npc == null ? null : OWNER.get(npc);
+    }
+
+    static boolean isMember(UUID owner, Ref<EntityStore> npc) {
+        return owner != null && owner.equals(ownerOf(npc));
+    }
+
+    static List<Ref<EntityStore>> members(UUID owner) {
+        List<Ref<EntityStore>> out = new ArrayList<>();
+        OWNER.forEach((npc, o) -> {
+            if (o.equals(owner) && npc.isValid()) out.add(npc);
+        });
+        return out;
+    }
+
+    /** Adds the mob to the player's army, or removes it if it was already in it. Returns true if added. */
+    static boolean toggle(PlayerRef player, Ref<EntityStore> playerEntity, Ref<EntityStore> npc,
+                          ComponentAccessor<EntityStore> buffer) {
+        UUID id = player.getUuid();
+        if (id.equals(OWNER.get(npc))) {
+            release(npc, playerEntity, buffer);
+            return false;
+        }
+        // An army order replaces any battle, fight or team the mob was in.
+        BattleManager.detach(List.of(npc));
+        FightManager.endFightsOf(List.of(npc));
+        OWNER.put(npc, id);
+        FightManager.befriend(npc, playerEntity, buffer);
+        return true;
+    }
+
+    /** Empties the player's army. Returns how many mobs left it. */
+    static int disband(UUID owner, Ref<EntityStore> playerEntity, ComponentAccessor<EntityStore> buffer) {
+        List<Ref<EntityStore>> mobs = members(owner);
+        for (Ref<EntityStore> npc : mobs) {
+            release(npc, playerEntity, buffer);
+        }
+        OWNER.values().removeIf(owner::equals);
+        return mobs.size();
+    }
+
+    /** /mobbattle resetall and army clearall: every army, every player. Returns how many mobs. */
+    static int clearAll() {
+        int n = 0;
+        for (Ref<EntityStore> npc : new ArrayList<>(OWNER.keySet())) {
+            if (npc.isValid()) {
+                FightManager.queueStop(npc, List.of());
+                n++;
+            }
+        }
+        FightManager.endFightsOf(new ArrayList<>(OWNER.keySet()));
+        OWNER.clear();
+        return n;
+    }
+
+    private static void release(Ref<EntityStore> npc, Ref<EntityStore> playerEntity, ComponentAccessor<EntityStore> buffer) {
+        OWNER.remove(npc);
+        FightManager.endFightsOf(List.of(npc));
+        // Back to its own AI; the owner stays ignored for a while instead of being attacked at once.
+        FightManager.queueStop(npc, playerEntity != null ? List.of(playerEntity) : List.of());
+    }
+
+    /*
+     * Army orders, most urgent first:
+     *  1. Self-defense: a mob hit by X turns on X (and the nearest free mate helps) - defend().
+     *  2. Bodyguard: someone hits the owner - order().
+     *  3. Owner's order: the owner hits a target - order().
+     *     order(): every free mob goes; if none is free, the nearest half to the enemy switches, the rest
+     *     finish what they were doing.
+     *  4. Regroup: a mob whose target died joins the nearest enemy the army still fights, or follows the
+     *     owner again - in follow(), once per second.
+     * "Free" = not fighting, or its target is dead.
+     */
+
+    /** Rules 2 and 3: the owner hit {@code enemy}, or {@code enemy} hit the owner. */
+    static void order(UUID owner, Ref<EntityStore> enemy, ComponentAccessor<EntityStore> buffer) {
+        if (enemy == null || !enemy.isValid() || isMember(owner, enemy) || !BattleManager.isAlive(enemy, buffer)) {
+            return;
+        }
+        List<Ref<EntityStore>> free = new ArrayList<>(), busy = new ArrayList<>();
+        for (Ref<EntityStore> npc : members(owner)) {
+            if (npc.getStore() != enemy.getStore() || !BattleManager.isAlive(npc, buffer)) continue;
+            if (FightManager.enemyOf(npc) == enemy) continue; // already on it
+            (isFree(npc, buffer) ? free : busy).add(npc);
+        }
+        if (free.isEmpty() && !busy.isEmpty()) {
+            // Nobody free: the nearest half switches, the rest finish their fight.
+            org.joml.Vector3d at = ChaosWand.positionOf(enemy, buffer);
+            if (at != null) busy.sort(java.util.Comparator.comparingDouble(n -> ChaosWand.distSq(at, n, buffer)));
+            free = busy.subList(0, (busy.size() + 1) / 2);
+        }
+        Ref<EntityStore> me = entityOf(owner);
+        for (Ref<EntityStore> npc : free) {
+            engage(npc, enemy, me, buffer);
+        }
+    }
+
+    /** Rule 1: army mob {@code mob} was hit by {@code attacker}: it fights back, with the nearest free mate. */
+    static void defend(Ref<EntityStore> mob, Ref<EntityStore> attacker, ComponentAccessor<EntityStore> buffer) {
+        UUID owner = ownerOf(mob);
+        if (owner == null || attacker == null || !attacker.isValid() || isMember(owner, attacker)
+                || attacker.getStore() != mob.getStore() || !BattleManager.isAlive(attacker, buffer)) {
+            return;
+        }
+        Ref<EntityStore> me = entityOf(owner);
+        if (FightManager.enemyOf(mob) != attacker) {
+            engage(mob, attacker, me, buffer);
+        }
+        org.joml.Vector3d at = ChaosWand.positionOf(mob, buffer);
+        if (at == null) return;
+        Ref<EntityStore> helper = null;
+        double best = Double.MAX_VALUE;
+        for (Ref<EntityStore> npc : members(owner)) {
+            if (npc == mob || npc.getStore() != mob.getStore() || !BattleManager.isAlive(npc, buffer)
+                    || !isFree(npc, buffer)) continue;
+            double d = ChaosWand.distSq(at, npc, buffer);
+            if (d < best) {
+                best = d;
+                helper = npc;
+            }
+        }
+        if (helper != null) engage(helper, attacker, me, buffer);
+    }
+
+    /** Not fighting, or its target is dead. */
+    private static boolean isFree(Ref<EntityStore> npc, ComponentAccessor<EntityStore> buffer) {
+        Ref<EntityStore> now = FightManager.enemyOf(npc);
+        return now == null || !now.isValid() || !BattleManager.isAlive(now, buffer);
+    }
+
+    private static void engage(Ref<EntityStore> npc, Ref<EntityStore> enemy, Ref<EntityStore> owner,
+                               ComponentAccessor<EntityStore> buffer) {
+        // Group fight: the enemy keeps its other fights, so several army mobs can be on it.
+        FightManager.startFight(npc, enemy, buffer, true);
+        FightManager.turnAgainst(npc, enemy, buffer, false);
+        if (owner != null && owner.isValid() && owner.getStore() == npc.getStore()) {
+            FightManager.befriend(npc, owner, buffer);
+        }
+    }
+
+    /** Rule 4 for one owner's mobs in this world: free mobs join the nearest enemy the army still fights. */
+    private static void regroup(UUID owner, List<Ref<EntityStore>> mobs, ComponentAccessor<EntityStore> buffer) {
+        List<Ref<EntityStore>> enemies = new ArrayList<>();
+        List<Ref<EntityStore>> free = new ArrayList<>();
+        for (Ref<EntityStore> npc : mobs) {
+            if (!BattleManager.isAlive(npc, buffer)) continue;
+            if (isFree(npc, buffer)) {
+                if (FightManager.enemyOf(npc) != null) FightManager.endFightsOf(List.of(npc));
+                free.add(npc);
+            } else {
+                Ref<EntityStore> e = FightManager.enemyOf(npc);
+                if (!enemies.contains(e)) enemies.add(e);
+            }
+        }
+        if (enemies.isEmpty() || free.isEmpty()) return;
+        Ref<EntityStore> me = entityOf(owner);
+        for (Ref<EntityStore> npc : free) {
+            org.joml.Vector3d at = ChaosWand.positionOf(npc, buffer);
+            if (at == null) continue;
+            Ref<EntityStore> nearest = null;
+            double best = Double.MAX_VALUE;
+            for (Ref<EntityStore> e : enemies) {
+                double d = ChaosWand.distSq(at, e, buffer);
+                if (d < best) {
+                    best = d;
+                    nearest = e;
+                }
+            }
+            if (nearest != null) engage(npc, nearest, me, buffer);
+        }
+    }
+
+    /** Blocks from the owner after which an army mob that isn't fighting is teleported back next to them. */
+    static final double TELEPORT_DISTANCE = 20;
+
+    /**
+     * Once per second per world (BattleLifecycleSystem, on the world thread): army mobs follow their owner.
+     * Their leash point (home) moves to the owner, so roles with a Leash sensor walk back to them; any mob
+     * farther than TELEPORT_DISTANCE and not fighting is teleported next to the owner.
+     */
+    static void follow(com.hypixel.hytale.component.Store<EntityStore> store) {
+        // One pass over every army mob of this world, grouped by owner.
+        Map<UUID, List<Ref<EntityStore>>> byOwner = new java.util.HashMap<>();
+        OWNER.forEach((npc, owner) -> {
+            if (npc.isValid() && npc.getStore() == store) byOwner.computeIfAbsent(owner, k -> new ArrayList<>()).add(npc);
+        });
+        if (byOwner.isEmpty()) return;
+        var tType = com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType();
+        var npcType = com.hypixel.hytale.server.npc.entities.NPCEntity.getComponentType();
+        java.util.concurrent.ThreadLocalRandom rnd = java.util.concurrent.ThreadLocalRandom.current();
+        byOwner.forEach((owner, mobs) -> {
+            regroup(owner, mobs, store);
+            Ref<EntityStore> me = entityOf(owner);
+            if (me == null || me.getStore() != store) return;
+            var mt = store.getComponent(me, tType);
+            if (mt == null) return;
+            org.joml.Vector3d p = new org.joml.Vector3d(mt.getPosition());
+            java.util.function.DoubleBinaryOperator floor = null;
+            for (Ref<EntityStore> npc : mobs) {
+                if (!BattleManager.isAlive(npc, store)) continue;
+                var entity = store.getComponent(npc, npcType);
+                var t = store.getComponent(npc, tType);
+                if (entity == null || t == null) continue;
+                entity.setLeashPoint(new org.joml.Vector3d(p));
+                if (!isFree(npc, store)
+                        || t.getPosition().distanceSquared(p) < TELEPORT_DISTANCE * TELEPORT_DISTANCE) continue;
+                if (floor == null) floor = FightFx.floorBelow(p.y, store);
+                double angle = rnd.nextDouble(Math.PI * 2), dist = 2 + rnd.nextDouble(2);
+                double x = p.x + Math.cos(angle) * dist, z = p.z + Math.sin(angle) * dist;
+                double y = floor.applyAsDouble(x, z);
+                org.joml.Vector3d to = new org.joml.Vector3d(x, Double.isFinite(y) ? y - 0.25 : p.y, z);
+                store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
+                        com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
+                                new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f)));
+                WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
+            }
+        });
+    }
+
+    /**
+     * The owner's current entity, looked up by UUID (not a stored PlayerRef: after a reconnect the player has
+     * a new one, and a stored one would keep a disconnected player's data alive). Null if offline.
+     */
+    private static Ref<EntityStore> entityOf(UUID owner) {
+        PlayerRef player = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(owner);
+        Ref<EntityStore> ref = player != null && player.isValid() ? player.getReference() : null;
+        return ref != null && ref.isValid() ? ref : null;
+    }
+
+    /** Drops dead or unloaded mobs (BattleManager.maintain). */
+    static void prune() {
+        OWNER.keySet().removeIf(npc -> !npc.isValid());
+    }
+}

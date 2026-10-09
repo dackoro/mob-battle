@@ -39,8 +39,21 @@ public final class BattleManager {
     /** Safety: a battle stops after this long even if nobody wins. */
     private static final long MAX_MILLIS = 15 * 60 * 1000;
 
+    /** Battle type; its key names it in /mobbattle friendlyfire and battleisolation. */
+    public enum Kind {
+        DUEL("duel"), ALL_VS_ONE("allvsone"), ROYALE("royale"), TEAMS("teams");
+
+        public final String key;
+
+        Kind(String key) {
+            this.key = key;
+        }
+    }
+
     public static final class Battle {
         final UUID id = UUID.randomUUID();
+        /** Set from the constructor; SelectFighterInteraction marks its 2-mob royale as a DUEL. */
+        volatile Kind kind;
         final PlayerRef owner;
         final boolean royale;
         /** Chaos Wand "EVERYONE vs X": the target's name (side 1, alone) vs everyone else (side 0); else null. */
@@ -71,6 +84,7 @@ public final class BattleManager {
             this.owner = owner;
             this.royale = royale;
             this.focusName = focusName;
+            this.kind = focusName != null ? Kind.ALL_VS_ONE : royale ? Kind.ROYALE : Kind.TEAMS;
         }
 
         void add(Ref<EntityStore> npc, int team) {
@@ -130,9 +144,10 @@ public final class BattleManager {
     public static boolean blocksDamage(Ref<EntityStore> x, Ref<EntityStore> y) {
         Battle a = battleOf(x), b = battleOf(y);
         if (a != null && a == b) {
-            return a.team(x) == a.team(y);
+            // Allies never pick each other as targets; with /mobbattle friendlyfire on, stray hits still hurt.
+            return !FxSettings.friendlyFire(a.kind) && a.team(x) == a.team(y);
         }
-        return FxSettings.battleIsolation && (a != null || b != null);
+        return a != null && FxSettings.isolated(a.kind) || b != null && FxSettings.isolated(b.kind);
     }
 
     /** Winner/timeout check and pet cache of this world's battles; runs on the world thread once per second. */
@@ -151,7 +166,10 @@ public final class BattleManager {
      * keeps its whole Store (world) reachable, so dead or unloaded entities must be dropped.
      */
     static void maintain() {
+        // Retired mobs stay managed on purpose (joinOwnersSide must not pull them back into a battle).
         MANAGED.removeIf(npc -> !npc.isValid());
+        WandFx.prune();
+        Army.prune();
         for (Battle battle : BATTLES) {
             // World unloaded (e.g. a closed instance): its tick will never run checkWinner again. A live world
             // handles its own empty battles there, with the "DRAW!" announcement.
@@ -172,6 +190,9 @@ public final class BattleManager {
         TeamFx.prune();
         MorphWand.prune();
         FightFx.pruneTitles();
+        FightFx.pruneHeldAreas();
+        Countdown.prune();
+        BattleDebug.prune();
     }
 
     private static void refreshFlocks(Battle battle, ComponentAccessor<EntityStore> accessor) {
@@ -190,18 +211,51 @@ public final class BattleManager {
     }
 
     private static void finish(Battle battle) {
+        finish(battle, battle.snapshot());
+    }
+
+    private static void finish(Battle battle, List<Ref<EntityStore>> formerMembers) {
         battle.over = true;
         BATTLES.remove(battle);
         List<Ref<EntityStore>> all = battle.snapshot();
         for (Ref<EntityStore> npc : all) {
             if (npc.isValid()) {
-                FightManager.queueStop(npc, all);
+                FightManager.queueStop(npc, formerMembers);
                 if (battle.isTeams()) TeamFx.clear(npc);
             }
         }
     }
 
     private BattleManager() {
+    }
+
+    /** Ends every running battle (duels, Chaos and team battles) with no winner. Returns how many. */
+    public static int stopAll() {
+        int n = 0;
+        for (Battle battle : new ArrayList<>(BATTLES)) {
+            finish(battle);
+            n++;
+        }
+        return n;
+    }
+
+    /** Empties every player's teams and removes the team look. Returns how many mobs were in a team. */
+    public static int clearAllDrafts() {
+        int n = 0;
+        for (Draft draft : DRAFTS.values()) {
+            for (List<Ref<EntityStore>> team : draft.teams) {
+                for (Ref<EntityStore> npc : team) {
+                    if (npc.isValid()) {
+                        TeamFx.clear(npc);
+                        n++;
+                    }
+                }
+            }
+        }
+        DRAFTS.clear();
+        DRAFT_OWNERS.clear();
+        draftMembers = false;
+        return n;
     }
 
     public static boolean hasBattles() {
@@ -257,7 +311,7 @@ public final class BattleManager {
             // Fewer than 2 sides left: nothing to win, end it silently.
             long sides = b.teamOf.values().stream().distinct().count();
             if (sides < 2) {
-                finish(b);
+                finish(b, opponents);
                 MobBattlePlugin.log("Battle ended: its mobs got new wand orders");
             }
         }
@@ -296,6 +350,53 @@ public final class BattleManager {
             }
         }
         return null;
+    }
+
+    /** Starts/replaces a duel, or merges only the connected duels in accumulated mode. */
+    static Battle startDuel(PlayerRef owner, Ref<EntityStore> a, Ref<EntityStore> b, boolean accumulate) {
+        if (!accumulate) {
+            Battle duel = startRoyale(owner, List.of(a, b));
+            duel.kind = Kind.DUEL;
+            return duel;
+        }
+        // Only explicitly connected Battle Wand duels merge; team and Chaos battles stay separate.
+        Set<Battle> previous = new java.util.LinkedHashSet<>();
+        List<Ref<EntityStore>> leaveOtherBattles = new ArrayList<>();
+        for (Ref<EntityStore> selected : List.of(a, b)) {
+            Battle old = battleOf(selected);
+            if (old != null && old.kind == Kind.DUEL) previous.add(old);
+            else if (old != null) leaveOtherBattles.add(selected);
+        }
+        detach(leaveOtherBattles);
+        Battle duel = new Battle(owner, true);
+        duel.kind = Kind.DUEL;
+        int nextSide = 0;
+        for (Battle old : previous) {
+            Map<Integer, Integer> sides = new java.util.HashMap<>();
+            for (Ref<EntityStore> member : old.snapshot()) {
+                if (!member.isValid()) continue;
+                Integer side = sides.get(old.team(member));
+                if (side == null) {
+                    side = nextSide++;
+                    sides.put(old.team(member), side);
+                }
+                duel.add(member, side);
+            }
+            duel.targets.putAll(old.targets);
+            // Transfer membership without stopping the former participants or declaring a winner.
+            old.over = true;
+            BATTLES.remove(old);
+        }
+        if (!duel.has(a)) duel.add(a, nextSide++);
+        if (!duel.has(b)) duel.add(b, nextSide++);
+        if (duel.team(a) == duel.team(b)) duel.add(b, nextSide);
+        FightManager.endFightsOf(duel.snapshot());
+        FightManager.cancelPendingStop(a);
+        FightManager.cancelPendingStop(b);
+        duel.targets.put(a, b);
+        duel.targets.put(b, a);
+        BATTLES.add(duel);
+        return duel;
     }
 
     /** Starts a battle royale: every NPC for itself. */

@@ -81,8 +81,6 @@ public final class FightFx {
 
     /** Once per second per world (BattleLifecycleSystem): redraw held areas whose owner holds the Chaos Wand. */
     static void refreshHeldAreas(com.hypixel.hytale.component.Store<EntityStore> store) {
-        if (HELD_AREAS.isEmpty()) return;
-        HELD_AREAS.values().removeIf(h -> !h.player().isValid() || !FxSettings.areaOnlyWand);
         for (HeldArea h : HELD_AREAS.values()) {
             if (h.store() == store && holdsItem(h.player(), CHAOS_WAND_ID, store)) {
                 drawArea(h.center(), h.radius(), h.style(), h.colorName(), HELD_AREA_SECONDS, h.player(), store);
@@ -90,11 +88,31 @@ public final class FightFx {
         }
     }
 
+    /**
+     * BattleManager.maintain: a held area keeps its world's Store reachable. Drops it when the player left,
+     * its world was unloaded, or areaonlywand was turned off (then refreshHeldAreas no longer runs).
+     */
+    static void pruneHeldAreas() {
+        if (HELD_AREAS.isEmpty()) return;
+        HELD_AREAS.values().removeIf(h -> !FxSettings.areaOnlyWand || !h.player().isValid() || h.store().isShutdown());
+    }
+
     /** Draws the area for {@code seconds}, to everyone in the world, or only to {@code only} when not null. */
     private static void drawArea(org.joml.Vector3d center, double radius, String style, String colorName, float seconds,
                                  PlayerRef only, ComponentAccessor<EntityStore> buffer) {
         java.util.List<com.hypixel.hytale.protocol.ToClientPacket> packets = new java.util.ArrayList<>();
-        var ground = groundOf(buffer);
+        var top = groundOf(buffer);
+        var below = floorBelow(center.y(), buffer);
+        // The heightmap is the highest block: under a roof (caves, the goblin instance) that is the ceiling.
+        // So first the nearest solid block under the center's feet; if none is loaded within reach, the
+        // heightmap, unless it is far above the center (a roof): then the center height.
+        double cy = center.y();
+        java.util.function.DoubleBinaryOperator ground = (x, z) -> {
+            double y = below.applyAsDouble(x, z);
+            if (Double.isFinite(y)) return y;
+            y = top.applyAsDouble(x, z);
+            return Double.isFinite(y) && y > cy + ROOF_MARGIN ? Double.NaN : y;
+        };
         boolean all = "all".equals(style);
         if (all || "both".equals(style) || "zone".equals(style) || "floor".equals(style)) {
             zone(center, radius, Teams.PALETTE.get(colorName), all || "zone".equals(style), seconds, ground, packets);
@@ -108,6 +126,45 @@ public final class FightFx {
         } else {
             PlayerUtil.broadcastPacketToPlayers(buffer, packets.toArray(new com.hypixel.hytale.protocol.ToClientPacket[0]));
         }
+    }
+
+    /** Blocks above the area center from which the top block counts as a roof, not the ground. */
+    private static final double ROOF_MARGIN = 6;
+
+    /** How far up (step onto a ledge) and down the nearest floor under the center is searched. */
+    private static final int FLOOR_UP = 3;
+    private static final int FLOOR_DOWN = 32;
+
+    /**
+     * Nearest solid block under {@code fromY} (0.25 above it), or NaN. Reads only loaded chunk sections
+     * (no loading); works under roofs, unlike the heightmap.
+     */
+    static java.util.function.DoubleBinaryOperator floorBelow(double fromY, ComponentAccessor<EntityStore> buffer) {
+        var chunks = buffer.getExternalData().getWorld().getChunkStore();
+        var store = chunks.getStore();
+        var blockTypes = com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.getAssetMap();
+        var sectionType = com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection.getComponentType();
+        int start = (int) Math.floor(fromY) + FLOOR_UP;
+        return (x, z) -> {
+            int bx = (int) Math.floor(x);
+            int bz = (int) Math.floor(z);
+            com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection section = null;
+            int sectionY = Integer.MIN_VALUE;
+            for (int y = start; y >= start - FLOOR_UP - FLOOR_DOWN; y--) {
+                if (y < 0) break;
+                if ((y >> 5) != sectionY) {
+                    sectionY = y >> 5;
+                    var ref = chunks.getChunkSectionReference(bx >> 5, sectionY, bz >> 5);
+                    section = ref != null && ref.isValid() ? store.getComponent(ref, sectionType) : null;
+                }
+                if (section == null) continue;
+                var type = blockTypes.getAsset(section.get(bx & 31, y & 31, bz & 31));
+                if (type != null && type.getMaterial() == com.hypixel.hytale.protocol.BlockMaterial.Solid) {
+                    return y + 1.25;
+                }
+            }
+            return Double.NaN;
+        };
     }
 
     /** Ground height (0.25 above the top collision block) from resident heightmaps only, or NaN. */
@@ -197,9 +254,13 @@ public final class FightFx {
     }
 
     public static final String TEAM_WAND_ID = "MobBattle_TeamWand";
-    /** Team rings are redrawn this often and last a bit longer, so they look continuous. */
-    public static final long TEAM_RING_REFRESH_MS = 1000;
-    private static final int TEAM_RING_MILLIS = 1150;
+    /**
+     * Team rings are redrawn this often and last one tick (~33 ms) longer, so they look continuous with
+     * almost no overlap (two rings at 0.6 opacity look darker). A drawn ring cannot be moved or replaced
+     * (DisplayDebug has no id), so a shorter refresh is also how long a ring lags behind a moving mob.
+     */
+    public static final long TEAM_RING_REFRESH_MS = 250;
+    private static final int TEAM_RING_MILLIS = 283;
 
     /** True if the player currently holds the Team Wand and is in the same world as {@code buffer}. */
     public static boolean holdsTeamWand(PlayerRef player, ComponentAccessor<EntityStore> buffer) {
@@ -307,15 +368,41 @@ public final class FightFx {
     /** Big title for group fights. */
     public static void title(PlayerRef player, String main, String sub) {
         if (FxSettings.titleEnabled) {
-            showTitle(player, main, sub);
+            for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub);
         }
     }
 
     /** Winner titles have their own switch, independent of fight-start titles. */
     public static void winnerTitle(PlayerRef player, String main, String sub) {
         if (FxSettings.winTitleEnabled) {
-            showTitle(player, main, sub, true);
+            for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub, true);
         }
+    }
+
+    /**
+     * /mobbattle titlescope: who sees the titles of {@code owner}'s fights. Each viewer keeps their own title
+     * queue, so two players' fights never cancel each other's titles: start titles are merged per viewer,
+     * winner titles all play.
+     */
+    static java.util.List<PlayerRef> titleViewers(PlayerRef owner) {
+        if ("owner".equals(FxSettings.titleScope) || owner == null || !owner.isValid()) {
+            return owner == null ? java.util.List.of() : java.util.List.of(owner);
+        }
+        java.util.UUID world = owner.getWorldUuid();
+        var center = owner.getTransform() != null ? owner.getTransform().getPosition() : null;
+        boolean nearby = "nearby".equals(FxSettings.titleScope);
+        double max = FxSettings.TITLE_NEARBY_BLOCKS * FxSettings.TITLE_NEARBY_BLOCKS;
+        java.util.List<PlayerRef> out = new java.util.ArrayList<>();
+        out.add(owner);
+        for (PlayerRef p : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
+            if (p == owner || !p.isValid() || world == null || !world.equals(p.getWorldUuid())) continue;
+            if (nearby) {
+                var t = p.getTransform();
+                if (center == null || t == null || t.getPosition().distanceSquared(center) > max) continue;
+            }
+            out.add(p);
+        }
+        return out;
     }
 
     /** Seconds a title stays fully visible / fades out (vanilla default is 4 / 1.5). */
@@ -379,6 +466,25 @@ public final class FightFx {
         TITLE_SCHEDULED.add(id);
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(
                 () -> flushTitle(player), Math.max(1, busyUntil - now), java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** /mobbattle countdown: "3", "2", "1"... shown at once, about one second each. */
+    static void countdownTitle(PlayerRef owner, int left, String label) {
+        for (PlayerRef viewer : titleViewers(owner)) countdownTitleTo(viewer, left, label);
+    }
+
+    private static synchronized void countdownTitleTo(PlayerRef player, int left, String label) {
+        if (!player.isValid()) {
+            return;
+        }
+        // The client queues titles: hide the one on screen (e.g. an earlier FIGHT!) so the number shows now.
+        if (TITLE_BUSY_UNTIL.getOrDefault(player.getUuid(), 0L) > System.currentTimeMillis()) {
+            EventTitleUtil.hideEventTitleFromPlayer(player, 0f);
+        }
+        var style = FxSettings.pickTitleStyle();
+        EventTitleUtil.showEventTitleToPlayer(player, Message.raw(String.valueOf(left)), Message.raw(label), style, null,
+                0.6f, 0.1f, 0.2f);
+        TITLE_BUSY_UNTIL.put(player.getUuid(), System.currentTimeMillis() + 950);
     }
 
     private static void sendTitle(PlayerRef player, PendingTitle title, long now) {

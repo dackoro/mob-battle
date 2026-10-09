@@ -75,6 +75,23 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                     + "right click in the air to switch team.").color("#ffcc55"));
             return;
         }
+        Countdown.run(player, buffer, "TEAM BATTLE", teams.stream().flatMap(List::stream).toList(), acc -> startNow(player, playerEntity, teams, colors, acc));
+    }
+
+    private static void startNow(PlayerRef player, Ref<EntityStore> playerEntity, List<List<Ref<EntityStore>>> teams,
+                                 List<Integer> colors, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        // Mobs that died during the countdown leave; a team left empty doesn't take part.
+        for (int k = teams.size() - 1; k >= 0; k--) {
+            teams.get(k).removeIf(r -> !BattleManager.isAlive(r, buffer));
+            if (teams.get(k).isEmpty()) {
+                teams.remove(k);
+                colors.remove(k);
+            }
+        }
+        if (teams.size() < 2) {
+            player.sendMessage(Message.raw("TEAM BATTLE cancelled: fewer than 2 teams have mobs left.").color("#ffcc55"));
+            return;
+        }
 
         // The battle stores team indexes 0..n-1; keep the draft's colors for them.
         List<List<Ref<EntityStore>>> byColor = new ArrayList<>();
@@ -83,6 +100,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
             byColor.add(k >= 0 ? teams.get(k) : new ArrayList<>());
         }
         BattleManager.Battle battle = BattleManager.startTeams(player, byColor);
+        FightManager.splitFlocksAcrossSides(battle, buffer);
         BattleManager.clearDraft(player.getUuid());
 
         int aggressive = 0;

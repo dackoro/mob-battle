@@ -1,0 +1,26 @@
+{
+  "$Comment": "Kill Wand disintegration: the model disappears bottom-up with a purple edge (Disappear, as Cinematic_Dissolve_Out).",
+  "SwitchTo": "Disappear",
+  "EffectDirection": "BottomUp",
+  "HighlightColor": "#9b4dff",
+  "HighlightThickness": 2.0,
+  "UseBloomOnHighlight": true,
+  "NoiseScale": {
+    "X": 40.0,
+    "Y": 40.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.0
+  },
+  "PostColor": "#000000",
+  "PostColorOpacity": 0.8,
+  "AnimationDuration": 0.5,
+  "AnimationRange": {
+    "X": 0.0,
+    "Y": 1.0
+  },
+  "CurveType": "Linear",
+  "LoopOption": "PlayOnce",
+  "UseProgessiveHighlight": false
+}

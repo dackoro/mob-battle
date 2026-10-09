@@ -1,0 +1,22 @@
+{
+  "$Comment": "Chaos Wand everyone vs one: the lone target glows gold.",
+  "Duration": 2.5,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ffb800",
+    "EntityBottomTint": "#a86a00",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Gold_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "MobBattle_Aura_Gold",
+        "TargetEntityPart": "Entity"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

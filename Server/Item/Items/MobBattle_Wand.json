@@ -10,8 +10,8 @@
   "Quality": "Rare",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/Weapons/Wand/Wood.blockymodel",
-  "Texture": "Items/Weapons/Wand/Wood_Texture.png",
+  "Model": "Items/MobBattle/BattleWand/MobBattle_Wand.blockymodel",
+  "Texture": "Items/MobBattle/BattleWand/MobBattle_Wand_Texture.png",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true
@@ -20,7 +20,26 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "MobBattle_Select"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_Select",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft",
+                "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
+              },
+              "RunTime": 0.1
+            },
+            {
+              "Type": "MobBattle_Select",
+              "Effects": {
+                "ItemAnimationId": "SwingRight",
+                "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
+              },
+              "RunTime": 0.1
+            }
+          ]
         }
       ]
     },

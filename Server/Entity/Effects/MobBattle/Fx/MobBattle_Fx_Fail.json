@@ -1,0 +1,18 @@
+{
+  "$Comment": "Wand error on the mob (e.g. Morph Wand: it already has that model): a quick grey-red flash, a fizzle and the error sound.",
+  "Duration": 0.5,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff2020",
+    "EntityBottomTint": "#3a0000",
+    "Particles": [
+      {
+        "SystemId": "Explosion_Fail",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Generic_Crafting_Failed"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

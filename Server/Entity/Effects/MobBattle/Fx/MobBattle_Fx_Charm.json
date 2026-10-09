@@ -1,0 +1,21 @@
+{
+  "$Comment": "Battle Wand duel: purple burst ring (like Heal/Cleanse) and a short purple tint and aura when the mob is picked (no stun).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#a020ff",
+    "EntityBottomTint": "#4a0090",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Charm_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "MobBattle_Aura_Purple",
+        "TargetEntityPart": "Entity"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

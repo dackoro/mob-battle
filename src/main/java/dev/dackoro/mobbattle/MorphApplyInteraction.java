@@ -13,6 +13,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
+import org.joml.Vector3d;
+
 import javax.annotation.Nonnull;
 
 /** Morph Wand left click: give the clicked mob the copied model. */
@@ -45,10 +47,21 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
             return;
         }
         String name = ChaosWand.nameOf(target, buffer);
+        MorphWand.Copy now = MorphWand.read(target, buffer);
+        if (now != null && now.modelId().equals(copy.modelId())) {
+            WandFx.onTarget(target, WandFx.FAIL, buffer);
+            player.sendMessage(Message.raw(name + " already looks like " + copy.modelId() + ".").color("#ffcc55"));
+            return;
+        }
         if (!MorphWand.apply(target, copy, buffer)) {
             player.sendMessage(Message.raw("Could not apply model " + copy.modelId() + ".").color("#ffcc55"));
             return;
         }
+        WandFx.onTarget(target, WandFx.MORPH, buffer);
+        // The new model is rebuilt on the client, which can drop particles attached to the old one:
+        // also play the burst in the world at the mob.
+        Vector3d at = ChaosWand.positionOf(target, buffer);
+        if (at != null) WandFx.burst("MobBattle_Copy_Burst", null, at.add(0, 0.8, 0), buffer);
         player.sendMessage(Message.raw(name + " now looks like " + copy.modelId()
                 + ". It keeps its own AI and attacks. Cleanse Wand or /mobbattle morph reset to undo.").color("#c88bff"));
     }

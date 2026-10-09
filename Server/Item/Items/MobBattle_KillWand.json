@@ -10,8 +10,8 @@
   "Quality": "Epic",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/Weapons/Wand/Wood.blockymodel",
-  "Texture": "Items/Weapons/Wand/Wood_Texture.png",
+  "Model": "Items/MobBattle/KillWand/MobBattle_KillWand.blockymodel",
+  "Texture": "Items/MobBattle/KillWand/MobBattle_KillWand_Texture.png",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true
@@ -20,7 +20,26 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "MobBattle_Kill"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_Kill",
+              "Effects": {
+                "ItemAnimationId": "CastLeftCharging",
+                "ClearAnimationOnFinish": true
+              },
+              "RunTime": 0.5
+            },
+            {
+              "Type": "MobBattle_Kill",
+              "Effects": {
+                "ItemAnimationId": "CastLeftCharging",
+                "ClearAnimationOnFinish": true
+              },
+              "RunTime": 0.5
+            }
+          ]
         }
       ]
     }

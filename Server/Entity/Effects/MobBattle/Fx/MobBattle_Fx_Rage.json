@@ -1,0 +1,21 @@
+{
+  "$Comment": "Chaos Wand everyone vs one: every attacker glows red.",
+  "Duration": 2.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff1a1a",
+    "EntityBottomTint": "#7a0000",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Remove_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "MobBattle_Aura_Red",
+        "TargetEntityPart": "Entity"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

@@ -18,6 +18,9 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
     private final java.util.Map<Store<EntityStore>, Long> nextHeldArea =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
+    private final java.util.Map<Store<EntityStore>, Long> nextFollow =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
     @Override
     public void tick(float delta, int index, Store<EntityStore> store) {
         long now = System.currentTimeMillis();
@@ -28,6 +31,11 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
         if (FxSettings.areaOnlyWand && now >= nextHeldArea.getOrDefault(store, 0L)) {
             nextHeldArea.put(store, now + FightFx.HELD_AREA_REFRESH_MS);
             FightFx.refreshHeldAreas(store);
+        }
+        if (Army.any() && now >= nextFollow.getOrDefault(store, 0L)) {
+            nextFollow.put(store, now + INTERVAL_MS);
+            // Teleports and leash changes outside the system iteration, on the world thread.
+            store.getExternalData().getWorld().execute(() -> Army.follow(store));
         }
         if (BattleManager.hasBattles()) {
             BattleManager.checkAll(store, now);

@@ -16,3 +16,5 @@ items.MobBattle_TeamWand.name = Varita de Equipos
 items.MobBattle_TeamWand.description = Clic izquierdo en un mob: lo añade al equipo actual (otra vez: lo quita).\nClic derecho al aire: siguiente equipo.\nClic derecho en un mob: empieza la batalla; gana el último equipo en pie.\nEquipos y reglas: /mobbattle teams.
 items.MobBattle_Wand.name = Varita de Batalla
 items.MobBattle_Wand.description = Clic izquierdo en un mob y luego en otro: pelean entre ellos.\nClic derecho: borra la selección.
+items.MobBattle_ArmyWand.name = Varita de Ejército
+items.MobBattle_ArmyWand.description = Clic izquierdo en un mob: se une a tu ejército (otro clic: lo deja).\nTu ejército ataca a quien golpees y a quien te golpee, y nunca te hace daño.\nClic derecho: disuelve tu ejército.

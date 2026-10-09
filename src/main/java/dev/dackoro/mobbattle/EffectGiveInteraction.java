@@ -44,11 +44,14 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
         }
         EntityEffect effect = EffectWand.find(FxSettings.effect);
         if (effect == null) {
-            player.sendMessage(Message.raw("Unknown effect " + FxSettings.effect + ". Use /mobbattle wandeffect <id>.").color("#ffcc55"));
+            player.sendMessage(Message.raw("Unknown effect " + FxSettings.effect + ". Use /mobbattle wandEffect <id>.").color("#ffcc55"));
             return;
         }
         String name = ChaosWand.nameOf(target, buffer);
         boolean ok = effects.addEffect(target, effect, buffer);
+        if (ok) {
+            WandFx.onTarget(target, WandFx.EFFECT, buffer);
+        }
         player.sendMessage(Message.raw(ok ? "Gave " + effect.getId() + " to " + name + "."
                 : name + " rejected " + effect.getId() + " (immune or not applicable).").color(ok ? "#b44bff" : "#ffcc55"));
     }

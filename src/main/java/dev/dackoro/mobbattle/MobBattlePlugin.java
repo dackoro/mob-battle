@@ -53,8 +53,11 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(SummonToggleInteraction.TYPE, SummonToggleInteraction.class, SummonToggleInteraction.CODEC)
                 .register(SummonSpawnInteraction.TYPE, SummonSpawnInteraction.class, SummonSpawnInteraction.CODEC)
                 .register(MorphCopyInteraction.TYPE, MorphCopyInteraction.class, MorphCopyInteraction.CODEC)
-                .register(MorphApplyInteraction.TYPE, MorphApplyInteraction.class, MorphApplyInteraction.CODEC);
+                .register(MorphApplyInteraction.TYPE, MorphApplyInteraction.class, MorphApplyInteraction.CODEC)
+                .register(ArmyToggleInteraction.TYPE, ArmyToggleInteraction.class, ArmyToggleInteraction.CODEC)
+                .register(ArmyDisbandInteraction.TYPE, ArmyDisbandInteraction.class, ArmyDisbandInteraction.CODEC);
         getEntityStoreRegistry().registerSystem(new FightDamageSystem());
+        getEntityStoreRegistry().registerSystem(new ArmyPlayerDamageSystem());
         getEntityStoreRegistry().registerSystem(new FightTickSystem());
         getEntityStoreRegistry().registerSystem(new BattleLifecycleSystem());
         FxSettings.load(getDataDirectory());
@@ -72,7 +75,7 @@ public class MobBattlePlugin extends JavaPlugin {
                             : null;
                     if (ref != null && WELCOMED.add(ref.getUuid())) {
                         ref.sendMessage(com.hypixel.hytale.server.core.Message.raw(
-                                "Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all nine wands.")
+                                "Dackoro's Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all ten wands.")
                                 .color("#ffd23e"));
                     }
                 });

@@ -1,0 +1,18 @@
+{
+  "$Comment": "Morph Wand transform: like the Cleanse flash, in blue (same as the copy). The burst also plays in the world (MorphApplyInteraction), since the model swap can drop attached particles.",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#1f6bff",
+    "EntityBottomTint": "#0a2a8a",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Copy_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Portal_Neutral_Open"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

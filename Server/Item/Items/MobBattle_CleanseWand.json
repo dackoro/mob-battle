@@ -10,8 +10,8 @@
   "Quality": "Uncommon",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/Weapons/Wand/Wood.blockymodel",
-  "Texture": "Items/Weapons/Wand/Wood_Texture.png",
+  "Model": "Items/MobBattle/CleanseWand/MobBattle_CleanseWand.blockymodel",
+  "Texture": "Items/MobBattle/CleanseWand/MobBattle_CleanseWand_Texture.png",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true
@@ -20,7 +20,24 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "MobBattle_Cleanse"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_Cleanse",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            },
+            {
+              "Type": "MobBattle_Cleanse",
+              "Effects": {
+                "ItemAnimationId": "SwingRight"
+              },
+              "RunTime": 0.1
+            }
+          ]
         }
       ]
     }

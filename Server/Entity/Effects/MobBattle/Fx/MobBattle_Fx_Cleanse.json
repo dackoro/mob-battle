@@ -1,0 +1,18 @@
+{
+  "$Comment": "Cleanse Wand: light blue burst like the Morph/Heal ones, white-blue flash.",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ffffff",
+    "EntityBottomTint": "#7fd3ff",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Cleanse_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Despawn"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

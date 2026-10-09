@@ -1,0 +1,5 @@
+{
+  "Spawners": [
+    { "SpawnerId": "MobBattle_Soul_Absorb", "PositionOffset": { "X": 0, "Y": 0, "Z": 0 } }
+  ]
+}

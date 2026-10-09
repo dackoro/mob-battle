@@ -2,6 +2,7 @@ package dev.dackoro.mobbattle;
 
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
@@ -65,6 +66,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
 
         if (first == null) {
             FightManager.select(player.getUuid(), target);
+            WandFx.onTarget(target, WandFx.CHARM, buffer);
             player.sendMessage(Message.raw("Selected: " + targetName + ". Now click its opponent.").color(COLOR_INFO));
             return;
         }
@@ -74,8 +76,24 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         }
 
         FightManager.clear(player.getUuid());
-        String firstName = nameOf(first, buffer);
-        BattleManager.detach(java.util.List.of(first, target));
+        Ref<EntityStore> playerEntity = context.getEntity();
+        Ref<EntityStore> picked = first;
+        WandFx.onTarget(target, WandFx.CHARM, buffer);
+        Countdown.run(player, buffer, "DUEL: " + nameOf(picked, buffer) + " vs " + targetName, java.util.List.of(picked, target),
+                acc -> duel(player, playerEntity, picked, target, acc));
+    }
+
+    /** The duel itself, right away or after /mobbattle countdown. */
+    static void duel(PlayerRef player, Ref<EntityStore> playerEntity, Ref<EntityStore> first, Ref<EntityStore> target,
+                     ComponentAccessor<EntityStore> buffer) {
+        if (!BattleManager.isAlive(first, buffer) || !BattleManager.isAlive(target, buffer)) {
+            player.sendMessage(Message.raw("Duel cancelled: a fighter is gone.").color(COLOR_WARN));
+            return;
+        }
+        String firstName = ChaosWand.nameOf(first, buffer);
+        String targetName = ChaosWand.nameOf(target, buffer);
+        boolean accumulate = FxSettings.accumulateDuels;
+        if (!accumulate) BattleManager.detach(java.util.List.of(first, target));
         FightManager.Result a = FightManager.turnAgainst(first, target, buffer);
         FightManager.Result b = FightManager.turnAgainst(target, first, buffer);
         if (a != FightManager.Result.AGGRESSIVE && b != FightManager.Result.AGGRESSIVE) {
@@ -83,9 +101,8 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
                     + " can attack. No fight.").color(COLOR_WARN));
             return;
         }
-        FightManager.startFight(first, target, buffer);
         // Also a 2-mob "royale", so the winner gets a title when the other one dies.
-        BattleManager.Battle duel = BattleManager.startRoyale(player, java.util.List.of(first, target));
+        BattleManager.Battle duel = BattleManager.startDuel(player, first, target, accumulate);
         BattleManager.setTarget(duel, first, target);
         BattleManager.setTarget(duel, target, first);
         // Universal trigger: each one "feels" a hit from the other, so any role that can fight
@@ -96,7 +113,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
                 + targetName + " (" + b + ", state " + FightManager.stateOf(target, buffer) + ")");
 
         player.sendMessage(Message.raw("FIGHT! " + firstName + " vs " + targetName).color(COLOR_FIGHT));
-        FightFx.showFightStart(player, context.getEntity(), firstName, targetName, first, target, buffer);
+        FightFx.showFightStart(player, playerEntity, firstName, targetName, first, target, buffer);
         if (a == FightManager.Result.PASSIVE) {
             player.sendMessage(Message.raw(firstName + " is passive: it will only run.").color(COLOR_WARN));
         }

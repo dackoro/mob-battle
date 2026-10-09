@@ -1,0 +1,16 @@
+{
+  "$Comment": "Cleanse Wand on a morphed mob: the Morph Wand blue swirl plays as it gets its own model back (on top of the white Cleanse flash).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "Particles": [
+      {
+        "SystemId": "Potion_Morph_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Portal_Neutral_Open"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

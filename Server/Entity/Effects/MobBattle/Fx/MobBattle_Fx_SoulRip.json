@@ -1,0 +1,18 @@
+{
+  "$Comment": "Kill Wand: the mob keeps moving, animating and attacking while it turns black and disintegrates; it is removed (no death animation) after /mobbattle killdelay. Keep MobBattle_Disintegrate AnimationDuration close to killdelay. Sound: the mob's own death sound at the start of disintegration (WandFx.deathSound), not on removal.",
+  "Duration": 3.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#000000",
+    "EntityBottomTint": "#000000",
+    "Particles": [
+      {
+        "SystemId": "Effect_Death_Void",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest"
+      }
+    ],
+    "ModelVFXId": "MobBattle_Disintegrate"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

@@ -39,6 +39,6 @@ public class SummonSpawnInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> self = context.getEntity();
         // Spawning needs the Store, not the interaction's CommandBuffer: run it on the world thread.
         var store = self.getStore();
-        store.getExternalData().getWorld().execute(() -> SummonList.spawn(store, center, player));
+        store.getExternalData().getWorld().execute(() -> SummonList.spawn(store, center, player, self));
     }
 }

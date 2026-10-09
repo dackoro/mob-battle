@@ -42,6 +42,7 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
             return;
         }
         MorphWand.setCopy(player.getUuid(), copy);
+        WandFx.onTarget(target, WandFx.COPY, buffer);
         player.sendMessage(Message.raw("Copied the model of " + ChaosWand.nameOf(target, buffer) + " (" + copy.modelId()
                 + "). Left click a mob to give it this look.").color("#c88bff"));
     }

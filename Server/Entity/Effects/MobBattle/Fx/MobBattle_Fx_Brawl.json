@@ -1,0 +1,21 @@
+{
+  "$Comment": "Chaos Wand battle royale: every fighter glows orange.",
+  "Duration": 2.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff6a00",
+    "EntityBottomTint": "#8a2a00",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Orange_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "MobBattle_Aura_Orange",
+        "TargetEntityPart": "Entity"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

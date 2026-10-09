@@ -43,6 +43,7 @@ public class SummonToggleInteraction extends SimpleInstantInteraction {
         String role = npc.getRoleName();
         boolean added = SummonList.toggle(role);
         FxSettings.save();
+        WandFx.onTarget(target, added ? WandFx.SUMMON_ADD : WandFx.SUMMON_REMOVE, buffer);
         player.sendMessage(Message.raw((added ? "Added " + role + " x1 to" : "Removed " + role + " from")
                 + " the summon list (" + SummonList.ENTRIES.size() + " types). Change counts with /mobbattle summon modify "
                 + role + " <count|random>.").color(added ? "#4bff6a" : "#aaaaaa"));

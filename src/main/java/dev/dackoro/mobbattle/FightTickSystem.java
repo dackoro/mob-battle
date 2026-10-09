@@ -53,7 +53,9 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         boolean stops = FightManager.hasPendingStops();
         boolean heals = FightManager.hasPendingHeals();
         boolean looks = TeamFx.hasPending();
-        if (!battles && !drafts && !stops && !heals && !looks && !FightManager.hasFights()) {
+        boolean kills = WandFx.hasPendingKills();
+        boolean countdowns = Countdown.hasPending();
+        if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !FightManager.hasFights()) {
             return;
         }
         Ref<EntityStore> self = chunk.getReferenceTo(entityIndex);
@@ -62,6 +64,8 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         if (stops) FightManager.applyPendingStop(self, buffer);
         if (heals) FightManager.applyPendingHeals(self, buffer);
         if (looks) TeamFx.apply(self, buffer);
+        if (kills) WandFx.applyPendingKill(self, now, buffer);
+        if (countdowns) Countdown.runDue(store, now, buffer);
 
         // Every battle and draft member is managed: wild NPCs skip the battle lookups entirely.
         boolean managed = BattleManager.isManaged(self);

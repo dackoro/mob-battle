@@ -10,8 +10,8 @@
   "Quality": "Epic",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/Weapons/Wand/Wood.blockymodel",
-  "Texture": "Items/Weapons/Wand/Wood_Texture.png",
+  "Model": "Items/MobBattle/SummonWand/MobBattle_SummonWand.blockymodel",
+  "Texture": "Items/MobBattle/SummonWand/MobBattle_SummonWand_Texture.png",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true
@@ -20,14 +20,36 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "MobBattle_SummonToggle"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_SummonToggle",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.35
+            },
+            {
+              "Type": "MobBattle_SummonToggle",
+              "Effects": {
+                "ItemAnimationId": "SwingRight"
+              },
+              "RunTime": 0.35
+            }
+          ]
         }
       ]
     },
     "Secondary": {
       "Interactions": [
         {
-          "Type": "MobBattle_SummonSpawn"
+          "Type": "MobBattle_SummonSpawn",
+          "Effects": {
+            "ItemPlayerAnimationsId": "Staff",
+            "ItemAnimationId": "CastSummon"
+          },
+          "RunTime": 0.6
         }
       ]
     }

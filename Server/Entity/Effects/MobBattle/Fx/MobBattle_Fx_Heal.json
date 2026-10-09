@@ -1,0 +1,31 @@
+{
+  "$Comment": "Heal Wand: green burst, vanilla healing aura and the Healing Totem particles and sound, green tint.",
+  "Duration": 1.5,
+  "ApplicationEffects": {
+    "EntityTopTint": "#00e040",
+    "EntityBottomTint": "#007a1f",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Heal_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "Aura_Heal",
+        "TargetEntityPart": "Entity"
+      },
+      {
+        "SystemId": "Totem_Heal_Extra",
+        "TargetEntityPart": "Entity"
+      },
+      {
+        "SystemId": "Totem_Heal_TopIcon",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Head"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Spawn"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

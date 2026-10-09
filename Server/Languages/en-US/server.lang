@@ -16,3 +16,5 @@ items.MobBattle_TeamWand.name = Team Wand
 items.MobBattle_TeamWand.description = Left click a mob: add it to the current team (again: remove it).\nRight click in the air: next team.\nRight click a mob: start the battle; last team standing wins.\nTeams and rules: /mobbattle teams.
 items.MobBattle_Wand.name = Battle Wand
 items.MobBattle_Wand.description = Left click a mob, then another: they fight each other.\nRight click: clear the selection.
+items.MobBattle_ArmyWand.name = Army Wand
+items.MobBattle_ArmyWand.description = Left click a mob: it joins your army (click again: it leaves).\nYour army attacks whoever you hit and whoever hits you, and never hurts you.\nRight click: disband your army.

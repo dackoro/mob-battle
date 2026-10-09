@@ -1,5 +1,6 @@
 package dev.dackoro.mobbattle;
 
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.Message;
@@ -115,9 +116,11 @@ public final class SummonList {
 
     /**
      * Spawns the whole list in a ring around {@code center}. Must run on the world thread
-     * (pass the world's Store). Capped at /mobbattle maxmobs.
+     * (pass the world's Store). Capped at /mobbattle maxmobs. Mobs stand on the nearest floor under them
+     * (works under roofs), close to the player (the ring grows with the count), inside a drawn area,
+     * and play their model's "Spawn" animation when it has one (108 vanilla models do).
      */
-    public static void spawn(Store<EntityStore> store, Vector3d center, PlayerRef player) {
+    public static void spawn(Store<EntityStore> store, Vector3d center, PlayerRef player, Ref<EntityStore> owner) {
         if (ENTRIES.isEmpty()) {
             player.sendMessage(Message.raw(describe()).color("#ffcc55"));
             return;
@@ -128,15 +131,29 @@ public final class SummonList {
         int failed = 0;
         int attempted = 0;
         StringBuilder summary = new StringBuilder();
-        for (Map.Entry<String, String> e : snapshot().entrySet()) {
+        // One copy: the list can change from a command while this runs (see snapshot()).
+        Map<String, String> entries = snapshot();
+        int planned = 0;
+        for (String value : entries.values()) {
+            planned += value.equalsIgnoreCase("random") ? Math.max(1, (randomMin + randomMax) / 2) : countOf(value);
+        }
+        planned = Math.min(planned, FxSettings.maxMobs);
+        // /mobbattle summonradius, or auto: about one mob per 5 square blocks, never past half the Chaos area radius.
+        double ring = FxSettings.summonRadius > 0 ? FxSettings.summonRadius
+                : Math.max(4, Math.min(FxSettings.radius / 2.0, 3 + Math.sqrt(planned) * 1.6));
+        var floor = FightFx.floorBelow(center.y, store);
+        for (Map.Entry<String, String> e : entries.entrySet()) {
             int n = countOf(e.getValue());
             int ok = 0;
             for (int i = 0; i < n && attempted < FxSettings.maxMobs; i++) {
                 attempted++;
                 double angle = rnd.nextDouble(Math.PI * 2);
-                double dist = 3 + rnd.nextDouble(Math.max(1, FxSettings.radius / 2.0));
-                Vector3d pos = new Vector3d(center.x + Math.cos(angle) * dist, center.y + 0.5,
-                        center.z + Math.sin(angle) * dist);
+                double dist = 1.5 + Math.sqrt(rnd.nextDouble()) * (ring - 1.5);
+                double x = center.x + Math.cos(angle) * dist;
+                double z = center.z + Math.sin(angle) * dist;
+                double y = floor.applyAsDouble(x, z);
+                // floorBelow is 0.25 above the block top; no floor loaded nearby: the player's height.
+                Vector3d pos = new Vector3d(x, Double.isFinite(y) ? y - 0.25 : center.y, z);
                 try {
                     var result = npc.spawnNPC(store, e.getKey(), null, pos,
                             new Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f));
@@ -146,6 +163,8 @@ public final class SummonList {
                             // Spawned straight into the player's team draft (Team Wand / teams start).
                             BattleManager.assign(BattleManager.draft(player), result.first(), team);
                         }
+                        WandFx.burst(WandFx.SUMMON_PARTICLE, null, pos, store);
+                        playSpawnAnimation(result.first(), store);
                         ok++;
                         spawned++;
                     } else {
@@ -163,9 +182,26 @@ public final class SummonList {
         if (summary.length() > 0) {
             summary.setLength(summary.length() - 2);
         }
+        if (spawned > 0) {
+            FightFx.area(owner, center, ring, store);
+            WandFx.burst(null, WandFx.SUMMON_SOUND, center, store);
+        }
         player.sendMessage(Message.raw("Summoned " + spawned + " mobs: " + summary
                 + (failed > 0 ? " (" + failed + " failed)" : "")
-                + (attempted >= FxSettings.maxMobs ? " — capped by /mobbattle maxmobs (spawn attempts)" : "")).color("#4bff6a"));
+                + (attempted >= FxSettings.maxMobs ? " — capped by /mobbattle maxMobs (spawn attempts)" : "")).color("#4bff6a"));
+    }
+
+    /** Plays the model's "Spawn" animation (e.g. skeletons rising from the ground), if it has one. */
+    private static void playSpawnAnimation(Ref<EntityStore> mob, Store<EntityStore> store) {
+        if (!FxSettings.wandFx || mob == null || !mob.isValid()) {
+            return;
+        }
+        var mc = store.getComponent(mob, com.hypixel.hytale.server.core.modules.entity.component.ModelComponent.getComponentType());
+        var sets = mc != null && mc.getModel() != null ? mc.getModel().getAnimationSetMap() : null;
+        if (sets != null && sets.containsKey("Spawn")) {
+            com.hypixel.hytale.server.core.entity.AnimationUtils.playAnimation(mob,
+                    com.hypixel.hytale.protocol.AnimationSlot.Action, "Spawn", true, store);
+        }
     }
 
     // ---- persistence (fx.properties, via FxSettings) ----

@@ -1,0 +1,22 @@
+{
+  "$Comment": "Summon Wand: mob type removed from the summon list (burst ring, red tint + ring).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff1a1a",
+    "EntityBottomTint": "#7a0000",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Remove_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      },
+      {
+        "SystemId": "MobBattle_Aura_Red",
+        "TargetEntityPart": "Entity"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Despawn"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

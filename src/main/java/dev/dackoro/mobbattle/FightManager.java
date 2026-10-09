@@ -53,6 +53,7 @@ public final class FightManager {
     private static final Map<Ref<EntityStore>, List<Ref<EntityStore>>> PENDING_STOPS = new ConcurrentHashMap<>();
 
     static boolean hasPendingStops() { return !PENDING_STOPS.isEmpty(); }
+    static void cancelPendingStop(Ref<EntityStore> npc) { PENDING_STOPS.remove(npc); }
 
     /** @param opponents an immutable list, shared by every member of the same battle */
     static void queueStop(Ref<EntityStore> npc, List<Ref<EntityStore>> opponents) {
@@ -116,11 +117,12 @@ public final class FightManager {
             // Long battles must not lose forced hostility when the initial ten-minute override expires.
             tryOverride(world, target, Attitude.HOSTILE, HOSTILE_SECONDS, hasCombat);
         }
-        if (FxSettings.battleIsolation && battle != null) {
+        boolean isolated = battle != null && FxSettings.isolated(battle.kind);
+        if (isolated) {
             ignoreOutsiders(self, world, hasCombat, accessor);
         }
         boolean outsider = target != null && !BattleManager.isManaged(target)
-                && FxSettings.battleIsolation && battle != null;
+                && isolated;
         if (outsider || target != null && BattleManager.isManaged(target)
                 && (battle == null ? !isFighting(self, target)
                     : !battle.has(target) || battle.team(target) == battle.team(self))) {
@@ -229,6 +231,37 @@ public final class FightManager {
     public static void endFightsOf(List<Ref<EntityStore>> npcs) {
         if (FIGHTS.removeIf(f -> f.isOver() || npcs.stream().anyMatch(f::has))) {
             reindex();
+        }
+    }
+
+    /**
+     * Group battles (teams, royale): members on different sides that share a flock (an owner and its pet or
+     * summon) leave it, so the flock rules don't protect them from each other. Same-side flocks stay intact.
+     * Leaving is permanent, like in a duel (the vanilla FlockLeave action).
+     */
+    static void splitFlocksAcrossSides(BattleManager.Battle battle, ComponentAccessor<EntityStore> buffer) {
+        List<Ref<EntityStore>> members = new java.util.ArrayList<>(battle.members());
+        List<Ref<EntityStore>> flocks = new java.util.ArrayList<>(members.size());
+        for (Ref<EntityStore> m : members) {
+            flocks.add(m.isValid() ? FlockPlugin.getFlockReference(m, buffer) : null);
+        }
+        java.util.Set<Ref<EntityStore>> leave = new java.util.HashSet<>();
+        for (int i = 0; i < members.size(); i++) {
+            Ref<EntityStore> fi = flocks.get(i);
+            if (fi == null) continue;
+            for (int j = i + 1; j < members.size(); j++) {
+                Ref<EntityStore> fj = flocks.get(j);
+                if (fj != null && same(fi, fj) && battle.team(members.get(i)) != battle.team(members.get(j))) {
+                    leave.add(members.get(i));
+                    leave.add(members.get(j));
+                }
+            }
+        }
+        for (Ref<EntityStore> npc : leave) {
+            buffer.tryRemoveComponent(npc, FlockMembership.getComponentType());
+        }
+        if (!leave.isEmpty()) {
+            MobBattlePlugin.log(leave.size() + " mobs left their flock to fight on different sides");
         }
     }
 
@@ -361,6 +394,15 @@ public final class FightManager {
 
     /** Makes {@code self} hostile to {@code enemy} and locks it as its target. */
     public static Result turnAgainst(Ref<EntityStore> self, Ref<EntityStore> enemy, ComponentAccessor<EntityStore> accessor) {
+        return turnAgainst(self, enemy, accessor, true);
+    }
+
+    /**
+     * @param ignorePrevious false for Army Wand mobs: an old target they switched away from must still get
+     *                       an answer if it keeps hitting them (self-defense), so it is not ignored for 30 s.
+     */
+    public static Result turnAgainst(Ref<EntityStore> self, Ref<EntityStore> enemy, ComponentAccessor<EntityStore> accessor,
+                                     boolean ignorePrevious) {
         PENDING_STOPS.remove(self); // A newer combat order replaces a queued cleanup.
         WorldSupport world = WorldSupport.get(self, accessor);
         if (world == null) {
@@ -386,7 +428,7 @@ public final class FightManager {
             // If it was busy with someone else, make it ignore that one for a while,
             // otherwise its own sensors lock the old target again.
             Ref<EntityStore> previous = marked.getMarkedEntityRef(TARGET_SLOT);
-            if (previous != null && previous.isValid() && !same(previous, enemy)) {
+            if (ignorePrevious && previous != null && previous.isValid() && !same(previous, enemy)) {
                 tryOverride(world, previous, Attitude.IGNORE, RETARGET_IGNORE_SECONDS, hasCombat);
             }
             marked.setMarkedEntity(TARGET_SLOT, enemy);
@@ -401,6 +443,34 @@ public final class FightManager {
             state.setState(self, combatState, combatSubStateOf(state.getStateHelper(), combatState), accessor);
         }
         return Result.AGGRESSIVE;
+    }
+
+    /**
+     * Army Wand: {@code self} must not attack {@code player} (its owner): friendly attitude toward it, and the
+     * player out of its target and hostile memory. Roles without attitude memory (e.g. goblins) get it created.
+     */
+    static void befriend(Ref<EntityStore> self, Ref<EntityStore> player, ComponentAccessor<EntityStore> accessor) {
+        if (player == null || !player.isValid() || player.getStore() != self.getStore()) {
+            return;
+        }
+        WorldSupport world = WorldSupport.get(self, accessor);
+        StateSupport state = StateSupport.get(self, accessor);
+        if (world != null) {
+            tryOverride(world, player, Attitude.FRIENDLY, HOSTILE_SECONDS, combatStateOf(state) != null);
+        }
+        MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
+        Ref<EntityStore> locked = marked != null ? marked.getMarkedEntityRef(TARGET_SLOT) : null;
+        TargetMemory memory = accessor.getComponent(self, TargetMemory.getComponentType());
+        if (memory != null) {
+            int id = player.getIndex();
+            memory.getKnownHostiles().remove(id);
+            memory.getKnownHostilesList().removeIf(r -> same(r, player));
+            Ref<EntityStore> closest = memory.getClosestHostile();
+            if (closest != null && same(closest, player)) memory.setClosestHostile(null);
+        }
+        if (locked != null && same(locked, player)) {
+            releaseTarget(self, state, accessor);
+        }
     }
 
     /** Clears the NPC's hostile target memory (known hostiles + closest hostile). */

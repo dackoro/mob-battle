@@ -1,0 +1,18 @@
+{
+  "$Comment": "Battle Wand right click: the selected mob is unselected (grey tint, grey burst ring).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#9a9a9a",
+    "EntityBottomTint": "#3a3a3a",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Grey_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Despawn"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

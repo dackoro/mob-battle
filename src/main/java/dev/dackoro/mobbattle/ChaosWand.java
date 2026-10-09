@@ -30,6 +30,12 @@ public final class ChaosWand {
     private ChaosWand() {
     }
 
+    private static List<Ref<EntityStore>> withTarget(List<Ref<EntityStore>> around, Ref<EntityStore> target) {
+        List<Ref<EntityStore>> all = new ArrayList<>(around);
+        all.add(target);
+        return all;
+    }
+
     static Vector3d positionOf(Ref<EntityStore> ref, ComponentAccessor<EntityStore> buffer) {
         TransformComponent t = buffer.getComponent(ref, TransformComponent.getComponentType());
         return t != null ? new Vector3d(t.getPosition()) : null;
@@ -48,11 +54,24 @@ public final class ChaosWand {
         }
         near.sort((x, y) -> Double.compare(x.distSq(), y.distSq()));
         int n = Math.min(near.size(), FxSettings.maxMobs);
+        LEFT_OUT.set(near.size() - n);
         List<Ref<EntityStore>> out = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             out.add(near.get(i).ref());
         }
         return out;
+    }
+
+    /** How many mobs the last npcsAround call on this thread left out because of /mobbattle maxmobs. */
+    private static final ThreadLocal<Integer> LEFT_OUT = ThreadLocal.withInitial(() -> 0);
+
+    /** Chat warning when the last npcsAround call hit /mobbattle maxmobs. */
+    static void warnLeftOut(PlayerRef player) {
+        int left = LEFT_OUT.get();
+        if (left > 0) {
+            player.sendMessage(Message.raw(left + " mobs were left out: the limit is " + FxSettings.maxMobs
+                    + " (/mobbattle maxMobs <2-" + FxSettings.MAX_MOBS_LIMIT + ">).").color(WARN));
+        }
     }
 
     private record Near(Ref<EntityStore> ref, double distSq) {
@@ -77,12 +96,30 @@ public final class ChaosWand {
             return;
         }
         List<Ref<EntityStore>> around = npcsAround(center, buffer);
-        around.removeIf(r -> r.getIndex() == target.getIndex());
-        FightFx.area(playerEntity, center, FxSettings.radius, buffer);
+        around.removeIf(r -> r == target);
         String targetName = nameOf(target, buffer);
         if (around.isEmpty()) {
+            // Only the cast animation and this message: no area, no effects.
             player.sendMessage(Message.raw("No mobs within " + FxSettings.radius + " blocks of " + targetName
-                    + ". Use /mobbattle arearadius <blocks>.").color(WARN));
+                    + ". Use /mobbattle areaRadius <blocks>.").color(WARN));
+            return;
+        }
+        FightFx.area(playerEntity, center, FxSettings.radius, buffer);
+        warnLeftOut(player);
+        // The lone target in gold, everyone against it in red.
+        WandFx.onTarget(target, WandFx.LONE, buffer);
+        for (Ref<EntityStore> npc : around) {
+            WandFx.onTarget(npc, WandFx.RAGE, buffer);
+        }
+        Countdown.run(player, buffer, "EVERYONE vs " + targetName, withTarget(around, target),
+                acc -> focusNow(player, playerEntity, target, targetName, around, acc));
+    }
+
+    private static void focusNow(PlayerRef player, Ref<EntityStore> playerEntity, Ref<EntityStore> target,
+                                 String targetName, List<Ref<EntityStore>> around, ComponentAccessor<EntityStore> buffer) {
+        around.removeIf(r -> !BattleManager.isAlive(r, buffer));
+        if (!BattleManager.isAlive(target, buffer) || around.isEmpty()) {
+            player.sendMessage(Message.raw("EVERYONE vs " + targetName + " cancelled: the mobs are gone.").color(WARN));
             return;
         }
 
@@ -107,6 +144,7 @@ public final class ChaosWand {
         }
         // A 2-side battle so the end shows who won (the target or the attackers).
         BattleManager.Battle battle = BattleManager.startFocus(player, target, targetName, around);
+        WandFx.onTarget(target, WandFx.LONE_MARK, buffer);
         // The target fights back against the nearest attacker.
         if (firstAttacker != null) {
             BattleManager.setTarget(battle, target, firstAttacker);
@@ -122,16 +160,32 @@ public final class ChaosWand {
     static void brawl(PlayerRef player, Ref<EntityStore> playerEntity, Vector3d center,
                       ComponentAccessor<EntityStore> buffer) {
         List<Ref<EntityStore>> around = npcsAround(center, buffer);
-        FightFx.area(playerEntity, center, FxSettings.radius, buffer);
         if (around.size() < 2) {
+            // Only the cast animation and this message: no area, no effects.
             player.sendMessage(Message.raw("A free-for-all needs at least 2 mobs within " + FxSettings.radius
-                    + " blocks. Use /mobbattle arearadius <blocks>.").color(WARN));
+                    + " blocks. Use /mobbattle areaRadius <blocks>.").color(WARN));
+            return;
+        }
+        FightFx.area(playerEntity, center, FxSettings.radius, buffer);
+        warnLeftOut(player);
+        for (Ref<EntityStore> npc : around) {
+            WandFx.onTarget(npc, WandFx.BRAWL, buffer);
+        }
+        Countdown.run(player, buffer, "BATTLE ROYALE", around, acc -> brawlNow(player, playerEntity, around, acc));
+    }
+
+    private static void brawlNow(PlayerRef player, Ref<EntityStore> playerEntity, List<Ref<EntityStore>> around,
+                                 ComponentAccessor<EntityStore> buffer) {
+        around.removeIf(r -> !BattleManager.isAlive(r, buffer));
+        if (around.size() < 2) {
+            player.sendMessage(Message.raw("BATTLE ROYALE cancelled: fewer than 2 mobs left.").color(WARN));
             return;
         }
 
         // Battle royale: each one starts on a random opponent; when its target dies it goes for
         // the nearest one still standing, until only one is left (FightTickSystem).
         BattleManager.Battle battle = BattleManager.startRoyale(player, around);
+        FightManager.splitFlocksAcrossSides(battle, buffer);
         int aggressive = 0;
         for (Ref<EntityStore> npc : around) {
             Ref<EntityStore> enemy;

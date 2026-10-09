@@ -1,0 +1,18 @@
+{
+  "$Comment": "Army Wand: the mob joins your army (green tint, green burst ring).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#00e040",
+    "EntityBottomTint": "#007a1f",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Heal_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

@@ -35,7 +35,11 @@ public class ClearSelectionInteraction extends SimpleInstantInteraction {
             context.getState().state = InteractionState.Failed;
             return;
         }
+        var selected = FightManager.getSelection(player.getUuid());
         boolean had = FightManager.clear(player.getUuid());
+        if (selected != null && selected.isValid() && selected.getStore() == context.getEntity().getStore()) {
+            WandFx.onTarget(selected, WandFx.UNSELECT, buffer);
+        }
         player.sendMessage(Message.raw(had ? "Selection cleared." : "Nothing selected.").color("#aaaaaa"));
     }
 }

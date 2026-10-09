@@ -1,0 +1,15 @@
+{
+  "LifeSpan": 2.0,
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Cleanse_Implosion"
+    },
+    {
+      "SpawnerId": "MobBattle_Cleanse_Sparks",
+      "PositionOffset": {
+        "Y": 0.25
+      }
+    }
+  ],
+  "$Comment": "Cleanse Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in light blue."
+}
