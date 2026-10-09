@@ -35,6 +35,20 @@ public class ClearSelectionInteraction extends SimpleInstantInteraction {
             context.getState().state = InteractionState.Failed;
             return;
         }
+        // During a duel's countdown (and its camera shot): right click calls it off.
+        var pending = Countdown.cancelFor(player.getUuid(), "DUEL");
+        if (!pending.isEmpty()) {
+            FightCamera.stop(player);
+            for (var mob : pending) {
+                if (mob.isValid() && mob.getStore() == context.getEntity().getStore()) {
+                    WandFx.onTarget(mob, WandFx.UNSELECT, buffer);
+                }
+            }
+            FightManager.clear(player.getUuid());
+            MobBattlePlugin.debug("duel called off during its countdown by " + player.getUsername());
+            player.sendMessage(Message.raw("Duel cancelled.").color("#aaaaaa"));
+            return;
+        }
         var selected = FightManager.getSelection(player.getUuid());
         boolean had = FightManager.clear(player.getUuid());
         if (selected != null && selected.isValid() && selected.getStore() == context.getEntity().getStore()) {

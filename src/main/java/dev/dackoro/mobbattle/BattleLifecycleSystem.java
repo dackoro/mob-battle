@@ -22,6 +22,13 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextFollow =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextArena =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private static final long ARENA_MS = 250;
+    private final java.util.Map<Store<EntityStore>, Long> nextUnstick =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextPlayers =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     @Override
     public void tick(float delta, int index, Store<EntityStore> store) {
@@ -44,8 +51,24 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             // Teleports and leash changes outside the system iteration, on the world thread.
             store.getExternalData().getWorld().execute(() -> Army.follow(store));
         }
+        if ((BattleManager.hasPlayerFighters() || TeamFx.hasPending())
+                && now >= nextPlayers.getOrDefault(store, 0L)) {
+            nextPlayers.put(store, now + FightFx.TEAM_RING_REFRESH_MS);
+            // Player fighters' team look and ring (FightTickSystem only ticks NPCs), on the world thread.
+            store.getExternalData().getWorld().execute(() -> PlayerFighters.tick(store));
+        }
+        if (Arena.any() && now >= nextArena.getOrDefault(store, 0L)) {
+            nextArena.put(store, now + ARENA_MS);
+            // Knockback, teleports and the timer's end outside the system iteration, on the world thread.
+            store.getExternalData().getWorld().execute(() -> Arena.tick(store));
+        }
         if (BattleManager.hasBattles()) {
             BattleManager.checkAll(store, now);
+            if (FxSettings.unstick && now >= nextUnstick.getOrDefault(store, 0L)) {
+                nextUnstick.put(store, now + INTERVAL_MS);
+                // Teleports outside the system iteration, on the world thread.
+                store.getExternalData().getWorld().execute(() -> Unstick.tick(store));
+            }
         }
     }
 }

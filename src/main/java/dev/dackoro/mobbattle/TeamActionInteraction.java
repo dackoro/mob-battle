@@ -82,7 +82,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                                  List<Integer> colors, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         // Mobs that died during the countdown leave; a team left empty doesn't take part.
         for (int k = teams.size() - 1; k >= 0; k--) {
-            teams.get(k).removeIf(r -> !BattleManager.isAlive(r, buffer));
+            teams.get(k).removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
             if (teams.get(k).isEmpty()) {
                 teams.remove(k);
                 colors.remove(k);
@@ -100,6 +100,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
             byColor.add(k >= 0 ? teams.get(k) : new ArrayList<>());
         }
         BattleManager.Battle battle = BattleManager.startTeams(player, byColor);
+        Arena.setupAround(battle, buffer);
         FightManager.splitFlocksAcrossSides(battle, buffer);
         BattleManager.clearDraft(player.getUuid());
 

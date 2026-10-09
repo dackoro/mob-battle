@@ -73,9 +73,12 @@ final class BattleMusic {
 
     /** Stops every battle music (/mobbattle music off). */
     static void stopAll() {
-        LISTENERS.values().forEach(set -> set.forEach(BattleMusic::clear));
+        // Empty the map first: clear() keeps the music of anyone still listed as a listener.
+        Set<UUID> all = new java.util.HashSet<>();
+        LISTENERS.values().forEach(all::addAll);
         LISTENERS.clear();
         STARTED.clear();
+        all.forEach(BattleMusic::clear);
     }
 
     /** Back to the world's own music, unless another battle's music still plays for that player. */

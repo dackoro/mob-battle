@@ -1,0 +1,18 @@
+{
+  "$Comment": "Snap Wand: the mob fades to ash (light gray-brown, visible on dark Void mobs too) and crumbles top-down, then is removed after WandFx.SNAP_DUST_MS. Keep MobBattle_SnapDust AnimationDuration close to it.",
+  "Duration": 3.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#b8a895",
+    "EntityBottomTint": "#7a6a58",
+    "Particles": [
+      {
+        "SystemId": "Block_Break_Dust",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest"
+      }
+    ],
+    "ModelVFXId": "MobBattle_SnapDust"
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

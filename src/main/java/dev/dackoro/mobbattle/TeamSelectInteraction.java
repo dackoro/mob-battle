@@ -34,7 +34,15 @@ public class TeamSelectInteraction extends SimpleInstantInteraction {
             return;
         }
         Ref<EntityStore> target = context.getTargetEntity();
-        if (target == null || !target.isValid() || buffer.getComponent(target, NPCEntity.getComponentType()) == null
+        boolean isPlayer = PlayerFighters.isPlayer(target, buffer);
+        if (isPlayer) {
+            // A player joins the team like a mob (/mobbattle playerFights teams).
+            if (!PlayerFighters.eligible(player, target, BattleManager.Kind.TEAMS, buffer)) {
+                context.getState().state = InteractionState.Failed;
+                return;
+            }
+            BattleManager.markPlayer(target, player.getUuid());
+        } else if (target == null || !target.isValid() || buffer.getComponent(target, NPCEntity.getComponentType()) == null
                 || !BattleManager.isAlive(target, buffer)) {
             player.sendMessage(Message.raw("Look at a living mob and click it to add it to a team.").color("#ffcc55"));
             context.getState().state = InteractionState.Failed;

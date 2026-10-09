@@ -1,0 +1,170 @@
+package dev.dackoro.mobbattle;
+
+import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerFly;
+import com.hypixel.hytale.server.npc.role.Role;
+import org.joml.Vector3d;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * /mobbattle unstick (default on): a battle mob that can't reach its opponent because they are on different levels
+ * (one in a cave, the other on the surface or up a mountain) is brought next to it. "Stuck" = for STUCK_MS it got
+ * no closer than before, is not fighting and its opponent is more than MIN_HEIGHT_GAP blocks above or below it.
+ * Fighting = it hit an enemy (a ranged mob shooting down from a cliff is not stuck), or something on its own level
+ * hit it (being shot from another level does not count: that is exactly the stuck case). It then appears 2-4 blocks
+ * from the opponent, on a spot to stand on at the opponent's height (FightFx.standableY), with the summon burst.
+ * Fliers (roles with a "Fly" motion controller, as BodyMotionTakeOff checks): height does not trap them, but a cave
+ * roof or a wall can, so they are moved after FLY_STUCK_MS whatever the height. A walker is never moved towards an
+ * opponent that is flying right now (it would land under it): the flier comes down to attack.
+ * Once per second per world (BattleLifecycleSystem, world thread, outside the systems). Players are never moved.
+ */
+final class Unstick {
+
+    static final long STUCK_MS = 10_000;
+    private static final long FLY_STUCK_MS = 20_000;
+    private static final double MIN_HEIGHT_GAP = 3;
+    /** Closer than this they are fighting, not stuck. */
+    private static final double MELEE = 4;
+    /** It counts as getting closer only if it gained at least this much. */
+    private static final double PROGRESS = 1;
+    private static final int STAND_RANGE = 6;
+
+    private static final class Track {
+        Ref<EntityStore> target;
+        double best;
+        long since;
+    }
+
+    /** Who hit a battle mob last, and when. */
+    private record Hurt(Ref<EntityStore> by, long at) {
+    }
+
+    private static final Map<Ref<EntityStore>, Track> TRACKS = new ConcurrentHashMap<>();
+    /** Battle mob -> when it last hit an enemy (BattleManager.recordDamage). */
+    private static final Map<Ref<EntityStore>, Long> LAST_HIT = new ConcurrentHashMap<>();
+    /** Battle mob -> its last hit taken (FightDamageSystem). */
+    private static final Map<Ref<EntityStore>, Hurt> LAST_HURT = new ConcurrentHashMap<>();
+
+    private Unstick() {
+    }
+
+    /** A battle hit by {@code attacker} (FightDamageSystem / PlayerBattleDamageSystem): it is fighting. */
+    static void hit(Ref<EntityStore> attacker) {
+        if (FxSettings.unstick) LAST_HIT.put(attacker, System.currentTimeMillis());
+    }
+
+    /** A battle mob took a hit from {@code attacker}: fighting, if the attacker is on its level (see check). */
+    static void hurt(Ref<EntityStore> victim, Ref<EntityStore> attacker) {
+        if (FxSettings.unstick && attacker != null && attacker != victim) {
+            LAST_HURT.put(victim, new Hurt(attacker, System.currentTimeMillis()));
+        }
+    }
+
+    static void tick(Store<EntityStore> store) {
+        // Queued with world.execute: the world may have closed since.
+        if (!FxSettings.unstick || store.isShutdown()) return;
+        long now = System.currentTimeMillis();
+        for (BattleManager.Battle battle : BattleManager.battles()) {
+            if (battle.over || battle.store != store) continue;
+            for (Ref<EntityStore> mob : battle.members()) {
+                if (BattleManager.isPlayerFighter(mob) || !BattleManager.isAlive(mob, store)) continue;
+                Ref<EntityStore> target = battle.targets.get(mob);
+                if (target == null || !battle.has(target) || !BattleManager.isAlive(target, store)) {
+                    TRACKS.remove(mob);
+                    continue;
+                }
+                check(mob, target, now, store);
+            }
+        }
+    }
+
+    private static void check(Ref<EntityStore> mob, Ref<EntityStore> target, long now, Store<EntityStore> store) {
+        Vector3d me = ChaosWand.positionOf(mob, store), them = ChaosWand.positionOf(target, store);
+        if (me == null || them == null) return;
+        double dist = me.distance(them);
+        Track t = TRACKS.computeIfAbsent(mob, k -> new Track());
+        boolean flier = canFly(mob, store);
+        if (t.target != target || dist < t.best - PROGRESS || dist < MELEE
+                || now - LAST_HIT.getOrDefault(mob, 0L) < STUCK_MS || hurtOnItsLevel(mob, me, now, store)
+                || !flier && flyingNow(target, store)) {
+            // New opponent, getting closer, in melee range, fighting, or after a flier it can't follow: not stuck.
+            t.target = target;
+            t.best = dist;
+            t.since = now;
+            return;
+        }
+        if (now - t.since < (flier ? FLY_STUCK_MS : STUCK_MS)) return;
+        if (!flier && Math.abs(them.y - me.y) <= MIN_HEIGHT_GAP) return;
+        // Stuck: next to the opponent, at its height.
+        double angle = Math.atan2(me.z - them.z, me.x - them.x);
+        for (int attempt = 0; attempt < 6; attempt++) {
+            double a = angle + attempt * Math.PI / 3, r = 2 + attempt % 3;
+            double x = them.x + Math.cos(a) * r, z = them.z + Math.sin(a) * r;
+            double y = FightFx.standableY(x, z, them.y, STAND_RANGE, store);
+            if (!Double.isFinite(y)) continue;
+            Vector3d to = new Vector3d(x, y, z);
+            float yaw = (float) Math.atan2(them.x - x, them.z - z);
+            store.putComponent(mob, Teleport.getComponentType(), Teleport.createExact(to, new Rotation3f(0f, yaw, 0f)));
+            WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
+            MobBattlePlugin.debug("unstick: " + ChaosWand.nameOf(mob, store) + (flier ? " (flier)" : "") + " could not reach "
+                    + ChaosWand.nameOf(target, store) + " (" + Math.round(Math.abs(them.y - me.y)) + " blocks up/down) for "
+                    + (now - t.since) / 1000 + " s: moved next to it");
+            break;
+        }
+        TRACKS.remove(mob);
+    }
+
+    /** True if something on the mob's level (or right next to it) hit it within STUCK_MS. */
+    private static boolean hurtOnItsLevel(Ref<EntityStore> mob, Vector3d me, long now, ComponentAccessor<EntityStore> accessor) {
+        Hurt h = LAST_HURT.get(mob);
+        if (h == null || now - h.at() >= STUCK_MS) return false;
+        Vector3d by = h.by().isValid() ? ChaosWand.positionOf(h.by(), accessor) : null;
+        // Its attacker is gone (killed, despawned): it was in a real fight a moment ago.
+        return by == null || Math.abs(by.y - me.y) <= MIN_HEIGHT_GAP || by.distance(me) <= MELEE;
+    }
+
+    /** True if the NPC's role can fly (has a "Fly" motion controller), even while it walks or perches. */
+    private static boolean canFly(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        Role role = roleOf(ref, accessor);
+        return role != null && role.hasMotionController(MotionControllerFly.TYPE);
+    }
+
+    /** True if the NPC is flying right now (its active motion controller is the "Fly" one). */
+    private static boolean flyingNow(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        Role role = roleOf(ref, accessor);
+        return role != null && role.getActiveMotionController() instanceof MotionControllerFly;
+    }
+
+    private static Role roleOf(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        NPCEntity npc = ref.isValid() ? accessor.getComponent(ref, NPCEntity.getComponentType()) : null;
+        return npc != null ? npc.getRole() : null;
+    }
+
+    /** BattleManager.maintain: a Ref keeps its world reachable. */
+    static void prune() {
+        if (!TRACKS.isEmpty()) TRACKS.keySet().removeIf(r -> !r.isValid() || BattleManager.battleOf(r) == null);
+        long now = System.currentTimeMillis();
+        if (!LAST_HIT.isEmpty()) {
+            LAST_HIT.entrySet().removeIf(e -> !e.getKey().isValid() || now - e.getValue() > STUCK_MS);
+        }
+        if (!LAST_HURT.isEmpty()) {
+            // The attacker's Ref is held too: drop old entries even while the victim lives.
+            LAST_HURT.entrySet().removeIf(e -> !e.getKey().isValid() || now - e.getValue().at() > STUCK_MS);
+        }
+    }
+
+    /** /mobbattle unstick off: nothing is tracked any more. */
+    static void clear() {
+        TRACKS.clear();
+        LAST_HIT.clear();
+        LAST_HURT.clear();
+    }
+}

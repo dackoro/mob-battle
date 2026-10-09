@@ -62,9 +62,17 @@ public final class FightFx {
      */
     public static void area(Ref<EntityStore> owner, org.joml.Vector3d center, double radius,
                             ComponentAccessor<EntityStore> buffer) {
+        area(owner, center, radius, RING_MILLIS / 1000f, buffer);
+    }
+
+    /** Same, shown for {@code seconds} (the summon area: 3 s). The long glow system is cut at that time. */
+    public static void area(Ref<EntityStore> owner, org.joml.Vector3d center, double radius, float seconds,
+                            ComponentAccessor<EntityStore> buffer) {
         String style = FxSettings.areaStyle;
-        if ("off".equals(style)) return;
         String name = FxSettings.pickAreaColorName();
+        PlayerRef ownerPlayer = owner != null && owner.isValid() ? buffer.getComponent(owner, PlayerRef.getComponentType()) : null;
+        if (ownerPlayer != null) LAST_AREA_COLOR.put(ownerPlayer.getUuid(), name);
+        if ("off".equals(style)) return;
         if (FxSettings.areaOnlyWand) {
             PlayerRef player = owner != null && owner.isValid()
                     ? buffer.getComponent(owner, PlayerRef.getComponentType()) : null;
@@ -76,7 +84,33 @@ public final class FightFx {
             }
             return;
         }
-        drawArea(center, radius, style, name, RING_MILLIS / 1000f, null, buffer);
+        // A new area replaces this owner's previous glow (and any glow in its own spot): repeated summons
+        // would otherwise pile up columns of light for 6 s each.
+        PlayerRef who = owner != null && owner.isValid() ? buffer.getComponent(owner, PlayerRef.getComponentType()) : null;
+        if (who != null) {
+            double[] prev = LAST_AREA.put(who.getUuid(),
+                    new double[]{center.x(), center.y(), center.z(), radius});
+            if (prev != null) cancelGlow(prev[0], prev[1], prev[2], prev[3], buffer);
+        }
+        cancelGlow(center.x(), center.y(), center.z(), radius, buffer);
+        drawArea(center, radius, style, name, seconds, null, buffer);
+    }
+
+    /** Per owner: center and radius of the last area drawn (for cancelling its glow). */
+    private static final java.util.Map<java.util.UUID, double[]> LAST_AREA = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Stops every glow column of the area system inside the circle's box, right away, for everyone in the world
+     * (CancelParticleSystems with a region, as the game does it). The floor / zone shapes can't be cancelled.
+     */
+    private static void cancelGlow(double x, double y, double z, double radius, ComponentAccessor<EntityStore> buffer) {
+        String[] ids = Teams.PALETTE.keySet().stream()
+                .flatMap(c -> java.util.stream.Stream.of(AREA_GLOW_ID + c, AREA_GLOW_SHORT_ID + c))
+                .toArray(String[]::new);
+        double r = radius + 3;
+        PlayerUtil.broadcastPacketToPlayers(buffer, new com.hypixel.hytale.protocol.packets.world.CancelParticleSystems(
+                new com.hypixel.hytale.protocol.Position(x - r, y - 64, z - r),
+                new com.hypixel.hytale.protocol.Position(x + r, y + 160, z + r), ids, true));
     }
 
     /** Once per second per world (BattleLifecycleSystem): redraw held areas whose owner holds the Chaos Wand. */
@@ -89,6 +123,16 @@ public final class FightFx {
     }
 
     /**
+     * /mobbattle stop: no more held-area redraws, and the shapes already drawn (areas, zones, rings) are erased
+     * for everyone in {@code world} (DebugUtils.clear: ClearDebugShapes). Team rings of drafts come back by
+     * themselves on their next redraw.
+     */
+    static void clearAreas(com.hypixel.hytale.server.core.universe.world.World world) {
+        HELD_AREAS.clear();
+        if (world != null) com.hypixel.hytale.server.core.modules.debug.DebugUtils.clear(world);
+    }
+
+    /**
      * BattleManager.maintain: a held area keeps its world's Store reachable. Drops it when the player left,
      * its world was unloaded, or areaonlywand was turned off (then refreshHeldAreas no longer runs).
      */
@@ -97,8 +141,15 @@ public final class FightFx {
         HELD_AREAS.values().removeIf(h -> !FxSettings.areaOnlyWand || !h.player().isValid() || h.store().isShutdown());
     }
 
+    /** Per player: the color of their last Chaos Wand area, so its arena keeps it (areaColor random). */
+    private static final java.util.Map<java.util.UUID, String> LAST_AREA_COLOR = new java.util.concurrent.ConcurrentHashMap<>();
+
+    static String lastAreaColor(PlayerRef owner) {
+        return owner != null ? LAST_AREA_COLOR.get(owner.getUuid()) : null;
+    }
+
     /** Draws the area for {@code seconds}, to everyone in the world, or only to {@code only} when not null. */
-    private static void drawArea(org.joml.Vector3d center, double radius, String style, String colorName, float seconds,
+    static void drawArea(org.joml.Vector3d center, double radius, String style, String colorName, float seconds,
                                  PlayerRef only, ComponentAccessor<EntityStore> buffer) {
         java.util.List<com.hypixel.hytale.protocol.ToClientPacket> packets = new java.util.ArrayList<>();
         var top = groundOf(buffer);
@@ -144,6 +195,42 @@ public final class FightFx {
                 RUNE_CENTER_ID, new com.hypixel.hytale.protocol.Position(center.x(), y, center.z()), null, 1f, null, seconds));
     }
 
+    private static final int WAVE_STEPS = 14;
+    private static final long WAVE_STEP_MS = 50;
+    private static final float WAVE_RING = 1.5f;
+
+    /**
+     * A shockwave: a thin ring on the ground growing from {@code center} out to {@code radius} in about 0.7 s
+     * (one DisplayDebug disc with a hole per step, like the zone floor), then the full area edge for a moment.
+     * Shows how far the Snap Wand reached. To everyone in the world.
+     */
+    static void shockwave(org.joml.Vector3d center, double radius, String hex, ComponentAccessor<EntityStore> buffer) {
+        if (!FxSettings.wandFx || center == null || radius <= 0) return;
+        double y = floorBelow(center.y(), buffer).applyAsDouble(center.x(), center.z());
+        double baseY = (Double.isFinite(y) ? y - 0.25 : center.y()) + 0.15;
+        var rgb = ColorParseUtil.hexStringToColor(hex);
+        var color = new org.joml.Vector3f((rgb.red & 255) / 255f, (rgb.green & 255) / 255f, (rgb.blue & 255) / 255f);
+        byte flags = (byte) com.hypixel.hytale.server.core.modules.debug.DebugUtils.FLAG_NO_WIREFRAME;
+        var world = buffer.getExternalData().getWorld();
+        float[] matrix = com.hypixel.hytale.math.matrix.Matrix4dUtil.asFloatData(
+                new org.joml.Matrix4d().translate(center.x(), baseY, center.z()));
+        for (int i = 1; i <= WAVE_STEPS; i++) {
+            boolean last = i == WAVE_STEPS;
+            float outer = (float) (radius * i / WAVE_STEPS);
+            float[] disc = new float[16];
+            disc[0] = outer;
+            disc[1] = ZONE_DISC_SEGMENTS;
+            disc[2] = Math.max(0, outer - WAVE_RING);
+            var packet = new com.hypixel.hytale.protocol.packets.player.DisplayDebug(com.hypixel.hytale.protocol.DebugShape.Disc,
+                    matrix, color, last ? 0.8f : (WAVE_STEP_MS + 30) / 1000f, flags, disc, last ? 0.45f : 0.6f);
+            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+                if (!world.getEntityStore().getStore().isShutdown()) {
+                    PlayerUtil.broadcastPacketToPlayers(world.getEntityStore().getStore(), packet);
+                }
+            }), (i - 1) * WAVE_STEP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
+    }
+
     /** Blocks above the area center from which the top block counts as a roof, not the ground. */
     private static final double ROOF_MARGIN = 6;
 
@@ -181,6 +268,72 @@ public final class FightFx {
             }
             return Double.NaN;
         };
+    }
+
+    /**
+     * Feet height of the standable spot (a solid block with 2 free blocks above it) in the column at x, z that is
+     * closest to {@code preferY}, within {@code range} blocks up or down; NaN if there is none in loaded chunks.
+     * Unlike floorBelow it never picks a spot inside a hill or under a low cave roof, and it keeps a mob at its
+     * own level (a cave mob stays in the cave, a mountain mob on the mountain).
+     */
+    static double standableY(double x, double z, double preferY, int range, ComponentAccessor<EntityStore> buffer) {
+        var chunks = buffer.getExternalData().getWorld().getChunkStore();
+        var store = chunks.getStore();
+        var blockTypes = com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.getAssetMap();
+        var sectionType = com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection.getComponentType();
+        int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
+        int top = (int) Math.floor(preferY) + range + 2, bottom = Math.max(0, (int) Math.floor(preferY) - range);
+        var fluidType = com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection.getComponentType();
+        var fluids = com.hypixel.hytale.server.core.asset.type.fluid.Fluid.getAssetMap();
+        // 1 = solid, 0 = free, -1 = unknown (unloaded) or a hurting fluid (lava), from top to bottom.
+        int[] cell = new int[top - bottom + 1];
+        com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection section = null;
+        com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection fluidSection = null;
+        int sectionY = Integer.MIN_VALUE;
+        for (int y = top; y >= bottom; y--) {
+            if ((y >> 5) != sectionY) {
+                sectionY = y >> 5;
+                var ref = chunks.getChunkSectionReference(bx >> 5, sectionY, bz >> 5);
+                boolean ok = ref != null && ref.isValid();
+                section = ok ? store.getComponent(ref, sectionType) : null;
+                fluidSection = ok ? store.getComponent(ref, fluidType) : null;
+            }
+            if (section == null) {
+                cell[y - bottom] = -1;
+                continue;
+            }
+            var type = blockTypes.getAsset(section.get(bx & 31, y & 31, bz & 31));
+            if (type != null && type.getMaterial() == com.hypixel.hytale.protocol.BlockMaterial.Solid) {
+                cell[y - bottom] = 1;
+                continue;
+            }
+            int fluidId = fluidSection != null ? fluidSection.getFluidId(bx & 31, y & 31, bz & 31) : 0;
+            var fluid = fluidId != 0 ? fluids.getAsset(fluidId) : null;
+            cell[y - bottom] = fluid != null && hurts(fluid) ? -1 : 0;
+        }
+        double best = Double.NaN, bestDist = Double.MAX_VALUE;
+        for (int y = bottom; y + 2 <= top; y++) {
+            int i = y - bottom;
+            if (cell[i] == 1 && cell[i + 1] == 0 && cell[i + 2] == 0) {
+                double dist = Math.abs(y + 1 - preferY);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = y + 1;
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * A fluid that harms whoever is in it. Lava and fire burn through a collision interaction (Lava_Source.json:
+     * "Interactions": {"Collision": ... "Lava_Burn"}, inherited by Lava), not DamageToEntities; poison has neither,
+     * so it goes by name. Water, slime, tar and mud are fine to stand in.
+     */
+    private static boolean hurts(com.hypixel.hytale.server.core.asset.type.fluid.Fluid fluid) {
+        var interactions = fluid.getInteractions();
+        return fluid.getDamageToEntities() > 0 || interactions != null && !interactions.isEmpty()
+                || fluid.getId() != null && fluid.getId().contains("Poison");
     }
 
     /** Ground height (0.25 above the top collision block) from resident heightmaps only, or NaN. */
@@ -255,7 +408,7 @@ public final class FightFx {
                              java.util.function.DoubleBinaryOperator ground,
                              java.util.List<com.hypixel.hytale.protocol.ToClientPacket> out) {
         var tint = ColorParseUtil.hexStringToColor(Teams.PALETTE.get(colorName));
-        String glowId = (seconds < RING_MILLIS / 1000f ? AREA_GLOW_SHORT_ID : AREA_GLOW_ID) + colorName;
+        String glowId = (seconds <= HELD_AREA_SECONDS ? AREA_GLOW_SHORT_ID : AREA_GLOW_ID) + colorName;
         int points = Math.max(12, Math.min(GLOW_MAX_POINTS, (int) Math.ceil(Math.PI * radius)));
         for (int i = 0; i < points; i++) {
             double a = 2 * Math.PI * i / points;
@@ -401,6 +554,25 @@ public final class FightFx {
      * winner titles all play.
      */
     static java.util.List<PlayerRef> titleViewers(PlayerRef owner) {
+        java.util.List<PlayerRef> viewers = scopeViewers(owner);
+        if (owner == null || !BattleManager.hasPlayerFighters()) {
+            return viewers;
+        }
+        // Players fighting in this owner's battles see its titles, timer and music whatever titleScope says.
+        // Matched through the online players, not read from the entity: countdown titles run off the world thread.
+        java.util.List<Ref<EntityStore>> fighters = BattleManager.playerFightersOf(owner.getUuid());
+        if (fighters.isEmpty()) {
+            return viewers;
+        }
+        java.util.List<PlayerRef> out = new java.util.ArrayList<>(viewers);
+        for (PlayerRef p : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
+            if (p.isValid() && fighters.contains(p.getReference()) && !out.contains(p)) out.add(p);
+        }
+        return out;
+    }
+
+    /** The owner and, per /mobbattle titleScope, the players near them or in their world. */
+    private static java.util.List<PlayerRef> scopeViewers(PlayerRef owner) {
         if ("owner".equals(FxSettings.titleScope) || owner == null || !owner.isValid()) {
             return owner == null ? java.util.List.of() : java.util.List.of(owner);
         }
@@ -505,9 +677,6 @@ public final class FightFx {
 
     private static void sendTitle(PlayerRef player, PendingTitle title, long now) {
         var style = FxSettings.pickTitleStyle();
-        if (title.victory() && style == com.hypixel.hytale.protocol.packets.interface_.EventTitleStyle.GoblinBreach) {
-            style = com.hypixel.hytale.protocol.packets.interface_.EventTitleStyle.Major;
-        }
         float fadeIn = EventTitleUtil.getDefaultFadeInDuration(style);
         EventTitleUtil.showEventTitleToPlayer(player, Message.raw(title.main()), Message.raw(title.sub()), style, null,
                 TITLE_SECONDS, fadeIn, TITLE_FADE_OUT);

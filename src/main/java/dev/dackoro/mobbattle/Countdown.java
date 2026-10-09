@@ -114,6 +114,21 @@ final class Countdown {
         TITLE_OWNER.remove(p.player.getUuid(), p);
     }
 
+    /**
+     * Battle Wand right click: cancels this player's pending countdowns whose label starts with {@code prefix}
+     * (e.g. "DUEL"). Returns their mobs (empty if none).
+     */
+    static java.util.Set<Ref<EntityStore>> cancelFor(UUID player, String prefix) {
+        java.util.Set<Ref<EntityStore>> mobs = new java.util.HashSet<>();
+        for (Pending p : PENDING) {
+            if (!p.cancelled && p.player.getUuid().equals(player) && p.label.startsWith(prefix)) {
+                finish(p);
+                mobs.addAll(p.mobs);
+            }
+        }
+        return mobs;
+    }
+
     /** Cancels every pending countdown. Returns how many. */
     static int cancelAll() {
         int n = 0;
@@ -122,6 +137,14 @@ final class Countdown {
             n++;
         }
         return n;
+    }
+
+    /** True if {@code ref} is one of the fighters of a countdown still running (a player waiting for their fight). */
+    static boolean involves(Ref<EntityStore> ref) {
+        for (Pending p : PENDING) {
+            if (!p.cancelled && p.mobs.contains(ref)) return true;
+        }
+        return false;
     }
 
     /** True if {@code player} has a countdown still running (BattleMusic keeps playing meanwhile). */

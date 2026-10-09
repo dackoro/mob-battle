@@ -55,7 +55,8 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         boolean looks = TeamFx.hasPending();
         boolean kills = WandFx.hasPendingKills();
         boolean countdowns = Countdown.hasPending();
-        if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !FightManager.hasFights()) {
+        boolean snaps = Snap.any();
+        if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !snaps && !FightManager.hasFights()) {
             return;
         }
         Ref<EntityStore> self = chunk.getReferenceTo(entityIndex);
@@ -65,6 +66,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         if (heals) FightManager.applyPendingHeals(self, buffer);
         if (looks) TeamFx.apply(self, buffer);
         if (kills) WandFx.applyPendingKill(self, now, buffer);
+        if (snaps) Snap.apply(self, now, buffer);
         if (countdowns) Countdown.runDue(store, now, buffer);
 
         // Every battle and draft member is managed: wild NPCs skip the battle lookups entirely.
@@ -140,6 +142,10 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         if (battle.over || !BattleManager.isAlive(self, buffer)) {
             return;
         }
+        if (battle.killAll && battle.team(self) != battle.survivorTeam) {
+            if (!WandFx.isDying(self)) WandFx.kill(self, null, true, buffer);
+            return;
+        }
         boolean[] changed = {false};
         Ref<EntityStore> target = BattleManager.currentTarget(battle, self, buffer, changed);
         if (target == null) {
@@ -154,8 +160,9 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         }
     }
 
-    /** Team color ring under this NPC, only for the player who owns the draft/battle and holds the Team Wand. */
-    private static void drawTeamRing(Ref<EntityStore> self, BattleManager.Battle battle, CommandBuffer<EntityStore> buffer) {
+    /** Team color ring under this NPC (or player fighter, from PlayerFighters.tick), only for the player who owns the draft/battle and holds the Team Wand. */
+    static void drawTeamRing(Ref<EntityStore> self, BattleManager.Battle battle,
+                             com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         if (battle != null) {
             PlayerRef owner = battle.owner();
             int team = battle.team(self);

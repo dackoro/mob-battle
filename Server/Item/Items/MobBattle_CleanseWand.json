@@ -6,8 +6,8 @@
   "Categories": [
     "Items.Weapons"
   ],
-  "Icon": "Icons/ItemsGenerated/Weapon_Wand_Wood.png",
-  "Quality": "Uncommon",
+  "Icon": "Icons/Items/MobBattle/CleanseWand.png",
+  "Quality": "Common",
   "ItemLevel": 1,
   "MaxStack": 1,
   "Model": "Items/MobBattle/CleanseWand/MobBattle_CleanseWand.blockymodel",

@@ -41,14 +41,42 @@ public final class ChaosWand {
         return t != null ? new Vector3d(t.getPosition()) : null;
     }
 
+    /** The color of the area just drawn for this player, as hex (red if unknown). */
+    private static String areaHex(PlayerRef player) {
+        String name = FightFx.lastAreaColor(player);
+        String hex = name != null ? Teams.PALETTE.get(name) : null;
+        return hex != null ? hex : "#ff4b3e";
+    }
+
     /** NPCs within the configured radius of {@code center}, nearest first, capped at /mobbattle maxmobs. */
     static List<Ref<EntityStore>> npcsAround(Vector3d center, ComponentAccessor<EntityStore> buffer) {
+        return npcsAround(center, FxSettings.radius, buffer);
+    }
+
+    /** Same, within {@code radius} blocks (Snap Wand: snapRadius). */
+    static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, ComponentAccessor<EntityStore> buffer) {
+        return npcsAround(center, radius, false, buffer);
+    }
+
+    /** Blocks above and below the center that a column search ({@code column}) reaches: the whole world height. */
+    private static final double COLUMN_HALF_HEIGHT = 512;
+
+    /**
+     * Same; {@code column}: every height within {@code radius} horizontally (fliers high up, mobs in caves
+     * below), not a sphere.
+     */
+    static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, boolean column,
+                                             ComponentAccessor<EntityStore> buffer) {
         // getAllEntitiesInSphere returns a thread-local list: copy it right away.
         // Distance once per NPC, not once per sort comparison (n log n component reads and copies).
         List<Near> near = new ArrayList<>();
-        for (Ref<EntityStore> r : TargetUtil.getAllEntitiesInSphere(center, FxSettings.radius, buffer)) {
+        List<Ref<EntityStore>> found = column
+                ? TargetUtil.getAllEntitiesInBox(new Vector3d(center.x - radius, center.y - COLUMN_HALF_HEIGHT, center.z - radius),
+                        new Vector3d(center.x + radius, center.y + COLUMN_HALF_HEIGHT, center.z + radius), buffer)
+                : TargetUtil.getAllEntitiesInSphere(center, radius, buffer);
+        for (Ref<EntityStore> r : found) {
             if (r != null && r.isValid() && buffer.getComponent(r, NPCEntity.getComponentType()) != null
-                    && BattleManager.isAlive(r, buffer)) {
+                    && BattleManager.isAlive(r, buffer) && (!column || horizontal(center, r, buffer) <= radius)) {
                 near.add(new Near(r, distSq(center, r, buffer)));
             }
         }
@@ -60,6 +88,11 @@ public final class ChaosWand {
             out.add(near.get(i).ref());
         }
         return out;
+    }
+
+    private static double horizontal(Vector3d center, Ref<EntityStore> r, ComponentAccessor<EntityStore> buffer) {
+        Vector3d p = positionOf(r, buffer);
+        return p == null ? Double.MAX_VALUE : Math.hypot(p.x - center.x, p.z - center.z);
     }
 
     /** How many mobs the last npcsAround call on this thread left out because of /mobbattle maxmobs. */
@@ -85,7 +118,10 @@ public final class ChaosWand {
 
     static String nameOf(Ref<EntityStore> ref, ComponentAccessor<EntityStore> buffer) {
         NPCEntity npc = buffer.getComponent(ref, NPCEntity.getComponentType());
-        return npc != null && npc.getRoleName() != null ? npc.getRoleName() : "mob";
+        if (npc != null && npc.getRoleName() != null) return npc.getRoleName();
+        // A player fighter (/mobbattle playerFights): titles and chat say their name.
+        PlayerRef player = buffer.getComponent(ref, PlayerRef.getComponentType());
+        return player != null ? player.getUsername() : "mob";
     }
 
     /** Everyone around {@code target} attacks it. */
@@ -105,6 +141,8 @@ public final class ChaosWand {
             return;
         }
         FightFx.area(playerEntity, center, FxSettings.radius, buffer);
+        // A shockwave out to the area edge, in the area color (same reach as the arena).
+        FightFx.shockwave(center, FxSettings.radius, areaHex(player), buffer);
         warnLeftOut(player);
         // The lone target in gold, everyone against it in red.
         WandFx.onTarget(target, WandFx.LONE, FxSettings.countdownSeconds, buffer);
@@ -114,13 +152,14 @@ public final class ChaosWand {
         FightFx.summonRune(center, buffer);
         FightCamera.overview(player, center, withTarget(around, target), buffer);
         Countdown.run(player, buffer, "EVERYONE vs " + targetName, withTarget(around, target),
-                acc -> focusNow(player, playerEntity, target, targetName, around, acc));
+                acc -> focusNow(player, playerEntity, target, targetName, around, center, acc));
     }
 
     private static void focusNow(PlayerRef player, Ref<EntityStore> playerEntity, Ref<EntityStore> target,
-                                 String targetName, List<Ref<EntityStore>> around, ComponentAccessor<EntityStore> buffer) {
-        around.removeIf(r -> !BattleManager.isAlive(r, buffer));
-        if (!BattleManager.isAlive(target, buffer) || around.isEmpty()) {
+                                 String targetName, List<Ref<EntityStore>> around, Vector3d center,
+                                 ComponentAccessor<EntityStore> buffer) {
+        around.removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
+        if (!BattleManager.isAlive(target, buffer) || !PlayerFighters.canStart(target, buffer) || around.isEmpty()) {
             player.sendMessage(Message.raw("EVERYONE vs " + targetName + " cancelled: the mobs are gone.").color(WARN));
             return;
         }
@@ -146,6 +185,7 @@ public final class ChaosWand {
         }
         // A 2-side battle so the end shows who won (the target or the attackers).
         BattleManager.Battle battle = BattleManager.startFocus(player, target, targetName, around);
+        Arena.setup(battle, center, FxSettings.radius, FightFx.lastAreaColor(player), buffer);
         WandFx.onTarget(target, WandFx.LONE_MARK, buffer);
         // The target fights back against the nearest attacker.
         if (firstAttacker != null) {
@@ -162,6 +202,8 @@ public final class ChaosWand {
     static void brawl(PlayerRef player, Ref<EntityStore> playerEntity, Vector3d center,
                       ComponentAccessor<EntityStore> buffer) {
         List<Ref<EntityStore>> around = npcsAround(center, buffer);
+        // /mobbattle playerFights royale: the players in the area fight too (not in Creative).
+        around.addAll(PlayerFighters.playersAround(player, center, FxSettings.radius, buffer));
         if (around.size() < 2) {
             // Only the cast animation and this message: no area, no effects.
             player.sendMessage(Message.raw("A free-for-all needs at least 2 mobs within " + FxSettings.radius
@@ -169,18 +211,37 @@ public final class ChaosWand {
             return;
         }
         FightFx.area(playerEntity, center, FxSettings.radius, buffer);
+        // A shockwave out to the area edge, in the area color (same reach as the arena).
+        FightFx.shockwave(center, FxSettings.radius, areaHex(player), buffer);
         warnLeftOut(player);
         for (Ref<EntityStore> npc : around) {
             WandFx.onTarget(npc, WandFx.BRAWL, FxSettings.countdownSeconds, buffer);
         }
         FightFx.summonRune(center, buffer);
         FightCamera.overview(player, center, around, buffer);
-        Countdown.run(player, buffer, "BATTLE ROYALE", around, acc -> brawlNow(player, playerEntity, around, acc));
+        Countdown.run(player, buffer, "BATTLE ROYALE", around, acc -> brawlNow(player, playerEntity, around, center, acc));
+    }
+
+    /** How many of the closest opponents a royale fighter picks its first one from. */
+    private static final int NEAREST_START = 3;
+
+    /** One of the NEAREST_START closest others of {@code around[i]}, at random (any other if positions are unknown). */
+    private static Ref<EntityStore> nearbyOpponent(List<Ref<EntityStore>> around, List<Vector3d> at, int i) {
+        Vector3d me = at.get(i);
+        List<Integer> others = new ArrayList<>(around.size() - 1);
+        for (int j = 0; j < around.size(); j++) if (j != i) others.add(j);
+        if (me != null) {
+            others.sort((x, y) -> Double.compare(
+                    at.get(x) != null ? at.get(x).distanceSquared(me) : Double.MAX_VALUE,
+                    at.get(y) != null ? at.get(y).distanceSquared(me) : Double.MAX_VALUE));
+        }
+        int pick = ThreadLocalRandom.current().nextInt(Math.min(NEAREST_START, others.size()));
+        return around.get(others.get(pick));
     }
 
     private static void brawlNow(PlayerRef player, Ref<EntityStore> playerEntity, List<Ref<EntityStore>> around,
-                                 ComponentAccessor<EntityStore> buffer) {
-        around.removeIf(r -> !BattleManager.isAlive(r, buffer));
+                                 Vector3d center, ComponentAccessor<EntityStore> buffer) {
+        around.removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
         if (around.size() < 2) {
             player.sendMessage(Message.raw("BATTLE ROYALE cancelled: fewer than 2 mobs left.").color(WARN));
             return;
@@ -189,13 +250,17 @@ public final class ChaosWand {
         // Battle royale: each one starts on a random opponent; when its target dies it goes for
         // the nearest one still standing, until only one is left (FightTickSystem).
         BattleManager.Battle battle = BattleManager.startRoyale(player, around);
+        Arena.setup(battle, center, FxSettings.radius, FightFx.lastAreaColor(player), buffer);
         FightManager.splitFlocksAcrossSides(battle, buffer);
         int aggressive = 0;
-        for (Ref<EntityStore> npc : around) {
-            Ref<EntityStore> enemy;
-            do {
-                enemy = around.get(ThreadLocalRandom.current().nextInt(around.size()));
-            } while (enemy.getIndex() == npc.getIndex());
+        // Positions once: each fighter starts on one of its NEAREST_START closest opponents, picked at random.
+        // A random opponent anywhere in a big area (radius 100) could be 150+ blocks away: the fight never
+        // started before a short timer ran out, and some roles give up chasing that far.
+        List<Vector3d> at = new ArrayList<>(around.size());
+        for (Ref<EntityStore> r : around) at.add(positionOf(r, buffer));
+        for (int i = 0; i < around.size(); i++) {
+            Ref<EntityStore> npc = around.get(i);
+            Ref<EntityStore> enemy = nearbyOpponent(around, at, i);
             BattleManager.setTarget(battle, npc, enemy);
             if (FightManager.turnAgainst(npc, enemy, buffer) == FightManager.Result.AGGRESSIVE) {
                 aggressive++;

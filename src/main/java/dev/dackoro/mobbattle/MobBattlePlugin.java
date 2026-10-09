@@ -35,6 +35,11 @@ public class MobBattlePlugin extends JavaPlugin {
         }
     }
 
+    /** /mobbattle debug on: detailed battle decisions in the server log, prefixed "[debug]". */
+    public static void debug(String message) {
+        if (FxSettings.debug) log("[debug] " + message);
+    }
+
     @Override
     protected void setup() {
         Teams.count(); // fills the default team slots
@@ -42,6 +47,7 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(SelectFighterInteraction.TYPE, SelectFighterInteraction.class, SelectFighterInteraction.CODEC)
                 .register(ClearSelectionInteraction.TYPE, ClearSelectionInteraction.class, ClearSelectionInteraction.CODEC)
                 .register(HealInteraction.TYPE, HealInteraction.class, HealInteraction.CODEC)
+                .register(SnapInteraction.TYPE, SnapInteraction.class, SnapInteraction.CODEC)
                 .register(KillInteraction.TYPE, KillInteraction.class, KillInteraction.CODEC)
                 .register(ChaosFocusInteraction.TYPE, ChaosFocusInteraction.class, ChaosFocusInteraction.CODEC)
                 .register(ChaosBrawlInteraction.TYPE, ChaosBrawlInteraction.class, ChaosBrawlInteraction.CODEC)
@@ -58,6 +64,9 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(ArmyDisbandInteraction.TYPE, ArmyDisbandInteraction.class, ArmyDisbandInteraction.CODEC);
         getEntityStoreRegistry().registerSystem(new FightDamageSystem());
         getEntityStoreRegistry().registerSystem(new ArmyPlayerDamageSystem());
+        getEntityStoreRegistry().registerSystem(new PlayerBattleDamageSystem());
+        getEntityStoreRegistry().registerSystem(new PlayerDeathSystem());
+        getEntityStoreRegistry().registerSystem(new KillTracker());
         getEntityStoreRegistry().registerSystem(new FightTickSystem());
         getEntityStoreRegistry().registerSystem(new BattleLifecycleSystem());
         FxSettings.load(getDataDirectory());

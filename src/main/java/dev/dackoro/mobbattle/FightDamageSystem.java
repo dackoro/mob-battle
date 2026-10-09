@@ -103,7 +103,20 @@ public class FightDamageSystem extends DamageEventSystem {
             damage.setCancelled(true);
             return;
         }
+        // A player fighter (/mobbattle playerFights) never hurts its own side's mobs, unless friendlyFire is on.
+        if (BattleManager.isPlayerFighter(source.getRef())) {
+            BattleManager.Battle mine = BattleManager.battleOf(source.getRef());
+            if (mine != null && mine.has(victim) && mine.team(victim) == mine.team(source.getRef())
+                    && !FxSettings.friendlyFire(mine.kind)) {
+                damage.setCancelled(true);
+                return;
+            }
+        }
         if (!FightManager.isFighting(source.getRef(), victim) && !BattleManager.areEnemies(source.getRef(), victim)) {
+            // Unstick: a battle mob hit by an outsider (a player, a wild mob with isolation off) is in a fight too.
+            if (FxSettings.unstick && !damage.isCancelled() && BattleManager.isManaged(victim)) {
+                Unstick.hurt(victim, source.getRef());
+            }
             return;
         }
         if (BattleDebug.tracing(source.getRef(), victim)) {
@@ -114,5 +127,6 @@ public class FightDamageSystem extends DamageEventSystem {
         if (damage.isCancelled()) {
             damage.setCancelled(false);
         }
+        BattleManager.recordDamage(source.getRef(), victim, damage.getAmount());
     }
 }

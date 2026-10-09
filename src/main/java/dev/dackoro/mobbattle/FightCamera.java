@@ -87,6 +87,7 @@ final class FightCamera {
                 else seq.keyframeLookingAt(at, look, orbit / ORBIT_KEYS, EasingType.Linear);
             }
             play(player, seq, eye);
+            ORBITS.put(player.getUuid(), System.currentTimeMillis() + seconds * 1000L);
         } catch (RuntimeException e) {
             MobBattlePlugin.log("Fight camera failed: " + e);
         }
@@ -245,6 +246,55 @@ final class FightCamera {
         } else {
             player.getPacketHandler().writeNoCache(new SetServerCamera(ClientCameraView.Custom, false, null));
         }
+    }
+
+    /** Ends this player's duel shot, if any, and gives them the normal camera back. */
+    static void stop(PlayerRef player) {
+        if (player != null && SHOT.remove(player.getUuid()) != null) reset(player);
+    }
+
+    /** Per player: when their orbit sequence ends, so /mobbattle stop can cut it short. */
+    private static final Map<UUID, Long> ORBITS = new ConcurrentHashMap<>();
+
+    /** BattleManager.maintain: forgets orbits that already ended. */
+    static void prune() {
+        if (ORBITS.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        ORBITS.values().removeIf(end -> end <= now);
+    }
+
+    /**
+     * /mobbattle stop: every running shot ends and its player gets the normal camera back. A duel shot stops
+     * sending frames; an orbit (a sequence the client plays by itself) is replaced by a short glide back to the
+     * player's eyes (a new sequence replaces the running one, CameraSequencePacketHandler.begin).
+     */
+    static int stopAll() {
+        long now = System.currentTimeMillis();
+        java.util.Set<UUID> players = new java.util.HashSet<>(SHOT.keySet());
+        SHOT.clear();
+        ORBITS.forEach((id, end) -> { if (end > now) players.add(id); });
+        java.util.Set<UUID> orbiting = new java.util.HashSet<>(ORBITS.keySet());
+        ORBITS.clear();
+        for (UUID id : players) {
+            PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(id);
+            if (p == null || !p.isValid()) continue;
+            Ref<EntityStore> ref = p.getReference();
+            if (ref == null || !ref.isValid()) continue;
+            var store = ref.getStore();
+            store.getExternalData().getWorld().execute(() -> {
+                if (orbiting.contains(id)) {
+                    Eye eye = eyeOf(p, store);
+                    if (eye != null) {
+                        CameraSequenceBuilder cut = new CameraSequenceBuilder();
+                        cut.keyframe(eye.pos, eye.look, 0.3f, EasingType.SineOut);
+                        cut.addFlag(CameraSequenceFlags.ReturnToGameplayCameraOnEnd);
+                        cut.sendTo(p);
+                    }
+                }
+                reset(p);
+            });
+        }
+        return players.size();
     }
 
     /** Ends on the player's own eye view (a glide back) and plays it. */

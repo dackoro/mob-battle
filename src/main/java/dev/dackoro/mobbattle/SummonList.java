@@ -183,13 +183,16 @@ public final class SummonList {
             summary.setLength(summary.length() - 2);
         }
         if (spawned > 0) {
-            FightFx.area(owner, center, ring, store);
+            FightFx.area(owner, center, ring, SUMMON_AREA_SECONDS, store);
             WandFx.burst(null, WandFx.SUMMON_SOUND, center, store);
         }
         player.sendMessage(Message.raw("Summoned " + spawned + " mobs: " + summary
                 + (failed > 0 ? " (" + failed + " failed)" : "")
                 + (attempted >= FxSettings.maxMobs ? " — capped by /mobbattle maxMobs (spawn attempts)" : "")).color("#4bff6a"));
     }
+
+    /** The summon area is a quick flash, not the Chaos Wand's 6 s. */
+    private static final float SUMMON_AREA_SECONDS = 3f;
 
     /** Plays the model's "Spawn" animation (e.g. skeletons rising from the ground), if it has one. */
     private static void playSpawnAnimation(Ref<EntityStore> mob, Store<EntityStore> store) {

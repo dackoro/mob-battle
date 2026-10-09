@@ -6,14 +6,14 @@ Patchline: **pre-release** (`ServerVersion >=0.7.0-pre <0.8.0`).
 
 ## Items
 
-Each wand's tooltip explains what it does (English and Spanish). Get all ten at once with `/mobbattle give`, or individually from the creative inventory or with `/give <item ID>`. The command gives one of each using Hytale's normal inventory placement and requires the same permission as `/give` for yourself. If some do not fit, it reports which ones were not delivered.
+Each wand's tooltip explains what it does (English and Spanish). Get all eleven at once with `/mobbattle give`, or individually from the creative inventory or with `/give <item ID>`. The command gives one of each using Hytale's normal inventory placement and requires the same permission as `/give` for yourself. If some do not fit, it reports which ones were not delivered.
 
 ### Fights
 | Item ID | Name | Left click | Right click |
 |---|---|---|---|
-| `MobBattle_Wand` | Battle Wand | Click mob A, then mob B: they fight each other. | Clear the selection. |
-| `MobBattle_ChaosWand` | Chaos Wand | Every mob within the radius attacks the clicked mob. | Battle royale: every mob within the radius fights; when a mob kills its target it goes for the nearest survivor, until one is left (centered on the mob you aim at, or on you). |
-| `MobBattle_TeamWand` | Team Wand | Add the mob to the current team (click again to remove it). | In the air: switch team. On a mob: start the battle. Last team standing wins. |
+| `MobBattle_Wand` | Battle Wand | Click mob A, then mob B: they fight each other. With `/mobbattle playerFights duel on`, players can be picked like mobs, and crouching + clicking a mob makes it fight you (or select one, then crouch and click the air). | Clear the selection. |
+| `MobBattle_ChaosWand` | Chaos Wand | Every mob within the radius attacks the clicked mob (or the clicked player, with `playerFights allVsOne on`). | Battle royale: every mob within the radius fights (and the players there, with `playerFights royale on`); each one starts on one of its 3 closest opponents, picked at random; when a mob kills its target it goes for the nearest survivor, until one is left (centered on the mob you aim at, or on you). |
+| `MobBattle_TeamWand` | Team Wand | Add the mob (or a player, with `playerFights teams on`) to the current team (click again to remove it). | In the air: switch team. On a mob: start the battle. Last team standing wins. |
 
 ### Mobs
 | Item ID | Name | Left click | Right click |
@@ -26,6 +26,7 @@ Each wand's tooltip explains what it does (English and Spanish). Get all ten at 
 |---|---|---|---|
 | `MobBattle_HealWand` | Heal Wand | Restore the entity to 100% health. | — |
 | `MobBattle_KillWand` | Kill Wand | Kill the entity (any amount of health). Mobs disintegrate first for `killDelay` and drop their loot (`killLoot`); players and other entities die at once. | — |
+| `MobBattle_SnapWand` | Snap Wand | Left click: half of the fighters (`snapPercent`), picked at random, turn to dust (the Kill Wand's soul rip, `killDelay`, `killLoot`), one after another over up to 5 s (`snapTime`). Click a mob in a battle: that battle. Click the air (or a mob in no battle): every mob within `snapRadius` (default 30) of the clicked mob or of you, fighting or not, horizontally and at any height (fliers and mobs in caves below too), up to `maxMobs`; a purple shockwave on the ground shows how far it reached. `/mobbattle snapMode global` (default): half of all of them; `team`: half of each side. An odd count rounds up or down at random. Same as `/mobbattle snap`. Uses the Kill Wand model for now. | — |
 | `MobBattle_EffectWand` | Effect Wand | Give the entity the selected effect (default `Burn`). | Next effect: Burn, Poison_T2, Freeze, Slow, Stun, Root, Vulnerable, Ability_Enrage_Buff, Potion_Health_Regen, Immune. |
 | `MobBattle_CleanseWand` | Cleanse Wand | Remove every effect from the entity and undo a morph. | — |
 | `MobBattle_ArmyWand` | Army Wand | Add the mob to your army (click it again to remove it). Your army follows you, defends you and attacks what you hit. | Disband your army. |
@@ -47,6 +48,16 @@ Each wand's tooltip explains what it does (English and Spanish). Get all ten at 
 - A trork's pet (same flock) that spawns during a group battle joins its owner's side. If you put an owner and its pet on different sides (teams or battle royale), they leave their flock when the battle starts so they really fight; this is permanent, as in a duel.
 - **Morphs** work like the vanilla frog potion, but have no time limit. A morph is saved with the world, while the original model is only remembered while the server runs: use `/mobbattle morph reset` or the Cleanse Wand before leaving the world, or the mob keeps the new look. Animations of the new model may not match the old role's attacks.
 
+### Players in battles
+With `/mobbattle playerFights <kind> on`, players are fighters too: nobody controls them, the mobs of the other sides attack them and their own side's mobs ignore them.
+- **Ways in:** the wands work on players like on mobs (Battle Wand duel, Chaos Wand left click = everyone vs that player, Team Wand = joins the current team); Chaos Wand right click takes in the players in the area (`royale`); crouching + Battle Wand on a mob = that mob vs you; `/mobbattle chaos me`; `/mobbattle teams join <team>` / `leave`.
+- **Creative players never count:** they can't be put in a battle (the chat says why), and a fighter who switches to Creative is out of it at once (their side may lose); during a countdown, they are left out when the fight starts. Use Adventure to fight.
+- **Your side's mobs** never pick you as a target and can't hurt you (unless `friendlyFire` is on for that kind); your hits on them are cancelled the same way. With `battleIsolation` on, mobs from outside the battle can't hurt you.
+- **PvP:** enemy players of the same battle follow the world's PvP rule; `/mobbattle battlePvp on` lets their hits through even where PvP is off (spawn protection and invulnerability still apply).
+- **Titles, timer and music** reach the players fighting in a battle, whatever `titleScope` says.
+- **Dying** takes you out of the battle for good (also during its countdown): you respawn outside it, and if your side has nobody left it loses. `teams leave` during a battle works the same way. If you win, the title shows your name.
+- **Disintegration:** the Snap Wand turns players to ash like mobs, and `timeUp kill` / `judge` disintegrate the players of the losing sides; then they die (an instant kill, whatever their health). The Kill Wand does the same with `killPlayers on` (default).
+
 ### Effects
 - **Fight start (Battle Wand, Chaos Wand, Team Wand):** a big title (`FIGHT!`, `EVERYONE vs X`, `BATTLE ROYALE!`, `TEAM BATTLE!`) and, with `/mobbattle fightLaser on`, a laser linking each mob to its first opponent (team color in team battles).
 - **Titles:** each lasts about 3 s. Repeated fight-start titles keep only the newest pending one. Every victory is queued in order and takes priority over pending starts; a new fight cannot overwrite a victory.
@@ -60,7 +71,7 @@ Each wand's tooltip explains what it does (English and Spanish). Get all ten at 
 - **Wand casts:** wands swing like a sword, alternating left and right on quick clicks (a combo), and each swing finishes before the next one (Summon Wand: the staff summon pose; Chaos Wand right click: a spellbook push with a light camera shake), some with a sound.
 - **On the clicked mob** (only when the action works; `/mobbattle wandFx off` turns them off):
   - Battle Wand: on each picked mob, the Heal/Cleanse burst ring in purple, plus a short (1 s) purple tint and aura (it does not stun). Clearing the selection (right click) flashes the selected mob grey with a grey burst ring.
-  - Chaos Wand: everyone vs one, the lone target glows gold and every attacker red; battle royale, every fighter glows orange. All with the burst ring (as Heal) in that color, an aura and a small summoning rune turning under their feet; a big rune also glows on the ground at the area's center for the countdown (`MobBattle_Rune_Center` / `MobBattle_Rune_Feet_<Color>` in `Server/Particles/MobBattle`). The lone target also gets a small golden crown over its head for 20 s once the fight starts. With no mobs in the area: only the cast and the chat message, no area.
+  - Chaos Wand: everyone vs one, the lone target glows gold and every attacker red; battle royale, every fighter glows orange. All with the burst ring (as Heal) in that color, an aura and a small summoning rune turning under their feet; a big rune also glows on the ground at the area's center for the countdown, and a shockwave ring in the area color runs along the ground from the center out to the area edge (`areaRadius`, the same reach as the arena) (`MobBattle_Rune_Center` / `MobBattle_Rune_Feet_<Color>` in `Server/Particles/MobBattle`). The lone target also gets a small golden crown over its head for 20 s once the fight starts. With no mobs in the area: only the cast and the chat message, no area.
   - Heal Wand: a green burst (the Morph Wand one, recolored), the vanilla green healing aura, the Healing Totem particles and sound, and a green glow.
   - Kill Wand: you channel with the wand while the mob keeps moving, animating and attacking as it turns black and disintegrates. Its own death sound plays at the start (a random dark one if its model has none), without repeating on removal. A small purple smoke cloud travels in a slight spiral and shrinks toward an approximate wand-tip position, updated from the player's position and look direction. This is not the exact animated hand bone, so custom models may need offset adjustments. The wand itself plays a "hakai" sound from the player when the kill lands (`SFX_MobBattle_Hakai`, random pitch so it never sounds the same; also on instant kills). Then the mob vanishes, no death animation, dropping its normal loot (`/mobbattle killLoot off`: no drops), after `/mobbattle killDelay` (0.5 s by default; players and other non-NPCs die at once, unless `/mobbattle killPlayers on`). The disintegration effect does not block its damage.
   - Summon Wand: mobs appear on the floor under them (also under roofs), close to you (`/mobbattle summonRadius`, by default it grows with how many), inside an area drawn like the Chaos Wand one, each with a summon burst and its model's own spawn animation when it has one (e.g. skeletons rising from the ground); adding a type to the list flashes the mob green with the burst ring (as Heal) and an aura, removing it does the same in red.
@@ -70,6 +81,8 @@ Each wand's tooltip explains what it does (English and Spanish). Get all ten at 
 - **Battle end:** `X WINS!`, `RED TEAM WINS!`, `Duel won`, `DRAW!`, or for the Chaos Wand left click (everyone vs one mob) `X WINS!` (it survived) / `X IS DEFEATED!`.
 - **Independent battles:** two team battles can use the same names and colors without sharing targets, damage, members or winners. Each battle keeps the team names and colors it started with. Allies never damage each other. With `/mobbattle battleIsolation` on (default for every kind) NPCs from outside the battle cannot damage its participants either. At the end, the mod clears its forced target/hostility and returns compatible NPCs to Idle.
 - **Victory timing:** no minimum fight duration. Winners and the 15-minute safety timeout are checked once per second per world, even without NPC combat ticks. A single surviving side wins; several surviving sides at the deadline produce DRAW. The winner title may wait for an already visible title to finish.
+- **Kill count:** a battle fighter gets a kill when its hit kills an enemy of the same battle. The timer box shows the leader ("28 fighters left | top: Trork 5"), the chat shows the top 3 when the battle ends ("Most kills: 1. Trork (5), 2. ..."), and `tieBreak kills` uses it. Only one line each, however many mobs fight. Disintegrations (Kill Wand, Snap Wand, `timeUp kill`) are not kills.
+- **Arena teleports** put a fighter on a spot it can stand on (solid ground with room above) at about its own height: a mob in a cave stays in the cave, one on a mountain stays up, and nobody lands inside a hill or in lava, fire or poison (water is fine). If there is no such spot there, it is only pushed back.
 
 ## Command: `/mobbattle`
 
@@ -91,7 +104,7 @@ Commands are written in camelCase in help (`areaRadius`, `teamLook onlyWand`) to
 | `/mobbattle countdown <seconds>` | Countdown before any fight starts (duel, everyone vs one, battle royale, teams): a `3`, `2`, `1` title, one per second, then the fight and its start title. 0-10; `0` (default) starts at once. The chat also counts `[DUEL: A vs B] 3`, `2`, `1`. Several countdowns can run at once, like fights without one; a new order cancels only the countdowns that share a mob with it, and the big titles follow your newest countdown. If mobs die during the countdown the fight starts without them, or is cancelled. |
 | `/mobbattle startTitle on` / `off` | Fight-start title on/off. |
 | `/mobbattle winTitle on` / `off` | Winner title (`X WINS!`, `DRAW!`) on/off. The chat message always shows. |
-| `/mobbattle titleStyle <name>` | Title style: `Default`, `Major` (default), `VoidEviction`. `GoblinBreach` is not offered: the client draws it tiny at the top of the screen; a saved `GoblinBreach` becomes `Major`. |
+| `/mobbattle titleStyle <name>` | Title style: `Default`, `Major` (default), `GoblinBreach`, `VoidEviction`. |
 | `/mobbattle titleStyle random` | Random style each fight. |
 
 ### Chaos Wand area and fighter laser
@@ -117,6 +130,25 @@ The `floor` / `zone` disc is flat and sits on the ground under the center (even 
 | `/mobbattle duelMode exclusive\|accumulate` | Battle Wand: `exclusive` (default) replaces a mob's duel, `accumulate` merges connected duels (see Notes). |
 | `/mobbattle debug` | Combat snapshots of the 4 nearest NPCs and a 10 s hit log (see Notes). Changes nothing. |
 | `/mobbattle friendlyFire <allVsOne\|teams\|all> on\|off` | Hits between allies of the same battle. `allVsOne`: the attackers ganging up on one mob (default `on`: stray hits and area attacks hurt each other). `teams`: teammates (default `off`: their hits on each other are cancelled). Either way allies never pick each other as targets. Duels and royales have no allies. If the game itself cancels a hit (for example between mobs of the same pack), it stays cancelled. |
+| `/mobbattle playerFights <duel\|allVsOne\|royale\|teams\|all> on\|off` | Players can fight in that kind of battle (default `off` for every kind; never players in Creative). See **Players in battles** above. |
+| `/mobbattle battlePvp on\|off` | Enemy players in the same battle hurt each other even where the world's PvP is off. Default `off` (the world's rule). |
+| `/mobbattle chaos me` | Everyone vs you: every mob within `areaRadius` attacks you, like the Chaos Wand left click on a mob (countdown, area, arena and timer included). Needs `playerFights allVsOne on`. |
+| `/mobbattle arena <duel\|allVsOne\|royale\|teams\|all> on\|show\|wall\|off` | Per battle kind, the fight's arena. `show`: the area stays drawn for the whole fight (areaStyle and the color it was drawn with; `glow` if areaStyle is off). `wall`: fighters that reach its edge are pushed back in (the game's knockback), and one flung far outside is teleported back in, so big mobs or a big group stay in. `on`: both. Its radius is always the area's own: `areaRadius` for the Chaos Wand, `arenaSize` for duels and team battles, centered on the fighters. Default `on` for allVsOne and royale, `off` for duel and teams. Everyone sees the arena. |
+| `/mobbattle arenaSize <8-128>\|auto` | Arena radius of duels and team battles. `auto` (default): around the fighters, their spread plus 6 blocks, at least 8. |
+| `/mobbattle timer <kind\|all> <time>\|off` | Per battle kind, a time limit of up to 60 minutes. The time can be written `90` or `90s` (seconds), `2m`, `1m30s`, or with the game's named arguments `--minutes=2`, `--seconds=30`, `--minutes=1 --seconds=30` (summed; `--seconds 30` works too). A timer longer than the 15 min safety limit extends it. The players who see the titles (`titleScope`) get a timer box at the top right: the battle kind, who is fighting ("Skeleton vs Trork", "vs X: 5 attackers", "6 left") and the time left (`m:ss`). Default `off`. If the timer is too short for the arena (fighters at opposite edges could not even reach each other: about 0.8 s per block of radius), the chat warns you and suggests a timer. |
+| `/mobbattle arenaShrink <duel\|allVsOne\|royale\|teams\|all> on\|off` | The arena closes in like a battle royale zone: its wall moves steadily toward the center until `arenaShrinkTo`, over the battle's timer (smallest when time is up) or over `arenaShrinkTime` when there is no timer. A closing arena is always drawn and always a wall, even with `arena off`: fighters at its edge are pushed in, and the ones left far outside are teleported in, so spread-out fighters end up meeting. Default: `on` for royale, `off` for the rest. |
+| `/mobbattle arenaShrinkTo <blocks>` | Final radius of a closing arena (4-128, default 15). An arena already smaller does not close. |
+| `/mobbattle arenaShrinkTime <time>` | How long a closing arena takes when the battle has no timer: `90`, `2m`, `1m30s` (default `2m`). |
+| `/mobbattle unstick on\|off` | A battle mob that can't reach its opponent because they are on different levels (one in a cave, the other on the surface or up a mountain) appears next to it, at the opponent's height, after 10 s without getting closer and without fighting. Fighting = it hit an enemy (a mob shooting from a cliff is left alone) or something on its own level hit it (being shot at from another level does not count: that is the stuck case). Fliers (birds, bats...) can reach any height, but a cave roof or a wall can still block them: they are moved after 20 s whatever the height. A walker is never moved toward an opponent that is flying (it would land under it); the flier comes down to attack. Default `on`. Players are never moved. |
+| `/mobbattle timerStyle custom\|portal` | Which timer box. `custom` (default): the mod's own box at the top right, with the game's container header and panel textures; its layout is the asset `Common/UI/Custom/MobBattle/TimerHud.ui` (edit it like any `.ui` file; the dev pack reloads it). `portal`: the game's Void portal box; only its title is ours, the client keeps its own "Fragment of Orbis" / "until the Veil closes" text. |
+| `/mobbattle tieBreak damage\|kills\|random\|draw` | `timeUp health` / `judge` when sides are even on health (within 0.5%): `damage` (default) the side that dealt more damage, `kills` the side with more kills, `random` a coin toss, `draw` no winner. |
+| `/mobbattle debugLog on\|off` | Writes the battle decisions to the server log, each line starting with `[debug]`: the settings when turned on, each battle start (kind, fighters and sides, arena mode, radius, center, timer, timeUp, tieBreak, isolation, friendly fire), arena pushes and teleports, the timer reaching 0, each side's health % and damage at time up, tie-breaks, the winner, rejected duels and snaps. Default off. |
+| `/mobbattle snap` | Same as the Snap Wand clicking the air: half of the mobs within `snapRadius` of you, fighting or not, turn to dust. |
+| `/mobbattle snapMode global\|team` | Snap Wand and `snap`. `global` (default): half of everyone, at random. `team`: half of each side (sides of one mob, as in a royale, count together). |
+| `/mobbattle snapPercent <1-100>` | Snap Wand and `snap`: share of the fighters that turn to dust (default 50). A fractional count rounds up or down at random. |
+| `/mobbattle snapTime <1-30>` | Seconds over which the chosen ones turn to dust, each at a random moment (default 5). When the last one is gone you get "The snap is over: X of Y turned to dust". |
+| `/mobbattle snapRadius <blocks>` | Snap with no battle clicked: reach around the clicked mob or you, shown by the shockwave. Its own value (default 30), separate from `areaRadius`: a big battle area does not make the snap reach farther. |
+| `/mobbattle timeUp <kind\|all> draw\|kill\|continue\|health\|judge` | What happens when the timer reaches 0. `draw` (default): the fight stops, "DRAW!". `kill`: every fighter left is disintegrated (soul rip, killDelay, killLoot), no winner. `continue`: the timer goes away and they keep fighting until the end, with no winner title. `health`: the side with the most health left wins, counted in percent so a big mob doesn't win just for having more health: each side's score is the average of its members' health in percent of their own max, the fallen counting as 0% (within half a percent: draw). `judge`: decided the same way, but then every fighter of the losing sides is disintegrated (soul rip) and the winners are healed to full (with the Heal Wand effect); on a tie, a draw. |
 
 ### Teams
 | Command | What it does |
@@ -125,6 +157,7 @@ The `floor` / `zone` disc is flat and sits on the ground under the center (even 
 | `/mobbattle teams start` | Start the team battle (same as Team Wand right click on a mob). |
 | `/mobbattle teams clear` | Empty your teams and remove their team look. |
 | `/mobbattle teams clearAll` | Empty every player's teams and remove their team look. |
+| `/mobbattle teams join <team>` / `teams leave` | You fight with that team yourself: you get its team look (tint/mist) and, while you hold the Team Wand, its ring under your feet. Start the battle as usual (Team Wand or `teams start`). `leave` takes you out of your team, or out of the team battle you are in. Needs `playerFights teams on`. |
 | `/mobbattle teams list` | Show the teams and their colors. Defaults: RED, BLUE, GREEN, YELLOW. |
 | `/mobbattle teams add <name> <color>` | Add a team with a custom name (up to 14), e.g. `/mobbattle teams add Undead purple`. Fixed colors only: red, blue, green, yellow, orange, purple, pink, cyan, white, black, brown, lime, gray, magenta. Custom hex colors are disabled. |
 | `/mobbattle teams color <team> <color>` | Choose a color from the fixed palette. |
@@ -141,7 +174,7 @@ All team colors use prebuilt effects, with no runtime asset loading. Older saved
 ### Summon
 | Command | What it does |
 |---|---|
-| `/mobbattle summonRadius <1-64>` / `auto` | Size of the summon area in blocks. `auto` (default) grows with how many mobs: about 4 blocks for a few, ~19 for 100, never more than half of `areaRadius`. The area is drawn with the same `areaStyle` and `areaColor` as the Chaos Wand area. |
+| `/mobbattle summonRadius <1-64>` / `auto` | Size of the summon area in blocks. `auto` (default) grows with how many mobs: about 4 blocks for a few, ~19 for 100, never more than half of `areaRadius`. The area is drawn with the same `areaStyle` and `areaColor` as the Chaos Wand area. The summon area lasts 3 s (the Chaos Wand's 6 s). A new area cancels the glow of your previous one (and any glow in its spot), so summoning or casting again and again doesn't pile up columns of light (the floor disc can't be cancelled, only its time runs out). |
 | `/mobbattle summon` | Summon the list around you (same as the Summon Wand right click). Mobs with a team rule spawn already in their team. |
 | `/mobbattle summon list` | Show the summon list. |
 | `/mobbattle summon add <role> [count\|random] [team]` | Add a mob type, e.g. `/mobbattle summon add Skeleton 5`, `/mobbattle summon add Trork_Warrior random blue`. Role IDs are case sensitive. |
@@ -155,7 +188,7 @@ All team colors use prebuilt effects, with no runtime asset loading. Older saved
 |---|---|
 | `/mobbattle wandFx on` / `off` | Effects on the clicked mob (heal glow, soul rip, daze...). Default on. The cast animations always play. |
 | `/mobbattle killDelay <seconds>` | Kill Wand: seconds of soul rip before the mob dies, 0-3 (`0` = instant). Default 0.5. |
-| `/mobbattle killPlayers on` / `off` | Kill Wand on players. `off` (default): they die at once. `on`: they also freeze, turn black and disintegrate, then die a normal death after `killDelay`; what they drop follows the world's own death rules. |
+| `/mobbattle killPlayers on` / `off` | Kill Wand on players. `on` (default): they freeze, turn black and disintegrate, then die (an instant kill) after `killDelay`; what they drop follows the world's own death rules. `off`: they die at once. |
 | `/mobbattle killLoot on` / `off` | Kill Wand: the disintegrated mob drops the loot a normal death would (its drop list, plus picked-up items). Default on. With `killDelay 0` the mob dies normally and always drops its loot. |
 | `/mobbattle wandEffect <id>` | Effect Wand effect: any loaded effect ID, including other mods' (e.g. `Potion_Morph_Frog`). |
 | `/mobbattle morph <model>` | Morph Wand model by ID, e.g. `/mobbattle morph Frog_Green`. |
@@ -166,11 +199,11 @@ All team colors use prebuilt effects, with no runtime asset loading. Older saved
 
 | Command | What it does |
 |---|---|
-| `/mobbattle stop` | End every battle in progress (duels, Chaos Wand and team battles, no winner) and cancel pending countdowns. |
+| `/mobbattle stop` | End every battle in progress (duels, Chaos Wand and team battles, no winner) and cancel pending countdowns. Everything they show goes too: timer boxes, arenas and the areas already drawn in your world, camera shots (you get your normal camera back at once) and battle music. |
 | `/mobbattle army clearAll` | Disband every player's army. |
 | `/mobbattle resetAll` | `stop` + `teams clearAll` + `army clearAll` + `morph reset` in one command. |
 
-Defaults: countdown 0, titleScope nearby, camera on, music Track_Z1D_Goblin_Boss_Battle, duelMode exclusive, fightLaser off, fightLaserColor `#FF4B3E`, startTitle on, winTitle on, titleStyle `Major`, areaRadius 60, areaStyle both, areaColor red, areaOnlyWand off, battleIsolation on (all kinds), friendlyFire on for allVsOne / off for teams, areaHeight 30, maxMobs 200, summonRadius auto, wandEffect `Burn`, wandFx on, killDelay 0.5, killLoot on, teamLook tint, teamLook time infinite, teamLook onlyWand off.
+Defaults: countdown 0, titleScope nearby, camera on, music Track_Z1D_Goblin_Boss_Battle, duelMode exclusive, fightLaser off, fightLaserColor `#FF4B3E`, startTitle on, winTitle on, titleStyle `Major`, areaRadius 60, areaStyle both, areaColor red, areaOnlyWand off, battleIsolation on (all kinds), friendlyFire on for allVsOne / off for teams, playerFights off (all kinds), battlePvp off, arena on for allVsOne and royale / off for duel and teams, arenaSize auto, timer off, timerStyle custom, timeUp draw, arenaShrink on for royale / off for the rest, arenaShrinkTo 15, arenaShrinkTime 2m, unstick on, tieBreak damage, snapMode global, snapPercent 50, snapTime 5, snapRadius 30, debugLog off, areaHeight 30, maxMobs 200, summonRadius auto, wandEffect `Burn`, wandFx on, killDelay 0.5, killLoot on, killPlayers on, teamLook tint, teamLook time infinite, teamLook onlyWand off.
 
 ## Install
 

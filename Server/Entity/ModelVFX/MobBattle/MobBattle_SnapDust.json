@@ -1,0 +1,26 @@
+{
+  "$Comment": "Snap Wand ash: the model crumbles top-down with a pale ash edge (Disappear, as MobBattle_Disintegrate).",
+  "SwitchTo": "Disappear",
+  "EffectDirection": "TopDown",
+  "HighlightColor": "#e8dcc8",
+  "HighlightThickness": 2.0,
+  "UseBloomOnHighlight": false,
+  "NoiseScale": {
+    "X": 80.0,
+    "Y": 80.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.0
+  },
+  "PostColor": "#8a7a66",
+  "PostColorOpacity": 0.9,
+  "AnimationDuration": 1.5,
+  "AnimationRange": {
+    "X": 0.0,
+    "Y": 1.0
+  },
+  "CurveType": "Linear",
+  "LoopOption": "PlayOnce",
+  "UseProgessiveHighlight": false
+}

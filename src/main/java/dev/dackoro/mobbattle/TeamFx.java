@@ -95,6 +95,20 @@ public final class TeamFx {
         HELD.keySet().removeIf(npc -> !npc.isValid());
     }
 
+    /**
+     * PlayerFighters.tick (world thread): applies the queued looks of players in this world. FightTickSystem does
+     * it for NPCs, but it never ticks players (/mobbattle teams join).
+     */
+    static void applyPlayers(com.hypixel.hytale.component.Store<EntityStore> store) {
+        if (PENDING.isEmpty()) return;
+        for (Ref<EntityStore> ref : PENDING.keySet()) {
+            if (ref.isValid() && ref.getStore() == store
+                    && store.getComponent(ref, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType()) != null) {
+                apply(ref, store);
+            }
+        }
+    }
+
     /** Applies the queued change for {@code self}, if any. */
     public static void apply(Ref<EntityStore> self, ComponentAccessor<EntityStore> accessor) {
         Pending p = PENDING.remove(self);

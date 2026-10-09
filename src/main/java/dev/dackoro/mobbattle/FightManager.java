@@ -56,7 +56,19 @@ public final class FightManager {
     static void cancelPendingStop(Ref<EntityStore> npc) { PENDING_STOPS.remove(npc); }
 
     /** @param opponents an immutable list, shared by every member of the same battle */
+    /** True if {@code ref} is an online player's entity (no component read: queueStop runs on any thread). */
+    private static boolean isOnlinePlayer(Ref<EntityStore> ref) {
+        for (com.hypixel.hytale.server.core.universe.PlayerRef p : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
+            if (p.getReference() == ref) return true;
+        }
+        return false;
+    }
+
     static void queueStop(Ref<EntityStore> npc, List<Ref<EntityStore>> opponents) {
+        // Only NPCs tick and consume this queue: a player left in it would keep FightTickSystem busy for good.
+        if (BattleManager.isPlayerFighter(npc) || isOnlinePlayer(npc)) {
+            return;
+        }
         PENDING_STOPS.put(npc, opponents);
     }
 
@@ -324,6 +336,11 @@ public final class FightManager {
         if (!victim.isValid() || !attacker.isValid()) {
             return;
         }
+        // Players (/mobbattle playerFights) need no provocation, and their heal back would wait in the NPC-only
+        // queue (FightTickSystem never ticks players).
+        if (buffer.getComponent(victim, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType()) != null) {
+            return;
+        }
         // "Physical" = Server/Entity/Damage/Physical.json (the DamageCause.PHYSICAL constant is deprecated).
         int cause = DamageCause.getAssetMap().getIndex("Physical");
         DamageSystems.executeDamage(victim, buffer,
@@ -392,6 +409,17 @@ public final class FightManager {
         NOT_NPC
     }
 
+    /**
+     * Whether {@code self} could attack at all, without changing anything (same test as {@link #turnAgainst}):
+     * a role with a combat state, or with an attitude memory.
+     */
+    static boolean canAttack(Ref<EntityStore> self, ComponentAccessor<EntityStore> accessor) {
+        WorldSupport world = WorldSupport.get(self, accessor);
+        if (world == null) return false;
+        if (combatStateOf(StateSupport.get(self, accessor)) != null) return true;
+        return ensureOverrideMemory(world, false) && RoleAttack.mayAttack(self, accessor);
+    }
+
     /** Makes {@code self} hostile to {@code enemy} and locks it as its target. */
     public static Result turnAgainst(Ref<EntityStore> self, Ref<EntityStore> enemy, ComponentAccessor<EntityStore> accessor) {
         return turnAgainst(self, enemy, accessor, true);
@@ -415,6 +443,10 @@ public final class FightManager {
         StateSupport state = StateSupport.get(self, accessor);
         String combatState = combatStateOf(state);
         boolean hasCombat = combatState != null;
+        if (!hasCombat && !RoleAttack.mayAttack(self, accessor)) {
+            // Its role has no attack (Bunny, Rabbit...): even with an attitude memory it can only flee.
+            return Result.PASSIVE;
+        }
         // Only fighters (roles with a Combat state) get the attitude memory created for them,
         // otherwise pigs and dummies would be counted as aggressive.
         boolean hostile = tryOverride(world, enemy, Attitude.HOSTILE, HOSTILE_SECONDS, hasCombat);

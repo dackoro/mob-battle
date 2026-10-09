@@ -49,9 +49,36 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         }
 
         Ref<EntityStore> target = context.getTargetEntity();
-        if (target == null || !target.isValid()
-                || buffer.getComponent(target, NPCEntity.getComponentType()) == null
-                || !BattleManager.isAlive(target, buffer)) {
+        if (PlayerFighters.crouching(context.getEntity(), buffer)) {
+            // Crouching: a duel against you (/mobbattle playerFights duel). The clicked mob, or the selected one
+            // when clicking the air.
+            Ref<EntityStore> mob = isLivingNpc(target, buffer) ? target : FightManager.getSelection(player.getUuid());
+            if (!isLivingNpc(mob, buffer) || mob.getStore() != context.getEntity().getStore()) {
+                player.sendMessage(Message.raw("Crouch and click a mob to fight it yourself (or select one, then crouch "
+                        + "and click the air).").color(COLOR_WARN));
+                context.getState().state = InteractionState.Failed;
+                return;
+            }
+            FightManager.clear(player.getUuid());
+            Ref<EntityStore> me = context.getEntity();
+            if (!PlayerFighters.eligible(player, me, BattleManager.Kind.DUEL, buffer)) {
+                context.getState().state = InteractionState.Failed;
+                return;
+            }
+            BattleManager.markPlayer(me, player.getUuid());
+            WandFx.onTarget(mob, WandFx.CHARM, buffer);
+            Countdown.run(player, buffer, "DUEL: " + nameOf(mob, buffer) + " vs you", java.util.List.of(mob, me),
+                    acc -> duel(player, me, mob, me, acc));
+            return;
+        }
+        // Another player (/mobbattle playerFights duel): picked like a mob.
+        boolean targetIsPlayer = PlayerFighters.isPlayer(target, buffer);
+        if (targetIsPlayer && (target == context.getEntity()
+                || !PlayerFighters.eligible(player, target, BattleManager.Kind.DUEL, buffer))) {
+            context.getState().state = InteractionState.Failed;
+            return;
+        }
+        if (!targetIsPlayer && !isLivingNpc(target, buffer)) {
             player.sendMessage(Message.raw("Look at a living mob and click it.").color(COLOR_WARN));
             context.getState().state = InteractionState.Failed;
             return;
@@ -78,6 +105,19 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         FightManager.clear(player.getUuid());
         Ref<EntityStore> playerEntity = context.getEntity();
         Ref<EntityStore> picked = first;
+        boolean players = PlayerFighters.isPlayer(picked, buffer) || targetIsPlayer;
+        if (!players && !FightManager.canAttack(picked, buffer) && !FightManager.canAttack(target, buffer)) {
+            // Nobody would fight: no countdown, no camera, just the failure effect on both.
+            MobBattlePlugin.debug("duel rejected: neither " + nameOf(picked, buffer) + " nor " + targetName + " can attack");
+            WandFx.onTarget(picked, WandFx.FAIL, buffer);
+            WandFx.onTarget(target, WandFx.FAIL, buffer);
+            player.sendMessage(Message.raw("Neither " + nameOf(picked, buffer) + " nor " + targetName
+                    + " can attack. No fight.").color(COLOR_WARN));
+            context.getState().state = InteractionState.Failed;
+            return;
+        }
+        if (PlayerFighters.isPlayer(picked, buffer)) BattleManager.markPlayer(picked, player.getUuid());
+        if (targetIsPlayer) BattleManager.markPlayer(target, player.getUuid());
         WandFx.onTarget(target, WandFx.CHARM, buffer);
         FightCamera.duel(player, picked, target, buffer);
         Countdown.run(player, buffer, "DUEL: " + nameOf(picked, buffer) + " vs " + targetName, java.util.List.of(picked, target),
@@ -87,7 +127,8 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
     /** The duel itself, right away or after /mobbattle countdown. */
     static void duel(PlayerRef player, Ref<EntityStore> playerEntity, Ref<EntityStore> first, Ref<EntityStore> target,
                      ComponentAccessor<EntityStore> buffer) {
-        if (!BattleManager.isAlive(first, buffer) || !BattleManager.isAlive(target, buffer)) {
+        if (!BattleManager.isAlive(first, buffer) || !BattleManager.isAlive(target, buffer)
+                || !PlayerFighters.canStart(first, buffer) || !PlayerFighters.canStart(target, buffer)) {
             player.sendMessage(Message.raw("Duel cancelled: a fighter is gone.").color(COLOR_WARN));
             return;
         }
@@ -97,13 +138,16 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         if (!accumulate) BattleManager.detach(java.util.List.of(first, target));
         FightManager.Result a = FightManager.turnAgainst(first, target, buffer);
         FightManager.Result b = FightManager.turnAgainst(target, first, buffer);
-        if (a != FightManager.Result.AGGRESSIVE && b != FightManager.Result.AGGRESSIVE) {
+        // A player fighter always can attack (a passive mob still gets hunted).
+        boolean withPlayer = BattleManager.isPlayerFighter(first) || BattleManager.isPlayerFighter(target);
+        if (!withPlayer && a != FightManager.Result.AGGRESSIVE && b != FightManager.Result.AGGRESSIVE) {
             player.sendMessage(Message.raw("Neither " + firstName + " nor " + targetName
                     + " can attack. No fight.").color(COLOR_WARN));
             return;
         }
         // Also a 2-mob "royale", so the winner gets a title when the other one dies.
         BattleManager.Battle duel = BattleManager.startDuel(player, first, target, accumulate);
+        Arena.setupAround(duel, buffer);
         BattleManager.setTarget(duel, first, target);
         BattleManager.setTarget(duel, target, first);
         // Universal trigger: each one "feels" a hit from the other, so any role that can fight
@@ -121,6 +165,11 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         if (b == FightManager.Result.PASSIVE) {
             player.sendMessage(Message.raw(targetName + " is passive: it will only run.").color(COLOR_WARN));
         }
+    }
+
+    private static boolean isLivingNpc(Ref<EntityStore> ref, CommandBuffer<EntityStore> buffer) {
+        return ref != null && ref.isValid() && buffer.getComponent(ref, NPCEntity.getComponentType()) != null
+                && BattleManager.isAlive(ref, buffer);
     }
 
     private static String nameOf(Ref<EntityStore> ref, CommandBuffer<EntityStore> buffer) {

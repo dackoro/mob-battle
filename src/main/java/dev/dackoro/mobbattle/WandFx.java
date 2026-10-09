@@ -25,6 +25,9 @@ final class WandFx {
 
     static final String HEAL = "Heal";
     static final String SOUL_RIP = "SoulRip";
+    /** Snap Wand: the mob turns to ash (light, so dark Void mobs show it too), slower than the soul rip. */
+    static final String SNAP_DUST = "SnapDust";
+    static final int SNAP_DUST_MS = 1500;
     static final String CHARM = "Charm";
     static final String RAGE = "Rage";
     static final String LONE = "Lone";
@@ -119,6 +122,30 @@ final class WandFx {
     static final String HAKAI_SOUND = "SFX_MobBattle_Hakai";
 
     /** Kills {@code target} now, or after /mobbattle killdelay with the soul rip effect (NPCs only). */
+    /** Snap Wand: an NPC turns to ash over {@link #SNAP_DUST_MS}, then is removed (loot per killLoot). */
+    static void snapKill(Ref<EntityStore> target, CommandBuffer<EntityStore> buffer) {
+        if (!FxSettings.wandFx) {
+            KillInteraction.killNow(target, null, buffer);
+            return;
+        }
+        onTarget(target, SNAP_DUST, buffer);
+        if (FxSettings.debug) {
+            // Why a mob might not show the ash: no effect controller, or other effects (spawn VFX...) on it.
+            EffectControllerComponent fx = buffer.getComponent(target, EffectControllerComponent.getComponentType());
+            StringBuilder active = new StringBuilder();
+            if (fx != null) {
+                for (int i : fx.getActiveEffectIndexes()) {
+                    var e = EntityEffect.getAssetMap().getAsset(i);
+                    active.append(e != null ? e.getId() : String.valueOf(i)).append(' ');
+                }
+            }
+            MobBattlePlugin.debug("snap dust on " + ChaosWand.nameOf(target, buffer) + ": effect controller "
+                    + (fx != null ? "yes, active [" + active.toString().trim() + "]" : "NO"));
+        }
+        deathSound(target, buffer);
+        KILLS.put(target, System.currentTimeMillis() + SNAP_DUST_MS);
+    }
+
     static void kill(Ref<EntityStore> target, Ref<EntityStore> killer, boolean npc, CommandBuffer<EntityStore> buffer) {
         // The wand's own sound, from the player, when its effect lands (the mob keeps its own death sound).
         if (killer != null && killer.isValid()) {
@@ -155,20 +182,39 @@ final class WandFx {
         if (PLAYER_KILLS.isEmpty()) {
             return;
         }
+        java.util.List<Map.Entry<Ref<EntityStore>, PlayerKill>> due = new java.util.ArrayList<>();
         for (Map.Entry<Ref<EntityStore>, PlayerKill> e : PLAYER_KILLS.entrySet()) {
             Ref<EntityStore> ref = e.getKey();
             if (!ref.isValid()) {
                 PLAYER_KILLS.remove(ref);
                 continue;
             }
-            if (ref.getStore() != store || now < e.getValue().dueAt() || !PLAYER_KILLS.remove(ref, e.getValue())) {
+            if (ref.getStore() == store && now >= e.getValue().dueAt() && PLAYER_KILLS.remove(ref, e.getValue())) {
+                due.add(e);
+            }
+        }
+        if (due.isEmpty()) {
+            return;
+        }
+        // Called from BattleLifecycleSystem.tick: damage and effect changes go outside the system iteration,
+        // on the world thread (as Arena.tick and Army.follow do).
+        store.getExternalData().getWorld().execute(() -> killPlayers(store, due));
+    }
+
+    private static void killPlayers(com.hypixel.hytale.component.Store<EntityStore> store,
+                                    java.util.List<Map.Entry<Ref<EntityStore>, PlayerKill>> due) {
+        for (Map.Entry<Ref<EntityStore>, PlayerKill> e : due) {
+            Ref<EntityStore> ref = e.getKey();
+            if (!ref.isValid() || ref.getStore() != store) {
                 continue;
             }
             // Visible again before respawn: drop the disintegration, then a normal death.
             var effects = store.getComponent(ref, EffectControllerComponent.getComponentType());
-            int rip = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + SOUL_RIP);
-            if (effects != null && rip >= 0 && effects.hasEffect(rip)) {
-                effects.removeEffect(ref, rip, store);
+            for (String fx : new String[] {SOUL_RIP, SNAP_DUST}) {
+                int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + fx);
+                if (effects != null && index >= 0 && effects.hasEffect(index)) {
+                    effects.removeEffect(ref, index, store);
+                }
             }
             KillInteraction.killNow(ref, e.getValue().killer(), store);
         }
@@ -251,6 +297,34 @@ final class WandFx {
             id = DEATH_SOUNDS[java.util.concurrent.ThreadLocalRandom.current().nextInt(DEATH_SOUNDS.length)];
         }
         burst(null, id, ChaosWand.positionOf(mob, buffer), buffer);
+    }
+
+    /**
+     * Snap Wand and timeUp kill/judge on a player fighter: they disintegrate ({@code fx}, e.g. SNAP_DUST or
+     * SOUL_RIP, for {@code ms}) and then die a normal death, whatever killPlayers says (applyPlayerKills). With
+     * wandFx off or no delay: dead at once.
+     */
+    static void killPlayer(Ref<EntityStore> target, String fx, long ms, ComponentAccessor<EntityStore> buffer) {
+        if (target == null || !target.isValid() || PLAYER_KILLS.containsKey(target)) {
+            return;
+        }
+        if (!FxSettings.wandFx || ms <= 0) {
+            KillInteraction.killNow(target, null, buffer);
+            return;
+        }
+        onTarget(target, fx, buffer);
+        deathSound(target, buffer);
+        PLAYER_KILLS.put(target, new PlayerKill(System.currentTimeMillis() + ms, null));
+    }
+
+    /** True while a player's disintegration runs (their death is pending). */
+    static boolean isPlayerDying(Ref<EntityStore> target) {
+        return PLAYER_KILLS.containsKey(target);
+    }
+
+    /** True while {@code target}'s soul rip runs (its death is pending). */
+    static boolean isDying(Ref<EntityStore> target) {
+        return KILLS.containsKey(target);
     }
 
     static boolean hasPendingKills() {
