@@ -134,9 +134,8 @@ public final class FxSettings {
     public static String tieBreak = "damage";
     /** Snap Wand and /mobbattle snap: "global" (half of everyone, default) or "team" (half of each side). */
     public static String snapMode = "global";
-    /** Everyone vs one: the lone target's edge, in % (/mobbattle targetBuff). 0 = none. See TargetBuff. */
-    public static int buffSize = 0, buffHealth = 0, buffDamage = 0, buffDefense = 0;
-    public static final int MAX_BUFF_SIZE = 200, MAX_BUFF = 1000, MAX_BUFF_DEFENSE = 90;
+    /** Cleanse Wand look, a palette color (/mobbattle cleanseColor). */
+    public static String cleanseColor = "White";
 
     /** Snap: share of the fighters that turn to dust, 1-100 % (/mobbattle snapPercent). */
     public static int snapPercent = 50;
@@ -395,6 +394,10 @@ public final class FxSettings {
                         Integer.parseInt(p.getProperty("team.fx.seconds", String.valueOf(teamFxSeconds)))));
             } catch (NumberFormatException ignored) {
             }
+            Buffs.load(p);
+            for (String c : Teams.PALETTE.keySet()) {
+                if (c.equalsIgnoreCase(p.getProperty("wand.cleanse.color", cleanseColor))) cleanseColor = c;
+            }
             areaStyle = loadAreaStyle(p.getProperty("chaos.area"), currentAreaStyles(p), areaStyle);
             String savedArea = p.getProperty("chaos.area.color", areaColor);
             areaColor = parseAreaColor(savedArea) != null ? parseAreaColor(savedArea) : areaColor;
@@ -462,10 +465,6 @@ public final class FxSettings {
             snapMode = "team".equalsIgnoreCase(p.getProperty("snap.mode", snapMode)) ? "team" : "global";
             try {
                 snapPercent = Math.max(1, Math.min(100, Integer.parseInt(p.getProperty("snap.percent", String.valueOf(snapPercent)))));
-                buffSize = Math.max(0, Math.min(MAX_BUFF_SIZE, Integer.parseInt(p.getProperty("buff.size", String.valueOf(buffSize)))));
-                buffHealth = Math.max(0, Math.min(MAX_BUFF, Integer.parseInt(p.getProperty("buff.health", String.valueOf(buffHealth)))));
-                buffDamage = Math.max(0, Math.min(MAX_BUFF, Integer.parseInt(p.getProperty("buff.damage", String.valueOf(buffDamage)))));
-                buffDefense = Math.max(0, Math.min(MAX_BUFF_DEFENSE, Integer.parseInt(p.getProperty("buff.defense", String.valueOf(buffDefense)))));
                 snapSeconds = Math.max(1, Math.min(MAX_SNAP_SECONDS, Integer.parseInt(p.getProperty("snap.time", String.valueOf(snapSeconds)))));
                 snapHitDelayMs = Math.max(0, Math.min(MAX_SNAP_HIT_DELAY_MS, Integer.parseInt(p.getProperty("snap.hitdelay", String.valueOf(snapHitDelayMs)))));
                 int r = Integer.parseInt(p.getProperty("snap.radius", String.valueOf(snapRadius)));
@@ -566,10 +565,8 @@ public final class FxSettings {
         p.setProperty("battle.tiebreak", tieBreak);
         p.setProperty("snap.mode", snapMode);
         p.setProperty("snap.percent", String.valueOf(snapPercent));
-        p.setProperty("buff.size", String.valueOf(buffSize));
-        p.setProperty("buff.health", String.valueOf(buffHealth));
-        p.setProperty("buff.damage", String.valueOf(buffDamage));
-        p.setProperty("buff.defense", String.valueOf(buffDefense));
+        Buffs.save(p);
+        p.setProperty("wand.cleanse.color", cleanseColor);
         p.setProperty("snap.time", String.valueOf(snapSeconds));
         p.setProperty("snap.hitdelay", String.valueOf(snapHitDelayMs));
         p.setProperty("snap.radius", String.valueOf(snapRadius));
@@ -691,7 +688,7 @@ public final class FxSettings {
                 "Battles: duelMode " + (accumulateDuels ? "accumulate" : "exclusive")
                         + " | battleIsolation " + rules(ISOLATION) + " | friendlyFire " + rules(FRIENDLY_FIRE)
                         + " | playerFights " + rules(PLAYER_FIGHTS) + ", battlePvp " + onOff(battlePvp)
-                        + " | targetBuff " + TargetBuff.describe(),
+                        + " | buff " + Buffs.describe(),
                 "Arenas: arena " + kinds(ARENA, v -> v.name().toLowerCase(java.util.Locale.ROOT))
                         + " | timer " + kinds(TIMER, MobBattleCommand::formatDuration)
                         + " | timeUp " + kinds(TIME_UP, v -> v.name().toLowerCase(java.util.Locale.ROOT))
@@ -713,9 +710,9 @@ public final class FxSettings {
         return switch (key) {
             case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope" -> 0;
             case "laser", "color" -> 1;
-            case "isolation", "battleisolation", "friendlyfire", "duelmode", "playerfights", "battlepvp", "targetbuff" -> 2;
+            case "isolation", "battleisolation", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
-            case "debuglog", "snapplayers", "morphplayers", "killhitdelay" -> 6;
+            case "debuglog", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius" -> 4;
             case "teamfx", "teambytype" -> 5;
             default -> 6;

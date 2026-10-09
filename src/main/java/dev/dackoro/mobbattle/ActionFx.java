@@ -68,8 +68,8 @@ public final class ActionFx {
     }
 
     public static final String DEFAULT = "default";
-    /** Everyone vs one: the golden crown over the lone target (MobBattle_Fx_LoneMark) (/mobbattle crown). */
-    static boolean crown = true;
+    /** Everyone vs one: the crown over the lone target (/mobbattle crown): Gold (the game's), a palette color or off. */
+    static String crown = "Gold";
     private static final Map<Role, String> MOB = new EnumMap<>(Role.class);
 
     static {
@@ -111,7 +111,7 @@ public final class ActionFx {
             GLOW.put(a, a.defGlow);
         }
         for (Role r : Role.values()) MOB.put(r, r.def);
-        crown = true;
+        crown = "Gold";
     }
 
     public static String wave(Action a) {
@@ -164,7 +164,10 @@ public final class ActionFx {
             String g = parse(p.getProperty("glow." + a.key), true);
             if (g != null) GLOW.put(a, g);
         }
-        crown = Boolean.parseBoolean(p.getProperty("fx.crown", "true"));
+        // Saved as true/false before the crown had colors.
+        String c = p.getProperty("fx.crown", "Gold");
+        crown = "true".equalsIgnoreCase(c) ? "Gold" : "false".equalsIgnoreCase(c) ? "off"
+                : Buffs.parseCrown(c) != null ? Buffs.parseCrown(c) : "Gold";
         for (Role r : Role.values()) {
             String v = p.getProperty("mobfx." + r.key);
             if (DEFAULT.equalsIgnoreCase(v)) MOB.put(r, DEFAULT);
@@ -178,7 +181,7 @@ public final class ActionFx {
             p.setProperty("glow." + a.key, GLOW.get(a));
         }
         for (Role r : Role.values()) p.setProperty("mobfx." + r.key, MOB.get(r));
-        p.setProperty("fx.crown", String.valueOf(crown));
+        p.setProperty("fx.crown", crown);
     }
 
     static String describe() {
@@ -193,7 +196,7 @@ public final class ActionFx {
             if (m.length() > 0) m.append(", ");
             m.append(r.key).append(' ').append(MOB.getOrDefault(r, r.def).toLowerCase(Locale.ROOT));
         }
-        return "Waves/borderColor: " + b + " | mobFx: " + m + " | crown " + (crown ? "on" : "off");
+        return "Waves/borderColor: " + b + " | mobFx: " + m + " | crown " + crown.toLowerCase(Locale.ROOT);
     }
 
     /** The action's shockwave out to {@code radius} (nothing when off). */

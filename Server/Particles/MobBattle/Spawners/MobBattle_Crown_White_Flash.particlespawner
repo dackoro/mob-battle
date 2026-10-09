@@ -60,7 +60,7 @@
             "Max": 1.5
           }
         },
-        "Color": "#f7faff",
+        "Color": "#fcfcfc",
         "Opacity": 1.0
       },
       "80": {
@@ -76,7 +76,7 @@
         }
       },
       "100": {
-        "Color": "#eef4ff",
+        "Color": "#f9f9f9",
         "Opacity": 0,
         "Scale": {
           "X": {

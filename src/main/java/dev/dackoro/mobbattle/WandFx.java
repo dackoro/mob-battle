@@ -33,7 +33,8 @@ final class WandFx {
     static final String LONE = "Lone";
     static final String BRAWL = "Brawl";
     static final String MORPH = "Morph";
-    static final String CLEANSE = "Cleanse";
+    /** Cleanse Wand look in a palette color (/mobbattle cleanseColor): MobBattle_Fx_Cleanse_<Color>. */
+    static final String CLEANSE = "Cleanse_";
     static final String EFFECT = "Effect";
     static final String COPY = "Copy";
     static final String UNMORPH = "Unmorph";
@@ -43,17 +44,31 @@ final class WandFx {
     static final String UNSELECT = "Unselect";
     static final String ARMY_ADD = "ArmyAdd";
     static final String ARMY_REMOVE = "ArmyRemove";
-    /** Floating marker over the lone target (no tint: not in ALL_FX, so new wand tints keep it). */
-    static final String LONE_MARK = "LoneMark";
+    /**
+     * Crown over the lone target, 20 s (/mobbattle crown): MobBattle_Fx_Crown_<Gold|Color>. Buffed mobs wear
+     * CrownBuff_<Color> until their buff goes (Buffs). No tint, not in ALL_FX: new wand tints keep them.
+     */
+    static final String CROWN = "Crown_";
     /** Every wand effect except SOUL_RIP, removed before a new one is put on (their tints would mix). */
     /** Swirl (remolino) in a palette color, no tint: MobBattle_Fx_Swirl_<Color> (Team Wand pick). */
     static final String SWIRL = "Swirl_";
     /** Battle mark in a palette color (/mobbattle mobFx): MobBattle_Fx_Mark_<Color>. */
     static final String MARK = "Mark_";
     private static final String[] ALL_FX = java.util.stream.Stream.concat(
-            java.util.stream.Stream.of(HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, CLEANSE, EFFECT,
+            java.util.stream.Stream.of(HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, EFFECT,
                     COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, ARMY_ADD, ARMY_REMOVE),
-            Teams.PALETTE.keySet().stream().map(c -> MARK + c)).toArray(String[]::new);
+            Teams.PALETTE.keySet().stream().flatMap(c -> java.util.stream.Stream.of(MARK + c, CLEANSE + c)))
+            .toArray(String[]::new);
+
+    /** The Cleanse Wand look in the current cleanseColor. */
+    static String cleanse() {
+        return CLEANSE + FxSettings.cleanseColor;
+    }
+
+    /** The lone target's crown in the current crown color, or null when off. */
+    static String crown() {
+        return "off".equals(ActionFx.crown) ? null : CROWN + ActionFx.crown;
+    }
 
     static final String SUMMON_PARTICLE = "Praetorian_Summon_Spawn";
     /** Summon Wand right click, played at the player when the mobs appear. Vanilla magic sound until we have our own. */
@@ -65,7 +80,7 @@ final class WandFx {
     static final String CHAOS_SOUND = "SFX_Portal_Neutral_Open";
 
     /** Effects that have no tint: they only restart themselves instead of clearing the other wand tints. */
-    private static final java.util.Set<String> TINTLESS = java.util.Set.of(UNMORPH, EFFECT, LONE_MARK);
+    private static final java.util.Set<String> TINTLESS = java.util.Set.of(UNMORPH, EFFECT);
 
     /** Mob -> time its soul rip ends (then it is removed). */
     private static final Map<Ref<EntityStore>, Long> KILLS = new ConcurrentHashMap<>();
@@ -97,7 +112,7 @@ final class WandFx {
             // Two tints at once mix (e.g. green + red = a washed-out white): remove every other wand tint
             // first, so only the newest one shows (tintless ones, e.g. Unmorph on top of Cleanse, only restart
             // themselves). The soul rip (pending kill) is never replaced.
-            boolean tinted = !TINTLESS.contains(fx) && !fx.startsWith(SWIRL);
+            boolean tinted = !TINTLESS.contains(fx) && !fx.startsWith(SWIRL) && !fx.startsWith("Crown");
             for (String other : ALL_FX) {
                 if (!tinted && !other.equals(fx)) continue;
                 int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + other);
@@ -127,10 +142,31 @@ final class WandFx {
         }
     }
 
-    /** Removes wand effect {@code fx} from those entities that have it, on their world thread. */
-    static void removeLater(java.util.List<Ref<EntityStore>> entities, String fx) {
+    /** Puts wand effect {@code fx} on the entity as it is (no tint clearing, no restart). World thread. */
+    static void addFx(Ref<EntityStore> target, String fx, ComponentAccessor<EntityStore> accessor) {
+        EffectControllerComponent effects = accessor.getComponent(target, EffectControllerComponent.getComponentType());
+        EntityEffect effect = EntityEffect.getAssetMap().getAsset("MobBattle_Fx_" + fx);
+        if (effects != null && effect != null) effects.addEffect(target, effect, accessor);
+    }
+
+    /** Takes wand effect {@code fx} off the entity if it has it. World thread. */
+    static void removeFx(Ref<EntityStore> target, String fx, ComponentAccessor<EntityStore> accessor) {
+        EffectControllerComponent effects = accessor.getComponent(target, EffectControllerComponent.getComponentType());
         int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + fx);
-        if (index < 0) return;
+        if (effects != null && index >= 0 && effects.hasEffect(index)) {
+            effects.removeEffect(target, index,
+                    com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior.COMPLETE, accessor);
+        }
+    }
+
+    /** Removes the lone target crown (any color) from those entities that have it, on their world thread. */
+    static void removeCrownsLater(java.util.List<Ref<EntityStore>> entities) {
+        java.util.List<Integer> indexes = new java.util.ArrayList<>();
+        for (String c : java.util.stream.Stream.concat(java.util.stream.Stream.of("Gold"), Teams.PALETTE.keySet().stream()).toList()) {
+            int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + CROWN + c);
+            if (index >= 0) indexes.add(index);
+        }
+        if (indexes.isEmpty()) return;
         // One task per world, not one per entity (an everyone vs one can hold 200 mobs).
         Map<com.hypixel.hytale.component.Store<EntityStore>, java.util.List<Ref<EntityStore>>> byStore = new java.util.HashMap<>();
         for (Ref<EntityStore> ref : entities) {
@@ -142,12 +178,11 @@ final class WandFx {
             for (Ref<EntityStore> ref : refs) {
                 if (!ref.isValid()) continue;
                 // Picked again meanwhile (the lone target of a new everyone vs one): it keeps its new crown.
-                if (LONE_MARK.equals(fx)) {
-                    BattleManager.Battle now = BattleManager.battleOf(ref);
-                    if (now != null && now.kind == BattleManager.Kind.ALL_VS_ONE && now.team(ref) == 1) continue;
-                }
+                BattleManager.Battle now = BattleManager.battleOf(ref);
+                if (now != null && now.kind == BattleManager.Kind.ALL_VS_ONE && now.team(ref) == 1) continue;
                 EffectControllerComponent effects = store.getComponent(ref, EffectControllerComponent.getComponentType());
-                if (effects != null && effects.hasEffect(index)) effects.removeEffect(ref, index, store);
+                if (effects == null) continue;
+                for (int index : indexes) if (effects.hasEffect(index)) effects.removeEffect(ref, index, store);
             }
         }));
     }

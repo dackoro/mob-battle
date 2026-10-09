@@ -87,7 +87,7 @@
       },
       "100": {
         "Opacity": 0.0,
-        "Color": "#f3f7ff"
+        "Color": "#fcfcfc"
       }
     },
     "UVOption": "RandomFlipU",

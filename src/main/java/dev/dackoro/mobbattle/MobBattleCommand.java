@@ -102,7 +102,8 @@ public class MobBattleCommand extends CommandBase {
                 "debug - combat snapshots of 4 nearest NPCs within 20 blocks; hit log for 10s",
                 "debugLog on|off - battle decisions (config, arena, health scores, winner) in the server log",
                 "duelMode exclusive|accumulate - replace a duel or keep connected fights",
-                "targetBuff size|health|damage|defense|all <percent> - everyone vs one: the lone target gets bigger, more health, harder hits or takes less (0 = none; all = every one at once; off = all 0)",
+                "buff lone|streak|champion size|health|damage|defense|all|off <percent> - battle buffs: lone = everyone-vs-one target, streak = per kill (up to buff streak maxKills, default 5), champion = the winners until they die or get cleansed (default 0 = none)",
+                "buff crown gold|<color>|off - crown on streak and champion mobs (default gold)",
                 "fightLaser on|off - laser between fighters at the start (per kind too)",
                 "fightLaserColor #RRGGBB|random - laser color",
                 "battleIsolation <duel|allVsOne|royale|teams|all> on|off - outside mobs cannot hurt battle mobs",
@@ -117,7 +118,8 @@ public class MobBattleCommand extends CommandBase {
                 "scoreboard <kind|all> on|off - HUD with one row per side: teams alive/total and kills, target health vs attackers, royale left + top killers, duel health (default teams on)",
                 "wave <summon|snap|slam|allVsOne|royale|all> <color|off> - ground shockwave color per action (palette colors; default summon green, snap white, slam/royale purple, allVsOne yellow)",
                 "mobFx <duel|allVsOne|attackers|royale|all> <color|default|off> - tint, aura and rune on the battle mobs (default = original look; royale purple by default)",
-                "crown on|off - everyone vs one: golden crown over the lone target for 20 s (default on)",
+                "crown gold|<color>|off - everyone vs one: crown with rays of light over the lone target for 20 s (default gold)",
+                "cleanseColor <color> - Cleanse Wand look: light from above, burst, aura and rune (default white)",
                 "borderColor <summon|snap|slam|allVsOne|royale|all> <color|off|area> - border glow color per action (area = areaColor; default summon green, allVsOne yellow, royale purple, snap/slam off: a color draws a ring at their reach)",
                 "arenaShrink <kind|all> on|off - the arena closes in like a battle royale zone (default: royale on)",
                 "arenaShrinkTo <blocks> - final radius (default 15); arenaShrinkTime <time> - with no timer (default 2m)",
@@ -361,6 +363,78 @@ public class MobBattleCommand extends CommandBase {
         return java.util.Map.entry(kinds, value.toLowerCase(java.util.Locale.ROOT));
     }
 
+    /** Gold, the palette colors and off (crown colors). */
+    private static Sub[] crownWords() {
+        java.util.List<String> names = new java.util.ArrayList<>(java.util.List.of("gold"));
+        Teams.PALETTE.keySet().forEach(n -> names.add(n.toLowerCase(java.util.Locale.ROOT)));
+        names.add("off");
+        return words("Crown", names.toArray(new String[0]));
+    }
+
+    /** buff &lt;who&gt;: its stats, all and off (and maxKills for the streak), with example percents. */
+    private static Sub buffWho(String who, String desc) {
+        java.util.List<Sub> kids = new java.util.ArrayList<>();
+        for (Buffs.Stat st : Buffs.Stat.values()) {
+            kids.add(new Sub(st.key, st.key + " %, 0-" + st.max + ("streak".equals(who) ? " per kill" : ""),
+                    words("Percent", "0", "10", "25", "50")));
+        }
+        kids.add(new Sub("all", "Every stat to the same % (size stops at 200, defense at 90)", words("Percent", "0", "10", "25", "50")));
+        kids.add(new Sub("off", "Every stat back to 0"));
+        if ("streak".equals(who)) {
+            kids.add(new Sub("maxkills", "Kills that count at most (1-" + Buffs.MAX_STREAK + ", default 5)", words("Kills", "3", "5", "10")));
+        }
+        return new Sub(who, desc, kids.toArray(new Sub[0]));
+    }
+
+    /** /mobbattle buff ...; false (after an error reply) if the input is invalid. */
+    private static boolean setBuff(CommandContext ctx) {
+        String[] a = argsAfter(ctx, "buff");
+        String usage = "Usage: /mobbattle buff <lone|streak|champion> <size|health|damage|defense|all|off> <percent>, "
+                + "buff streak maxKills <1-" + Buffs.MAX_STREAK + ">, buff crown gold|<color>|off";
+        if (a.length >= 2 && "crown".equalsIgnoreCase(a[0])) {
+            String c = Buffs.parseCrown(a[1]);
+            if (c == null) {
+                reply(ctx, usage, ERR);
+                return false;
+            }
+            Buffs.crown = c;
+            return true;
+        }
+        Buffs.Source who = a.length >= 2 ? Buffs.Source.of(a[0]) : null;
+        if (who == null) {
+            reply(ctx, usage, ERR);
+            return false;
+        }
+        String what = a[1].toLowerCase(java.util.Locale.ROOT);
+        if (what.equals("off")) {
+            for (Buffs.Stat st : Buffs.Stat.values()) Buffs.setPercent(who, st, 0);
+            return true;
+        }
+        int v = -1;
+        try {
+            if (a.length >= 3) v = Integer.parseInt(a[2].replace("%", ""));
+        } catch (NumberFormatException ignored) {
+        }
+        if (what.equals("maxkills") && who == Buffs.Source.STREAK) {
+            if (v < 1 || v > Buffs.MAX_STREAK) {
+                reply(ctx, usage, ERR);
+                return false;
+            }
+            Buffs.streakMax = v;
+            return true;
+        }
+        Buffs.Stat stat = Buffs.Stat.of(what);
+        if (!what.equals("all") && stat == null || v < 0 || v > (stat != null ? stat.max : 1000)) {
+            reply(ctx, usage, ERR);
+            return false;
+        }
+        // all: each stat capped at its own maximum (size 200, defense 90).
+        for (Buffs.Stat st : Buffs.Stat.values()) {
+            if (stat == null || st == stat) Buffs.setPercent(who, st, v);
+        }
+        return true;
+    }
+
     private static Sub battleKind(String name, String desc) {
         return new Sub(name, desc, new Sub("on", "On"), new Sub("off", "Off"));
     }
@@ -537,8 +611,10 @@ public class MobBattleCommand extends CommandBase {
                 battleKind("royale", "Chaos Wand battle royale (default on)"),
                 battleKind("teams", "Team Wand battles"),
                 battleKind("all", "Every kind at once")));
-        addSubCommand(new Sub("crown", "Everyone vs one: golden crown over the lone target",
-                new Sub("on", "Show it for 20 s (default)"), new Sub("off", "No crown")));
+        addSubCommand(new Sub("crown", "Everyone vs one: crown with rays of light over the lone target, 20 s: gold (default), a palette color or off",
+                crownWords()));
+        addSubCommand(new Sub("cleansecolor", "Cleanse Wand look (light from above, burst, aura, rune): a palette color (default white)",
+                colorWords()));
         addSubCommand(new Sub("mobfx", "Look on battle mobs per role: <duel|allVsOne|attackers|royale|all> <palette color|default|off>",
                 new Sub("duel", "Both duel fighters", colorWords("default", "off")),
                 new Sub("allvsone", "The lone target", colorWords("default", "off")),
@@ -588,14 +664,11 @@ public class MobBattleCommand extends CommandBase {
                 "border", "disc", "discborder", "wall", "off"));
         addSubCommand(new Sub("areaheight", "Height of the zone wall in blocks (3-128)"));
         addSubCommand(new Sub("skiptimer", "Every running battle timer jumps to 0: the battles end by their timeUp rule"));
-        addSubCommand(new Sub("targetbuff", "Everyone vs one: buff the lone target, in % (0 = none)",
-                new Sub("size", "Bigger model, % (0-" + FxSettings.MAX_BUFF_SIZE + ", mobs only)", words("Percent", "0", "10", "25", "50")),
-                new Sub("health", "More max health, % (0-" + FxSettings.MAX_BUFF + "), starts full", words("Percent", "0", "25", "50", "100")),
-                new Sub("damage", "Harder hits, % (0-" + FxSettings.MAX_BUFF + ")", words("Percent", "0", "25", "50", "100")),
-                new Sub("defense", "Takes less damage, % (0-" + FxSettings.MAX_BUFF_DEFENSE + ")", words("Percent", "0", "10", "25", "50")),
-                new Sub("all", "Every buff to the same % (size stops at " + FxSettings.MAX_BUFF_SIZE + ", defense at "
-                        + FxSettings.MAX_BUFF_DEFENSE + ")", words("Percent", "0", "10", "25", "50")),
-                new Sub("off", "Every buff back to 0")));
+        addSubCommand(new Sub("buff", "Battle buffs: buff <lone|streak|champion> <size|health|damage|defense|all|off> <percent>",
+                buffWho("lone", "Everyone vs one: the lone target, for that battle"),
+                buffWho("streak", "Per kill in a battle (times its kills, up to maxKills), for that battle"),
+                buffWho("champion", "The winners of a battle, until they die or get the Cleanse Wand"),
+                new Sub("crown", "Crown on streak and champion mobs: gold, a palette color or off", crownWords())));
         addSubCommand(new Sub("stop", "End every battle, countdown, timer box, arena, camera shot and battle music"));
         addSubCommand(new Sub("reset", "Settings of one group back to default",
                 new Sub("effects", "Waves, border glow, mob looks, crown, runes, area, lasers, team look, wand effects"),
@@ -1093,52 +1166,8 @@ public class MobBattleCommand extends CommandBase {
                 if (ref != null && ref.isValid()) ref.getStore().getExternalData().getWorld().execute(job); else job.run();
                 return;
             }
-            case "targetbuff" -> {
-                String[] a = argsAfter(ctx, "targetbuff");
-                String stat = a.length >= 1 ? a[0].toLowerCase(java.util.Locale.ROOT) : "";
-                if (stat.equals("off")) {
-                    FxSettings.buffSize = FxSettings.buffHealth = FxSettings.buffDamage = FxSettings.buffDefense = 0;
-                } else if (stat.equals("all")) {
-                    // Every buff to the same %, each capped at its own maximum (defense 90, size 200).
-                    int v = -1;
-                    try {
-                        if (a.length >= 2) v = Integer.parseInt(a[1].replace("%", ""));
-                    } catch (NumberFormatException ignored) {
-                    }
-                    if (v < 0 || v > FxSettings.MAX_BUFF) {
-                        reply(ctx, "Usage: /mobbattle targetBuff all <0-" + FxSettings.MAX_BUFF + ">  (percent; size stops at "
-                                + FxSettings.MAX_BUFF_SIZE + ", defense at " + FxSettings.MAX_BUFF_DEFENSE + ")", ERR);
-                        return;
-                    }
-                    FxSettings.buffSize = Math.min(v, FxSettings.MAX_BUFF_SIZE);
-                    FxSettings.buffHealth = v;
-                    FxSettings.buffDamage = v;
-                    FxSettings.buffDefense = Math.min(v, FxSettings.MAX_BUFF_DEFENSE);
-                } else {
-                    int max = switch (stat) {
-                        case "size" -> FxSettings.MAX_BUFF_SIZE;
-                        case "health", "damage" -> FxSettings.MAX_BUFF;
-                        case "defense" -> FxSettings.MAX_BUFF_DEFENSE;
-                        default -> -1;
-                    };
-                    int v = -1;
-                    try {
-                        if (a.length >= 2) v = Integer.parseInt(a[1].replace("%", ""));
-                    } catch (NumberFormatException ignored) {
-                    }
-                    if (max < 0 || v < 0 || v > max) {
-                        reply(ctx, "Usage: /mobbattle targetBuff size <0-" + FxSettings.MAX_BUFF_SIZE + "> | health <0-"
-                                + FxSettings.MAX_BUFF + "> | damage <0-" + FxSettings.MAX_BUFF + "> | defense <0-"
-                                + FxSettings.MAX_BUFF_DEFENSE + "> | all <0-" + FxSettings.MAX_BUFF + "> | off  (percent)", ERR);
-                        return;
-                    }
-                    switch (stat) {
-                        case "size" -> FxSettings.buffSize = v;
-                        case "health" -> FxSettings.buffHealth = v;
-                        case "damage" -> FxSettings.buffDamage = v;
-                        default -> FxSettings.buffDefense = v;
-                    }
-                }
+            case "buff" -> {
+                if (!setBuff(ctx)) return;
             }
             case "skiptimer" -> {
                 int n = Arena.skipTimers();
@@ -1286,12 +1315,20 @@ public class MobBattleCommand extends CommandBase {
                 }
             }
             case "crown" -> {
-                Boolean on = parseOnOff(val);
-                if (on == null) {
-                    reply(ctx, "Usage: /mobbattle crown on|off", ERR);
+                String c = Buffs.parseCrown(val);
+                if (c == null) {
+                    reply(ctx, "Usage: /mobbattle crown gold|<palette color>|off", ERR);
                     return;
                 }
-                ActionFx.crown = on;
+                ActionFx.crown = c;
+            }
+            case "cleansecolor" -> {
+                String c = Buffs.parseCrown(val);
+                if (c == null || c.equals("off") || c.equals("Gold")) {
+                    reply(ctx, "Usage: /mobbattle cleanseColor <palette color>  (default white)", ERR);
+                    return;
+                }
+                FxSettings.cleanseColor = c;
             }
             case "wave", "glow" -> {
                 boolean glow = key.equals("glow");
@@ -1650,6 +1687,7 @@ public class MobBattleCommand extends CommandBase {
             if (all) {
                 msg += ", " + BattleManager.clearAllDrafts() + " mobs out of their teams";
                 msg += ", " + Army.clearAll() + " mobs out of their armies";
+                msg += ", " + Buffs.clearEverything() + " buffs removed";
                 var ref = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
                 if (ref != null && ref.isValid()) {
                     msg += ", " + MorphWand.restoreAll(ref.getStore()) + " morphs undone";

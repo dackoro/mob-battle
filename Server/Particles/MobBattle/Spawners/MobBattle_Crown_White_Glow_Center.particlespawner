@@ -76,7 +76,7 @@
           }
         },
         "Opacity": 0.7,
-        "Color": "#eef4ff"
+        "Color": "#f9f9f9"
       },
       "100": {
         "Opacity": 0.0,

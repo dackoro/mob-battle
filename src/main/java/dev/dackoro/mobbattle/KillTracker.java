@@ -55,6 +55,11 @@ public class KillTracker extends RefChangeSystem<EntityStore, DeathComponent> {
             return;
         }
         battle.recordKill(killer, ChaosWand.nameOf(killer, buffer), team);
+        // /mobbattle buff streak: % per kill in this battle, up to maxKills.
+        BattleManager.Kills k = battle.kills.get(killer);
+        if (k != null && Buffs.enabled(Buffs.Source.STREAK)) {
+            Buffs.set(killer, Buffs.Source.STREAK, Math.min(k.count(), Buffs.streakMax));
+        }
     }
 
     @Override

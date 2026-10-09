@@ -274,7 +274,7 @@ public final class BattleManager {
         WandFx.prune();
         Snap.prune();
         Army.prune();
-        TargetBuff.prune();
+        Buffs.prune();
         BattleMusic.maintain();
         for (Battle battle : BATTLES) {
             // World unloaded (e.g. a closed instance): its tick will never run checkWinner again. A live world
@@ -335,9 +335,9 @@ public final class BattleManager {
         BATTLES.remove(battle);
         killSummary(battle);
         List<Ref<EntityStore>> all = battle.snapshot();
-        // Everyone vs one: the lone target's buff and crown go (formerMembers: it may have just been detached).
-        for (Ref<EntityStore> r : formerMembers) TargetBuff.clear(r);
-        if (battle.kind == Kind.ALL_VS_ONE) WandFx.removeLater(formerMembers, WandFx.LONE_MARK);
+        // The lone and streak buffs go (formerMembers: a mob may have just been detached), and the lone target's crown.
+        for (Ref<EntityStore> r : formerMembers) Buffs.endBattle(r);
+        if (battle.kind == Kind.ALL_VS_ONE) WandFx.removeCrownsLater(formerMembers);
         for (Ref<EntityStore> npc : all) {
             if (!npc.isValid()) continue;
             if (isPlayerFighter(npc)) {
@@ -678,6 +678,13 @@ public final class BattleManager {
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " over: " + outcome + ", sides alive " + aliveTeams
                 + ", fighters alive " + alive + ", damage by side " + battle.damageBy + (expired ? " (15 min limit)" : ""));
         finish(battle);
+        // /mobbattle buff champion: the winners keep an edge (after finish, which took their battle buffs).
+        if (outcome == BattleOutcome.WIN && Buffs.enabled(Buffs.Source.CHAMPION)) {
+            int side = aliveTeams.iterator().next();
+            for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+                if (e.getValue() == side && isAlive(e.getKey(), buffer)) Buffs.set(e.getKey(), Buffs.Source.CHAMPION, 1);
+            }
+        }
         if (battle.silent) {
             MobBattlePlugin.log("Battle over after its time was up (" + outcome + ")");
             return;

@@ -55,11 +55,11 @@
       },
       "75": {
         "Opacity": 0.4,
-        "Color": "#f3f7ff"
+        "Color": "#fbfbfb"
       },
       "100": {
         "Opacity": 0.0,
-        "Color": "#f3f7ff"
+        "Color": "#fbfbfb"
       }
     },
     "InitialAnimationFrame": {

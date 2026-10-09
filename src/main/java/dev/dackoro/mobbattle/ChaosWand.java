@@ -188,9 +188,10 @@ public final class ChaosWand {
         // A 2-side battle so the end shows who won (the target or the attackers).
         BattleManager.Battle battle = BattleManager.startFocus(player, target, targetName, around);
         Arena.setup(battle, center, FxSettings.radius, FightFx.lastAreaColor(player), buffer);
-        if (ActionFx.crown) WandFx.onTarget(target, WandFx.LONE_MARK, buffer);
-        // /mobbattle targetBuff: bigger, more health, harder hits, fewer taken (undone in BattleManager.finish).
-        TargetBuff.apply(target, buffer);
+        String crown = WandFx.crown();
+        if (crown != null) WandFx.onTarget(target, crown, buffer);
+        // /mobbattle buff lone: bigger, more health, harder hits, fewer taken (undone in BattleManager.finish).
+        Buffs.set(target, Buffs.Source.LONE, 1);
         // The target fights back against the nearest attacker.
         if (firstAttacker != null) {
             BattleManager.setTarget(battle, target, firstAttacker);

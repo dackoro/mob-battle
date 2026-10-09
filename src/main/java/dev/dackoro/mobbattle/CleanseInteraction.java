@@ -41,9 +41,11 @@ public class CleanseInteraction extends SimpleInstantInteraction {
             context.getState().state = InteractionState.Failed;
             return;
         }
+        // Buffs first: they put back the model the mob had before its size buff.
+        Buffs.clearNow(target, buffer);
         effects.clearEffects(target, buffer);
         boolean unmorphed = MorphWand.restore(target, buffer);
-        WandFx.onTarget(target, WandFx.CLEANSE, buffer);
+        WandFx.onTarget(target, WandFx.cleanse(), buffer);
         if (unmorphed) WandFx.onTarget(target, WandFx.UNMORPH, buffer);
         player.sendMessage(Message.raw("Removed every effect from " + ChaosWand.nameOf(target, buffer) + ".").color("#7fd3ff"));
     }

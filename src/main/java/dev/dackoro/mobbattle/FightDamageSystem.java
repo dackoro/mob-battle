@@ -127,8 +127,8 @@ public class FightDamageSystem extends DamageEventSystem {
         if (damage.isCancelled()) {
             damage.setCancelled(false);
         }
-        // /mobbattle targetBuff damage/defense on the lone target of everyone vs one.
-        damage.setAmount(TargetBuff.scale(source.getRef(), victim, damage.getAmount()));
+        // /mobbattle buff: damage of a buffed attacker, defense of a buffed victim.
+        damage.setAmount(Buffs.scale(source.getRef(), victim, damage.getAmount()));
         BattleManager.recordDamage(source.getRef(), victim, damage.getAmount());
     }
 }

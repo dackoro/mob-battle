@@ -60,7 +60,7 @@ final class Presets {
                 m.put("laser.enabled", "false");
                 m.put("chaos.area", "off");
                 m.put("fx.runes", "false");
-                m.put("fx.crown", "false");
+                m.put("fx.crown", "off");
                 for (ActionFx.Action a : ActionFx.Action.values()) {
                     m.put("wave." + a.key, ActionFx.OFF);
                     m.put("glow." + a.key, ActionFx.OFF);
@@ -265,7 +265,7 @@ final class Presets {
         }
         if (key.startsWith("wave.") || key.startsWith("glow.") || key.startsWith("mobfx.") || key.startsWith("fx.")
                 || key.startsWith("chaos.area") || key.equals("chaos.height") || key.startsWith("laser.")
-                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("debug")) return "effects";
+                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("debug")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
         if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
