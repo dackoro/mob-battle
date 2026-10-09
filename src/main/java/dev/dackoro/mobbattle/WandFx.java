@@ -60,6 +60,11 @@ final class WandFx {
 
     /** Puts the short {@code MobBattle_Fx_<fx>} effect on {@code target} (no-op with wandfx off). */
     static void onTarget(Ref<EntityStore> target, String fx, ComponentAccessor<EntityStore> buffer) {
+        onTarget(target, fx, 0f, buffer);
+    }
+
+    /** Same, lasting at least {@code minSeconds} (e.g. the whole countdown and its camera shot). */
+    static void onTarget(Ref<EntityStore> target, String fx, float minSeconds, ComponentAccessor<EntityStore> buffer) {
         if (!FxSettings.wandFx || target == null || !target.isValid()) {
             return;
         }
@@ -83,7 +88,12 @@ final class WandFx {
                             com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior.COMPLETE, buffer);
                 }
             }
-            effects.addEffect(target, effect, buffer);
+            if (minSeconds > effect.getDuration()) {
+                effects.addEffect(target, effect, minSeconds,
+                        com.hypixel.hytale.server.core.asset.type.entityeffect.config.OverlapBehavior.OVERWRITE, buffer);
+            } else {
+                effects.addEffect(target, effect, buffer);
+            }
         }
     }
 
@@ -105,16 +115,63 @@ final class WandFx {
 
     // ---- Kill Wand: soul rip, then death ----
 
+    /** The Kill Wand's sound when its effect lands, at the player (Common/Sounds/MobBattle/Hakai.ogg, random pitch). */
+    static final String HAKAI_SOUND = "SFX_MobBattle_Hakai";
+
     /** Kills {@code target} now, or after /mobbattle killdelay with the soul rip effect (NPCs only). */
     static void kill(Ref<EntityStore> target, Ref<EntityStore> killer, boolean npc, CommandBuffer<EntityStore> buffer) {
-        if (!FxSettings.wandFx || FxSettings.killDelayMs <= 0 || !npc) {
+        // The wand's own sound, from the player, when its effect lands (the mob keeps its own death sound).
+        if (killer != null && killer.isValid()) {
+            burst(null, HAKAI_SOUND, ChaosWand.positionOf(killer, buffer), buffer);
+        }
+        boolean player = !npc && FxSettings.killPlayers
+                && buffer.getComponent(target, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType()) != null;
+        if (!FxSettings.wandFx || FxSettings.killDelayMs <= 0 || (!npc && !player)) {
             KillInteraction.killNow(target, killer, buffer);
             return;
         }
         onTarget(target, SOUL_RIP, buffer);
         deathSound(target, buffer);
-        KILLS.put(target, System.currentTimeMillis() + FxSettings.killDelayMs);
+        long dueAt = System.currentTimeMillis() + FxSettings.killDelayMs;
+        if (player) {
+            PLAYER_KILLS.put(target, new PlayerKill(dueAt, killer));
+        } else {
+            KILLS.put(target, dueAt);
+        }
         soulStream(target, killer, buffer);
+    }
+
+    /**
+     * /mobbattle killPlayers on: players also disintegrate, then die a normal death (the world's own rules
+     * decide what they drop). Run by BattleLifecycleSystem, which ticks every world (FightTickSystem only
+     * ticks NPCs).
+     */
+    private record PlayerKill(long dueAt, Ref<EntityStore> killer) {
+    }
+
+    private static final Map<Ref<EntityStore>, PlayerKill> PLAYER_KILLS = new ConcurrentHashMap<>();
+
+    static void applyPlayerKills(com.hypixel.hytale.component.Store<EntityStore> store, long now) {
+        if (PLAYER_KILLS.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<Ref<EntityStore>, PlayerKill> e : PLAYER_KILLS.entrySet()) {
+            Ref<EntityStore> ref = e.getKey();
+            if (!ref.isValid()) {
+                PLAYER_KILLS.remove(ref);
+                continue;
+            }
+            if (ref.getStore() != store || now < e.getValue().dueAt() || !PLAYER_KILLS.remove(ref, e.getValue())) {
+                continue;
+            }
+            // Visible again before respawn: drop the disintegration, then a normal death.
+            var effects = store.getComponent(ref, EffectControllerComponent.getComponentType());
+            int rip = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + SOUL_RIP);
+            if (effects != null && rip >= 0 && effects.hasEffect(rip)) {
+                effects.removeEffect(ref, rip, store);
+            }
+            KillInteraction.killNow(ref, e.getValue().killer(), store);
+        }
     }
 
     /** Soul wisps travelling from the mob to the wand during the kill delay (positions re-read every step). */
@@ -251,5 +308,6 @@ final class WandFx {
     /** From BattleManager.maintain: a Ref keeps its whole world alive. */
     static void prune() {
         KILLS.keySet().removeIf(npc -> !npc.isValid());
+        PLAYER_KILLS.keySet().removeIf(p -> !p.isValid());
     }
 }

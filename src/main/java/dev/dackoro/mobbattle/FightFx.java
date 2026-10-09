@@ -128,6 +128,22 @@ public final class FightFx {
         }
     }
 
+    /** Big summoning rune at a Chaos Wand area's center (Server/Particles/MobBattle). */
+    public static final String RUNE_CENTER_ID = "MobBattle_Rune_Center";
+
+    /**
+     * A summoning rune on the ground at {@code center} for the countdown (at least 2 s), to everyone in the
+     * world. The fighters get their own small runes from their Rage / Lone / Brawl effects.
+     */
+    static void summonRune(org.joml.Vector3d center, ComponentAccessor<EntityStore> buffer) {
+        if (!FxSettings.wandFx || center == null) return;
+        double y = floorBelow(center.y(), buffer).applyAsDouble(center.x(), center.z());
+        y = Double.isFinite(y) ? y - 0.25 : center.y();
+        float seconds = Math.max(2, FxSettings.countdownSeconds);
+        PlayerUtil.broadcastPacketToPlayers(buffer, new com.hypixel.hytale.protocol.packets.world.SpawnParticleSystem(
+                RUNE_CENTER_ID, new com.hypixel.hytale.protocol.Position(center.x(), y, center.z()), null, 1f, null, seconds));
+    }
+
     /** Blocks above the area center from which the top block counts as a roof, not the ground. */
     private static final double ROOF_MARGIN = 6;
 

@@ -55,7 +55,8 @@ public class KillInteraction extends SimpleInstantInteraction {
     }
 
     /** Damage far above max health (cause "Command", else "Physical"). */
-    static void killNow(Ref<EntityStore> target, Ref<EntityStore> killer, CommandBuffer<EntityStore> buffer) {
+    static void killNow(Ref<EntityStore> target, Ref<EntityStore> killer,
+                        com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         if (target == null || !target.isValid() || !BattleManager.isAlive(target, buffer)) {
             return;
         }

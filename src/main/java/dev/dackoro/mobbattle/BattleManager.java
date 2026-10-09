@@ -170,6 +170,7 @@ public final class BattleManager {
         MANAGED.removeIf(npc -> !npc.isValid());
         WandFx.prune();
         Army.prune();
+        BattleMusic.maintain();
         for (Battle battle : BATTLES) {
             // World unloaded (e.g. a closed instance): its tick will never run checkWinner again. A live world
             // handles its own empty battles there, with the "DRAW!" announcement.

@@ -79,6 +79,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> playerEntity = context.getEntity();
         Ref<EntityStore> picked = first;
         WandFx.onTarget(target, WandFx.CHARM, buffer);
+        FightCamera.duel(player, picked, target, buffer);
         Countdown.run(player, buffer, "DUEL: " + nameOf(picked, buffer) + " vs " + targetName, java.util.List.of(picked, target),
                 acc -> duel(player, playerEntity, picked, target, acc));
     }

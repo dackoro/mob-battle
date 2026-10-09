@@ -18,12 +18,15 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
     private final java.util.Map<Store<EntityStore>, Long> nextHeldArea =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
+    private final java.util.Map<Store<EntityStore>, Long> nextArmyRing =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextFollow =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     @Override
     public void tick(float delta, int index, Store<EntityStore> store) {
         long now = System.currentTimeMillis();
+        WandFx.applyPlayerKills(store, now);
         long next = nextMaintain.get();
         if (now >= next && nextMaintain.compareAndSet(next, now + INTERVAL_MS)) {
             BattleManager.maintain();
@@ -31,6 +34,10 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
         if (FxSettings.areaOnlyWand && now >= nextHeldArea.getOrDefault(store, 0L)) {
             nextHeldArea.put(store, now + FightFx.HELD_AREA_REFRESH_MS);
             FightFx.refreshHeldAreas(store);
+        }
+        if (Army.any() && now >= nextArmyRing.getOrDefault(store, 0L)) {
+            nextArmyRing.put(store, now + FightFx.TEAM_RING_REFRESH_MS);
+            Army.drawRings(store);
         }
         if (Army.any() && now >= nextFollow.getOrDefault(store, 0L)) {
             nextFollow.put(store, now + INTERVAL_MS);

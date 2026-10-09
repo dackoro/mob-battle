@@ -13,6 +13,10 @@
       {
         "SystemId": "MobBattle_Aura_Gold",
         "TargetEntityPart": "Entity"
+      },
+      {
+        "SystemId": "MobBattle_Rune_Feet_Gold",
+        "TargetEntityPart": "Entity"
       }
     ],
     "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"

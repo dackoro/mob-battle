@@ -107,10 +107,12 @@ public final class ChaosWand {
         FightFx.area(playerEntity, center, FxSettings.radius, buffer);
         warnLeftOut(player);
         // The lone target in gold, everyone against it in red.
-        WandFx.onTarget(target, WandFx.LONE, buffer);
+        WandFx.onTarget(target, WandFx.LONE, FxSettings.countdownSeconds, buffer);
         for (Ref<EntityStore> npc : around) {
-            WandFx.onTarget(npc, WandFx.RAGE, buffer);
+            WandFx.onTarget(npc, WandFx.RAGE, FxSettings.countdownSeconds, buffer);
         }
+        FightFx.summonRune(center, buffer);
+        FightCamera.overview(player, center, withTarget(around, target), buffer);
         Countdown.run(player, buffer, "EVERYONE vs " + targetName, withTarget(around, target),
                 acc -> focusNow(player, playerEntity, target, targetName, around, acc));
     }
@@ -169,8 +171,10 @@ public final class ChaosWand {
         FightFx.area(playerEntity, center, FxSettings.radius, buffer);
         warnLeftOut(player);
         for (Ref<EntityStore> npc : around) {
-            WandFx.onTarget(npc, WandFx.BRAWL, buffer);
+            WandFx.onTarget(npc, WandFx.BRAWL, FxSettings.countdownSeconds, buffer);
         }
+        FightFx.summonRune(center, buffer);
+        FightCamera.overview(player, center, around, buffer);
         Countdown.run(player, buffer, "BATTLE ROYALE", around, acc -> brawlNow(player, playerEntity, around, acc));
     }
 

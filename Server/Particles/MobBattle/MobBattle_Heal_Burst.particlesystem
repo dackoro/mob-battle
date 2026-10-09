@@ -11,5 +11,6 @@
       }
     }
   ],
-  "$Comment": "Heal Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in green."
+  "$Comment": "Heal Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in green.",
+  "CullDistance": 120
 }

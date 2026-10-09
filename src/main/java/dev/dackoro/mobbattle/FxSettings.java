@@ -32,6 +32,11 @@ public final class FxSettings {
     public static boolean winTitleEnabled = true;
     /** An EventTitleStyle name (Default, Major, GoblinBreach, VoidEviction), or "random". */
     public static String titleStyle = "Major";
+    /** Wide camera shot of the fighters during a Chaos Wand countdown (/mobbattle camera). */
+    public static boolean fightCamera = true;
+    /** Battle music from the countdown to the end of the battle (/mobbattle music). */
+    public static boolean battleMusic = true;
+    public static String musicTrack = BattleMusic.DEFAULT_TRACK;
     /** Who sees the big titles (countdown, start, winner): owner, nearby (default: same world, 64 blocks) or world. */
     public static String titleScope = "nearby";
     public static final String[] TITLE_SCOPES = {"owner", "nearby", "world"};
@@ -64,6 +69,8 @@ public final class FxSettings {
     public static final int MAX_KILL_DELAY_MS = 3000;
     /** Kill Wand: the disintegrated mob drops its normal loot (/mobbattle killLoot). Default: on. */
     public static boolean killLoot = true;
+    /** Kill Wand: players disintegrate too, then die normally (/mobbattle killPlayers). Default: off. */
+    public static boolean killPlayers = false;
 
     /** Area only for its owner, only while holding the Chaos Wand (/mobbattle areaonlywand). Default: off. */
     public static boolean areaOnlyWand = false;
@@ -195,6 +202,9 @@ public final class FxSettings {
             titleEnabled = Boolean.parseBoolean(p.getProperty("title.enabled", String.valueOf(titleEnabled)));
             winTitleEnabled = Boolean.parseBoolean(p.getProperty("wintitle.enabled", String.valueOf(winTitleEnabled)));
             titleStyle = p.getProperty("title.style", titleStyle);
+            fightCamera = Boolean.parseBoolean(p.getProperty("fight.camera", String.valueOf(fightCamera)));
+            battleMusic = Boolean.parseBoolean(p.getProperty("battle.music", String.valueOf(battleMusic)));
+            musicTrack = p.getProperty("battle.music.track", musicTrack);
             String scope = p.getProperty("title.scope", titleScope).toLowerCase();
             titleScope = java.util.Arrays.asList(TITLE_SCOPES).contains(scope) ? scope : "nearby";
             accumulateDuels = "accumulate".equalsIgnoreCase(p.getProperty("duel.mode", "exclusive"));
@@ -235,6 +245,7 @@ public final class FxSettings {
                 // keep the default
             }
             killLoot = Boolean.parseBoolean(p.getProperty("kill.loot", String.valueOf(killLoot)));
+            killPlayers = Boolean.parseBoolean(p.getProperty("kill.players", String.valueOf(killPlayers)));
             areaOnlyWand = Boolean.parseBoolean(p.getProperty("chaos.area.onlywand", String.valueOf(areaOnlyWand)));
             resetBattleRules();
             // Older saves have one global value: it becomes the value of every kind.
@@ -272,6 +283,9 @@ public final class FxSettings {
         p.setProperty("title.enabled", String.valueOf(titleEnabled));
         p.setProperty("wintitle.enabled", String.valueOf(winTitleEnabled));
         p.setProperty("title.style", titleStyle);
+        p.setProperty("fight.camera", String.valueOf(fightCamera));
+        p.setProperty("battle.music", String.valueOf(battleMusic));
+        p.setProperty("battle.music.track", musicTrack);
         p.setProperty("title.scope", titleScope);
         p.setProperty("duel.mode", accumulateDuels ? "accumulate" : "exclusive");
         p.setProperty("chaos.radius", String.valueOf(radius));
@@ -282,6 +296,7 @@ public final class FxSettings {
         p.setProperty("wand.fx", String.valueOf(wandFx));
         p.setProperty("kill.delay.millis", String.valueOf(killDelayMs));
         p.setProperty("kill.loot", String.valueOf(killLoot));
+        p.setProperty("kill.players", String.valueOf(killPlayers));
         p.setProperty("chaos.area.onlywand", String.valueOf(areaOnlyWand));
         ISOLATION.forEach((k, v) -> p.setProperty("battle.isolation." + k.key, String.valueOf(v)));
         FRIENDLY_FIRE.forEach((k, v) -> p.setProperty("battle.friendlyfire." + k.key, String.valueOf(v)));
@@ -359,7 +374,7 @@ public final class FxSettings {
     /** Settings as short labelled lines, one per group (see {@link #groupOf}). */
     public static String[] describeLines() {
         return new String[] {
-                "Titles: countdown " + countdownSeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope,
+                "Titles: countdown " + countdownSeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope + ", camera " + onOff(fightCamera) + ", music " + (battleMusic ? musicTrack : "off"),
                 "Fighter laser: fightLaser " + onOff(laserEnabled) + ", fightLaserColor " + laserColor,
                 "Battles: duelMode " + (accumulateDuels ? "accumulate" : "exclusive")
                         + " | battleIsolation " + rules(ISOLATION) + " | friendlyFire " + rules(FRIENDLY_FIRE),
@@ -368,14 +383,14 @@ public final class FxSettings {
                         + ", summonRadius " + (summonRadius > 0 ? summonRadius : "auto"),
                 "Team look: teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
                         + ", onlyWand " + onOff(teamLookOnlyWand),
-                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killLoot " + onOff(killLoot),
+                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers),
         };
     }
 
     /** Which describeLines() line a setting key belongs to. */
     public static int groupOf(String key) {
         return switch (key) {
-            case "title", "wintitle", "style", "countdown", "titlescope" -> 0;
+            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "friendlyfire", "duelmode" -> 2;
             case "radius", "area", "areacolor", "height", "areaonlywand", "maxmobs", "summonradius" -> 3;

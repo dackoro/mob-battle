@@ -284,6 +284,26 @@ final class Army {
         return ref != null && ref.isValid() ? ref : null;
     }
 
+    public static final String ARMY_WAND_ID = "MobBattle_ArmyWand";
+    /** Ring color under army mobs (the Army Wand join color). */
+    static final String RING_COLOR = "#00e040";
+
+    /**
+     * Every FightFx.TEAM_RING_REFRESH_MS per world (BattleLifecycleSystem): while an owner holds the Army
+     * Wand, a ring at the feet of each of their army mobs, seen only by that owner (like the team rings).
+     */
+    static void drawRings(com.hypixel.hytale.component.Store<EntityStore> store) {
+        Map<UUID, Boolean> holds = new java.util.HashMap<>();
+        OWNER.forEach((npc, owner) -> {
+            if (!npc.isValid() || npc.getStore() != store) return;
+            PlayerRef player = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(owner);
+            if (player == null) return;
+            if (holds.computeIfAbsent(owner, o -> FightFx.holdsItem(player, ARMY_WAND_ID, store))) {
+                FightFx.teamRing(player, npc, RING_COLOR, store);
+            }
+        });
+    }
+
     /** Drops dead or unloaded mobs (BattleManager.maintain). */
     static void prune() {
         OWNER.keySet().removeIf(npc -> !npc.isValid());

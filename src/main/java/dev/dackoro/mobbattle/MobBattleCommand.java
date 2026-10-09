@@ -73,6 +73,8 @@ public class MobBattleCommand extends CommandBase {
                 "winTitle on|off - title with the winner",
                 "titleStyle default|major|voidEviction|random",
                 "titleScope owner|nearby|world - who sees fight titles",
+                "camera on|off - wide shot of the fighters during a Chaos Wand countdown",
+                "music on|off|<track> - battle music from the countdown to the end",
         });
         HELP.put("chaos", new String[] {
                 "Chaos area",
@@ -130,6 +132,7 @@ public class MobBattleCommand extends CommandBase {
                 "wandFx on|off - glow, soul rip, charm... on the clicked mob",
                 "killDelay <seconds> - Kill Wand soul rip before death (0-3, 0 = instant)",
                 "killLoot on|off - the disintegrated mob drops its loot (default on)",
+                "killPlayers on|off - players disintegrate too, then die normally (default off)",
         });
     }
 
@@ -223,6 +226,10 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(give);
         addSubCommand(new Sub("starttitle", "title", "Fight-start title on/off", words("Fight-start title", "on", "off")));
         addSubCommand(new Sub("wintitle", "Winner title on/off", words("Winner title", "on", "off")));
+        addSubCommand(new Sub("music", "Battle music: on, off, or a music track ID (default " + BattleMusic.DEFAULT_TRACK + ")",
+                words("Music", "on", "off", "Track_Z1D_Goblin_Boss_Battle", "Track_Void_Escalation", "Track_Void_Tension")));
+        addSubCommand(new Sub("camera", "Wide camera shot of the fighters during a Chaos Wand countdown",
+                new Sub("on", "Show it (default; needs a countdown)"), new Sub("off", "Normal camera")));
         addSubCommand(new Sub("titlescope", "Who sees fight titles: owner, nearby (default, 64 blocks) or world",
                 words("Title scope", "owner", "nearby", "world")));
         addSubCommand(new Sub("titlestyle", "style", "Title style", words("Title style", "default", "major", "voideviction", "random")));
@@ -261,6 +268,9 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("on", "Show them (default)"),
                 new Sub("off", "No effects on the mob")));
         addSubCommand(new Sub("killdelay", "Kill Wand: seconds of soul rip before the mob dies (0-3, 0 = instant)"));
+        addSubCommand(new Sub("killplayers", "Kill Wand: players disintegrate too, then die a normal death",
+                new Sub("on", "Disintegrate players too"),
+                new Sub("off", "Players die at once (default)")));
         addSubCommand(new Sub("killloot", "Kill Wand: the disintegrated mob drops its loot",
                 new Sub("on", "Drop its normal loot (default)"),
                 new Sub("off", "No drops")));
@@ -388,6 +398,28 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.winTitleEnabled = on;
+            }
+            case "music" -> {
+                Boolean on = parseOnOff(val);
+                if (on != null) {
+                    FxSettings.battleMusic = on;
+                    if (!on) BattleMusic.stopAll();
+                } else if (val != null && com.hypixel.hytale.server.core.asset.type.musiccontainer.config.MusicContainer
+                        .getAssetMap().getIndex(val) > 0) {
+                    FxSettings.musicTrack = val;
+                    FxSettings.battleMusic = true;
+                } else {
+                    reply(ctx, "Usage: /mobbattle music on|off|<track>, e.g. " + String.join(", ", BattleMusic.SUGGESTED), ERR);
+                    return;
+                }
+            }
+            case "camera" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle camera on|off", ERR);
+                    return;
+                }
+                FxSettings.fightCamera = on;
             }
             case "titlescope" -> {
                 String scope = val == null ? "" : val.toLowerCase();
@@ -567,6 +599,14 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.wandFx = on;
+            }
+            case "killplayers" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle killPlayers on|off", ERR);
+                    return;
+                }
+                FxSettings.killPlayers = on;
             }
             case "killloot" -> {
                 Boolean on = parseOnOff(val);

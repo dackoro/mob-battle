@@ -13,6 +13,10 @@
       {
         "SystemId": "MobBattle_Aura_Orange",
         "TargetEntityPart": "Entity"
+      },
+      {
+        "SystemId": "MobBattle_Rune_Feet_Orange",
+        "TargetEntityPart": "Entity"
       }
     ]
   },

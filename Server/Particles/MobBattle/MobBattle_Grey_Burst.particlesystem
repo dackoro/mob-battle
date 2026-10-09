@@ -11,5 +11,6 @@
       }
     }
   ],
-  "$Comment": "Cleanse Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in grey (Battle Wand: selection cleared)."
+  "$Comment": "Cleanse Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in grey (Battle Wand: selection cleared).",
+  "CullDistance": 120
 }

@@ -1,0 +1,65 @@
+{
+  "$Comment": "Mob Battle summoning rune on the ground (texture of vanilla Praetorian_Summon_Circle).",
+  "RenderMode": "BlendAdd",
+  "ParticleRotationInfluence": "None",
+  "ParticleRotateWithSpawner": false,
+  "LinearFiltering": false,
+  "LightInfluence": 0,
+  "MaxConcurrentParticles": 1,
+  "ParticleLifeSpan": {
+    "Min": 3.0,
+    "Max": 3.0
+  },
+  "SpawnRate": {
+    "Min": 100.0,
+    "Max": 100.0
+  },
+  "SpawnBurst": false,
+  "UseEmitDirection": false,
+  "CameraOffset": -0.1,
+  "Particle": {
+    "Texture": "Particles/Textures/Circles/Portal_Runic2.png",
+    "ScaleRatioConstraint": "None",
+    "Animation": {
+      "0": {
+        "Opacity": 0.0,
+        "Color": "#ffc21a"
+      },
+      "12": {
+        "Opacity": 0.9
+      },
+      "88": {
+        "Opacity": 0.9
+      },
+      "100": {
+        "Opacity": 0.0,
+        "Rotation": {
+          "Z": {
+            "Min": -180.0,
+            "Max": -180.0
+          }
+        }
+      }
+    },
+    "InitialAnimationFrame": {
+      "Opacity": 0.0,
+      "Color": "#ffc21a",
+      "Rotation": {
+        "X": {
+          "Min": 90.0,
+          "Max": 90.0
+        }
+      },
+      "Scale": {
+        "X": {
+          "Min": 0.3,
+          "Max": 0.3
+        },
+        "Y": {
+          "Min": 0.3,
+          "Max": 0.3
+        }
+      }
+    }
+  }
+}

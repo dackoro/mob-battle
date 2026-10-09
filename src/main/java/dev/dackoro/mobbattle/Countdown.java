@@ -65,6 +65,7 @@ final class Countdown {
         Set<Ref<EntityStore>> set = ConcurrentHashMap.newKeySet();
         set.addAll(mobs);
         cancelSharing(set);
+        BattleMusic.start(player, buffer);
         int seconds = FxSettings.countdownSeconds;
         if (seconds <= 0) {
             start.accept(buffer);
@@ -121,6 +122,14 @@ final class Countdown {
             n++;
         }
         return n;
+    }
+
+    /** True if {@code player} has a countdown still running (BattleMusic keeps playing meanwhile). */
+    static boolean hasPendingFor(java.util.UUID player) {
+        for (Pending p : PENDING) {
+            if (!p.cancelled && p.player.getUuid().equals(player)) return true;
+        }
+        return false;
     }
 
     static boolean hasPending() {

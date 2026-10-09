@@ -11,5 +11,6 @@
       }
     }
   ],
-  "$Comment": "Effect Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in purple."
+  "$Comment": "Effect Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in purple.",
+  "CullDistance": 120
 }

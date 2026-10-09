@@ -11,5 +11,6 @@
       }
     }
   ],
-  "$Comment": "Cleanse Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in light blue."
+  "$Comment": "Cleanse Wand: the Morph Wand burst (vanilla Potion_Morph_Burst) in light blue.",
+  "CullDistance": 120
 }
