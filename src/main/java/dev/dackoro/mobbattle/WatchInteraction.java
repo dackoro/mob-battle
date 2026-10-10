@@ -23,6 +23,8 @@ abstract class WatchInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        // Keep the explicit exit available if permissions are changed while a player is spectating.
+        if (direction() != 0 && !Perms.interactionAllowed(context)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         PlayerRef player = buffer != null ? buffer.getComponent(context.getEntity(), PlayerRef.getComponentType()) : null;
         if (player == null) {

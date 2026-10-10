@@ -184,7 +184,7 @@ final class Arena {
             MobBattlePlugin.debug("battle rules: arena " + mode + ", radius " + Math.round(radius) + " at "
                     + Math.round(center.x) + " " + Math.round(center.y) + " " + Math.round(center.z)
                     + ", timer " + (seconds > 0 ? seconds + " s" : "off") + ", timeUp " + FxSettings.timeUp(battle.kind)
-                    + ", tieBreak " + FxSettings.tieBreak + ", isolation " + FxSettings.ISOLATION.get(battle.kind)
+                    + ", judgeBy " + FxSettings.judgeBy(battle.kind) + ", tieBreak " + FxSettings.tieBreak(battle.kind) + ", isolation " + FxSettings.ISOLATION.get(battle.kind)
                     + ", friendlyFire " + FxSettings.friendlyFire(battle.kind) + ", timerStyle " + FxSettings.timerStyle);
         }
         boolean shrink = FxSettings.shrinks(battle.kind) && radius > FxSettings.shrinkTo;
@@ -193,8 +193,8 @@ final class Arena {
         Store<EntityStore> store = buffer.getExternalData().getWorld().getEntityStore().getStore();
         State s = new State(battle, store, new Vector3d(center), radius, mode,
                 color != null ? color : FxSettings.pickAreaColorName(), seconds);
-        if (seconds > 0 && battle.owner() != null && battle.owner().isValid()) {
-            for (PlayerRef viewer : FightFx.titleViewers(battle.owner())) s.viewers.add(viewer.getUuid());
+        if (seconds > 0) {
+            for (PlayerRef viewer : FightFx.titleViewers(battle)) s.viewers.add(viewer.getUuid());
         }
         ARENAS.add(s);
         // The 15 min safety limit never ends a fight before its timer (timeUp continue: a minute more after it).
@@ -209,14 +209,18 @@ final class Arena {
      * CHASE_BLOCKS_PER_SECOND) before time is up. Tells the owner, with a timer that would do.
      */
     private static void warnShortTimer(BattleManager.Battle battle, double radius, int seconds, boolean shrink) {
-        if (seconds <= 0 || battle.owner() == null || !battle.owner().isValid()) return;
+        if (seconds <= 0) return;
         int needed = (int) Math.ceil(radius * 2 / CHASE_BLOCKS_PER_SECOND / 10.0) * 10;
         if (seconds >= needed) return;
-        battle.owner().sendMessage(com.hypixel.hytale.server.core.Message.raw("The " + battle.kind.key + " timer ("
+        String warning = "The " + battle.kind.key + " timer ("
                 + MobBattleCommand.formatDuration(seconds) + ") is short for an arena of radius " + Math.round(radius)
                 + ": fighters far apart may not meet before time is up. Try /mobbattle timer " + battle.kind.key + " "
                 + MobBattleCommand.formatDuration(needed) + (shrink ? "" : ", /mobbattle arenaShrink " + battle.kind.key + " on")
-                + " or a smaller area.").color("#ffcc55"));
+                + " or a smaller area.";
+        PlayerRef owner = battle.owner();
+        if (owner != null && owner.isValid()) {
+            owner.sendMessage(com.hypixel.hytale.server.core.Message.raw(warning).color("#ffcc55"));
+        }
     }
 
     /**

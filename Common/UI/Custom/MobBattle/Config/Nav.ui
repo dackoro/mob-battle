@@ -1,0 +1,20 @@
+$C = "../../Common.ui";
+
+// One entry of the settings panel's left menu (ConfigPage). #Sel is the gold marker of the open page.
+Group {
+  Anchor: (Height: 34, Bottom: 4);
+  LayoutMode: Left;
+
+  Group #Sel {
+    Visible: false;
+    Anchor: (Width: 4);
+    Background: #e3b341;
+  }
+
+  Group { Anchor: (Width: 4); }
+
+  $C.@SmallTertiaryTextButton #Button {
+    @Text = "";
+    FlexWeight: 1;
+  }
+}

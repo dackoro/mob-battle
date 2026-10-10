@@ -66,31 +66,39 @@ final class BattleDebug {
         if (!player.isValid() || player.getStore() != store) return;
         for (var self : npcs) {
             if (!self.isValid()) continue;
-            var battle = BattleManager.battleOf(self);
-            var marked = MarkedEntitySupport.get(self, store);
-            var locked = marked != null ? marked.getMarkedEntityRef(FightManager.TARGET_SLOT) : null;
-            var ordered = battle != null ? battle.targets.get(self) : FightManager.enemyOf(self);
-            var combat = CombatSupport.get(self, store);
-            var support = WorldSupport.get(self, store);
-            var target = ordered != null && ordered.isValid() ? ordered : locked;
-            String distance = "?", attitude = "?", canDamage = "?";
-            if (target != null && target.isValid() && target.getStore() == store) {
-                var from = ChaosWand.positionOf(self, store);
-                var to = ChaosWand.positionOf(target, store);
-                if (from != null && to != null) distance = String.format(java.util.Locale.ROOT, "%.1f", from.distance(to));
-                if (support != null) attitude = String.valueOf(support.getAttitude(self, target, store));
-                if (combat != null) canDamage = String.valueOf(combat.getCanCauseDamage(self, target, store));
-            }
-            String line = "[+" + seconds + "s] " + name(self, store) + " state=" + FightManager.stateOf(self, store)
-                    + " alive=" + BattleManager.isAlive(self, store)
-                    + " frozen=" + (store.getComponent(self, com.hypixel.hytale.server.core.entity.Frozen.getComponentType()) != null)
-                    + " attacking=" + (combat != null && combat.isExecutingAttack())
-                    + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
-                    + " ordered=" + name(ordered, store) + " locked=" + name(locked, store)
-                    + " distance=" + distance + " attitude=" + attitude + " vanillaCanDamage=" + canDamage;
+            String line = "[+" + seconds + "s] " + name(self, store) + aiFields(self, store);
             send(player, store, line);
             MobBattlePlugin.log("Battle debug " + line);
         }
+    }
+
+    /**
+     * The AI part of a snapshot line, starting with " state=": state, alive, frozen, attacking, battle, ordered and
+     * locked target, distance, attitude, vanilla canDamage. Read-only; shared with the Debug Wand's inspect.
+     */
+    static String aiFields(Ref<EntityStore> self, Store<EntityStore> store) {
+        var battle = BattleManager.battleOf(self);
+        var marked = MarkedEntitySupport.get(self, store);
+        var locked = marked != null ? marked.getMarkedEntityRef(FightManager.TARGET_SLOT) : null;
+        var ordered = battle != null ? battle.targets.get(self) : FightManager.enemyOf(self);
+        var combat = CombatSupport.get(self, store);
+        var support = WorldSupport.get(self, store);
+        var target = ordered != null && ordered.isValid() ? ordered : locked;
+        String distance = "?", attitude = "?", canDamage = "?";
+        if (target != null && target.isValid() && target.getStore() == store) {
+            var from = ChaosWand.positionOf(self, store);
+            var to = ChaosWand.positionOf(target, store);
+            if (from != null && to != null) distance = String.format(java.util.Locale.ROOT, "%.1f", from.distance(to));
+            if (support != null) attitude = String.valueOf(support.getAttitude(self, target, store));
+            if (combat != null) canDamage = String.valueOf(combat.getCanCauseDamage(self, target, store));
+        }
+        return " state=" + FightManager.stateOf(self, store)
+                + " alive=" + BattleManager.isAlive(self, store)
+                + " frozen=" + (store.getComponent(self, com.hypixel.hytale.server.core.entity.Frozen.getComponentType()) != null)
+                + " attacking=" + (combat != null && combat.isExecutingAttack())
+                + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
+                + " ordered=" + name(ordered, store) + " locked=" + name(locked, store)
+                + " distance=" + distance + " attitude=" + attitude + " vanillaCanDamage=" + canDamage;
     }
 
     private static String name(Ref<EntityStore> ref, Store<EntityStore> store) {

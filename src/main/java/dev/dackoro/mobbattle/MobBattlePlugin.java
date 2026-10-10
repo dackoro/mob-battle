@@ -17,10 +17,16 @@ public class MobBattlePlugin extends JavaPlugin {
     private static final java.util.Set<java.util.UUID> WELCOMED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static MobBattlePlugin instance;
+    private final MobBattleApi api = new MobBattleApi();
 
     public MobBattlePlugin(@Nonnull JavaPluginInit init) {
         super(init);
         instance = this;
+    }
+
+    /** Public API for trusted plugins declaring a dependency on Dackoro:Mob Battle. */
+    public static MobBattleApi getApi() {
+        return instance != null ? instance.api : null;
     }
 
     /** Asset pack key of this mod ("Dackoro:Mob Battle"), used for runtime team effects. */
@@ -43,6 +49,7 @@ public class MobBattlePlugin extends JavaPlugin {
     @Override
     protected void setup() {
         Teams.count(); // fills the default team slots
+        Perms.register();
         getCodecRegistry(Interaction.CODEC)
                 .register(SelectFighterInteraction.TYPE, SelectFighterInteraction.class, SelectFighterInteraction.CODEC)
                 .register(ClearSelectionInteraction.TYPE, ClearSelectionInteraction.class, ClearSelectionInteraction.CODEC)
@@ -66,7 +73,9 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(ArmyDisbandInteraction.TYPE, ArmyDisbandInteraction.class, ArmyDisbandInteraction.CODEC)
                 .register(WatchInteraction.Prev.TYPE, WatchInteraction.Prev.class, WatchInteraction.Prev.CODEC)
                 .register(WatchInteraction.Next.TYPE, WatchInteraction.Next.class, WatchInteraction.Next.CODEC)
-                .register(WatchInteraction.Exit.TYPE, WatchInteraction.Exit.class, WatchInteraction.Exit.CODEC);
+                .register(WatchInteraction.Exit.TYPE, WatchInteraction.Exit.class, WatchInteraction.Exit.CODEC)
+                .register(DebugInspectInteraction.TYPE, DebugInspectInteraction.class, DebugInspectInteraction.CODEC)
+                .register(DebugTrackInteraction.TYPE, DebugTrackInteraction.class, DebugTrackInteraction.CODEC);
         getEntityStoreRegistry().registerSystem(new FightDamageSystem());
         getEntityStoreRegistry().registerSystem(new ArmyPlayerDamageSystem());
         getEntityStoreRegistry().registerSystem(new PlayerBattleDamageSystem());
@@ -81,6 +90,8 @@ public class MobBattlePlugin extends JavaPlugin {
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent.class,
                 event -> {
+                    // Left while watching a battle: back from our saved spectator game mode.
+                    BattleWatch.onReady(event.getPlayerRef());
                     var player = event.getPlayer();
                     if (player == null || player.getGameMode() != com.hypixel.hytale.protocol.GameMode.Creative) {
                         return;
@@ -91,13 +102,27 @@ public class MobBattlePlugin extends JavaPlugin {
                             : null;
                     if (ref != null && WELCOMED.add(ref.getUuid())) {
                         ref.sendMessage(com.hypixel.hytale.server.core.Message.raw(
-                                "Dackoro's Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all ten wands. "
-                                + "Besides help, everything is configurable: effects, timers, results and more (see /mobbattle settings).")
+                                "Dackoro's Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all thirteen wands. "
+                                + "Everything is configurable (effects, cameras, timers, rules, teams, summon list, presets) "
+                                + "in the settings window: /mobbattle config, or with commands.")
                                 .color("#ffd23e"));
                     }
                 });
 
         getLogger().at(Level.INFO).log("Mob Battle loaded (interactions: "
                 + SelectFighterInteraction.TYPE + ", " + ClearSelectionInteraction.TYPE + ")");
+    }
+
+    @Override
+    protected void shutdown() {
+        // Player-side state first (spectator mode, cameras, forced music, HUDs); onReady covers anyone missed.
+        BattleWatch.exitAll();
+        FightCamera.stopAll();
+        BattleMusic.stopAll();
+        DuelCard.clearAll();
+        MobBattleApi.shutdown();
+        super.shutdown();
+        WELCOMED.clear();
+        instance = null;
     }
 }

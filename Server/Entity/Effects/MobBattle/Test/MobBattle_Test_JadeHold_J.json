@@ -1,0 +1,21 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): even jade over the whole model (Jade1A held), texture shows, no glow",
+  "Infinite": true,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_JadeHold_J",
+    "EntityTopTint": "#7dffa0",
+    "EntityBottomTint": "#2f8f55",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

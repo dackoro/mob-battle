@@ -27,6 +27,7 @@ public class SummonToggleInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        if (!Perms.interactionAllowed(context, Perms.CONFIG)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         PlayerRef player = buffer != null ? buffer.getComponent(context.getEntity(), PlayerRef.getComponentType()) : null;
         if (player == null) {

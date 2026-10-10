@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): purple veins only (no recolor), slow pulse",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 3.0,
+  "AnimationRange": {
+    "X": 0.2,
+    "Y": 0.8
+  },
+  "CurveType": "Linear",
+  "LoopOption": "LoopMirror",
+  "HighlightColor": "#c77dff",
+  "HighlightThickness": 1.2,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 60.0,
+    "Y": 60.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.03
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}

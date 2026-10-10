@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): shimmer melt: head and feet flow into the middle and vanish",
+  "SwitchTo": "Disappear",
+  "EffectDirection": "ToCenter",
+  "AnimationDuration": 1.2,
+  "AnimationRange": {
+    "X": 0.0,
+    "Y": 1.0
+  },
+  "CurveType": "Linear",
+  "LoopOption": "PlayOnce",
+  "HighlightColor": "#d9a6ff",
+  "HighlightThickness": 3.0,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 200.0,
+    "Y": 200.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.1,
+    "Y": -0.3
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}

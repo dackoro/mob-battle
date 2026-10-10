@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.entity.component.EntityScaleComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.Modifier;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
@@ -112,6 +113,8 @@ final class Buffs {
     }
 
     private static final Map<Ref<EntityStore>, State> STATES = new ConcurrentHashMap<>();
+    /** Lone targets buffed during the countdown, before their battle exists (pruned with STATES in prune). */
+    private static final java.util.Set<Ref<EntityStore>> PRE_LONE = ConcurrentHashMap.newKeySet();
 
     static {
         reset();
@@ -166,9 +169,26 @@ final class Buffs {
 
     // ---- sources ----
 
+    /**
+     * Everyone vs one: the lone buff from the start of the countdown, so the target is already big and tough when
+     * the mobs around it (maybe right next to it) start hitting. Taken again with {@link #cancelPreLone}.
+     */
+    static void preLone(Ref<EntityStore> mob) {
+        if (mob == null || !mob.isValid()) return;
+        PRE_LONE.add(mob);
+        set(mob, Source.LONE, 1);
+    }
+
+    /** The countdown was cancelled (or its battle never started): the early lone buff goes. */
+    static void cancelPreLone(Ref<EntityStore> mob) {
+        if (mob == null || !PRE_LONE.remove(mob)) return;
+        set(mob, Source.LONE, 0);
+    }
+
     /** Puts (weight > 0) or takes (0) one source on a mob; its looks and stats follow on its world thread. */
     static void set(Ref<EntityStore> mob, Source source, int weight) {
         if (mob == null || !mob.isValid()) return;
+        if (source == Source.LONE && weight <= 0) PRE_LONE.remove(mob);
         if (weight > 0 && !enabled(source) && !STATES.containsKey(mob)) {
             // e.g. buff lone heal on with no lone buff: the picked target is still healed.
             if (heals(source)) run(mob, store -> fill(mob, store));
@@ -184,13 +204,16 @@ final class Buffs {
                     return;
                 }
                 // Queued just before its battle ended (e.g. the last kill): a battle-only buff would then never go.
-                if (source.battleOnly() && BattleManager.battleOf(mob) == null) return;
+                if (source.battleOnly() && BattleManager.battleOf(mob) == null
+                        && !(source == Source.LONE && PRE_LONE.contains(mob))) return;
                 // Same weight (a streak already at maxKills): nothing to redo, no new model sent.
                 if (s != null && Integer.valueOf(weight).equals(s.weight.get(source))) return;
                 if (s == null) STATES.put(mob, s = new State());
                 s.weight.put(source, weight);
             }
             apply(mob, s, heals(source) && weight > 0, store);
+            // The mob can die in the same tick: its position can't be read any more.
+            if (!mob.isValid()) return;
             // The gold swirl (buffColor) when a Buff Wand click or a duel win buffs it; a moment after apply, since
             // the size change rebuilds the mob on the client and would drop a swirl put on now.
             if (weight > 0 && (source == Source.WAND || source == Source.CHAMPION)) {
@@ -244,8 +267,14 @@ final class Buffs {
             // its extra max health still goes. The bigger model can't be told apart from its own after a restart.
             EntityStatMap stats = mob.isValid() ? accessor.getComponent(mob, EntityStatMap.getComponentType()) : null;
             if (stats != null) {
-                stats.removeModifier(DefaultEntityStatTypes.getHealth(), MODIFIER_KEY);
-                stats.removeModifier(DefaultEntityStatTypes.getHealth(), OLD_MODIFIER_KEY);
+                int index = DefaultEntityStatTypes.getHealth();
+                EntityStatValue before = stats.get(index);
+                float oldValue = before != null ? before.get() : 0;
+                boolean had = stats.removeModifier(index, MODIFIER_KEY) != null;
+                had |= stats.removeModifier(index, OLD_MODIFIER_KEY) != null;
+                // As apply: the health it had, cut to the smaller max.
+                EntityStatValue after = stats.get(index);
+                if (had && oldValue > 0 && after != null && after.getMax() > 0) stats.setStatValue(index, Math.min(oldValue, after.getMax()));
             }
             // A size buff left on it goes too (saved with it; otherwise only the builder tools scale entities).
             EntityScaleComponent scale = mob.isValid() ? accessor.getComponent(mob, EntityScaleComponent.getComponentType()) : null;
@@ -296,12 +325,13 @@ final class Buffs {
     /** Brings the mob's model, health modifier and crown in line with its sources. World thread. */
     private static void apply(Ref<EntityStore> mob, State s, boolean fillHealth, ComponentAccessor<EntityStore> accessor) {
         if (!mob.isValid()) {
-            STATES.remove(mob);
+            STATES.remove(mob, s);
             return;
         }
         // Size: the entity scale (mobs and players), from the one it had before the first buff.
         int size = total(s, Stat.SIZE);
         EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
+        float scaleBefore = scale != null ? scale.getScale() : 1f;
         if (size > 0) {
             // Always 1, not the current scale: a size buff saved with the mob before a restart/reload is still on it
             // (our state isn't saved), and taking that scale as the base made it grow again on every new buff
@@ -314,33 +344,56 @@ final class Buffs {
             if (scale != null) scale.setScale(s.baseScale);
             s.baseScale = null;
         }
+        EntityScaleComponent scaleNow = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
+        float scaled = scaleNow != null ? scaleNow.getScale() : 1f;
+        // A new scale rebuilds the mob on the client and drops the particles on it (WandFx.MODEL_SETTLE_MS).
+        boolean resized = Math.abs(scaled - scaleBefore) > 0.001f;
+        // Same for a Jade/Shimmer look (Effect Wand): LookKeeper puts it on again after the rebuild.
+        if (resized) LookKeeper.resized(mob);
         // Health.
         int health = total(s, Stat.HEALTH);
         EntityStatMap stats = accessor.getComponent(mob, EntityStatMap.getComponentType());
         if (stats != null) {
             int index = DefaultEntityStatTypes.getHealth();
+            // A bigger max keeps health's share of it: a full mob stays full at once instead of regenerating the
+            // extra slowly (heal on fills it). A smaller max (buff lowered or gone) keeps the health it had, cut to
+            // the new max: hits taken while buffed came out of the extra, so 500/1000 becomes 100/100, not 50/100.
+            EntityStatValue before = stats.get(index);
+            float share = before != null && before.getMax() > 0 ? before.get() / before.getMax() : -1;
+            float oldMax = before != null ? before.getMax() : 0, oldValue = before != null ? before.get() : 0;
+            boolean changed = false;
             if (health > 0) {
                 stats.putModifier(index, MODIFIER_KEY, new StaticModifier(Modifier.ModifierTarget.MAX,
                         StaticModifier.CalculationType.MULTIPLICATIVE, 1 + health / 100f));
-                if (fillHealth) stats.maximizeStatValue(index);
                 s.health = true;
+                changed = true;
             } else if (s.health) {
                 stats.removeModifier(index, MODIFIER_KEY);
                 s.health = false;
+                changed = true;
+            }
+            if (changed) {
+                EntityStatValue after = stats.get(index);
+                if (fillHealth && health > 0) stats.maximizeStatValue(index);
+                else if (share > 0 && after != null && after.getMax() > 0) {
+                    stats.setStatValue(index, after.getMax() >= oldMax ? share * after.getMax() : Math.min(oldValue, after.getMax()));
+                }
             }
         }
         // Crown on streak, champion and wand-buffed mobs (the lone target has its own, /mobbattle crown).
         boolean crowned = !"off".equals(crown) && (s.weight.containsKey(Source.STREAK) || s.weight.containsKey(Source.CHAMPION)
                 || s.weight.containsKey(Source.WAND));
-        String want = crowned ? "CrownBuff_" + crown : null;
+        // Sized to the mob (attached particles don't grow with the entity scale): CrownBuff_<color>_S200 at x2.
+        String want = crowned ? "CrownBuff_" + crown + WandFx.crownSize(scaled) : null;
         if (s.crownFx != null && !s.crownFx.equals(want)) {
             WandFx.removeFx(mob, s.crownFx, accessor);
             s.crownFx = null;
         }
-        if (want != null && !want.equals(s.crownFx)) {
-            WandFx.addFx(mob, want, accessor);
+        if (want != null && (!want.equals(s.crownFx) || resized)) {
             s.crownFx = want;
             s.crownAt = System.currentTimeMillis();
+            if (resized) crownLater(mob, s, want);
+            else WandFx.addFx(mob, want, accessor);
         }
         // Wand, streak and champion buffs: their tint and aura stay while the buff lasts (scripts/gen-bufflook.py).
         boolean looks = s.weight.containsKey(Source.STREAK) || s.weight.containsKey(Source.CHAMPION)
@@ -354,7 +407,7 @@ final class Buffs {
             WandFx.addFx(mob, look, accessor);
             s.lookFx = look;
         }
-        if (s.weight.isEmpty()) STATES.remove(mob);
+        if (s.weight.isEmpty()) STATES.remove(mob, s);
     }
 
     /** "size +20%, health +40%" for that many Buff Wand stacks (each stat capped at its max). */
@@ -373,6 +426,11 @@ final class Buffs {
         return !STATES.isEmpty();
     }
 
+    /** True if the mob (or player) has any buff state. False for null. */
+    static boolean has(Ref<EntityStore> ref) {
+        return ref != null && STATES.containsKey(ref);
+    }
+
     /**
      * A hit: more from a buffed attacker, less to a buffed victim. enemies = the two are battle enemies (every
      * source counts); otherwise only the Buff Wand's.
@@ -386,9 +444,21 @@ final class Buffs {
         return amount;
     }
 
+    /** The crown, put on again once a size change has reached the client (it would drop one put on now). */
+    private static void crownLater(Ref<EntityStore> mob, State s, String fx) {
+        Store<EntityStore> store = mob.getStore();
+        if (store.isShutdown()) return;
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> run(mob, st -> {
+            if (!mob.isValid() || !fx.equals(s.crownFx)) return;
+            WandFx.removeFx(mob, fx, st);
+            WandFx.addFx(mob, fx, st);
+        }), WandFx.MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
     /** BattleManager.maintain: drops dead or unloaded mobs. */
     static void prune() {
         STATES.keySet().removeIf(r -> !r.isValid());
+        PRE_LONE.removeIf(r -> !r.isValid());
         if (sparksEvery <= 0) return;
         long now = System.currentTimeMillis();
         STATES.forEach((mob, s) -> {

@@ -29,47 +29,84 @@ final class BattleMusic {
     /** Time for a countdown's battle to register before the music is stopped for having no battle. */
     private static final long GRACE_MS = 2000;
 
-    /** Battle owner -> the players hearing their music. */
+    /** Player owner UUID or ownerless event UUID -> the players hearing that music. */
     private static final Map<UUID, Set<UUID>> LISTENERS = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> STARTED = new ConcurrentHashMap<>();
+    private static final Set<UUID> EVENT_SESSIONS = ConcurrentHashMap.newKeySet();
+    /** Session -> battle kind of its music (stopSilenced: only the kinds whose music is now off). */
+    private static final Map<UUID, BattleManager.Kind> KINDS = new ConcurrentHashMap<>();
 
     private BattleMusic() {
     }
 
     /** Music for {@code owner}'s fight and its title viewers. From a world thread (the wand or tick buffer). */
     static void start(BattleManager.Kind kind, PlayerRef owner, ComponentAccessor<EntityStore> buffer) {
+        start(kind, owner, null, buffer);
+    }
+
+    static void start(BattleManager.Kind kind, PlayerRef owner, BattleManager.Battle.Anchor anchor,
+                      ComponentAccessor<EntityStore> buffer) {
         String track = KindFx.musicTrack(kind);
-        if (track == null || owner == null || !owner.isValid()) {
+        if (track == null || owner != null && !owner.isValid()
+                || owner == null && (anchor == null || anchor.world() == null)) {
             return;
         }
         int index = MusicContainer.getAssetMap().getIndex(track);
         if (index <= 0) {
             return;
         }
-        Set<UUID> listeners = LISTENERS.computeIfAbsent(owner.getUuid(), k -> ConcurrentHashMap.newKeySet());
-        for (PlayerRef viewer : FightFx.titleViewers(owner)) {
+        UUID session = owner != null ? owner.getUuid() : anchor.eventId();
+        if (owner == null) EVENT_SESSIONS.add(session);
+        Set<UUID> listeners = LISTENERS.computeIfAbsent(session, k -> ConcurrentHashMap.newKeySet());
+        List<PlayerRef> viewers = owner != null ? FightFx.titleViewers(owner)
+                : FightFx.eventViewers(anchor, FxSettings.titleScope);
+        for (PlayerRef viewer : viewers) {
             if (set(viewer, index, buffer)) listeners.add(viewer.getUuid());
         }
-        STARTED.put(owner.getUuid(), System.currentTimeMillis());
+        if (kind != null) KINDS.put(session, kind);
+        STARTED.put(session, System.currentTimeMillis());
     }
 
     /**
-     * Once per second (BattleManager.maintain): stops the music of owners with no battle and no countdown left.
+     * Once per second (BattleManager.maintain): stops music when its battle/event and countdown have ended.
      * Polling instead of hooking every way a battle ends (winner, stop, new order, unloaded world).
      */
     static void maintain() {
         if (LISTENERS.isEmpty()) return;
         long now = System.currentTimeMillis();
-        for (UUID owner : LISTENERS.keySet()) {
-            if (now - STARTED.getOrDefault(owner, 0L) < GRACE_MS) continue;
-            boolean busy = Countdown.hasPendingFor(owner)
+        for (UUID session : LISTENERS.keySet()) {
+            if (now - STARTED.getOrDefault(session, 0L) < GRACE_MS) continue;
+            boolean busy = EVENT_SESSIONS.contains(session) ? Countdown.hasPendingEvent(session)
+                    || BattleManager.battles().stream().anyMatch(b -> !b.over && b.anchor != null
+                    && session.equals(b.anchor.eventId()))
+                    : Countdown.hasPendingFor(session)
                     || BattleManager.battles().stream().anyMatch(b -> !b.over && b.owner() != null
-                    && owner.equals(b.owner().getUuid()));
+                    && session.equals(b.owner().getUuid()));
             if (busy) continue;
-            Set<UUID> listeners = LISTENERS.remove(owner);
-            STARTED.remove(owner);
+            Set<UUID> listeners = LISTENERS.remove(session);
+            STARTED.remove(session);
+            EVENT_SESSIONS.remove(session);
+            KINDS.remove(session);
             if (listeners != null) listeners.forEach(BattleMusic::clear);
         }
+    }
+
+    /**
+     * A music setting changed (global, per kind, preset, panel): stops only the music whose kind now has no
+     * track, so a kind with its own override keeps playing when the global music is turned off.
+     */
+    static void stopSilenced() {
+        Set<UUID> silenced = new java.util.HashSet<>();
+        for (UUID session : LISTENERS.keySet()) {
+            if (KindFx.musicTrack(KINDS.get(session)) != null) continue;
+            Set<UUID> listeners = LISTENERS.remove(session);
+            STARTED.remove(session);
+            EVENT_SESSIONS.remove(session);
+            KINDS.remove(session);
+            if (listeners != null) silenced.addAll(listeners);
+        }
+        // After every removal: clear() keeps the music of anyone still listed in another session.
+        silenced.forEach(BattleMusic::clear);
     }
 
     /** Stops every battle music (/mobbattle music off). */
@@ -79,6 +116,8 @@ final class BattleMusic {
         LISTENERS.values().forEach(all::addAll);
         LISTENERS.clear();
         STARTED.clear();
+        EVENT_SESSIONS.clear();
+        KINDS.clear();
         all.forEach(BattleMusic::clear);
     }
 

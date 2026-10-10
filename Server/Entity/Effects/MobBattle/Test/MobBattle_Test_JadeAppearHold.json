@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): jade appearing (1 s), ends exactly on the JadeOnce_C look: chain JadeAppearC>JadeOnce_C",
+  "Infinite": true,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_JadeAppearC",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

@@ -33,6 +33,7 @@ public class HealInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        if (!Perms.interactionAllowed(context)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         Ref<EntityStore> target = context.getTargetEntity();
         if (buffer == null || target == null || !target.isValid()) {

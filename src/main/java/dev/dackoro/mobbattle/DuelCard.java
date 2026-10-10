@@ -53,7 +53,8 @@ final class DuelCard extends CustomUIHud {
         return FxSettings.duelCard && (BattleManager.hasBattles() || Countdown.hasPending());
     }
 
-    private record Duel(PlayerRef owner, List<Ref<EntityStore>> fighters) {
+    /** A duel and who sees its card (the owner's title viewers; for an ownerless server event, its audience). */
+    private record Duel(List<PlayerRef> viewers, List<Ref<EntityStore>> fighters) {
     }
 
     /** Once per second per world (BattleLifecycleSystem, world thread). */
@@ -63,15 +64,15 @@ final class DuelCard extends CustomUIHud {
         if (FxSettings.duelCard) {
             List<Duel> duels = new ArrayList<>();
             for (Countdown.PendingDuel d : Countdown.pendingDuels()) {
-                if (d.store() == store) duels.add(new Duel(d.player(), d.mobs()));
+                if (d.store() == store) duels.add(new Duel(FightFx.titleViewers(d.player()), d.mobs()));
             }
             for (BattleManager.Battle b : BattleManager.battles()) {
-                if (b.over || b.store != store || b.kind != BattleManager.Kind.DUEL || b.owner() == null) continue;
+                if (b.over || b.store != store || b.kind != BattleManager.Kind.DUEL) continue;
                 List<Ref<EntityStore>> members = new ArrayList<>(b.members());
-                if (members.size() == 2) duels.add(new Duel(b.owner(), members));
+                if (members.size() == 2) duels.add(new Duel(FightFx.titleViewers(b), members));
             }
             for (Duel d : duels) {
-                for (PlayerRef p : FightFx.titleViewers(d.owner())) {
+                for (PlayerRef p : d.viewers()) {
                     // A /mobbattle watch spectator has the watch card in the same spot.
                     if (p.isValid() && !BattleWatch.isWatching(p)) want.put(p.getUuid(), d);
                 }

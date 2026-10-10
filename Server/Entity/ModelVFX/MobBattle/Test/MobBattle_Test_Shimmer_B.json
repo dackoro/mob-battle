@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): thin fast purple rays running over the body",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 1.5,
+  "AnimationRange": {
+    "X": 0.1,
+    "Y": 0.9
+  },
+  "CurveType": "Linear",
+  "LoopOption": "Loop",
+  "HighlightColor": "#d9a6ff",
+  "HighlightThickness": 0.6,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 100.0,
+    "Y": 100.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.08
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}

@@ -87,6 +87,11 @@ public final class MorphWand {
         return new Copy(mc.getModel().getModelAssetId(), mc.getModel().getScale());
     }
 
+    /** The model the entity had before its first morph (read-only, for the Debug Wand), or null. */
+    static synchronized Model originalOf(Ref<EntityStore> entity) {
+        return ORIGINALS.get(entity);
+    }
+
     /** Puts the model on the entity. Returns false if the model asset or the entity's model is missing. */
     public static synchronized boolean apply(Ref<EntityStore> entity, Copy copy, ComponentAccessor<EntityStore> accessor) {
         ModelAsset asset = ModelAsset.getAssetMap().getAsset(copy.modelId());

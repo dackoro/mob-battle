@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): glowing marbled jade (whole model is highlight, bloom)",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 0.6,
+  "AnimationRange": {
+    "X": 0.0,
+    "Y": 0.5
+  },
+  "CurveType": "Linear",
+  "LoopOption": "PlayOnce",
+  "HighlightColor": "#5dff8a",
+  "HighlightThickness": 60.0,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": true,
+  "NoiseScale": {
+    "X": 40.0,
+    "Y": 40.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.0
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}

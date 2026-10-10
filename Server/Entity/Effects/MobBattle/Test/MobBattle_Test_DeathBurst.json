@@ -1,0 +1,31 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): shimmer death step 2: bursts from the middle into purple liquid",
+  "Duration": 0.4,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_DeathBurst",
+    "EntityTopTint": "#b98cff",
+    "EntityBottomTint": "#3a1a5c",
+    "Particles": [
+      {
+        "SystemId": "Potion_Morph_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#a24bff"
+      },
+      {
+        "SystemId": "Water_Splash",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#8a3dff"
+      },
+      {
+        "SystemId": "Item_Break_GlassMagic",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#c77dff"
+      }
+    ]
+  }
+}

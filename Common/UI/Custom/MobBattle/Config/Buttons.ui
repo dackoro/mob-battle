@@ -1,0 +1,15 @@
+$C = "../../Common.ui";
+
+// Up to four buttons side by side (presets, reset groups); unused ones stay hidden.
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 38, Bottom: 8);
+
+  $C.@SmallSecondaryTextButton #B0 { @Text = ""; FlexWeight: 1; Visible: false; }
+  Group { Anchor: (Width: 8); }
+  $C.@SmallSecondaryTextButton #B1 { @Text = ""; FlexWeight: 1; Visible: false; }
+  Group { Anchor: (Width: 8); }
+  $C.@SmallSecondaryTextButton #B2 { @Text = ""; FlexWeight: 1; Visible: false; }
+  Group { Anchor: (Width: 8); }
+  $C.@SmallSecondaryTextButton #B3 { @Text = ""; FlexWeight: 1; Visible: false; }
+}

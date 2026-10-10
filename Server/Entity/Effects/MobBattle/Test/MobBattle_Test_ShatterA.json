@@ -1,0 +1,25 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): jade shatter: big shards breaking from the middle, glowing jade edges",
+  "Duration": 0.9,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_ShatterA",
+    "EntityTopTint": "#7dffa0",
+    "EntityBottomTint": "#2f8f55",
+    "Particles": [
+      {
+        "SystemId": "Block_Break_Crystal",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#4fd37e"
+      },
+      {
+        "SystemId": "Block_Gem_Sparks",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#7dffa0"
+      }
+    ]
+  }
+}

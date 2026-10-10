@@ -1,0 +1,49 @@
+$C = "../../Common.ui";
+
+// Pick a value, then press the button (add a team or a mob, Morph Wand model, join a team, save a preset).
+// The label is on its own line so the controls fit; #Preview shows the picked mob/model's icon when used.
+Group {
+  LayoutMode: Top;
+  Anchor: (Bottom: 8);
+
+  Label #Label {
+    Anchor: (Left: 6, Right: 8, Height: 24);
+    Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center, Wrap: true);
+  }
+
+  Group #Line {
+    LayoutMode: Left;
+    Anchor: (Height: 52, Left: 6);
+
+    AssetImage #Preview {
+      Visible: false;
+      Anchor: (Width: 48, Height: 48, Right: 10);
+      FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+    }
+
+    $C.@TextField #Name {
+      @Anchor = (Width: 170, Right: 8, Top: 6);
+      PlaceholderText: "Name";
+      Visible: false;
+    }
+
+    $C.@DropdownBox #Input {
+      Anchor: (Width: 280, Top: 9, Right: 8, Height: 32);
+      ShowSearchInput: true;
+    }
+
+    $C.@TextField #Count {
+      @Anchor = (Width: 80, Right: 8, Top: 6);
+      Visible: false;
+    }
+
+    $C.@DropdownBox #Extra {
+      Anchor: (Width: 160, Top: 9, Right: 8, Height: 32);
+      Visible: false;
+    }
+
+    $C.@SmallSecondaryTextButton #Button {
+      @Anchor = (Width: 130, Top: 9);
+    }
+  }
+}

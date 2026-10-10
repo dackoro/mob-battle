@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): living jade: patches breathe, glowing edge moves",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 2.5,
+  "AnimationRange": {
+    "X": 0.6,
+    "Y": 1.0
+  },
+  "CurveType": "Linear",
+  "LoopOption": "LoopMirror",
+  "HighlightColor": "#b6ffcc",
+  "HighlightThickness": 1.5,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 40.0,
+    "Y": 40.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.05
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.8
+}

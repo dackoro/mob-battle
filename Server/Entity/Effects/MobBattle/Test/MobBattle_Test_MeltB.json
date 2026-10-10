@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): shimmer melt: head and feet flow into the middle and vanish",
+  "Duration": 1.2,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_MeltB",
+    "EntityTopTint": "#b98cff",
+    "EntityBottomTint": "#3a1a5c",
+    "Particles": [
+      {
+        "SystemId": "Item_Break_GlassMagic",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#a24bff"
+      }
+    ]
+  }
+}

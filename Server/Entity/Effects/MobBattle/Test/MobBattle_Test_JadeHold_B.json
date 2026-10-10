@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): Jade2A held for good, stronger jade (fixed threshold 0.8)",
+  "Infinite": true,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_JadeHold_B",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

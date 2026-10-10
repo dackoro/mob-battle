@@ -73,6 +73,13 @@ final class FightCamera {
         for (PlayerRef viewer : FightFx.cameraViewers(owner)) introFor(kind, viewer, center, sides, buffer);
     }
 
+    static void intro(BattleManager.Kind kind, BattleManager.Battle.Anchor anchor, Vector3d center,
+                      List<List<Ref<EntityStore>>> sides, ComponentAccessor<EntityStore> buffer) {
+        for (PlayerRef viewer : FightFx.eventViewers(anchor, FxSettings.cameraScope)) {
+            introFor(kind, viewer, center, sides, buffer);
+        }
+    }
+
     private static void introFor(BattleManager.Kind kind, PlayerRef player, Vector3d center,
                                  List<List<Ref<EntityStore>>> sides, ComponentAccessor<EntityStore> buffer) {
         // Never let a camera problem break the fight that called it.
@@ -130,6 +137,12 @@ final class FightCamera {
     static void ending(BattleManager.Kind kind, PlayerRef owner, Ref<EntityStore> focus,
                        ComponentAccessor<EntityStore> buffer) {
         for (PlayerRef viewer : FightFx.cameraViewers(owner)) endingFor(kind, viewer, focus, buffer);
+    }
+
+    static void ending(BattleManager.Battle battle, Ref<EntityStore> focus,
+                       ComponentAccessor<EntityStore> buffer) {
+        if (battle == null) return;
+        for (PlayerRef viewer : FightFx.cameraViewers(battle)) endingFor(battle.kind, viewer, focus, buffer);
     }
 
     private static void endingFor(BattleManager.Kind kind, PlayerRef player, Ref<EntityStore> focus,
@@ -261,8 +274,14 @@ final class FightCamera {
                 Vector3d at = new Vector3d(c.x + dx / len * dist, c.y + 2.5 + spread * 0.25, c.z + dz / len * dist);
                 // Hold on the first one, then sweep across the rest.
                 double u = (double) t / each;
-                int idx = members.size() == 1 || u < HOLD ? 0
-                        : 1 + (int) Math.min(members.size() - 2, (u - HOLD) / (1 - HOLD) * (members.size() - 1));
+                // Few stops, each kept at least FOCUS_HOLD_MS (evenly spread over the team): one stop per member made
+                // the look-at jump many times a second in a big team.
+                int idx = 0;
+                if (members.size() > 1 && u >= HOLD) {
+                    int steps = (int) Math.max(1, Math.min(members.size() - 1, (long) (each * (1 - HOLD)) / FOCUS_HOLD_MS));
+                    int stop = (int) Math.min(steps - 1, (u - HOLD) / (1 - HOLD) * steps);
+                    idx = 1 + stop * (members.size() - 1) / steps;
+                }
                 Vector3d look = track.pos(members.get(idx), acc);
                 if (look == null) look = c;
                 return frame(at, new Vector3d(look.x, look.y + 1.2, look.z), DUEL_LERP);
@@ -303,25 +322,40 @@ final class FightCamera {
             double eye = track.eye(target, acc);
             return closeUp(q, track.yaw(target, acc), eye, -0.3 + 0.6 * t / first, Math.max(3, eye * 2.2), eye * 0.9 + 0.4);
         }));
+        // The attacker in front of the camera, kept at least FOCUS_HOLD_MS: picking the closest one every frame made
+        // the camera jump from one to another many times a second in a big crowd.
+        @SuppressWarnings("unchecked")
+        Ref<EntityStore>[] held = new Ref[1];
+        long[] heldSince = {-FOCUS_HOLD_MS};
         shots.add(new Shot(circle, (t, acc) -> {
             Vector3d c = track.pos(target, acc);
             if (c == null) return null;
             double a = a0 + FOCUS_SWEEP * t / circle;
             double x = c.x + Math.cos(a) * ring, z = c.z + Math.sin(a) * ring;
             double y = Math.max(c.y + 2.5 + ring * 0.15, ground(x, z, c.y, acc) + 2.5);
-            // The living attacker whose direction from the target is closest to the camera's.
-            Vector3d look = c;
-            double best = Double.MAX_VALUE;
-            for (Ref<EntityStore> m : crowd) {
-                if (!m.isValid() || !BattleManager.isAlive(m, acc)) continue;
-                Vector3d q = track.pos(m, acc);
-                if (q == null) continue;
-                double d = Math.abs(Math.IEEEremainder(Math.atan2(q.z - c.z, q.x - c.x) - a, Math.PI * 2));
-                if (d < best) {
-                    best = d;
-                    look = q;
+            boolean keep = held[0] != null && held[0].isValid() && BattleManager.isAlive(held[0], acc)
+                    && t - heldSince[0] < FOCUS_HOLD_MS;
+            if (!keep) {
+                // The living attacker whose direction from the target is closest to the camera's.
+                Ref<EntityStore> pick = null;
+                double best = Double.MAX_VALUE;
+                for (Ref<EntityStore> m : crowd) {
+                    if (!m.isValid() || !BattleManager.isAlive(m, acc)) continue;
+                    Vector3d q = track.pos(m, acc);
+                    if (q == null) continue;
+                    double d = Math.abs(Math.IEEEremainder(Math.atan2(q.z - c.z, q.x - c.x) - a, Math.PI * 2));
+                    if (d < best) {
+                        best = d;
+                        pick = m;
+                    }
                 }
+                if (pick != held[0]) heldSince[0] = t;
+                held[0] = pick;
             }
+            Vector3d q = held[0] != null ? track.pos(held[0], acc) : null;
+            // Halfway between that attacker and the target: the target never leaves the shot, and a change of
+            // attacker only moves the view half as far.
+            Vector3d look = q == null ? c : new Vector3d((q.x + c.x) / 2, (q.y + c.y) / 2, (q.z + c.z) / 2);
             return frame(new Vector3d(x, y, z), new Vector3d(look.x, look.y + 1.2, look.z), DUEL_LERP);
         }));
         playShots(player, buffer.getExternalData().getWorld(), shots);
@@ -492,25 +526,46 @@ final class FightCamera {
         long id = SEQ.incrementAndGet();
         SHOT.put(uuid, id);
         ORBITS.remove(uuid);
-        long start = 0;
-        for (Shot shot : shots) {
-            for (long t = 0; t < shot.ms(); t += STEP_MS) {
-                long local = t;
-                schedule(uuid, id, start + t, () -> world.execute(() -> {
-                    if (!Long.valueOf(id).equals(SHOT.get(uuid))) return;
-                    ServerCameraSettings s = shot.frame().at(local, world.getEntityStore().getStore());
-                    if (s != null) send(player, s);
-                }));
+        long total = 0;
+        for (Shot shot : shots) total += shot.ms();
+        long end = total;
+        // One frame task at a time, each scheduling the next: a 30 s camera to a whole world of viewers used to
+        // queue 600 tasks per viewer up front. A newer sequence (or a cut) stops the chain at its next step.
+        Runnable[] step = new Runnable[1];
+        long[] at = {0};
+        step[0] = () -> {
+            long t = at[0];
+            if (t >= end) {
+                ServerCameraSettings back = behindPlayer(player);
+                if (back != null) send(player, back);
+                schedule(uuid, id, BACK_MS, () -> {
+                    if (SHOT.remove(uuid, id)) reset(player);
+                });
+                return;
             }
-            start += shot.ms();
-        }
-        schedule(uuid, id, start, () -> {
-            ServerCameraSettings back = behindPlayer(player);
-            if (back != null) send(player, back);
-        });
-        schedule(uuid, id, start + BACK_MS, () -> {
-            if (SHOT.remove(uuid, id)) reset(player);
-        });
+            long start = 0;
+            Shot current = shots.get(shots.size() - 1);
+            for (Shot shot : shots) {
+                if (t < start + shot.ms()) {
+                    current = shot;
+                    break;
+                }
+                start += shot.ms();
+            }
+            Shot shot = current;
+            long local = t - start;
+            // Viewer gone or moved to another world: end the chain here, so no further frame is queued.
+            if (!viewerIn(player, world)) { SHOT.remove(uuid, id); return; }
+            world.execute(() -> {
+                if (!Long.valueOf(id).equals(SHOT.get(uuid))) return;
+                if (!viewerIn(player, world)) { SHOT.remove(uuid, id); return; }
+                ServerCameraSettings s = shot.frame().at(local, world.getEntityStore().getStore());
+                if (s != null) send(player, s);
+            });
+            at[0] = t + STEP_MS;
+            schedule(uuid, id, STEP_MS, step[0]);
+        };
+        schedule(uuid, id, 0, step[0]);
     }
 
     /** Shot 0: close on A from B's side; 1: close on B from A's side; 2: both from the side. */
@@ -545,6 +600,8 @@ final class FightCamera {
     private static final int MAX_TEAM_SHOTS = 6;
     /** Focus: how far the camera circles the target (radians, about 200 degrees). */
     private static final double FOCUS_SWEEP = 3.5;
+    /** Focus circle: the attacker it looks at is kept at least this long. */
+    private static final long FOCUS_HOLD_MS = 1500;
     /** Drone: height over a fighter it dives past, side offset (so it passes beside, not over), ground clearance. */
     private static final double DRONE_LOW = 3.5;
     private static final double DRONE_SIDE = 5;
@@ -616,6 +673,13 @@ final class FightCamera {
         }, delayMs, TimeUnit.MILLISECONDS);
     }
 
+    /** The viewer is still online and their entity is in this world's store (a shot ends when they are not). */
+    private static boolean viewerIn(PlayerRef player, com.hypixel.hytale.server.core.universe.world.World world) {
+        if (!player.isValid()) return false;
+        Ref<EntityStore> ref = player.getReference();
+        return ref != null && ref.isValid() && ref.getStore() == world.getEntityStore().getStore();
+    }
+
     private static void send(PlayerRef player, ServerCameraSettings settings) {
         if (player.isValid()) {
             player.getPacketHandler().writeNoCache(new SetServerCamera(ClientCameraView.Custom, true, settings));
@@ -647,6 +711,7 @@ final class FightCamera {
 
     /** BattleManager.maintain: forgets orbits and intros that already ended. */
     static void prune() {
+        SKIP_HINTED.removeIf(id -> com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(id) == null);
         if (ORBITS.isEmpty() && INTROS.isEmpty()) return;
         long now = System.currentTimeMillis();
         ORBITS.values().removeIf(end -> end <= now);

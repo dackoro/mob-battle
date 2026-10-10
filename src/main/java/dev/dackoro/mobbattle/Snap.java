@@ -183,15 +183,15 @@ final class Snap {
      */
     static void applyPlayers(com.hypixel.hytale.component.Store<EntityStore> store, long now) {
         if (QUEUE.isEmpty()) return;
-        for (Map.Entry<Ref<EntityStore>, Entry> e : QUEUE.entrySet()) {
-            Ref<EntityStore> ref = e.getKey();
-            if (!ref.isValid() || ref.getStore() != store || now < e.getValue().due()
-                    || !PLAYERS.contains(ref) || !QUEUE.remove(ref, e.getValue())) {
+        for (Ref<EntityStore> ref : PLAYERS) {
+            Entry e = QUEUE.get(ref);
+            if (e == null || !ref.isValid() || ref.getStore() != store || now < e.due()
+                    || !PLAYERS.contains(ref) || !QUEUE.remove(ref, e)) {
                 continue;
             }
             PLAYERS.remove(ref);
             if (PlayerFighters.isCreative(ref, store)) {
-                done(e.getValue().wave());
+                done(e.wave());
                 continue;
             }
             if (BattleManager.isAlive(ref, store)) {
@@ -199,7 +199,7 @@ final class Snap {
                 WandFx.killPlayer(ref, WandFx.SNAP_DUST, WandFx.SNAP_DUST_MS, store);
                 WandFx.ashDrift(ref, store);
             }
-            done(e.getValue().wave());
+            done(e.wave());
         }
     }
 

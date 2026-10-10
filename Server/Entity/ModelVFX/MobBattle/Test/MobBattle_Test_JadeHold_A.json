@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): Jade2A held for good (Loop, fixed threshold 0.5)",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 1.0,
+  "AnimationRange": {
+    "X": 0.5,
+    "Y": 0.5
+  },
+  "CurveType": "Linear",
+  "LoopOption": "Loop",
+  "HighlightColor": "#5dff8a",
+  "HighlightThickness": 60.0,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": true,
+  "NoiseScale": {
+    "X": 40.0,
+    "Y": 40.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.0
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}

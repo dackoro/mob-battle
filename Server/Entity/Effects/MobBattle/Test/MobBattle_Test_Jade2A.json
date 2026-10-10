@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): glowing marbled jade (whole model is highlight, bloom)",
+  "Duration": 60,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_Jade2A",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeDot_Jade",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeDot_Jade",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

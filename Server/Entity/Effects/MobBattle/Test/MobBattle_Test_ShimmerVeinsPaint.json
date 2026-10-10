@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): pulsing purple veins with the shader turning part of the body purple (patches below the veins)",
+  "Infinite": true,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_ShimmerVeinsPaint",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Violet",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Violet",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

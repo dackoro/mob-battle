@@ -229,6 +229,8 @@ final class Army {
 
     /** Blocks from the owner after which an army mob that isn't fighting is teleported back next to them. */
     static final double TELEPORT_DISTANCE = 20;
+    /** Blocks up or down from the owner's height within which the teleport spot must be (FightFx.standableY). */
+    private static final int STAND_RANGE = 6;
 
     /**
      * Once per second per world (BattleLifecycleSystem, on the world thread): army mobs follow their owner.
@@ -252,7 +254,6 @@ final class Army {
             var mt = store.getComponent(me, tType);
             if (mt == null) return;
             org.joml.Vector3d p = new org.joml.Vector3d(mt.getPosition());
-            java.util.function.DoubleBinaryOperator floor = null;
             for (Ref<EntityStore> npc : mobs) {
                 if (!BattleManager.isAlive(npc, store)) continue;
                 var entity = store.getComponent(npc, npcType);
@@ -261,11 +262,12 @@ final class Army {
                 entity.setLeashPoint(new org.joml.Vector3d(p));
                 if (!isFree(npc, store)
                         || t.getPosition().distanceSquared(p) < TELEPORT_DISTANCE * TELEPORT_DISTANCE) continue;
-                if (floor == null) floor = FightFx.floorBelow(p.y, store);
                 double angle = rnd.nextDouble(Math.PI * 2), dist = 2 + rnd.nextDouble(2);
                 double x = p.x + Math.cos(angle) * dist, z = p.z + Math.sin(angle) * dist;
-                double y = floor.applyAsDouble(x, z);
-                org.joml.Vector3d to = new org.joml.Vector3d(x, Double.isFinite(y) ? y - 0.25 : p.y, z);
+                // A standable spot nearest the owner's height; none in reach: no teleport this second.
+                double y = FightFx.standableY(x, z, p.y, STAND_RANGE, store);
+                if (!Double.isFinite(y)) continue;
+                org.joml.Vector3d to = new org.joml.Vector3d(x, y, z);
                 store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
                         com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
                                 new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f)));

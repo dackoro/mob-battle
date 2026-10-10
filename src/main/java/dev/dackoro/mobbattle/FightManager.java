@@ -109,18 +109,24 @@ public final class FightManager {
     }
 
     /** Ignore other rounds and allies, even when the role's natural sensors would pick them. */
+    /**
+     * {@code full}: also the pass over every managed mob (O(managed), so FightTickSystem runs it only when battle
+     * membership changed or every half minute; the IGNORE it sets lasts HOSTILE_SECONDS anyway).
+     */
     static void refreshBattleIsolation(Ref<EntityStore> self, BattleManager.Battle battle,
-                                       ComponentAccessor<EntityStore> accessor) {
+                                       ComponentAccessor<EntityStore> accessor, boolean full) {
         if (!BattleManager.isAlive(self, accessor)) return;
         WorldSupport world = WorldSupport.get(self, accessor);
         if (world == null) return;
         StateSupport state = StateSupport.get(self, accessor);
         boolean hasCombat = combatStateOf(state) != null;
-        for (Ref<EntityStore> other : BattleManager.managed()) {
-            if (!other.isValid() || other.getStore() != self.getStore() || same(self, other)) continue;
-            boolean opponent = battle != null ? battle.has(other) && battle.team(other) != battle.team(self)
-                    : isFighting(self, other);
-            if (!opponent) tryOverride(world, other, Attitude.IGNORE, HOSTILE_SECONDS, hasCombat);
+        if (full) {
+            for (Ref<EntityStore> other : BattleManager.managed()) {
+                if (!other.isValid() || other.getStore() != self.getStore() || same(self, other)) continue;
+                boolean opponent = battle != null ? battle.has(other) && battle.team(other) != battle.team(self)
+                        : isFighting(self, other);
+                if (!opponent) tryOverride(world, other, Attitude.IGNORE, HOSTILE_SECONDS, hasCombat);
+            }
         }
         MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
         Ref<EntityStore> target = marked != null ? marked.getMarkedEntityRef(TARGET_SLOT) : null;
@@ -206,13 +212,15 @@ public final class FightManager {
     /** Every NPC in a wand fight, so the per-tick check for the other NPCs is one set lookup. */
     private static volatile java.util.Set<Ref<EntityStore>> fighters = java.util.Set.of();
 
-    private static void reindex() {
+    /** Synchronized: two worlds reindexing at once could otherwise publish an older set last. */
+    private static synchronized void reindex() {
         java.util.Set<Ref<EntityStore>> set = new java.util.HashSet<>();
         for (Fight f : FIGHTS) {
             set.add(f.a());
             set.add(f.b());
         }
         fighters = set;
+        BattleManager.membershipChanged();
     }
 
     static boolean isFighter(Ref<EntityStore> npc) {

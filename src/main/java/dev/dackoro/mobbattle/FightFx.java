@@ -135,13 +135,10 @@ public final class FightFx {
      * (CancelParticleSystems with a region, as the game does it). The floor / zone shapes can't be cancelled.
      */
     private static void cancelGlow(double x, double y, double z, double radius, ComponentAccessor<EntityStore> buffer) {
-        String[] ids = Teams.PALETTE.keySet().stream()
-                .flatMap(c -> java.util.stream.Stream.of(AREA_GLOW_ID + c, AREA_GLOW_SHORT_ID + c))
-                .toArray(String[]::new);
         double r = radius + 3;
         PlayerUtil.broadcastPacketToPlayers(buffer, new com.hypixel.hytale.protocol.packets.world.CancelParticleSystems(
                 new com.hypixel.hytale.protocol.Position(x - r, y - 64, z - r),
-                new com.hypixel.hytale.protocol.Position(x + r, y + 160, z + r), ids, true));
+                new com.hypixel.hytale.protocol.Position(x + r, y + 160, z + r), GLOW_IDS, true));
     }
 
     /** Once per second per world (BattleLifecycleSystem): redraw held areas whose owner holds the Chaos Wand. */
@@ -473,6 +470,10 @@ public final class FightFx {
     public static final String AREA_GLOW_SHORT_ID = "MobBattle_AreaGlowShort_";
     /** Glow columns about every 2 blocks of the edge, capped so huge radii stay cheap. */
     public static final int GLOW_MAX_POINTS = 120;
+    /** Long and short glow ids of every palette color (cancelGlow). Teams.PALETTE is constant, so built once. */
+    private static final String[] GLOW_IDS = Teams.PALETTE.keySet().stream()
+            .flatMap(c -> java.util.stream.Stream.of(AREA_GLOW_ID + c, AREA_GLOW_SHORT_ID + c))
+            .toArray(String[]::new);
 
     /** "glow" area: tall columns of rising light along the edge, one SpawnParticleSystem packet each. */
     private static void glow(org.joml.Vector3d c, double radius, String colorName, float seconds, int fixedPoints,
@@ -528,6 +529,9 @@ public final class FightFx {
     private static final float TEAM_RING_OUTER = 1.0f;
     private static final float TEAM_RING_OPACITY = 0.6f;
     private static final int TEAM_RING_SMOOTHNESS = 32;
+    /** Parsed ring colors by hex string (teamRing runs 4 times a second per mob). Read-only once parsed. */
+    private static final java.util.Map<String, com.hypixel.hytale.protocol.Color> RING_TINT =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Solid colored ring on the ground under the mob, only for {@code player}: the game's Disc debug shape
@@ -541,7 +545,7 @@ public final class FightFx {
             return;
         }
         var c = t.getPosition();
-        var rgb = ColorParseUtil.hexStringToColor(color);
+        var rgb = RING_TINT.computeIfAbsent(color, ColorParseUtil::hexStringToColor);
         var tint = new org.joml.Vector3f((rgb.red & 255) / 255f, (rgb.green & 255) / 255f, (rgb.blue & 255) / 255f);
         var m = new org.joml.Matrix4d().translate(c.x(), c.y() + 0.08, c.z());
         float[] data = new float[16];
@@ -612,10 +616,23 @@ public final class FightFx {
         }
     }
 
+    /** Ownerless event title; recipients are resolved from the battle's immutable world/center anchor. */
+    static void title(BattleManager.Battle battle, String main, String sub) {
+        if (battle != null && KindFx.startTitle(battle.kind)) {
+            for (PlayerRef viewer : titleViewers(battle)) showTitle(viewer, main, sub);
+        }
+    }
+
     /** Winner titles have their own switch (winTitle of that kind), independent of fight-start titles. */
     public static void winnerTitle(BattleManager.Kind kind, PlayerRef player, String main, String sub) {
         if (KindFx.winTitle(kind)) {
             for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub, true);
+        }
+    }
+
+    static void winnerTitle(BattleManager.Battle battle, String main, String sub) {
+        if (battle != null && KindFx.winTitle(battle.kind)) {
+            for (PlayerRef viewer : titleViewers(battle)) showTitle(viewer, main, sub, true);
         }
     }
 
@@ -642,6 +659,11 @@ public final class FightFx {
         return out;
     }
 
+    static java.util.List<PlayerRef> titleViewers(BattleManager.Battle battle) {
+        if (battle == null) return java.util.List.of();
+        return battle.owner() != null ? titleViewers(battle.owner()) : scopeViewers(battle.anchor, FxSettings.titleScope);
+    }
+
     /** The owner and, per /mobbattle titleScope, the players near them or in their world. */
     private static java.util.List<PlayerRef> scopeViewers(PlayerRef owner) {
         return scopeViewers(owner, FxSettings.titleScope);
@@ -650,6 +672,15 @@ public final class FightFx {
     /** /mobbattle cameraScope: who gets {@code owner}'s fight cameras (owner, nearby or world). */
     static java.util.List<PlayerRef> cameraViewers(PlayerRef owner) {
         return scopeViewers(owner, FxSettings.cameraScope);
+    }
+
+    static java.util.List<PlayerRef> cameraViewers(BattleManager.Battle battle) {
+        if (battle == null) return java.util.List.of();
+        return battle.owner() != null ? cameraViewers(battle.owner()) : scopeViewers(battle.anchor, FxSettings.cameraScope);
+    }
+
+    static java.util.List<PlayerRef> eventViewers(BattleManager.Battle.Anchor anchor, String scope) {
+        return scopeViewers(anchor, scope);
     }
 
     private static java.util.List<PlayerRef> scopeViewers(PlayerRef owner, String scope) {
@@ -667,6 +698,23 @@ public final class FightFx {
             if (nearby) {
                 var t = p.getTransform();
                 if (center == null || t == null || t.getPosition().distanceSquared(center) > max) continue;
+            }
+            out.add(p);
+        }
+        return out;
+    }
+
+    /** Ownerless `owner` scope falls back to the 64-block event audience around its launch anchor. */
+    private static java.util.List<PlayerRef> scopeViewers(BattleManager.Battle.Anchor anchor, String scope) {
+        if (anchor == null || anchor.world() == null || anchor.center() == null) return java.util.List.of();
+        boolean nearby = !"world".equals(scope);
+        double max = FxSettings.TITLE_NEARBY_BLOCKS * FxSettings.TITLE_NEARBY_BLOCKS;
+        java.util.List<PlayerRef> out = new java.util.ArrayList<>();
+        for (PlayerRef p : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
+            if (!p.isValid() || !anchor.world().equals(p.getWorldUuid())) continue;
+            if (nearby) {
+                var t = p.getTransform();
+                if (t == null || t.getPosition() == null || t.getPosition().distanceSquared(anchor.center()) > max) continue;
             }
             out.add(p);
         }
@@ -739,6 +787,10 @@ public final class FightFx {
     /** /mobbattle countdown: "3", "2", "1"... shown at once, about one second each. */
     static void countdownTitle(PlayerRef owner, int left, String label) {
         for (PlayerRef viewer : titleViewers(owner)) countdownTitleTo(viewer, left, label);
+    }
+
+    static void countdownTitle(BattleManager.Battle.Anchor anchor, int left, String label) {
+        for (PlayerRef viewer : scopeViewers(anchor, FxSettings.titleScope)) countdownTitleTo(viewer, left, label);
     }
 
     private static synchronized void countdownTitleTo(PlayerRef player, int left, String label) {

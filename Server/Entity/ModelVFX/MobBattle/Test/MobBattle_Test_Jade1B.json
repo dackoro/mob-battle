@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): solid jade, dark, almost opaque",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 0.1,
+  "AnimationRange": {
+    "X": 0.0,
+    "Y": 1.0
+  },
+  "CurveType": "Linear",
+  "LoopOption": "PlayOnce",
+  "HighlightColor": "#b6ffcc",
+  "HighlightThickness": 0.0,
+  "UseBloomOnHighlight": false,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 40.0,
+    "Y": 40.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.0
+  },
+  "PostColor": "#1f8f4a",
+  "PostColorOpacity": 0.9
+}

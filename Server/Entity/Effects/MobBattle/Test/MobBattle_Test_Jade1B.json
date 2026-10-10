@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): solid jade, dark, almost opaque",
+  "Duration": 60,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_Jade1B",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeDot_Jade",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeDot_Jade",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

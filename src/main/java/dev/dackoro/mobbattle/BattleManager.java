@@ -4,6 +4,7 @@ import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
@@ -55,10 +56,27 @@ public final class BattleManager {
     }
 
     public static final class Battle {
+        /** Stable presentation anchor for server-launched battles that have no player owner. */
+        record Anchor(UUID world, Vector3d center, UUID eventId) {
+            Anchor(UUID world, Vector3d center) {
+                this(world, center, UUID.randomUUID());
+            }
+
+            Anchor {
+                center = center == null ? null : new Vector3d(center);
+                eventId = eventId == null ? UUID.randomUUID() : eventId;
+            }
+
+            public Vector3d center() {
+                return center == null ? null : new Vector3d(center);
+            }
+        }
+
         final UUID id = UUID.randomUUID();
         /** Set from the constructor; SelectFighterInteraction marks its 2-mob royale as a DUEL. */
         volatile Kind kind;
         final PlayerRef owner;
+        final Anchor anchor;
         final boolean royale;
         /** Chaos Wand "EVERYONE vs X": the target's name (side 1, alone) vs everyone else (side 0); else null. */
         final String focusName;
@@ -73,6 +91,10 @@ public final class BattleManager {
         final Map<Ref<EntityStore>, Integer> teamOf = new ConcurrentHashMap<>();
         /** Member -> its current target. */
         final Map<Ref<EntityStore>, Ref<EntityStore>> targets = new ConcurrentHashMap<>();
+        /** selfDefense: member -> the enemy that last hit it (FightDamageSystem), read once by FightTickSystem. */
+        final Map<Ref<EntityStore>, Ref<EntityStore>> hitBy = new ConcurrentHashMap<>();
+        /** selfDefense: member -> when it last turned on an attacker (no switching back and forth). */
+        final Map<Ref<EntityStore>, Long> turnedAt = new ConcurrentHashMap<>();
         /** (flock, member) pairs refreshed once per second, so pets can join without scanning every member. */
         volatile List<Ref<EntityStore>[]> flocks = List.of();
         /** Safety deadline; an arena timer longer than MAX_MILLIS pushes it past its own end (Arena.setup). */
@@ -80,6 +102,11 @@ public final class BattleManager {
         /** Next winner check; only touched by the battle's own world thread. */
         long nextCheck;
         volatile boolean over;
+        final java.util.concurrent.atomic.AtomicBoolean finishOnce = new java.util.concurrent.atomic.AtomicBoolean();
+        volatile MobBattleApi.EndReason eventEndReason;
+        /** -2 = not a winner result, -1 = explicit draw, otherwise winning team index. */
+        volatile int eventWinnerSide = -2;
+        volatile List<UUID> eventWinners = List.of();
         /** Time up with timeUp continue or kill: the end gets no winner title. */
         volatile boolean silent;
         /** A living fighter was unloaded with its chunk (BattleUnloadSystem): checkWinner cancels it, no winner. */
@@ -123,7 +150,12 @@ public final class BattleManager {
         }
 
         Battle(PlayerRef owner, boolean royale, String focusName) {
+            this(owner, null, royale, focusName);
+        }
+
+        Battle(PlayerRef owner, Anchor anchor, boolean royale, String focusName) {
             this.owner = owner;
+            this.anchor = anchor;
             this.royale = royale;
             this.focusName = focusName;
             this.kind = focusName != null ? Kind.ALL_VS_ONE : royale ? Kind.ROYALE : Kind.TEAMS;
@@ -133,6 +165,7 @@ public final class BattleManager {
             if (store == null) store = npc.getStore();
             teamOf.put(npc, team);
             MANAGED.add(npc);
+            MEMBERSHIP.incrementAndGet();
         }
 
         String name(int team) { return team >= 0 && team < names.length && names[team] != null ? names[team] : "?"; }
@@ -167,13 +200,20 @@ public final class BattleManager {
 
     private static final List<Battle> BATTLES = new CopyOnWriteArrayList<>();
     private static final Set<Ref<EntityStore>> MANAGED = ConcurrentHashMap.newKeySet();
+    /** Bumped on every battle join: FightTickSystem redoes the full "ignore the rest" pass when it changes. */
+    private static final java.util.concurrent.atomic.AtomicLong MEMBERSHIP = new java.util.concurrent.atomic.AtomicLong();
+
+    static long membership() { return MEMBERSHIP.get(); }
+    /** Wand fights (FightManager) change who is fighting whom too. */
+    static void membershipChanged() { MEMBERSHIP.incrementAndGet(); }
 
     /** Some draft has mobs (refreshed by maintain, set right away when one is added). */
     private static volatile boolean draftMembers;
     /** Some battle member belongs to a flock, so new pets may need to join (refreshed once per second). */
     private static volatile boolean anyFlocks;
 
-    static boolean isManaged(Ref<EntityStore> npc) { return MANAGED.contains(npc); }
+    /** Every battle member is managed (add), so a hit between two unmanaged entities needs no battle lookup. */
+    static boolean isManaged(Ref<EntityStore> npc) { return npc != null && MANAGED.contains(npc); }
     static Set<Ref<EntityStore>> managed() { return MANAGED; }
 
     /**
@@ -207,6 +247,8 @@ public final class BattleManager {
         if (b == null) return null;
         b.teamOf.remove(player);
         b.targets.remove(player);
+        b.hitBy.remove(player);
+        b.turnedAt.remove(player);
         FightManager.endFightsOf(List.of(player));
         releasePlayer(player);
         return b;
@@ -247,6 +289,8 @@ public final class BattleManager {
      * battles, or players for the mobs' hits). Players can always hit battle mobs: only NPC sources get here.
      */
     public static boolean blocksDamage(Ref<EntityStore> x, Ref<EntityStore> y) {
+        // Per hit: wild vs wild never walks the battle list.
+        if (!isManaged(x) && !isManaged(y)) return false;
         Battle a = battleOf(x), b = battleOf(y);
         if (a != null && a == b) {
             // Allies never pick each other as targets; with /mobbattle friendlyfire on, stray hits still hurt.
@@ -277,12 +321,13 @@ public final class BattleManager {
         Snap.prune();
         Army.prune();
         Buffs.prune();
+        SummonDespawn.maintain();
         BattleMusic.maintain();
         for (Battle battle : BATTLES) {
             // World unloaded (e.g. a closed instance): its tick will never run checkWinner again. A live world
             // handles its own empty battles there, with the "DRAW!" announcement.
             if (battle.store == null || battle.store.isShutdown()) {
-                finish(battle);
+                finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.UNLOAD, -2);
                 MobBattlePlugin.log("Battle dropped: its world was unloaded");
             }
         }
@@ -304,6 +349,7 @@ public final class BattleManager {
         FightManager.prune();
         TeamFx.prune();
         MorphWand.prune();
+        EyeRecolor.prune();
         FightFx.pruneTitles();
         FightFx.pruneHeldAreas();
         Countdown.prune();
@@ -341,8 +387,27 @@ public final class BattleManager {
 
     /** keepLook: winners whose team look stays WINNER_LOOK_SECONDS longer. */
     private static void finish(Battle battle, List<Ref<EntityStore>> formerMembers, Set<Ref<EntityStore>> keepLook) {
+        finish(battle, formerMembers, keepLook, null, -2);
+    }
+
+    /** False if another thread already finished it (stop, new order) and this call did nothing. */
+    private static boolean finish(Battle battle, List<Ref<EntityStore>> formerMembers, Set<Ref<EntityStore>> keepLook,
+                                  MobBattleApi.EndReason reason, int winnerSide) {
+        if (!battle.finishOnce.compareAndSet(false, true)) return false;
+        if (reason != null) battle.eventEndReason = reason;
+        if (winnerSide != -2) battle.eventWinnerSide = winnerSide;
         battle.over = true;
         BATTLES.remove(battle);
+        try {
+            cleanUp(battle, formerMembers, keepLook);
+        } finally {
+            // Whatever failed above, an API event still ends (else it stays RUNNING for good).
+            publishApiResult(battle);
+        }
+        return true;
+    }
+
+    private static void cleanUp(Battle battle, List<Ref<EntityStore>> formerMembers, Set<Ref<EntityStore>> keepLook) {
         killSummary(battle);
         List<Ref<EntityStore>> all = battle.snapshot();
         // An intro camera still filming this battle ends with it (the end camera keeps playing).
@@ -351,6 +416,9 @@ public final class BattleManager {
         // The lone and streak buffs go (formerMembers: a mob may have just been detached), and the lone target's crown.
         for (Ref<EntityStore> r : formerMembers) Buffs.endBattle(r);
         if (battle.kind == Kind.ALL_VS_ONE) WandFx.removeCrownsLater(formerMembers);
+        // summonDespawn battleEnd: the surviving summons that fought here leave (each claimed once).
+        SummonDespawn.battleEnded(all);
+        SummonDespawn.battleEnded(formerMembers);
         for (Ref<EntityStore> npc : all) {
             if (!npc.isValid()) continue;
             if (isPlayerFighter(npc)) {
@@ -371,6 +439,29 @@ public final class BattleManager {
         }
     }
 
+    private static void publishApiResult(Battle battle) {
+        if (battle.anchor == null || battle.anchor.eventId() == null) return;
+        MobBattleApi.EndReason reason = battle.eventEndReason != null ? battle.eventEndReason
+                : battle.abandoned ? MobBattleApi.EndReason.UNLOAD : MobBattleApi.EndReason.STOPPED;
+        List<UUID> winners = reason == MobBattleApi.EndReason.WIN || reason == MobBattleApi.EndReason.TIMEOUT
+                ? battle.eventWinners : List.of();
+        Integer side = (reason == MobBattleApi.EndReason.WIN || reason == MobBattleApi.EndReason.TIMEOUT)
+                && battle.eventWinnerSide >= 0 ? battle.eventWinnerSide : null;
+        MobBattleApi.terminal(battle.anchor.eventId(), reason, winners,
+                side);
+    }
+
+    static boolean stopEvent(UUID eventId) {
+        if (eventId == null) return false;
+        for (Battle battle : new ArrayList<>(BATTLES)) {
+            if (battle.anchor != null && eventId.equals(battle.anchor.eventId())) {
+                finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.STOPPED, -2);
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean inDraft(Ref<EntityStore> npc) {
         for (Draft d : DRAFTS.values()) if (d.teamOf(npc) >= 0) return true;
         return false;
@@ -381,7 +472,7 @@ public final class BattleManager {
 
     /** At the end: the top 3 killers in chat, to the owner and the player fighters (one line, any battle size). */
     private static void killSummary(Battle battle) {
-        if (battle.kills.isEmpty() || battle.owner() == null) return;
+        if (battle.kills.isEmpty()) return;
         StringBuilder line = new StringBuilder("Most kills: ");
         int place = 1;
         for (Kills k : battle.topKillers(3)) {
@@ -389,7 +480,7 @@ public final class BattleManager {
             line.append(place++).append(". ").append(k.name().replace('_', ' ')).append(" (").append(k.count()).append(')');
         }
         Message msg = Message.raw(line.toString()).color("#ffd23e");
-        for (PlayerRef p : FightFx.titleViewers(battle.owner())) {
+        for (PlayerRef p : FightFx.titleViewers(battle)) {
             if (p.isValid()) p.sendMessage(msg);
         }
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " kills by side " + battle.killsBy + " | " + line);
@@ -399,10 +490,18 @@ public final class BattleManager {
     public static int stopAll() {
         int n = 0;
         for (Battle battle : new ArrayList<>(BATTLES)) {
-            finish(battle);
+            finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.STOPPED, -2);
             n++;
         }
         return n;
+    }
+
+    /** Plugin shutdown or unload: every battle ends (wand battles too, so their mobs calm down if the worlds go on). */
+    static void shutdownEvents() {
+        for (Battle battle : new ArrayList<>(BATTLES)) {
+            finish(battle, battle.snapshot(), Set.of(),
+                    battle.anchor != null ? MobBattleApi.EndReason.SHUTDOWN : MobBattleApi.EndReason.STOPPED, -2);
+        }
     }
 
     /** Empties every player's teams and removes the team look. Returns how many mobs were in a team. */
@@ -442,7 +541,7 @@ public final class BattleManager {
 
     /** True if both are in the same battle on different sides (their hits must never be filtered). */
     public static boolean areEnemies(Ref<EntityStore> x, Ref<EntityStore> y) {
-        if (x == null || y == null || BATTLES.isEmpty()) {
+        if (BATTLES.isEmpty() || !isManaged(x) || !isManaged(y)) {
             return false;
         }
         Battle b = battleOf(x);
@@ -460,24 +559,34 @@ public final class BattleManager {
         // The newest wand order wins, but only for the mobs it touches: they leave their battle and
         // the rest keep fighting (anyone targeting them picks a new enemy, see currentTarget).
         for (Battle b : BATTLES) {
-            boolean touched = false;
             List<Ref<EntityStore>> opponents = null;
+            List<Ref<EntityStore>> left = null;
             for (Ref<EntityStore> npc : npcs) {
                 if (!b.has(npc)) continue;
-                if (opponents == null) opponents = b.snapshot();
+                if (opponents == null) {
+                    opponents = b.snapshot();
+                    left = new ArrayList<>();
+                }
                 if (!isPlayerFighter(npc)) FightManager.queueStop(npc, opponents);
                 b.teamOf.remove(npc);
                 b.targets.remove(npc);
-                touched = true;
+                b.hitBy.remove(npc);
+                b.turnedAt.remove(npc);
+                left.add(npc);
             }
-            if (!touched) {
+            if (left == null) {
                 continue;
             }
             // Fewer than 2 sides left: nothing to win, end it silently.
             long sides = b.teamOf.values().stream().distinct().count();
             if (sides < 2) {
-                finish(b, opponents);
+                finish(b, opponents, Set.of(), MobBattleApi.EndReason.REPLACED, -2);
                 MobBattlePlugin.log("Battle ended: its mobs got new wand orders");
+            } else {
+                // The battle goes on without them: what finish does for its members, only for the ones that left
+                // (lone/streak buff, the lone target's crown). Its intro keeps filming the rest.
+                for (Ref<EntityStore> r : left) Buffs.endBattle(r);
+                if (b.kind == Kind.ALL_VS_ONE) WandFx.removeCrownsLater(left);
             }
         }
     }
@@ -519,8 +628,17 @@ public final class BattleManager {
 
     /** Starts/replaces a duel, or merges only the connected duels in accumulated mode. */
     static Battle startDuel(PlayerRef owner, Ref<EntityStore> a, Ref<EntityStore> b, boolean accumulate) {
+        return startDuel(owner, null, a, b, accumulate);
+    }
+
+    static Battle startDuel(Battle.Anchor anchor, Ref<EntityStore> a, Ref<EntityStore> b) {
+        return startDuel(null, anchor, a, b, false);
+    }
+
+    private static Battle startDuel(PlayerRef owner, Battle.Anchor anchor, Ref<EntityStore> a, Ref<EntityStore> b,
+                                    boolean accumulate) {
         if (!accumulate) {
-            Battle duel = startRoyale(owner, List.of(a, b));
+            Battle duel = startRoyale(owner, anchor, List.of(a, b));
             duel.kind = Kind.DUEL;
             return duel;
         }
@@ -533,7 +651,7 @@ public final class BattleManager {
             else if (old != null) leaveOtherBattles.add(selected);
         }
         detach(leaveOtherBattles);
-        Battle duel = new Battle(owner, true);
+        Battle duel = new Battle(owner, anchor, true, null);
         duel.kind = Kind.DUEL;
         int nextSide = 0;
         for (Battle old : previous) {
@@ -551,6 +669,9 @@ public final class BattleManager {
             // Transfer membership without stopping the former participants or declaring a winner.
             old.over = true;
             BATTLES.remove(old);
+            if (old.anchor != null && old.finishOnce.compareAndSet(false, true)) {
+                MobBattleApi.terminal(old.anchor.eventId(), MobBattleApi.EndReason.REPLACED, List.of(), null);
+            }
         }
         if (!duel.has(a)) duel.add(a, nextSide++);
         if (!duel.has(b)) duel.add(b, nextSide++);
@@ -575,7 +696,7 @@ public final class BattleManager {
         for (Battle b : new ArrayList<>(BATTLES)) {
             if (b.kind != Kind.ALL_VS_ONE && b.kind != Kind.ROYALE) continue;
             if (b.snapshot().stream().anyMatch(mine::contains)) {
-                finish(b);
+                finish(b, b.snapshot(), Set.of(), MobBattleApi.EndReason.REPLACED, -2);
                 MobBattlePlugin.log("Battle ended: a new Chaos Wand battle took its mobs");
             }
         }
@@ -583,9 +704,17 @@ public final class BattleManager {
 
     /** Starts a battle royale: every NPC for itself. */
     public static Battle startRoyale(PlayerRef owner, List<Ref<EntityStore>> npcs) {
+        return startRoyale(owner, null, npcs);
+    }
+
+    static Battle startRoyale(Battle.Anchor anchor, List<Ref<EntityStore>> npcs) {
+        return startRoyale(null, anchor, npcs);
+    }
+
+    private static Battle startRoyale(PlayerRef owner, Battle.Anchor anchor, List<Ref<EntityStore>> npcs) {
         detach(npcs);
         FightManager.endFightsOf(npcs);
-        Battle battle = new Battle(owner, true);
+        Battle battle = new Battle(owner, anchor, true, null);
         for (int i = 0; i < npcs.size(); i++) {
             battle.add(npcs.get(i), i);
         }
@@ -596,11 +725,21 @@ public final class BattleManager {
     /** Chaos Wand focus: every attacker (allies, side 0) vs the target (side 1), so the end gets a winner title. */
     public static Battle startFocus(PlayerRef owner, Ref<EntityStore> target, String targetName,
                                     List<Ref<EntityStore>> attackers) {
+        return startFocus(owner, null, target, targetName, attackers);
+    }
+
+    static Battle startFocus(Battle.Anchor anchor, Ref<EntityStore> target, String targetName,
+                             List<Ref<EntityStore>> attackers) {
+        return startFocus(null, anchor, target, targetName, attackers);
+    }
+
+    private static Battle startFocus(PlayerRef owner, Battle.Anchor anchor, Ref<EntityStore> target,
+                                     String targetName, List<Ref<EntityStore>> attackers) {
         List<Ref<EntityStore>> all = new ArrayList<>(attackers);
         all.add(target);
         detach(all);
         FightManager.endFightsOf(all);
-        Battle battle = new Battle(owner, false, targetName);
+        Battle battle = new Battle(owner, anchor, false, targetName);
         for (Ref<EntityStore> npc : attackers) {
             battle.add(npc, 0);
             battle.targets.put(npc, target);
@@ -676,6 +815,30 @@ public final class BattleManager {
         return target;
     }
 
+    /** selfDefense: after turning on an attacker, a mob keeps it at least this long (another hit can't pull it away). */
+    private static final long SELF_DEFENSE_MS = 3000;
+
+    /**
+     * selfDefense (FightTickSystem, world thread): the enemy that hit {@code self} becomes its target, unless it
+     * already is, it is gone, or {@code self} turned on someone less than {@link #SELF_DEFENSE_MS} ago while that
+     * one is still standing. Like Army.defend for Army Wand mobs. Returns true if the target changed.
+     */
+    static boolean selfDefense(Battle battle, Ref<EntityStore> self, ComponentAccessor<EntityStore> buffer) {
+        Ref<EntityStore> by = battle.hitBy.remove(self);
+        if (by == null || by == self || !FxSettings.selfDefense(battle.kind) || !by.isValid() || !battle.has(by)
+                || battle.team(by) == battle.team(self) || !isAlive(by, buffer)) return false;
+        Ref<EntityStore> now = battle.targets.get(self);
+        if (now == by) return false;
+        long t = System.currentTimeMillis();
+        Long last = battle.turnedAt.get(self);
+        if (last != null && t - last < SELF_DEFENSE_MS && now != null && battle.has(now) && isAlive(now, buffer)) return false;
+        battle.targets.put(self, by);
+        battle.turnedAt.put(self, t);
+        if (FxSettings.debug) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
+                + ChaosWand.nameOf(self, buffer) + " defends itself against " + ChaosWand.nameOf(by, buffer));
+        return true;
+    }
+
     /** Sets the first target of an NPC (used at battle start). */
     public static void setTarget(Battle battle, Ref<EntityStore> self, Ref<EntityStore> target) {
         battle.targets.put(self, target);
@@ -688,7 +851,7 @@ public final class BattleManager {
         }
         if (battle.abandoned) {
             // Fighters unloaded with their chunks (no player near): they didn't die, so nobody wins.
-            finish(battle);
+            finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.UNLOAD, -1);
             MobBattlePlugin.log("Battle cancelled: fighters were unloaded");
             if (!battle.silent && battle.owner != null && battle.owner.isValid()) {
                 battle.owner.sendMessage(Message.raw("Battle cancelled: some fighters were unloaded (too far from every player). No winner.").color("#aaaaaa"));
@@ -711,6 +874,20 @@ public final class BattleManager {
         if (outcome == BattleOutcome.ONGOING) {
             return;
         }
+        if (battle.eventEndReason == null) {
+            battle.eventEndReason = battle.abandoned ? MobBattleApi.EndReason.UNLOAD
+                    : outcome == BattleOutcome.TIMEOUT ? MobBattleApi.EndReason.TIMEOUT
+                    : outcome == BattleOutcome.WIN ? MobBattleApi.EndReason.WIN : MobBattleApi.EndReason.DRAW;
+        }
+        if (outcome != BattleOutcome.WIN && battle.eventEndReason == MobBattleApi.EndReason.TIMEOUT
+                && battle.eventWinnerSide >= 0) {
+            battle.eventWinnerSide = -1;
+            battle.eventWinners = List.of();
+        }
+        if (outcome == BattleOutcome.WIN && battle.eventWinnerSide == -2) {
+            battle.eventWinnerSide = aliveTeams.iterator().next();
+            battle.eventWinners = winnerUuids(battle, battle.eventWinnerSide, buffer);
+        }
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " over: " + outcome + ", sides alive " + aliveTeams
                 + ", fighters alive " + alive + ", damage by side " + battle.damageBy + (expired ? " (15 min limit)" : ""));
         Set<Ref<EntityStore>> keepLook = new HashSet<>();
@@ -720,7 +897,8 @@ public final class BattleManager {
                 if (e.getValue() == side && !isPlayerFighter(e.getKey()) && isAlive(e.getKey(), buffer)) keepLook.add(e.getKey());
             }
         }
-        finish(battle, battle.snapshot(), keepLook);
+        // Already ended from another thread (/mobbattle stop, a new order): no champion, no end messages.
+        if (!finish(battle, battle.snapshot(), keepLook, battle.eventEndReason, battle.eventWinnerSide)) return;
         // /mobbattle buff champion: the winners keep an edge (after finish, which took their battle buffs).
         if (outcome == BattleOutcome.WIN && Buffs.enabled(Buffs.Source.CHAMPION)) {
             int side = aliveTeams.iterator().next();
@@ -768,11 +946,11 @@ public final class BattleManager {
             }
         }
         MobBattlePlugin.log("Battle over: " + main + " (" + sub + ")");
-        if (battle.owner != null && battle.owner.isValid()) {
-            battle.owner.sendMessage(Message.raw(main + " " + sub).color(color));
-            FightFx.winnerTitle(battle.kind, battle.owner, main, sub);
-            if (focus != null) FightCamera.ending(battle.kind, battle.owner, focus, buffer);
+        for (PlayerRef viewer : messageViewers(battle)) {
+            if (viewer.isValid()) viewer.sendMessage(Message.raw(main + " " + sub).color(color));
         }
+        FightFx.winnerTitle(battle, main, sub);
+        if (focus != null) FightCamera.ending(battle, focus, buffer);
     }
 
     /**
@@ -812,10 +990,12 @@ public final class BattleManager {
             case KILL -> {
                 battle.silent = true;
                 battle.killAll = true;
+                battle.eventEndReason = MobBattleApi.EndReason.TIMEOUT;
+                battle.eventWinnerSide = -1;
                 announce(battle, "TIME'S UP!", "Nobody survives", "#ff6b5e");
             }
             case DRAW -> {
-                finish(battle);
+                finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.TIMEOUT, -1);
                 announce(battle, "DRAW!", "Time is up", "#aaaaaa");
             }
             case HEALTH -> healthWinner(battle, false, buffer);
@@ -825,12 +1005,18 @@ public final class BattleManager {
     }
 
     /**
-     * timeUp health: each side's score is the average of its members' remaining health in percent of their own
-     * max (the fallen count as 0%), so a 1000 HP mob doesn't win just for being big. Highest score wins; within
-     * half a percent it is a draw.
+     * timeUp health/judge, scored by judgeBy (per kind):
+     * <ul>
+     * <li>health: the average of the members' remaining health in percent of their own max (the fallen count as
+     * 0%), so a 1000 HP mob doesn't win just for being big;</li>
+     * <li>damage / kills: the side's share of all damage / kills, each side divided by its size first (20 attackers
+     * don't win against one target just for being 20);</li>
+     * <li>mix: the three averaged.</li>
+     * </ul>
+     * Highest score wins; within half a percent it goes to tieBreak.
      */
     private static void healthWinner(Battle battle, boolean judge, ComponentAccessor<EntityStore> buffer) {
-        Map<Integer, double[]> sides = new java.util.HashMap<>();   // team -> {sum of fractions, members}
+        Map<Integer, double[]> sides = new java.util.HashMap<>();   // team -> {sum of health fractions, members}
         Map<Integer, Ref<EntityStore>> anyMember = new java.util.HashMap<>();
         for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
             double[] s = sides.computeIfAbsent(e.getValue(), k -> new double[2]);
@@ -838,10 +1024,30 @@ public final class BattleManager {
             s[1]++;
             anyMember.putIfAbsent(e.getValue(), e.getKey());
         }
+        String by = FxSettings.judgeBy(battle.kind);
+        double damageTotal = 0, killTotal = 0;
+        for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
+            double members = Math.max(1, e.getValue()[1]);
+            damageTotal += battle.damageBy.getOrDefault(e.getKey(), 0.0) / members;
+            killTotal += battle.killsBy.getOrDefault(e.getKey(), 0) / members;
+        }
+        Map<Integer, Double> scores = new java.util.HashMap<>();
+        for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
+            double members = Math.max(1, e.getValue()[1]);
+            double health = e.getValue()[1] > 0 ? e.getValue()[0] / e.getValue()[1] : 0;
+            double damage = damageTotal > 0 ? battle.damageBy.getOrDefault(e.getKey(), 0.0) / members / damageTotal : 0;
+            double kills = killTotal > 0 ? battle.killsBy.getOrDefault(e.getKey(), 0) / members / killTotal : 0;
+            scores.put(e.getKey(), switch (by) {
+                case "damage" -> damage;
+                case "kills" -> kills;
+                case "mix" -> (health + damage + kills) / 3;
+                default -> health;
+            });
+        }
         int best = -1;
         double bestScore = -1, second = -1;
-        for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
-            double score = e.getValue()[1] > 0 ? e.getValue()[0] / e.getValue()[1] : 0;
+        for (Map.Entry<Integer, Double> e : scores.entrySet()) {
+            double score = e.getValue();
             if (score > bestScore) {
                 second = bestScore;
                 bestScore = score;
@@ -857,27 +1063,30 @@ public final class BattleManager {
                 sb.append(" | side ").append(e.getKey()).append(": ")
                         .append(Math.round((v[1] > 0 ? v[0] / v[1] : 0) * 1000) / 10.0).append("% of ")
                         .append((int) v[1]).append(" fighters, damage ")
-                        .append(Math.round(battle.damageBy.getOrDefault(e.getKey(), 0.0)));
+                        .append(Math.round(battle.damageBy.getOrDefault(e.getKey(), 0.0)))
+                        .append(", kills ").append(battle.killsBy.getOrDefault(e.getKey(), 0))
+                        .append(", score ").append(Math.round(scores.get(e.getKey()) * 1000) / 10.0);
             }
-            MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " time up (" + (judge ? "judge" : "health") + "):" + sb);
+            MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " time up (" + (judge ? "judge" : "health")
+                    + ", judgeBy " + by + "):" + sb);
         }
         String tie = null;
         if (best >= 0 && bestScore > 0 && bestScore - second < TIE) {
             // Even on health: /mobbattle tieBreak damage (who dealt more), random, or draw.
             java.util.List<Integer> tied = new java.util.ArrayList<>();
-            for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
-                double score = e.getValue()[1] > 0 ? e.getValue()[0] / e.getValue()[1] : 0;
-                if (bestScore - score < TIE) tied.add(e.getKey());
+            for (Map.Entry<Integer, Double> e : scores.entrySet()) {
+                if (bestScore - e.getValue() < TIE) tied.add(e.getKey());
             }
             best = breakTie(battle, tied);
+            String rule = FxSettings.tieBreak(battle.kind);
             MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": tie between sides " + tied + ", tieBreak "
-                    + FxSettings.tieBreak + " -> " + (best < 0 ? "draw" : "side " + best));
-            tie = best < 0 ? null : "damage".equals(FxSettings.tieBreak) ? "more damage dealt"
-                    : "kills".equals(FxSettings.tieBreak) ? "more kills" : "a coin toss";
+                    + rule + (rule.equals(FxSettings.tieBreak) ? "" : " (" + FxSettings.tieBreak + " = judgeBy)") + " -> " + (best < 0 ? "draw" : "side " + best));
+            tie = best < 0 ? null : "damage".equals(rule) ? "more damage dealt"
+                    : "kills".equals(rule) ? "more kills" : "a coin toss";
         }
         if (best < 0 || bestScore <= 0) {
-            finish(battle);
-            announce(battle, "DRAW!", "Time is up, even on health", "#aaaaaa");
+            finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.TIMEOUT, -1);
+            announce(battle, "DRAW!", "Time is up, even on " + judgeWord(by), "#aaaaaa");
             return;
         }
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": side " + best + " wins"
@@ -887,6 +1096,9 @@ public final class BattleManager {
             // (one side left) without a second title.
             battle.silent = true;
             battle.survivorTeam = best;
+            battle.eventEndReason = MobBattleApi.EndReason.TIMEOUT;
+            battle.eventWinnerSide = best;
+            battle.eventWinners = winnerUuids(battle, best, buffer);
             battle.killAll = true;
             for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
                 if (e.getValue() != best || !isAlive(e.getKey(), buffer)) continue;
@@ -895,7 +1107,8 @@ public final class BattleManager {
                 WandFx.onTarget(e.getKey(), WandFx.HEAL, buffer);
             }
         } else {
-            finish(battle);
+            battle.eventWinners = winnerUuids(battle, best, buffer);
+            finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.TIMEOUT, best);
         }
         String winner;
         String color = "#ffd23e";
@@ -907,13 +1120,37 @@ public final class BattleManager {
             winner = battle.name(best) + " TEAM";
             color = battle.color(best);
         }
-        String why = tie != null ? "even on health (" + Math.round(bestScore * 100) + "%), won by " + tie
-                : Math.round(bestScore * 100) + "% health left vs " + Math.round(Math.max(0, second) * 100) + "%";
+        String why = tie != null ? "even on " + judgeWord(by) + " (" + Math.round(bestScore * 100) + "%), won by " + tie
+                : Math.round(bestScore * 100) + "% " + switch (by) {
+                    case "damage" -> "of the damage";
+                    case "kills" -> "of the kills";
+                    case "mix" -> "score";
+                    default -> "health left";
+                } + " vs " + Math.round(Math.max(0, second) * 100) + "%";
         announce(battle, winner + " WINS!", (judge ? "Time is up: the losers fall. " : "Time is up: ") + why, color);
     }
 
-    /** Health scores closer than this (half a percent) are a tie. */
+    private static String judgeWord(String by) {
+        return switch (by) {
+            case "damage" -> "damage";
+            case "kills" -> "kills";
+            case "mix" -> "score";
+            default -> "health";
+        };
+    }
+
+    /** Scores closer than this (half a percent) are a tie. */
     private static final double TIE = 0.005;
+
+    private static List<UUID> winnerUuids(Battle battle, int side, ComponentAccessor<EntityStore> accessor) {
+        List<UUID> ids = new ArrayList<>();
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            if (e.getValue() != side || !isAlive(e.getKey(), accessor)) continue;
+            UUIDComponent component = accessor.getComponent(e.getKey(), UUIDComponent.getComponentType());
+            if (component != null) ids.add(component.getUuid());
+        }
+        return List.copyOf(ids);
+    }
 
     /**
      * /mobbattle tieBreak: damage = the tied side that dealt the most damage (a draw if that is even too),
@@ -921,7 +1158,7 @@ public final class BattleManager {
      */
     private static int breakTie(Battle battle, java.util.List<Integer> tied) {
         if (tied.size() < 2) return tied.isEmpty() ? -1 : tied.get(0);
-        switch (FxSettings.tieBreak) {
+        switch (FxSettings.tieBreak(battle.kind)) {
             case "random" -> {
                 return tied.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(tied.size()));
             }
@@ -962,12 +1199,16 @@ public final class BattleManager {
 
     /** A hit between enemies of the same battle (FightDamageSystem): adds to the attacker's side's damage. */
     static void recordDamage(Ref<EntityStore> attacker, Ref<EntityStore> victim, float amount) {
-        if (amount <= 0) return;
+        if (amount <= 0 || !isManaged(attacker)) return;
         Battle b = battleOf(attacker);
         if (b == null || !b.has(victim)) return;
         int team = b.team(attacker);
         if (team != b.team(victim)) {
             b.damageBy.merge(team, (double) amount, Double::sum);
+            // selfDefense: a mob hit by an enemy that isn't its target turns on it (FightTickSystem, next tick).
+            if (b.targets.get(victim) != attacker && FxSettings.selfDefense(b.kind) && !isPlayerFighter(victim)) {
+                b.hitBy.put(victim, attacker);
+            }
             Unstick.hit(attacker);
             Unstick.hurt(victim, attacker);
         }
@@ -984,10 +1225,18 @@ public final class BattleManager {
 
     private static void announce(Battle battle, String main, String sub, String color) {
         MobBattlePlugin.log("Battle: " + main + " (" + sub + ")");
-        if (battle.owner != null && battle.owner.isValid()) {
-            battle.owner.sendMessage(Message.raw(main + " " + sub).color(color));
-            FightFx.winnerTitle(battle.kind, battle.owner, main, sub);
+        for (PlayerRef viewer : messageViewers(battle)) {
+            if (viewer.isValid()) viewer.sendMessage(Message.raw(main + " " + sub).color(color));
         }
+        FightFx.winnerTitle(battle, main, sub);
+    }
+
+    /** Chat results stay owner-only for wand battles; ownerless events report to their configured spectators. */
+    private static List<PlayerRef> messageViewers(Battle battle) {
+        if (battle.owner() != null) {
+            return battle.owner().isValid() ? List.of(battle.owner()) : List.of();
+        }
+        return FightFx.titleViewers(battle);
     }
 
     // ---- Team Wand drafts: the teams a player is building before starting the battle ----
@@ -1043,6 +1292,11 @@ public final class BattleManager {
 
     /** Player UUID -> draft. Its owner is looked up by UUID (draftOwner): a PlayerRef is never kept. */
     private static final Map<UUID, Draft> DRAFTS = new ConcurrentHashMap<>();
+
+    /** The player's draft if they have one (never creates it: the settings panel only shows it). */
+    static Draft existingDraft(UUID player) {
+        return player == null ? null : DRAFTS.get(player);
+    }
 
     public static Draft draft(PlayerRef player) {
         EntityStore current = player.getReference().getStore().getExternalData();

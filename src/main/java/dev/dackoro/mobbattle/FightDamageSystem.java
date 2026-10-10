@@ -98,8 +98,11 @@ public class FightDamageSystem extends DamageEventSystem {
             return;
         }
         Ref<EntityStore> victim = chunk.getReferenceTo(index);
-        if (source.getRef().isValid() && buffer.getComponent(source.getRef(), NPCEntity.getComponentType()) != null
-                && BattleManager.blocksDamage(source.getRef(), victim)) {
+        Ref<EntityStore> attackerRef = source.getRef();
+        // No attacker entity: nothing battle-related below (and the concurrent maps reject a null key).
+        if (attackerRef == null) return;
+        if (attackerRef.isValid() && buffer.getComponent(attackerRef, NPCEntity.getComponentType()) != null
+                && BattleManager.blocksDamage(attackerRef, victim)) {
             damage.setCancelled(true);
             return;
         }

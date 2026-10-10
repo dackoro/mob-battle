@@ -1,0 +1,30 @@
+$C = "../../Common.ui";
+
+// One team of the team list: color swatch, name (rename), color, remove.
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 40, Bottom: 6);
+
+  Group #Swatch {
+    Anchor: (Width: 26, Height: 26, Top: 7, Left: 6, Right: 12);
+    Background: #808080;
+  }
+
+  $C.@TextField #Name {
+    @Anchor = (Width: 200, Right: 8);
+  }
+
+  $C.@SmallSecondaryTextButton #Rename {
+    @Text = "Rename";
+    @Anchor = (Width: 110, Top: 4, Right: 16);
+  }
+
+  $C.@DropdownBox #Color {
+    Anchor: (Width: 180, Top: 4, Right: 16, Height: 32);
+  }
+
+  $C.@SmallSecondaryTextButton #Remove {
+    @Text = "Remove";
+    @Anchor = (Width: 110, Top: 4);
+  }
+}

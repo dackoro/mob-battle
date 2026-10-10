@@ -1,0 +1,17 @@
+$C = "../../Common.ui";
+
+// A button that runs a Mob Battle command right away (lists, tools, admin).
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 38, Bottom: 6);
+
+  Label #Label {
+    FlexWeight: 1;
+    Anchor: (Left: 6, Right: 16);
+    Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center, Wrap: true);
+  }
+
+  $C.@SmallSecondaryTextButton #Button {
+    @Anchor = (Width: 230, Top: 3);
+  }
+}

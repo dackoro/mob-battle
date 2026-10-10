@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): shimmer melt: the body drains away from the head down, rippling purple edge",
+  "Duration": 1.4,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_MeltA",
+    "EntityTopTint": "#b98cff",
+    "EntityBottomTint": "#3a1a5c",
+    "Particles": [
+      {
+        "SystemId": "Item_Break_GlassMagic",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis",
+        "Color": "#a24bff"
+      }
+    ]
+  }
+}

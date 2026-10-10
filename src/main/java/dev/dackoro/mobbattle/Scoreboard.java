@@ -58,8 +58,8 @@ final class Scoreboard extends CustomUIHud {
         if (store.isShutdown()) return;
         Map<UUID, BattleManager.Battle> want = new HashMap<>();
         for (BattleManager.Battle b : BattleManager.battles()) {
-            if (b.over || b.store != store || !FxSettings.scoreboard(b.kind) || b.owner() == null) continue;
-            for (PlayerRef p : FightFx.titleViewers(b.owner())) {
+            if (b.over || b.store != store || !FxSettings.scoreboard(b.kind)) continue;
+            for (PlayerRef p : FightFx.titleViewers(b)) {
                 if (p.isValid()) want.put(p.getUuid(), b);
             }
         }

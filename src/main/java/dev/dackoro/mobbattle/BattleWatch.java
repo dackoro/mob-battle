@@ -130,12 +130,12 @@ final class BattleWatch extends CustomUIHud {
      * owner (cameraScope) start watching it, unless they fight, already watch or spectate; it ends their intro.
      */
     static void auto(BattleManager.Battle battle) {
-        if (battle == null || battle.owner() == null || battle.store == null || !KindFx.autoWatch(battle.kind)) return;
+        if (battle == null || battle.store == null || !KindFx.autoWatch(battle.kind)) return;
         Store<EntityStore> store = battle.store;
         // Game mode and camera changes outside the system iteration that started the battle.
         store.getExternalData().getWorld().execute(() -> {
             if (battle.over || store.isShutdown()) return;
-            for (PlayerRef p : FightFx.cameraViewers(battle.owner())) {
+            for (PlayerRef p : FightFx.cameraViewers(battle)) {
                 Ref<EntityStore> me = p.isValid() ? p.getReference() : null;
                 if (me == null || !me.isValid() || me.getStore() != store || WATCHING.containsKey(p.getUuid())
                         || battle.has(me) || BattleManager.isPlayerFighter(me) || Spectating.isSpectating(me, store)
@@ -163,6 +163,13 @@ final class BattleWatch extends CustomUIHud {
         }
         store.putComponent(me, Spectating.getComponentType(), new Spectating(target));
         WATCHING.put(player.getUuid(), new Watch(battle, store, at, look));
+        // Cutting that camera gives the player their normal camera back a moment later (and an orbit glides back
+        // first), after the spectator camera was attached: the client was left flying free while the server still
+        // thought it followed a fighter. Attach it again once the cut is done.
+        // Always, not only when we cut one: an intro that ends right now (duels: cameraTime 0 = the countdown, so it
+        // ends exactly when the battle starts and autoWatch runs) sends its own camera reset after ours.
+        reattachLater(player, store, REATTACH_MS);
+        reattachLater(player, store, REATTACH_LATE_MS);
         MobBattlePlugin.debug("watch: " + player.getUsername() + " watches battle #" + battle.id.toString().substring(0, 8));
         player.sendMessage(Message.raw("Watching the battle: right click = nearest fighter, left click = back to the previous one, "
                 + "mouse = turn the camera, Q = exit (or /mobbattle watch exit).").color("#ffd23e"));
@@ -218,6 +225,25 @@ final class BattleWatch extends CustomUIHud {
         acc.putComponent(me, Spectating.getComponentType(), new Spectating(next));
     }
 
+    /** After a cut camera's glide back (FightCamera.cut: 0.3 s sequence, then the camera reset). */
+    private static final long REATTACH_MS = 500;
+    /** Second try, after a camera reset that left the world queue late. */
+    private static final long REATTACH_LATE_MS = 1500;
+
+    /** Puts the watcher's Spectating again (same target), so OnSpectatingChange sends the attached camera anew. */
+    private static void reattachLater(PlayerRef player, Store<EntityStore> store, long delayMs) {
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+            if (store.isShutdown()) return;
+            store.getExternalData().getWorld().execute(() -> {
+                Ref<EntityStore> me = player.isValid() ? player.getReference() : null;
+                if (me == null || !me.isValid() || me.getStore() != store || !WATCHING.containsKey(player.getUuid())) return;
+                Spectating sp = store.getComponent(me, Spectating.getComponentType());
+                Ref<EntityStore> target = sp != null ? sp.getTargetRef() : null;
+                if (target != null && target.isValid()) store.putComponent(me, Spectating.getComponentType(), new Spectating(target));
+            });
+        }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
     /** How many fighters left click can go back through. */
     private static final int HISTORY = 32;
 
@@ -259,6 +285,21 @@ final class BattleWatch extends CustomUIHud {
         return n;
     }
 
+    /**
+     * PlayerReadyEvent: the game mode is saved with the player (PersistentGameModeType), so someone who left
+     * while watching (disconnect, server stop) comes back as our spectator with no watch behind it: give their
+     * own game mode back. Their start position is gone with the watch, so they stay where they are.
+     */
+    static void onReady(Ref<EntityStore> me) {
+        if (me == null || !me.isValid()) return;
+        Store<EntityStore> store = me.getStore();
+        store.getExternalData().getWorld().execute(() -> {
+            if (!me.isValid() || !GAME_MODE.equals(GameModeTypes.getCurrentTypeId(me, store))) return;
+            PlayerRef p = store.getComponent(me, PlayerRef.getComponentType());
+            if (p != null && !WATCHING.containsKey(p.getUuid())) exit(p, me, store);
+        });
+    }
+
     /** KillTracker: the camera of whoever watched {@code victim} goes to its {@code killer}. */
     static void onKill(Ref<EntityStore> victim, Ref<EntityStore> killer, ComponentAccessor<EntityStore> acc) {
         if (WATCHING.isEmpty() || killer == null || !killer.isValid() || killer.getStore() != victim.getStore()) return;
@@ -283,8 +324,21 @@ final class BattleWatch extends CustomUIHud {
             PlayerRef p = Universe.get().getPlayer(e.getKey());
             Ref<EntityStore> me = p != null && p.isValid() ? p.getReference() : null;
             if (me == null || !me.isValid() || me.getStore() != w.store) {
-                // Left the server or the world: nothing to give back here.
-                WATCHING.remove(e.getKey());
+                // Left the server or the world. Moved to another world still as our spectator (/tp, the watched
+                // world closed): give their game mode back there, else they keep flying through blocks.
+                if (WATCHING.remove(e.getKey(), w) && me != null && me.isValid()) {
+                    Store<EntityStore> there = me.getStore();
+                    PlayerRef player = p;
+                    there.getExternalData().getWorld().execute(() -> {
+                        if (me.isValid() && GAME_MODE.equals(GameModeTypes.getCurrentTypeId(me, there))) exit(player, me, there);
+                    });
+                }
+                continue;
+            }
+            // Still inside a world that shut down (picked up by another world's tick): never touch it with this
+            // world's store; its refs are invalidated with it.
+            if (w.store != store) {
+                WATCHING.remove(e.getKey(), w);
                 continue;
             }
             // Left our game mode some other way (/gamemode, /spectate exit): forget it.
@@ -327,8 +381,16 @@ final class BattleWatch extends CustomUIHud {
 
     // ---- picking fighters ----
 
-    /** The battle's top killer still standing, else the fighter nearest to the player. */
+    /**
+     * Everyone vs one: the lone target (the one the battle is about). Otherwise the battle's top killer still
+     * standing, else the fighter nearest to the player (a duel: the closer duelist).
+     */
     private static Ref<EntityStore> firstTarget(BattleManager.Battle b, Vector3d at, Store<EntityStore> store) {
+        if (b.kind == BattleManager.Kind.ALL_VS_ONE) {
+            for (Ref<EntityStore> r : b.members()) {
+                if (b.team(r) == 1 && r.isValid() && BattleManager.isAlive(r, store)) return r;
+            }
+        }
         Ref<EntityStore> top = topKillerAlive(b, store);
         return top != null ? top : nearestAlive(b, at, null, store);
     }

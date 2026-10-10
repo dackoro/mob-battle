@@ -29,12 +29,15 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
 
     private static final long CHECK_INTERVAL_MS = 1000;
     private static final long ISOLATION_INTERVAL_MS = 5000;
+    /** The full "ignore every other managed mob" pass, unless battle membership changed meanwhile. */
+    private static final long IGNORE_ALL_INTERVAL_MS = 30_000;
     /** Timers are keyed by entity reference, so removed mobs must be dropped or the map keeps growing. */
     private static final long PRUNE_INTERVAL_MS = 10_000;
 
     /** Last run of each periodic job for one NPC. */
     private static final class Timers {
-        long check, ring, join, isolation;
+        long check, ring, join, isolation, ignoreAll;
+        long membership = -1;
     }
 
     private final Map<Ref<EntityStore>, Timers> timers = new ConcurrentHashMap<>();
@@ -57,6 +60,8 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         boolean countdowns = Countdown.hasPending();
         boolean snaps = Snap.any();
         if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !snaps && !FightManager.hasFights()) {
+            // Nothing running anywhere: drop the timers, their Refs would keep unloaded worlds reachable.
+            if (!timers.isEmpty()) timers.clear();
             return;
         }
         Ref<EntityStore> self = chunk.getReferenceTo(entityIndex);
@@ -73,7 +78,14 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         boolean managed = BattleManager.isManaged(self);
         BattleManager.Battle battle = managed && battles ? BattleManager.battleOf(self) : null;
         if (managed && due(self, now, ISOLATION_INTERVAL_MS, t -> t.isolation, (t, v) -> t.isolation = v)) {
-            FightManager.refreshBattleIsolation(self, battle, buffer);
+            Timers t = timers.get(self);
+            long version = BattleManager.membership();
+            boolean full = t == null || t.membership != version || now - t.ignoreAll >= IGNORE_ALL_INTERVAL_MS;
+            if (full && t != null) {
+                t.membership = version;
+                t.ignoreAll = now;
+            }
+            FightManager.refreshBattleIsolation(self, battle, buffer, full);
         }
         if (battles && !managed && BattleManager.hasFlocks() && !FightManager.isFighter(self)
                 && due(self, now, CHECK_INTERVAL_MS, t -> t.join, (t, v) -> t.join = v)) {
@@ -146,7 +158,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             if (!WandFx.isDying(self)) WandFx.kill(self, null, true, buffer);
             return;
         }
-        boolean[] changed = {false};
+        boolean[] changed = {BattleManager.selfDefense(battle, self, buffer)};
         Ref<EntityStore> target = BattleManager.currentTarget(battle, self, buffer, changed);
         if (target == null) {
             return;

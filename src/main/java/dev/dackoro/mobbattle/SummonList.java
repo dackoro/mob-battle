@@ -158,6 +158,7 @@ public final class SummonList {
                     var result = npc.spawnNPC(store, e.getKey(), null, pos,
                             new Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f));
                     if (result != null && result.first() != null) {
+                        SummonDespawn.track(result.first());
                         Integer team = TEAMS.get(e.getKey());
                         if (team != null) {
                             // Spawned straight into the player's team draft (Team Wand / teams start).

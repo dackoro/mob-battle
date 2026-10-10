@@ -1,0 +1,28 @@
+$C = "../../Common.ui";
+
+// One team of the player's Team Wand draft: color, name and count, then one chip per mob type (#Chips, GalleryChip.ui).
+Group {
+  LayoutMode: Top;
+  Anchor: (Bottom: 10);
+
+  Group #Head {
+    LayoutMode: Left;
+    Anchor: (Height: 28);
+
+    Group #Swatch {
+      Anchor: (Width: 18, Height: 18, Top: 5, Left: 6, Right: 10);
+      Background: #808080;
+    }
+
+    Label #Label {
+      FlexWeight: 1;
+      Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center, RenderBold: true);
+    }
+  }
+
+  Group #Chips {
+    LayoutMode: LeftScrolling;
+    ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    Anchor: (Height: 88, Left: 6);
+  }
+}

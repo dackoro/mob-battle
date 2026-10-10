@@ -1,0 +1,21 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): thin fast purple rays running over the body",
+  "Duration": 60,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_Shimmer_B",
+    "EntityTopTint": "#b98cff",
+    "EntityBottomTint": "#3a1a5c",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Violet",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Violet",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

@@ -33,6 +33,7 @@ public class KillInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        if (!Perms.interactionAllowed(context)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         Ref<EntityStore> target = context.getTargetEntity();
         if (buffer == null || target == null || !target.isValid()) {
@@ -54,6 +55,7 @@ public class KillInteraction extends SimpleInstantInteraction {
                 player.sendMessage(Message.raw("The Kill Wand doesn't work on players. Turn it on with /mobbattle killPlayers on")
                         .color("#ffcc55"));
             }
+            context.getState().state = InteractionState.Failed;
             return;
         }
         // NPCs get the soul rip first and die after /mobbattle killdelay; anything else dies right away.

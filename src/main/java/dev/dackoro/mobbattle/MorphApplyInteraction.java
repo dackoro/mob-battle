@@ -29,6 +29,7 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        if (!Perms.interactionAllowed(context)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         PlayerRef player = buffer != null ? buffer.getComponent(context.getEntity(), PlayerRef.getComponentType()) : null;
         if (player == null) {

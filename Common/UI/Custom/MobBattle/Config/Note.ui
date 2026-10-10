@@ -1,0 +1,10 @@
+// A line of explanation inside a settings page.
+Group {
+  LayoutMode: Top;
+  Anchor: (Bottom: 8);
+
+  Label #Label {
+    Anchor: (Left: 6, Right: 8);
+    Style: (FontSize: 13, TextColor: #96a9be, Wrap: true);
+  }
+}

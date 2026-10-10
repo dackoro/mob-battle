@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): SLOW MOTION shimmer death step 2 (2 s)",
+  "SwitchTo": "Disappear",
+  "EffectDirection": "FromCenter",
+  "AnimationDuration": 2.0,
+  "AnimationRange": {
+    "X": 0.0,
+    "Y": 1.0
+  },
+  "CurveType": "Linear",
+  "LoopOption": "PlayOnce",
+  "HighlightColor": "#c77dff",
+  "HighlightThickness": 3.0,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 30.0,
+    "Y": 30.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.0
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}

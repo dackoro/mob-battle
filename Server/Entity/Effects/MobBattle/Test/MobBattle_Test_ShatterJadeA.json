@@ -1,0 +1,23 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): jade shatter that keeps the JadeOnce_C look while breaking (same noise, pieces fall where the noise is low)",
+  "Duration": 0.9,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_ShatterJadeA",
+    "Particles": [
+      {
+        "SystemId": "Block_Break_Crystal",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#4fd37e"
+      },
+      {
+        "SystemId": "Block_Gem_Sparks",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#7dffa0"
+      }
+    ]
+  }
+}

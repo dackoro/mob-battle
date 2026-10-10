@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): softer jade, texture shows (threshold 0.3, bloom)",
+  "Infinite": true,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_JadeHold_C",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

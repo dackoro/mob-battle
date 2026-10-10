@@ -1,0 +1,215 @@
+$C = "../Common.ui";
+
+// Dackoro's Mob Battle settings panel (/mobbattle config). ConfigPage.java fills the left menu (#Nav) and every
+// page (#Page0..#Page13) with the row templates in Config/. Changes are kept as a draft until "Save changes".
+$C.@DecoratedContainer {
+  @CloseButton = true;
+  Anchor: (Width: 1120, Height: 760);
+
+  #Title {
+    Group {
+      LayoutMode: Left;
+      $C.@Title {
+        @Text = "Dackoro's Mob Battle - Settings";
+        @Alignment = Center;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group #Main {
+      FlexWeight: 1;
+      LayoutMode: Left;
+
+      Group #Nav {
+        Anchor: (Width: 220);
+        LayoutMode: TopScrolling;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Padding: (Right: 8);
+      }
+
+      Group {
+        Anchor: (Width: 1);
+        Background: #2b3542;
+      }
+
+      Group #Body {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Padding: (Left: 16);
+
+        Label #PageTitle {
+          Anchor: (Height: 30);
+          Text: "";
+          Style: (FontSize: 20, TextColor: #ffffff, RenderBold: true, RenderUppercase: true, VerticalAlignment: Center);
+        }
+
+        Label #PageHint {
+          Anchor: (Bottom: 6);
+          Text: "";
+          Style: (FontSize: 13, TextColor: #96a9be, Wrap: true);
+        }
+
+        Label #ReadOnly {
+          Visible: false;
+          Anchor: (Bottom: 6);
+          Text: "Read only: changing settings needs the dackoro.mob_battle.config permission (server permission mode).";
+          Style: (FontSize: 13, TextColor: #ffcc55, Wrap: true);
+        }
+
+        Group #Pages {
+          FlexWeight: 1;
+          LayoutMode: Top;
+
+          Group #Page0 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page1 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page2 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page3 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page4 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page5 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page6 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page7 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page8 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page9 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page10 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page11 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page12 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page13 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+        }
+      }
+    }
+
+    $C.@ContentSeparator {}
+
+    Group #Footer {
+      Anchor: (Height: 48, Top: 10);
+      LayoutMode: Left;
+
+      Label #Status {
+        FlexWeight: 1;
+        Anchor: (Left: 6, Right: 12);
+        Text: "";
+        Style: (FontSize: 14, TextColor: #96a9be, VerticalAlignment: Center, Wrap: true);
+      }
+
+      $C.@SecondaryTextButton #UndoButton {
+        @Text = "Undo last save";
+        @Anchor = (Width: 200);
+      }
+
+      Group { Anchor: (Width: 10); }
+
+      $C.@SecondaryTextButton #DiscardButton {
+        @Text = "Discard changes";
+        @Anchor = (Width: 200);
+      }
+
+      Group { Anchor: (Width: 10); }
+
+      $C.@TextButton #SaveButton {
+        @Text = "Save changes";
+        @Anchor = (Width: 200);
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): eye particle system EyeDot_Violet (L-Eye and R-Eye)",
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Test_EyeDot_Violet",
+      "PositionOffset": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      }
+    }
+  ],
+  "CullDistance": 64
+}

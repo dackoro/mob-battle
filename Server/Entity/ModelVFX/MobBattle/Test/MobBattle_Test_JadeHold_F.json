@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): C with an even darker green and a bit more jade",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 1.0,
+  "AnimationRange": {
+    "X": 0.35,
+    "Y": 0.35
+  },
+  "CurveType": "Linear",
+  "LoopOption": "Loop",
+  "HighlightColor": "#237a45",
+  "HighlightThickness": 60.0,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": true,
+  "NoiseScale": {
+    "X": 40.0,
+    "Y": 40.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.0
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}

@@ -1,0 +1,14 @@
+$C = "../../Common.ui";
+
+// Section header inside a settings page.
+Group {
+  LayoutMode: Top;
+  Anchor: (Top: 12, Bottom: 8);
+
+  Label #Label {
+    Anchor: (Height: 26);
+    Style: (FontSize: 15, TextColor: #e3b341, RenderBold: true, RenderUppercase: true, VerticalAlignment: Center);
+  }
+
+  $C.@ContentSeparator {}
+}

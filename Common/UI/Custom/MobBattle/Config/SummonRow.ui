@@ -1,0 +1,35 @@
+$C = "../../Common.ui";
+
+// One mob of the Summon Wand list: icon, role, count (number or random), team, remove.
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 44, Bottom: 6);
+
+  AssetImage #Icon {
+    Anchor: (Width: 40, Height: 40, Left: 6, Right: 10, Top: 2);
+    FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+  }
+
+  Label #Role {
+    Anchor: (Right: 12, Width: 210);
+    Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center, Wrap: true);
+  }
+
+  $C.@TextField #Count {
+    @Anchor = (Width: 90, Right: 8, Top: 3);
+  }
+
+  $C.@SmallSecondaryTextButton #SetCount {
+    @Text = "Set";
+    @Anchor = (Width: 70, Top: 6, Right: 16);
+  }
+
+  $C.@DropdownBox #Team {
+    Anchor: (Width: 170, Top: 6, Right: 16, Height: 32);
+  }
+
+  $C.@SmallSecondaryTextButton #Remove {
+    @Text = "Remove";
+    @Anchor = (Width: 110, Top: 6);
+  }
+}

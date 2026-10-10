@@ -49,7 +49,13 @@ public final class ChaosWand {
 
     /** Same, within {@code radius} blocks (Snap Wand: snapRadius). */
     static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, ComponentAccessor<EntityStore> buffer) {
-        return npcsAround(center, radius, false, buffer);
+        return npcsAround(center, radius, FxSettings.maxMobs, buffer);
+    }
+
+    /** Same query with an explicit per-event cap; does not change the server's persistent maxMobs setting. */
+    static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, int maxMobs,
+                                             ComponentAccessor<EntityStore> buffer) {
+        return npcsAround(center, radius, false, maxMobs, buffer);
     }
 
     /** Blocks above and below the center that a column search ({@code column}) reaches: the whole world height. */
@@ -60,6 +66,11 @@ public final class ChaosWand {
      * below), not a sphere.
      */
     static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, boolean column,
+                                             ComponentAccessor<EntityStore> buffer) {
+        return npcsAround(center, radius, column, FxSettings.maxMobs, buffer);
+    }
+
+    static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, boolean column, int maxMobs,
                                              ComponentAccessor<EntityStore> buffer) {
         // getAllEntitiesInSphere returns a thread-local list: copy it right away.
         // Distance once per NPC, not once per sort comparison (n log n component reads and copies).
@@ -75,7 +86,7 @@ public final class ChaosWand {
             }
         }
         near.sort((x, y) -> Double.compare(x.distSq(), y.distSq()));
-        int n = Math.min(near.size(), FxSettings.maxMobs);
+        int n = Math.min(near.size(), FxSettings.clampMaxMobs(maxMobs));
         LEFT_OUT.set(near.size() - n);
         List<Ref<EntityStore>> out = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
@@ -153,7 +164,11 @@ public final class ChaosWand {
         FightFx.summonRune(kind, center, buffer);
         FightCamera.intro(kind, player, center, List.of(List.of(target), new ArrayList<>(around)), buffer);
         Countdown.run(kind, player, buffer, "EVERYONE vs " + targetName, withTarget(around, target),
-                acc -> focusNow(player, playerEntity, target, targetName, around, center, acc));
+                acc -> focusNow(player, playerEntity, target, targetName, around, center, acc),
+                reason -> Buffs.cancelPreLone(target));
+        // The lone buff from the countdown on (after Countdown.run: a replaced countdown of this target cancels
+        // first), so it is already big and healthy when the mobs around it start hitting.
+        if (KindFx.countdown(kind) > 0) Buffs.preLone(target);
     }
 
     private static void focusNow(PlayerRef player, Ref<EntityStore> playerEntity, Ref<EntityStore> target,
@@ -161,6 +176,7 @@ public final class ChaosWand {
                                  ComponentAccessor<EntityStore> buffer) {
         around.removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
         if (!BattleManager.isAlive(target, buffer) || !PlayerFighters.canStart(target, buffer) || around.isEmpty()) {
+            Buffs.cancelPreLone(target);
             player.sendMessage(Message.raw("EVERYONE vs " + targetName + " cancelled: the mobs are gone.").color(WARN));
             return;
         }
@@ -188,8 +204,7 @@ public final class ChaosWand {
         // A 2-side battle so the end shows who won (the target or the attackers).
         BattleManager.Battle battle = BattleManager.startFocus(player, target, targetName, around);
         Arena.setup(battle, center, FxSettings.radius, FightFx.lastAreaColor(player), buffer);
-        String crown = WandFx.crown();
-        if (crown != null) WandFx.onTarget(target, crown, buffer);
+        WandFx.loneCrown(target, buffer);
         // /mobbattle buff lone: bigger, more health, harder hits, fewer taken (undone in BattleManager.finish).
         Buffs.set(target, Buffs.Source.LONE, 1);
         // The target fights back against the nearest attacker.

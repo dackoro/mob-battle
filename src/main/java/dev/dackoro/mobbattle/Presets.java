@@ -21,7 +21,7 @@ import java.util.stream.Stream;
  *   <li>effects: countdown 3, 2 min timer (most health wins), titles, music, lasers, runes, area, scoreboards;
  *       no cameras.</li>
  *   <li>debug: everything visible for testing (area floor + zone + glow, lasers, runes, arenas drawn, team
- *       look, debug log), no cinematics.</li>
+ *       look), no cinematics. The debug log is not part of any preset (see isSecurityKey).</li>
  *   <li>cinematic: countdown and full camera work (western duel, drone royale, team sweep, focus, end
  *       camera with kill count), music and titles, no lasers, runes or area drawings.</li>
  *   <li>save / load / delete &lt;name&gt;: your own presets, in &lt;plugin data dir&gt;/presets/&lt;name&gt;.properties.</li>
@@ -37,7 +37,7 @@ final class Presets {
     private static final String[] PRESENTATION_KEYS = {
             "fight.countdown", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
             "camera.end.time", "camera.autowatch", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
-            "laser.enabled", "chaos.area", "fx.runes", "debug", "fx.crown"
+            "laser.enabled", "chaos.area", "fx.runes", "fx.crown"
     };
 
     /** Prefixes of presentation keys a built-in preset also puts back first (waves, glow, mob looks). */
@@ -98,7 +98,6 @@ final class Presets {
                 m.put("chaos.area", "wall");
                 m.put("fx.runes", "true");
                 m.put("team.fx", "both");
-                m.put("debug", "true");
                 for (BattleManager.Kind k : BattleManager.Kind.values()) {
                     // Every arena drawn; the ones that had a wall keep it.
                     Arena.Mode mode = FxSettings.arenaMode(k);
@@ -146,21 +145,37 @@ final class Presets {
         return false;
     }
 
+    /** Windows device names (CON, COM1...): a preset file with one of these names can't be written. */
+    private static final java.util.regex.Pattern WINDOWS_RESERVED =
+            java.util.regex.Pattern.compile("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]", java.util.regex.Pattern.CASE_INSENSITIVE);
+
     static boolean validName(String name) {
-        return name != null && name.matches("[A-Za-z0-9_-]{1,32}");
+        return name != null && name.matches("[A-Za-z0-9_-]{1,32}") && !WINDOWS_RESERVED.matcher(name).matches();
+    }
+
+    /** Settings a preset or reset would give: {@code props}, or why not ({@code error}). Nothing is applied. */
+    record Preview(Properties props, String error) {
     }
 
     /**
      * Applies a built-in or saved preset and saves the settings. Returns null if done, else why not.
      */
     static String apply(String name) {
+        Preview pv = preview(name);
+        if (pv.error() != null) return pv.error();
+        FxSettings.applyAll(pv.props());
+        return null;
+    }
+
+    /** The settings a preset gives (the settings panel loads them into its form). */
+    static Preview preview(String name) {
         String lower = name.toLowerCase(java.util.Locale.ROOT);
         Properties p = FxSettings.toProperties();
         Properties defaults = FxSettings.defaults();
         if ("default".equals(lower)) {
             // Everything back to default, except the team and summon lists.
             for (String key : defaults.stringPropertyNames()) {
-                if (!isListKey(key)) p.setProperty(key, defaults.getProperty(key));
+                if (!isListKey(key) && !isSecurityKey(key)) p.setProperty(key, defaults.getProperty(key));
             }
             p.keySet().removeIf(k -> KindFx.isOverrideKey(k.toString()));
         } else if (isBuiltIn(lower)) {
@@ -177,33 +192,36 @@ final class Presets {
             overlay(lower).forEach(p::setProperty);
         } else {
             Path file = fileOf(name);
-            if (file == null || !Files.exists(file)) return "No preset named " + name + ". See /mobbattle preset list.";
+            if (file == null || !Files.exists(file)) return new Preview(null, "No preset named " + name + ". See /mobbattle preset list.");
             Properties saved = new Properties();
             try (InputStream in = Files.newInputStream(file)) {
                 saved.load(in);
-            } catch (IOException e) {
-                return "Could not read " + file.getFileName() + ": " + e.getMessage();
+            } catch (IOException | IllegalArgumentException e) {
+                return new Preview(null, "Could not read " + file.getFileName() + ": " + e.getMessage());
             }
             // A saved preset has its own per-kind overrides: drop the current ones first.
             p.keySet().removeIf(k -> KindFx.isOverrideKey(k.toString()));
             for (String key : saved.stringPropertyNames()) {
-                if (!isListKey(key)) p.setProperty(key, saved.getProperty(key));
+                if (!isListKey(key) && !isSecurityKey(key)) p.setProperty(key, saved.getProperty(key));
             }
         }
-        FxSettings.apply(p);
-        FxSettings.save();
-        if (!FxSettings.battleMusic) BattleMusic.stopAll();
-        return null;
+        return new Preview(p, null);
     }
 
     /** Saves the current settings (not the team and summon lists) as a preset. Returns null if done, else why not. */
     static String save(String name) {
+        return save(name, FxSettings.toProperties());
+    }
+
+    /** Saves {@code settings} (the panel's form: saved settings + unsaved changes) as a preset. */
+    static String save(String name, Properties settings) {
         if (!validName(name)) return "Preset names use letters, digits, - and _ (up to 32).";
         if (isBuiltIn(name)) return name + " is a built-in preset: pick another name.";
         Path file = fileOf(name);
         if (file == null) return "Settings are not loaded yet.";
-        Properties p = FxSettings.toProperties();
-        p.keySet().removeIf(k -> isListKey(k.toString()));
+        Properties p = new Properties();
+        p.putAll(settings);
+        p.keySet().removeIf(k -> isListKey(k.toString()) || isSecurityKey(k.toString()));
         try {
             Files.createDirectories(file.getParent());
             try (OutputStream out = Files.newOutputStream(file)) {
@@ -243,9 +261,22 @@ final class Presets {
         return out;
     }
 
+    /** summon.* keys that are settings, not part of the summon list (they go in presets and resets). */
+    private static final java.util.Set<String> SUMMON_SETTINGS = java.util.Set.of(
+            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit",
+            // The random count range is a setting too (panel "Save changes"), not part of the list.
+            "summon.min", "summon.max", "summon.atleastone");
+
     private static boolean isListKey(String key) {
-        // summon.radius is a setting, not part of the summon list.
-        return key.startsWith("teams.") || key.startsWith("summon.") && !key.equals("summon.radius");
+        return key.startsWith("teams.") || key.startsWith("summon.") && !SUMMON_SETTINGS.contains(key);
+    }
+
+    /**
+     * Access policy and the debug log are security settings: they must survive every preset and reset group (only
+     * /mobbattle permissions and /mobbattle debugLog change them).
+     */
+    private static boolean isSecurityKey(String key) {
+        return FxSettings.PERMISSIONS_KEY.equals(key) || "debug".equals(key);
     }
 
     /** /mobbattle reset groups, in help order. */
@@ -253,24 +284,25 @@ final class Presets {
 
     /** The reset group of a fx.properties key (null = none: the team and summon lists). */
     static String groupOf(String key) {
+        if (isSecurityKey(key)) return null;
         if (isListKey(key)) return null;
         if (KindFx.isOverrideKey(key)) {
             // kind.<kind>.<option>: by its option.
             String opt = key.substring(key.lastIndexOf('.') + 1);
             return switch (opt) {
-                case "camera", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime" -> "cameras";
+                case "camera", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch" -> "cameras";
                 case "countdown", "starttitle", "wintitle", "music" -> "titles";
                 default -> "effects";
             };
         }
         if (key.startsWith("wave.") || key.startsWith("glow.") || key.startsWith("mobfx.") || key.startsWith("fx.")
                 || key.startsWith("chaos.area") || key.equals("chaos.height") || key.startsWith("laser.")
-                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color") || key.equals("debug")) return "effects";
+                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
         if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
-                || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak")
+                || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak")
                 || key.equals("battle.unstick") || key.equals("battle.duelCard")) return "arenas";
         if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.equals("effect.id")) return "wands";
         return "rules";
@@ -281,19 +313,24 @@ final class Presets {
      * null if done, else why not.
      */
     static String reset(String group) {
+        Preview pv = previewReset(group);
+        if (pv.error() != null) return pv.error();
+        FxSettings.applyAll(pv.props());
+        return null;
+    }
+
+    /** The settings {@link #reset} would give (the settings panel loads them into its form). */
+    static Preview previewReset(String group) {
         String g = group.toLowerCase(java.util.Locale.ROOT);
-        if (!java.util.Arrays.asList(GROUPS).contains(g)) return "Unknown group. Groups: " + String.join(", ", GROUPS);
-        if (g.equals("all")) return apply("default");
+        if (!java.util.Arrays.asList(GROUPS).contains(g)) return new Preview(null, "Unknown group. Groups: " + String.join(", ", GROUPS));
+        if (g.equals("all")) return preview("default");
         Properties p = FxSettings.toProperties();
         Properties defaults = FxSettings.defaults();
         p.keySet().removeIf(k -> g.equals(groupOf(k.toString())) && !defaults.containsKey(k));
         for (String key : defaults.stringPropertyNames()) {
             if (g.equals(groupOf(key))) p.setProperty(key, defaults.getProperty(key));
         }
-        FxSettings.apply(p);
-        FxSettings.save();
-        if (!FxSettings.battleMusic) BattleMusic.stopAll();
-        return null;
+        return new Preview(p, null);
     }
 
     private static Path dir() {

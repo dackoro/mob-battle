@@ -25,6 +25,7 @@ public class ClearSelectionInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        if (!Perms.interactionAllowed(context)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         if (buffer == null) {
             context.getState().state = InteractionState.Failed;

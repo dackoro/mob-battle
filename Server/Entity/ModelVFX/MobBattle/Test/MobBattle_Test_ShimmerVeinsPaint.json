@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): pulsing purple veins with the shader turning part of the body purple (patches below the veins)",
+  "SwitchTo": "PostColor",
+  "EffectDirection": "None",
+  "AnimationDuration": 3.0,
+  "AnimationRange": {
+    "X": 0.55,
+    "Y": 0.75
+  },
+  "CurveType": "Linear",
+  "LoopOption": "LoopMirror",
+  "HighlightColor": "#d9a6ff",
+  "HighlightThickness": 1.2,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 60.0,
+    "Y": 60.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": 0.03
+  },
+  "PostColor": "#6a2bb3",
+  "PostColorOpacity": 0.5
+}

@@ -36,6 +36,8 @@ public class CleanseInteraction extends SimpleInstantInteraction {
                            com.hypixel.hytale.component.ComponentAccessor<EntityStore> accessor) {
         // Buffs first: they take their crown and put back the scale and max health.
         Buffs.clearNow(target, accessor);
+        // The look goes too (removed on purpose): LookKeeper must not put it back.
+        LookKeeper.untrack(target);
         EffectControllerComponent effects = accessor.getComponent(target, EffectControllerComponent.getComponentType());
         if (effects == null) return;
         int keep = com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + keepFx);
@@ -49,6 +51,7 @@ public class CleanseInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
+        if (!Perms.interactionAllowed(context)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         PlayerRef player = buffer != null ? buffer.getComponent(context.getEntity(), PlayerRef.getComponentType()) : null;
         if (player == null) {

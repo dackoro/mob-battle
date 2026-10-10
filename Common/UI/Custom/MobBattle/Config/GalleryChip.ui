@@ -1,0 +1,27 @@
+// One mob type in a team gallery (TeamGallery.ui): its icon and how many of it ("x5").
+Group {
+  LayoutMode: Top;
+  Anchor: (Width: 76, Right: 6);
+  Background: #000000(0.25);
+  Padding: (Top: 4, Bottom: 2);
+
+  Group {
+    LayoutMode: Middle;
+    Anchor: (Height: 52);
+
+    AssetImage #Icon {
+      Anchor: (Width: 48, Height: 48);
+      FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+    }
+  }
+
+  Label #Count {
+    Anchor: (Height: 18);
+    Style: (FontSize: 13, TextColor: #ffd23e, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+  }
+
+  Label #Name {
+    Anchor: (Height: 14);
+    Style: (FontSize: 10, TextColor: #96a9be, HorizontalAlignment: Center, VerticalAlignment: Center);
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): C with a darker green: same texture, less glow",
+  "Infinite": true,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_JadeHold_E",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "L-Eye"
+      },
+      {
+        "SystemId": "MobBattle_Test_EyeFlame_Jade",
+        "TargetNodeName": "R-Eye"
+      }
+    ]
+  }
+}

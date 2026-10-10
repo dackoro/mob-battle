@@ -51,6 +51,8 @@ public class BuffDamageSystem extends DamageEventSystem {
         if (!Buffs.any()) return;
         Ref<EntityStore> victim = chunk.getReferenceTo(index);
         Ref<EntityStore> attacker = damage.getSource() instanceof Damage.EntitySource source ? source.getRef() : null;
+        // Neither side is buffed: Buffs.scale would return the damage unchanged, so skip the enemy checks.
+        if (!Buffs.has(attacker) && !Buffs.has(victim)) return;
         boolean enemies = attacker != null && (BattleManager.areEnemies(attacker, victim) || FightManager.isFighting(attacker, victim));
         float scaled = Buffs.scale(attacker, victim, damage.getAmount(), enemies);
         if (scaled != damage.getAmount()) damage.setAmount(scaled);

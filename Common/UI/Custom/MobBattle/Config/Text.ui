@@ -1,0 +1,33 @@
+$C = "../../Common.ui";
+
+// Free text setting (per-kind number overrides: empty = global value).
+// #Label = setting name (gold when changed and not saved yet), #Tip = what it does (small line below).
+Group {
+  LayoutMode: Top;
+  Anchor: (Bottom: 8);
+
+  Group #Line {
+    LayoutMode: Left;
+    Anchor: (Height: 40);
+
+    Label #Label {
+      Anchor: (Left: 6, Right: 16, Width: 330);
+      Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center, Wrap: true);
+    }
+
+    $C.@TextField #Input {
+      @Anchor = (Width: 160);
+    }
+
+    Label #Hint {
+      FlexWeight: 1;
+      Anchor: (Left: 14);
+      Style: (FontSize: 13, TextColor: #6e7f93, VerticalAlignment: Center, Wrap: true);
+    }
+  }
+
+  Label #Tip {
+    Anchor: (Left: 6, Right: 8);
+    Style: (FontSize: 12, TextColor: #6e7f93, Wrap: true);
+  }
+}

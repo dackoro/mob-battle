@@ -17,10 +17,14 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class FxSettings {
 
     public static final String RANDOM = "random";
+    /** Global access policy for item interactions and Mob Battle commands. */
+    public static volatile String permissionsMode = "open";
+    static final String PERMISSIONS_KEY = "permissions.mode";
 
     /** Vivid colors used when the laser color is "random". */
+    /** Laser "random": the eight bright palette colors (palette only, see Teams.PALETTE). */
     private static final String[] RANDOM_COLORS = {
-            "#FF4B3E", "#2EFFD3", "#FFD23E", "#B44BFF", "#FF8A00", "#4BFF6A", "#FF4BD8", "#4B9BFF"
+            "#FF4B3E", "#3EF0FF", "#FFD23E", "#A24BFF", "#FF8C1A", "#4BFF6A", "#FF6BD5", "#4B9BFF"
     };
 
     /** Laser between fighters at fight start (off by default; the Chaos Wand area has its own setting). */
@@ -98,6 +102,11 @@ public final class FxSettings {
      */
     public static final java.util.Map<BattleManager.Kind, Boolean> FRIENDLY_FIRE = new java.util.EnumMap<>(BattleManager.Kind.class);
     /**
+     * Per battle kind: a battle mob hit by an enemy of its battle that isn't its target turns on it, like an Army
+     * Wand mob defends itself (/mobbattle selfDefense). Default: on for every kind.
+     */
+    public static final java.util.Map<BattleManager.Kind, Boolean> SELF_DEFENSE = new java.util.EnumMap<>(BattleManager.Kind.class);
+    /**
      * Per battle kind: the arena (/mobbattle arena &lt;kind|all&gt; on|show|wall|off). show: the area stays drawn
      * for the whole fight; wall: fighters can't leave it. Default: on for allvsone and royale, off for duel, teams.
      */
@@ -106,6 +115,12 @@ public final class FxSettings {
     public static final java.util.Map<BattleManager.Kind, Integer> TIMER = new java.util.EnumMap<>(BattleManager.Kind.class);
     /** Per battle kind: what happens at 0 (/mobbattle timeUp draw|kill|continue|health|judge). Default: draw, royale judge. */
     public static final java.util.Map<BattleManager.Kind, Arena.TimeUp> TIME_UP = new java.util.EnumMap<>(BattleManager.Kind.class);
+    /**
+     * Per battle kind: what timeUp health/judge scores (/mobbattle judgeBy): health (average health % left, default),
+     * damage (share of the damage dealt, per fighter), kills (share of the kills, per fighter) or mix (the three averaged).
+     */
+    public static final java.util.Map<BattleManager.Kind, String> JUDGE_BY = new java.util.EnumMap<>(BattleManager.Kind.class);
+    public static final String[] JUDGE_BY_VALUES = {"health", "damage", "kills", "mix"};
     /**
      * Per battle kind: the arena closes in, like a battle royale zone (/mobbattle arenaShrink). Its wall pushes
      * everyone toward the center until arenaShrinkTo, over the timer (or arenaShrinkTime with no timer).
@@ -131,7 +146,7 @@ public final class FxSettings {
     /** Arena radius of duels and team battles (/mobbattle arenaSize); 0 = auto, around the fighters. */
     public static int arenaSize = 0;
     /** /mobbattle debug: battle decisions (config, arena, health scores, winner) in the server log. */
-    public static boolean debug = false;
+    public static volatile boolean debug = false;
     /** timeUp health/judge when even on health: "damage" (default), "random" or "draw" (/mobbattle tieBreak). */
     public static String tieBreak = "damage";
     /** Snap Wand and /mobbattle snap: "global" (half of everyone, default) or "team" (half of each side). */
@@ -167,6 +182,27 @@ public final class FxSettings {
         return kind == null ? 0 : TIMER.getOrDefault(kind, 0);
     }
 
+    public static String judgeBy(BattleManager.Kind kind) {
+        return kind == null ? "health" : JUDGE_BY.getOrDefault(kind, "health");
+    }
+
+    /**
+     * The tie break a battle kind really uses: tieBreak damage with judgeBy damage (or kills with kills) would only
+     * tie again, so it takes the other one (damage <-> kills).
+     */
+    public static String tieBreak(BattleManager.Kind kind) {
+        String by = judgeBy(kind);
+        if (tieBreak.equals(by)) return by.equals("damage") ? "kills" : "damage";
+        return tieBreak;
+    }
+
+    /** A judgeBy value as stored (lowercase), or null. */
+    public static String parseJudgeBy(String value) {
+        if (value == null) return null;
+        for (String v : JUDGE_BY_VALUES) if (v.equalsIgnoreCase(value.trim())) return v;
+        return null;
+    }
+
     public static Arena.TimeUp timeUp(BattleManager.Kind kind) {
         return kind == null ? Arena.TimeUp.DRAW : TIME_UP.getOrDefault(kind, Arena.TimeUp.DRAW);
     }
@@ -197,6 +233,7 @@ public final class FxSettings {
     private static void resetBattleRules() {
         for (BattleManager.Kind k : BattleManager.Kind.values()) {
             ISOLATION.put(k, true);
+            SELF_DEFENSE.put(k, true);
         }
         FRIENDLY_FIRE.put(BattleManager.Kind.ALL_VS_ONE, true);
         FRIENDLY_FIRE.put(BattleManager.Kind.TEAMS, false);
@@ -210,6 +247,7 @@ public final class FxSettings {
             boolean royale = k == BattleManager.Kind.ROYALE;
             TIMER.put(k, royale ? 180 : 0);
             TIME_UP.put(k, royale ? Arena.TimeUp.JUDGE : Arena.TimeUp.DRAW);
+            JUDGE_BY.put(k, "health");
             SHRINK.put(k, k == BattleManager.Kind.ROYALE);
             SCOREBOARD.put(k, k == BattleManager.Kind.TEAMS);
         }
@@ -217,6 +255,10 @@ public final class FxSettings {
 
     public static boolean isolated(BattleManager.Kind kind) {
         return kind == null || ISOLATION.getOrDefault(kind, true);
+    }
+
+    public static boolean selfDefense(BattleManager.Kind kind) {
+        return kind != null && SELF_DEFENSE.getOrDefault(kind, true);
     }
 
     public static boolean friendlyFire(BattleManager.Kind kind) {
@@ -252,6 +294,13 @@ public final class FxSettings {
     /** Summon area radius in blocks (/mobbattle summonradius); 0 = auto, grows with how many mobs. */
     public static int summonRadius = 0;
     public static final int MAX_SUMMON_RADIUS = 64;
+
+    /** Summoned mobs leave on their own: never (default, they stay), battleEnd (the surviving summons of a battle go when it ends) or timer (summonLifetime after spawn) (/mobbattle summonDespawn). Global, not per kind: summons spawn outside battles. */
+    public static String summonDespawn = SummonDespawn.NEVER;
+    /** Seconds a summon lives with summonDespawn timer (/mobbattle summonLifetime). */
+    public static int summonLifetime = 60;
+    /** How a summon leaves: disintegrate (the Kill Wand's soul rip, no loot) or vanish (removed at once) (/mobbattle summonExit). */
+    public static String summonExit = SummonDespawn.DISINTEGRATE;
 
     /** Max mobs one Chaos Wand click affects (/mobbattle maxmobs). Mostly limited by the game's own AI cost. */
     public static int maxMobs = 200;
@@ -302,6 +351,40 @@ public final class FxSettings {
     private FxSettings() {
     }
 
+    /** Laser color from a command: random, a palette name or a palette hex; null for anything else. */
+    public static String parseLaserColor(String value) {
+        if (value == null) return null;
+        if (RANDOM.equalsIgnoreCase(value)) return RANDOM;
+        String hex = Teams.parseColor(value);
+        if (hex != null) return hex;
+        for (String h : Teams.PALETTE.values()) if (h.equalsIgnoreCase(value)) return h;
+        return null;
+    }
+
+    /** The palette hex closest (RGB distance) to {@code hex}. */
+    static String nearestPaletteHex(String hex) {
+        int c = Integer.parseInt(hex.substring(1), 16);
+        String best = Teams.PALETTE.get("Red");
+        long bestD = Long.MAX_VALUE;
+        for (String h : Teams.PALETTE.values()) {
+            int p = Integer.parseInt(h.substring(1), 16);
+            long dr = ((c >> 16) & 255) - ((p >> 16) & 255), dg = ((c >> 8) & 255) - ((p >> 8) & 255), db = (c & 255) - (p & 255);
+            long d = dr * dr + dg * dg + db * db;
+            if (d < bestD) {
+                bestD = d;
+                best = h;
+            }
+        }
+        return best;
+    }
+
+    /** Palette name of the laser color, or "random". */
+    static String laserColorName() {
+        if (RANDOM.equals(laserColor)) return RANDOM;
+        for (var e : Teams.PALETTE.entrySet()) if (e.getValue().equalsIgnoreCase(laserColor)) return e.getKey().toLowerCase(java.util.Locale.ROOT);
+        return laserColor;
+    }
+
     public static String pickLaserColor() {
         if (RANDOM.equalsIgnoreCase(laserColor)) {
             return RANDOM_COLORS[ThreadLocalRandom.current().nextInt(RANDOM_COLORS.length)];
@@ -332,6 +415,17 @@ public final class FxSettings {
         return value != null && value.matches("#[0-9a-fA-F]{6}");
     }
 
+    /** The int stored under {@code key}, or {@code current} when the key is missing or not a number. */
+    private static int intOr(Properties p, String key, int current) {
+        String v = p.getProperty(key);
+        if (v == null) return current;
+        try {
+            return Integer.parseInt(v);
+        } catch (NumberFormatException e) {
+            return current;
+        }
+    }
+
     public static void load(Path dataDirectory) {
         file = dataDirectory.resolve("fx.properties");
         if (defaults == null) defaults = toProperties();
@@ -341,11 +435,47 @@ public final class FxSettings {
         Properties p = new Properties();
         try (InputStream in = Files.newInputStream(file)) {
             p.load(in);
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             MobBattlePlugin.log("Could not read " + file + ": " + e);
             return;
         }
         apply(p);
+    }
+
+    /** Reloads the server's fx.properties, resetting removed keys to their startup defaults. */
+    static String reload() {
+        if (file == null) return "Settings are not loaded yet.";
+        Properties p = new Properties();
+        try {
+            if (Files.exists(file)) {
+                try (InputStream in = Files.newInputStream(file)) {
+                    p.load(in);
+                }
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            return "Could not read " + file.getFileName() + ": " + e.getMessage();
+        }
+        Properties all = defaults();
+        all.putAll(p);
+        applyAll(all, false);
+        return null;
+    }
+
+    /**
+     * Sets every setting from a full set of properties (toProperties + changes), saves fx.properties and switches
+     * off what a setting turned off now stops (music, unstick tracking, duel cards). Presets, resets, reload and the
+     * settings panel all go through here, like a single command would.
+     */
+    static void applyAll(Properties p) {
+        applyAll(p, true);
+    }
+
+    private static void applyAll(Properties p, boolean write) {
+        apply(p);
+        if (write) save();
+        BattleMusic.stopSilenced();
+        if (!unstick) Unstick.clear();
+        if (!duelCard) DuelCard.clearAll();
     }
 
     /** The plugin data directory (where fx.properties lives), or null before load. */
@@ -367,10 +497,15 @@ public final class FxSettings {
     static void apply(Properties p) {
         ActionFx.load(p);
         {
+            String permissions = p.getProperty(PERMISSIONS_KEY, permissionsMode);
+            permissionsMode = "server".equalsIgnoreCase(permissions) ? "server" : "open";
             laserEnabled = Boolean.parseBoolean(p.getProperty("laser.enabled", String.valueOf(laserEnabled)));
             String savedColor = p.getProperty("laser.color", laserColor);
-            if (RANDOM.equalsIgnoreCase(savedColor) || isHexColor(savedColor)) {
-                laserColor = savedColor;
+            if (RANDOM.equalsIgnoreCase(savedColor)) {
+                laserColor = RANDOM;
+            } else if (isHexColor(savedColor)) {
+                // Older files could hold any #RRGGBB: keep the closest palette color.
+                laserColor = nearestPaletteHex(savedColor);
             }
             titleEnabled = Boolean.parseBoolean(p.getProperty("title.enabled", String.valueOf(titleEnabled)));
             winTitleEnabled = Boolean.parseBoolean(p.getProperty("wintitle.enabled", String.valueOf(winTitleEnabled)));
@@ -384,12 +519,13 @@ public final class FxSettings {
             if (!RANDOM.equalsIgnoreCase(titleStyle) && parseStyle(titleStyle) == null) {
                 titleStyle = "Major";
             }
-            try {
-                maxMobs = clampMaxMobs(Integer.parseInt(p.getProperty("chaos.maxmobs", String.valueOf(maxMobs))));
-                summonRadius = Math.max(0, Math.min(MAX_SUMMON_RADIUS,
-                        Integer.parseInt(p.getProperty("summon.radius", String.valueOf(summonRadius)))));
-            } catch (NumberFormatException ignored) {
-            }
+            maxMobs = clampMaxMobs(intOr(p, "chaos.maxmobs", maxMobs));
+            summonRadius = Math.max(0, Math.min(MAX_SUMMON_RADIUS, intOr(p, "summon.radius", summonRadius)));
+            String despawn = SummonDespawn.parseMode(p.getProperty("summon.despawn"));
+            if (despawn != null) summonDespawn = despawn;
+            summonLifetime = SummonDespawn.clampLifetime(intOr(p, "summon.lifetime", summonLifetime));
+            String exit = SummonDespawn.parseExit(p.getProperty("summon.exit"));
+            if (exit != null) summonExit = exit;
             effect = p.getProperty("effect.id", effect);
             Teams.load(p);
             SummonList.load(p);
@@ -439,6 +575,10 @@ public final class FxSettings {
                 String v = p.getProperty("battle.isolation." + k.key, oldIso);
                 if (v != null) ISOLATION.put(k, Boolean.parseBoolean(v));
             }
+            for (BattleManager.Kind k : BattleManager.Kind.values()) {
+                String v = p.getProperty("battle.selfdefense." + k.key);
+                if (v != null) SELF_DEFENSE.put(k, Boolean.parseBoolean(v));
+            }
             for (BattleManager.Kind k : ALLY_KINDS) {
                 String v = p.getProperty("battle.friendlyfire." + k.key, oldFf);
                 if (v != null) FRIENDLY_FIRE.put(k, Boolean.parseBoolean(v));
@@ -450,61 +590,58 @@ public final class FxSettings {
             battlePvp = Boolean.parseBoolean(p.getProperty("battle.pvp", String.valueOf(battlePvp)));
             unstick = Boolean.parseBoolean(p.getProperty("battle.unstick", String.valueOf(unstick)));
             duelCard = Boolean.parseBoolean(p.getProperty("battle.duelCard", String.valueOf(duelCard)));
+            // Each key on its own: a bad value keeps that kind's current setting, the other keys still load.
             for (BattleManager.Kind k : BattleManager.Kind.values()) {
                 try {
                     String v = p.getProperty("battle.arena." + k.key);
                     if (v != null) ARENA.put(k, Arena.Mode.valueOf(v.toUpperCase(java.util.Locale.ROOT)));
-                    v = p.getProperty("battle.timeup." + k.key);
-                    if (v != null) TIME_UP.put(k, Arena.TimeUp.valueOf(v.toUpperCase(java.util.Locale.ROOT)));
-                    v = p.getProperty("battle.timer." + k.key);
-                    if (v != null) TIMER.put(k, Math.max(0, Math.min(MAX_TIMER, Integer.parseInt(v))));
-                    v = p.getProperty("battle.shrink." + k.key);
-                    if (v != null) SHRINK.put(k, Boolean.parseBoolean(v));
-                    v = p.getProperty("battle.scoreboard." + k.key);
-                    if (v != null) SCOREBOARD.put(k, Boolean.parseBoolean(v));
                 } catch (IllegalArgumentException ignored) {
                     // keep the default
                 }
+                try {
+                    String v = p.getProperty("battle.timeup." + k.key);
+                    if (v != null) TIME_UP.put(k, Arena.TimeUp.valueOf(v.toUpperCase(java.util.Locale.ROOT)));
+                } catch (IllegalArgumentException ignored) {
+                    // keep the default
+                }
+                String judge = parseJudgeBy(p.getProperty("battle.judgeby." + k.key));
+                if (judge != null) JUDGE_BY.put(k, judge);
+                try {
+                    String v = p.getProperty("battle.timer." + k.key);
+                    if (v != null) TIMER.put(k, Math.max(0, Math.min(MAX_TIMER, Integer.parseInt(v))));
+                } catch (NumberFormatException ignored) {
+                    // keep the default
+                }
+                // Booleans never throw (parseBoolean), so their keys need no try.
+                String shrink = p.getProperty("battle.shrink." + k.key);
+                if (shrink != null) SHRINK.put(k, Boolean.parseBoolean(shrink));
+                String scoreboard = p.getProperty("battle.scoreboard." + k.key);
+                if (scoreboard != null) SCOREBOARD.put(k, Boolean.parseBoolean(scoreboard));
             }
             String style = p.getProperty("battle.timer.style", timerStyle);
             timerStyle = "portal".equalsIgnoreCase(style) ? "portal" : "custom";
             String tb = p.getProperty("battle.tiebreak", tieBreak).toLowerCase(java.util.Locale.ROOT);
             tieBreak = tb.equals("random") || tb.equals("draw") || tb.equals("kills") ? tb : "damage";
             snapMode = "team".equalsIgnoreCase(p.getProperty("snap.mode", snapMode)) ? "team" : "global";
-            try {
-                snapPercent = Math.max(1, Math.min(100, Integer.parseInt(p.getProperty("snap.percent", String.valueOf(snapPercent)))));
-                snapSeconds = Math.max(1, Math.min(MAX_SNAP_SECONDS, Integer.parseInt(p.getProperty("snap.time", String.valueOf(snapSeconds)))));
-                snapHitDelayMs = Math.max(0, Math.min(MAX_SNAP_HIT_DELAY_MS, Integer.parseInt(p.getProperty("snap.hitdelay", String.valueOf(snapHitDelayMs)))));
-                int r = Integer.parseInt(p.getProperty("snap.radius", String.valueOf(snapRadius)));
-                // Older saves: 0 meant "auto = areaRadius"; the snap now has its own reach.
-                snapRadius = r <= 0 ? DEFAULT_SNAP_RADIUS : clampRadius(r);
-            } catch (NumberFormatException ignored) {
-            }
-            try {
-                shrinkTo = Math.max(MIN_SHRINK_TO, Math.min(MAX_ARENA, Integer.parseInt(p.getProperty("battle.shrink.to", String.valueOf(shrinkTo)))));
-                shrinkSeconds = Math.max(10, Math.min(MAX_TIMER, Integer.parseInt(p.getProperty("battle.shrink.time", String.valueOf(shrinkSeconds)))));
-                int v = Integer.parseInt(p.getProperty("battle.arena.size", String.valueOf(arenaSize)));
-                arenaSize = v <= 0 ? 0 : Math.max(MIN_ARENA, Math.min(MAX_ARENA, v));
-            } catch (NumberFormatException ignored) {
-            }
-            try {
-                pillarHeight = clampHeight(Integer.parseInt(p.getProperty("chaos.height", String.valueOf(pillarHeight))));
-            } catch (NumberFormatException ignored) {
-            }
-            try {
-                radius = clampRadius(Integer.parseInt(p.getProperty("chaos.radius", String.valueOf(radius))));
-            } catch (NumberFormatException ignored) {
-            }
+            snapPercent = Math.max(1, Math.min(100, intOr(p, "snap.percent", snapPercent)));
+            snapSeconds = Math.max(1, Math.min(MAX_SNAP_SECONDS, intOr(p, "snap.time", snapSeconds)));
+            snapHitDelayMs = Math.max(0, Math.min(MAX_SNAP_HIT_DELAY_MS, intOr(p, "snap.hitdelay", snapHitDelayMs)));
+            int r = intOr(p, "snap.radius", snapRadius);
+            // Older saves: 0 meant "auto = areaRadius"; the snap now has its own reach.
+            snapRadius = r <= 0 ? DEFAULT_SNAP_RADIUS : clampRadius(r);
+            shrinkTo = Math.max(MIN_SHRINK_TO, Math.min(MAX_ARENA, intOr(p, "battle.shrink.to", shrinkTo)));
+            shrinkSeconds = Math.max(10, Math.min(MAX_TIMER, intOr(p, "battle.shrink.time", shrinkSeconds)));
+            int v = intOr(p, "battle.arena.size", arenaSize);
+            arenaSize = v <= 0 ? 0 : Math.max(MIN_ARENA, Math.min(MAX_ARENA, v));
+            pillarHeight = clampHeight(intOr(p, "chaos.height", pillarHeight));
+            radius = clampRadius(intOr(p, "chaos.radius", radius));
             String cs = p.getProperty("camera.style", cameraStyle).toLowerCase(java.util.Locale.ROOT);
             cameraStyle = java.util.Arrays.asList(KindFx.CAMERA_STYLES).contains(cs) ? cs : "auto";
             String ec = p.getProperty("camera.end", endCamera).toLowerCase(java.util.Locale.ROOT);
             endCamera = java.util.Arrays.asList(KindFx.END_CAMERAS).contains(ec) ? ec : "off";
-            try {
-                cameraSeconds = Math.max(0, Math.min(KindFx.MAX_CAMERA_TIME, Integer.parseInt(p.getProperty("camera.time", String.valueOf(cameraSeconds)))));
-                cameraShots = Math.max(1, Math.min(MAX_MOBS_LIMIT, Integer.parseInt(p.getProperty("camera.shots", String.valueOf(cameraShots)))));
-                endCameraSeconds = Math.max(1, Math.min(KindFx.MAX_END_CAMERA_TIME, Integer.parseInt(p.getProperty("camera.end.time", String.valueOf(endCameraSeconds)))));
-            } catch (NumberFormatException ignored) {
-            }
+            cameraSeconds = Math.max(0, Math.min(KindFx.MAX_CAMERA_TIME, intOr(p, "camera.time", cameraSeconds)));
+            cameraShots = Math.max(1, Math.min(MAX_MOBS_LIMIT, intOr(p, "camera.shots", cameraShots)));
+            endCameraSeconds = Math.max(1, Math.min(KindFx.MAX_END_CAMERA_TIME, intOr(p, "camera.end.time", endCameraSeconds)));
             runes = Boolean.parseBoolean(p.getProperty("fx.runes", String.valueOf(runes)));
             autoWatch = Boolean.parseBoolean(p.getProperty("camera.autowatch", String.valueOf(autoWatch)));
             String camScope = p.getProperty("camera.scope", cameraScope).toLowerCase(java.util.Locale.ROOT);
@@ -535,6 +672,7 @@ public final class FxSettings {
     /** Every setting as properties (what fx.properties holds). */
     static Properties toProperties() {
         Properties p = new Properties();
+        p.setProperty(PERMISSIONS_KEY, permissionsMode);
         p.setProperty("laser.enabled", String.valueOf(laserEnabled));
         p.setProperty("laser.color", laserColor);
         p.setProperty("title.enabled", String.valueOf(titleEnabled));
@@ -560,11 +698,13 @@ public final class FxSettings {
         p.setProperty("chaos.area.onlywand", String.valueOf(areaOnlyWand));
         ISOLATION.forEach((k, v) -> p.setProperty("battle.isolation." + k.key, String.valueOf(v)));
         FRIENDLY_FIRE.forEach((k, v) -> p.setProperty("battle.friendlyfire." + k.key, String.valueOf(v)));
+        SELF_DEFENSE.forEach((k, v) -> p.setProperty("battle.selfdefense." + k.key, String.valueOf(v)));
         PLAYER_FIGHTS.forEach((k, v) -> p.setProperty("battle.players." + k.key, String.valueOf(v)));
         p.setProperty("battle.pvp", String.valueOf(battlePvp));
         ARENA.forEach((k, v) -> p.setProperty("battle.arena." + k.key, v.name().toLowerCase(java.util.Locale.ROOT)));
         TIMER.forEach((k, v) -> p.setProperty("battle.timer." + k.key, String.valueOf(v)));
         TIME_UP.forEach((k, v) -> p.setProperty("battle.timeup." + k.key, v.name().toLowerCase(java.util.Locale.ROOT)));
+        JUDGE_BY.forEach((k, v) -> p.setProperty("battle.judgeby." + k.key, v));
         p.setProperty("battle.arena.size", String.valueOf(arenaSize));
         SHRINK.forEach((k, v) -> p.setProperty("battle.shrink." + k.key, String.valueOf(v)));
         p.setProperty("battle.shrink.to", String.valueOf(shrinkTo));
@@ -588,6 +728,9 @@ public final class FxSettings {
         p.setProperty("team.fx.seconds", String.valueOf(teamFxSeconds));
         p.setProperty("chaos.maxmobs", String.valueOf(maxMobs));
         p.setProperty("summon.radius", String.valueOf(summonRadius));
+        p.setProperty("summon.despawn", summonDespawn);
+        p.setProperty("summon.lifetime", String.valueOf(summonLifetime));
+        p.setProperty("summon.exit", summonExit);
         p.setProperty("chaos.height", String.valueOf(pillarHeight));
         p.setProperty("camera.style", cameraStyle);
         p.setProperty("camera.time", String.valueOf(cameraSeconds));
@@ -604,6 +747,17 @@ public final class FxSettings {
         p.setProperty("morph.players", String.valueOf(morphPlayers));
         KindFx.save(p);
         return p;
+    }
+
+    static boolean serverPermissions() {
+        return "server".equals(permissionsMode);
+    }
+
+    static String setPermissionsMode(String mode) {
+        if (!"open".equalsIgnoreCase(mode) && !"server".equalsIgnoreCase(mode)) return "Use /mobbattle permissions open|server.";
+        permissionsMode = mode.toLowerCase(java.util.Locale.ROOT);
+        save();
+        return null;
     }
 
     public static int clampMaxMobs(int value) {
@@ -696,14 +850,15 @@ public final class FxSettings {
                         + ", runes " + onOff(runes) + " | cameraStyle " + cameraStyle + ", cameraTime " + (cameraSeconds > 0 ? cameraSeconds + " s" : "countdown")
                         + ", cameraShots " + cameraShots + ", endCamera " + endCamera + ", endCameraTime " + endCameraSeconds + " s, cameraScope " + cameraScope + ", autoWatch " + onOff(autoWatch)
                         + " | per kind: " + KindFx.describeOverrides(),
-                "Fighter laser: fightLaser " + onOff(laserEnabled) + ", fightLaserColor " + laserColor,
+                "Fighter laser: fightLaser " + onOff(laserEnabled) + ", fightLaserColor " + laserColorName(),
                 "Battles: duelMode " + (accumulateDuels ? "accumulate" : "exclusive")
-                        + " | battleIsolation " + rules(ISOLATION) + " | friendlyFire " + rules(FRIENDLY_FIRE)
+                        + " | battleIsolation " + rules(ISOLATION) + " | selfDefense " + rules(SELF_DEFENSE) + " | friendlyFire " + rules(FRIENDLY_FIRE)
                         + " | playerFights " + rules(PLAYER_FIGHTS) + ", battlePvp " + onOff(battlePvp)
                         + " | buff " + Buffs.describe(),
                 "Arenas: arena " + kinds(ARENA, v -> v.name().toLowerCase(java.util.Locale.ROOT))
                         + " | timer " + kinds(TIMER, MobBattleCommand::formatDuration)
                         + " | timeUp " + kinds(TIME_UP, v -> v.name().toLowerCase(java.util.Locale.ROOT))
+                        + " | judgeBy " + kinds(JUDGE_BY, v -> v)
                         + " | arenaShrink " + rules(SHRINK) + " to " + shrinkTo + ", over " + MobBattleCommand.formatDuration(shrinkSeconds)
                         + " with no timer | scoreboard " + rules(SCOREBOARD) + " | unstick " + onOff(unstick)
                         + " | duelCard " + onOff(duelCard)
@@ -711,23 +866,27 @@ public final class FxSettings {
                         + ", snapPercent " + snapPercent + "%, snapTime " + snapSeconds + " s, snapHitDelay " + snapHitDelayMs + " ms, snapRadius " + snapRadius,
                 "Chaos area: areaStyle " + areaStyle + ", areaColor " + areaColor.toLowerCase() + ", areaRadius " + radius
                         + ", areaHeight " + pillarHeight + ", areaOnlyWand " + onOff(areaOnlyWand) + ", maxMobs " + maxMobs
-                        + ", summonRadius " + (summonRadius > 0 ? summonRadius : "auto") + " | " + ActionFx.describe() + " (wave/borderColor)",
+                        + ", summonRadius " + (summonRadius > 0 ? summonRadius : "auto") + ", summonDespawn " + summonDespawn
+                        + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
                         + ", onlyWand " + onOff(teamLookOnlyWand),
                 "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", debugLog " + onOff(debug),
+                "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
         };
     }
 
     /** Which describeLines() line a setting key belongs to. */
     public static int groupOf(String key) {
         return switch (key) {
-            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope" -> 0;
+            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch" -> 0;
             case "laser", "color" -> 1;
-            case "isolation", "battleisolation", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
-            case "scoreboard", "arena", "timer", "timeup", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
+            case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
+            case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
             case "debuglog", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor" -> 6;
-            case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius" -> 4;
+            case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
+                 "summondespawn", "summonlifetime", "summonexit" -> 4;
             case "teamfx", "teambytype" -> 5;
+            case "permissions" -> 7;
             default -> 6;
         };
     }

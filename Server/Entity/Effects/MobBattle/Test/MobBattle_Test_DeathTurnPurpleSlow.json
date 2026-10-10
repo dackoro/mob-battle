@@ -1,0 +1,10 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): SLOW MOTION shimmer death step 1 (2.5 s)",
+  "Duration": 2.6,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "ModelVFXId": "MobBattle_Test_DeathTurnPurpleSlow",
+    "Particles": []
+  }
+}

@@ -9,11 +9,15 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Once per second: global cleanup (any world thread, whichever ticks first), then victory and timeout of
  * the battles of the ticking world (on its own thread). Nothing is keyed by world here, so an unloaded
- * instance leaves nothing behind.
+ * instance leaves nothing behind. Exception: the look guardian (LookKeeper) runs every tick while a look is kept.
  */
 public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
     private static final long INTERVAL_MS = 1000;
+    /** A countdown this late was not started by an NPC tick (no NPC ticking in its world): start it from here. */
+    private static final long COUNTDOWN_LATE_MS = 250;
     private final AtomicLong nextMaintain = new AtomicLong();
+    private final java.util.Map<Store<EntityStore>, Long> nextCountdown =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     /** Per world: next held-area redraw (areaonlywand). Weak keys: an unloaded instance leaves nothing behind. */
     private final java.util.Map<Store<EntityStore>, Long> nextHeldArea =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
@@ -35,6 +39,8 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextWatch =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextDebugWand =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     @Override
     public void tick(float delta, int index, Store<EntityStore> store) {
@@ -43,6 +49,14 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
         long next = nextMaintain.get();
         if (now >= next && nextMaintain.compareAndSet(next, now + INTERVAL_MS)) {
             BattleManager.maintain();
+        }
+        if (Countdown.hasPending() && now >= Countdown.nextDue() + COUNTDOWN_LATE_MS
+                && now >= nextCountdown.getOrDefault(store, 0L)) {
+            nextCountdown.put(store, now + COUNTDOWN_LATE_MS);
+            // Starting a battle changes components: on the world thread, outside the system iteration.
+            store.getExternalData().getWorld().execute(() -> {
+                if (!store.isShutdown()) Countdown.runDue(store, System.currentTimeMillis(), store);
+            });
         }
         if (FxSettings.areaOnlyWand && now >= nextHeldArea.getOrDefault(store, 0L)) {
             nextHeldArea.put(store, now + FightFx.HELD_AREA_REFRESH_MS);
@@ -71,6 +85,15 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
         if (DuelCard.any() && now >= nextCard.getOrDefault(store, 0L)) {
             nextCard.put(store, now + INTERVAL_MS);
             store.getExternalData().getWorld().execute(() -> DuelCard.tick(store));
+        }
+        if (LookKeeper.any()) {
+            // Looks kept on mobs (LookKeeper): every tick while one is tracked, on the world thread.
+            LookKeeper.schedule(store);
+        }
+        if (DebugWand.any() && now >= nextDebugWand.getOrDefault(store, 0L)) {
+            nextDebugWand.put(store, now + INTERVAL_MS);
+            // Debug Wand tracks (effects and health, 1/s) read components: on the world thread, outside the iteration.
+            store.getExternalData().getWorld().execute(() -> DebugWand.tick(store));
         }
         if (BattleWatch.any() && now >= nextWatch.getOrDefault(store, 0L)) {
             nextWatch.put(store, now + FightFx.TEAM_RING_REFRESH_MS);

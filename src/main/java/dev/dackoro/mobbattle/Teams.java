@@ -123,6 +123,14 @@ public final class Teams {
         return -2;
     }
 
+    /** The team (other than {@code except}) that already has this color, or -1. */
+    public static int withColor(String hex, int except) {
+        for (int i = 0; i < MAX; i++) {
+            if (i != except && exists(i) && color(i).equalsIgnoreCase(hex)) return i;
+        }
+        return -1;
+    }
+
     public static void recolor(int slot, String hex) {
         requirePaletteColor(hex);
         set(slot, BattleManager.TEAM_NAMES[slot], hex);

@@ -125,6 +125,7 @@ public final class TeamFx {
             int index = map.getIndex(id);
             if (index >= 0 && effects.hasEffect(index)) {
                 effects.removeEffect(self, index, accessor);
+                LookKeeper.touched(self);
             }
         }
         if (p.color() == null || "off".equals(FxSettings.teamFx)) {

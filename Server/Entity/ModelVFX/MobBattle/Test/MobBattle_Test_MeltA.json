@@ -1,0 +1,26 @@
+{
+  "$Comment": "TEST look (scripts/gen-testlooks.py): shimmer melt: the body drains away from the head down, rippling purple edge",
+  "SwitchTo": "Disappear",
+  "EffectDirection": "TopDown",
+  "AnimationDuration": 1.4,
+  "AnimationRange": {
+    "X": 0.0,
+    "Y": 1.0
+  },
+  "CurveType": "QuartIn",
+  "LoopOption": "PlayOnce",
+  "HighlightColor": "#c77dff",
+  "HighlightThickness": 2.5,
+  "UseBloomOnHighlight": true,
+  "UseProgessiveHighlight": false,
+  "NoiseScale": {
+    "X": 150.0,
+    "Y": 150.0
+  },
+  "NoiseScrollSpeed": {
+    "X": 0.0,
+    "Y": -0.25
+  },
+  "PostColor": "#3fbf6a",
+  "PostColorOpacity": 0.0
+}
