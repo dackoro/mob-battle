@@ -1,0 +1,87 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.MobBattle_BuffWand.name",
+    "Description": "server.items.MobBattle_BuffWand.description"
+  },
+  "Categories": [
+    "Items.Weapons"
+  ],
+  "Icon": "Icons/Items/MobBattle/BuffWand.png",
+  "Quality": "Common",
+  "ItemLevel": 1,
+  "MaxStack": 1,
+  "Model": "Items/MobBattle/BuffWand/MobBattle_BuffWand.blockymodel",
+  "Texture": "Items/MobBattle/BuffWand/MobBattle_BuffWand_Texture.png",
+  "PlayerAnimationsId": "Wand",
+  "Utility": {
+    "Compatible": true
+  },
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_BuffGive",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            },
+            {
+              "Type": "MobBattle_BuffGive",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            }
+          ]
+        }
+      ]
+    },
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_BuffTake",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            },
+            {
+              "Type": "MobBattle_BuffTake",
+              "Effects": {
+                "ItemAnimationId": "SwingRight"
+              },
+              "RunTime": 0.1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "IconProperties": {
+    "Scale": 0.6,
+    "Translation": [
+      -13,
+      -16
+    ],
+    "Rotation": [
+      45,
+      90,
+      0
+    ]
+  },
+  "DroppedItemAnimation": "Items/Animations/Dropped/Dropped_Diagonal_Left.blockyanim",
+  "Tags": {
+    "Type": [
+      "Tool"
+    ]
+  }
+}

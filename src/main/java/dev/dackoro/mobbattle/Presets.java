@@ -36,7 +36,7 @@ final class Presets {
     /** Presentation keys a built-in preset first puts back to default (with every per-kind override). */
     private static final String[] PRESENTATION_KEYS = {
             "fight.countdown", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
-            "camera.end.time", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
+            "camera.end.time", "camera.autowatch", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
             "laser.enabled", "chaos.area", "fx.runes", "debug", "fx.crown"
     };
 
@@ -265,13 +265,13 @@ final class Presets {
         }
         if (key.startsWith("wave.") || key.startsWith("glow.") || key.startsWith("mobfx.") || key.startsWith("fx.")
                 || key.startsWith("chaos.area") || key.equals("chaos.height") || key.startsWith("laser.")
-                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("debug")) return "effects";
+                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color") || key.equals("debug")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
         if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
                 || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak")
-                || key.equals("battle.unstick")) return "arenas";
+                || key.equals("battle.unstick") || key.equals("battle.duelCard")) return "arenas";
         if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.equals("effect.id")) return "wands";
         return "rules";
     }

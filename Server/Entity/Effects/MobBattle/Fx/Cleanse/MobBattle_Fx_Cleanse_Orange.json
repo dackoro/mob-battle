@@ -23,8 +23,7 @@
         "SystemId": "MobBattle_Mark_Rune_Orange",
         "TargetEntityPart": "Entity"
       }
-    ],
-    "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Despawn"
+    ]
   },
   "OverlapBehavior": "Overwrite",
   "Debuff": false

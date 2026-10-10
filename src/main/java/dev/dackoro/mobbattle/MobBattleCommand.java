@@ -33,7 +33,7 @@ public class MobBattleCommand extends CommandBase {
             "MobBattle_Wand", "MobBattle_ChaosWand", "MobBattle_TeamWand",
             "MobBattle_SummonWand", "MobBattle_MorphWand", "MobBattle_HealWand",
             "MobBattle_KillWand", "MobBattle_EffectWand", "MobBattle_CleanseWand", "MobBattle_ArmyWand",
-            "MobBattle_SnapWand"
+            "MobBattle_SnapWand", "MobBattle_BuffWand"
     };
 
     /** /mobbattle help [topic]: line 0 is the title, "  " lines are details. Commands in camelCase (any case works). */
@@ -81,9 +81,11 @@ public class MobBattleCommand extends CommandBase {
                 "camera on|off - intro camera during the countdown (or cameraTime)",
                 "cameraStyle auto|orbit|duel|showcase|teams|focus|drone - auto: duel western, allVsOne focus, teams sweep, royale orbit",
                 "cameraTime <seconds> - intro camera length; 0 = the countdown; >0 films even with countdown 0",
-                "cameraShots <n> - showcase: how many fighters it shows",
+                "cameraShots <n> - showcase: how many fighters it shows (1 to maxMobs; each shot needs 1.2 s of cameraTime)",
                 "endCamera off|winner|lastHit - films the winner or who landed the final kill, with its kill count",
                 "endCameraTime <seconds> - end camera length",
+                "  crouch while a camera plays (or skipCamera) to end it; an intro also ends when its battle ends",
+                "autoWatch on|off - start watching by yourself when the battle starts (after the countdown), for the cameraScope players; it ends the intro (default off)",
                 "music on|off|<track> - battle music from the countdown to the end",
                 "runes on|off - summoning runes and fighter marks at the start",
                 "  e.g. countdown royale 5, cameraStyle royale showcase, camera duel off, endCamera all winner",
@@ -103,7 +105,10 @@ public class MobBattleCommand extends CommandBase {
                 "debugLog on|off - battle decisions (config, arena, health scores, winner) in the server log",
                 "duelMode exclusive|accumulate - replace a duel or keep connected fights",
                 "buff lone|streak|champion size|health|damage|defense|all|off <percent> - battle buffs: lone = everyone-vs-one target, streak = per kill (up to buff streak maxKills, default 5), champion = the winners until they die or get cleansed (default 0 = none)",
-                "buff crown gold|<color>|off - crown on streak and champion mobs (default gold)",
+                "buff wand size|health|damage|defense|all|off <percent> - Buff Wand, per click (default size 10, health 20, damage 10, defense 5; stacks up to buff wand maxStacks, default 5)",
+                "buff lone|streak|champion|wand heal on|off - that buff also fills the health (lone: heals the target when picked, even with no lone buff); default off: only max health goes up",
+                "buff crown gold|<color>|off - crown on streak, champion and Buff Wand mobs (default gold)",
+                "buff sparks <seconds>|off - replay the crown's sparks and rays on buffed mobs every N seconds (default 3)",
                 "fightLaser on|off - laser between fighters at the start (per kind too)",
                 "fightLaserColor #RRGGBB|random - laser color",
                 "battleIsolation <duel|allVsOne|royale|teams|all> on|off - outside mobs cannot hurt battle mobs",
@@ -120,21 +125,26 @@ public class MobBattleCommand extends CommandBase {
                 "mobFx <duel|allVsOne|attackers|royale|all> <color|default|off> - tint, aura and rune on the battle mobs (default = original look; royale purple by default)",
                 "crown gold|<color>|off - everyone vs one: crown with rays of light over the lone target for 20 s (default gold)",
                 "cleanseColor <color> - Cleanse Wand look: light from above, burst, aura and rune (default white)",
+                "buffColor <color> - Buff Wand look: tint, swirl, burst, aura and rune (default yellow = gold; taking the buff off is grey)",
                 "borderColor <summon|snap|slam|allVsOne|royale|all> <color|off|area> - border glow color per action (area = areaColor; default summon green, allVsOne yellow, royale purple, snap/slam off: a color draws a ring at their reach)",
                 "arenaShrink <kind|all> on|off - the arena closes in like a battle royale zone (default: royale on)",
                 "arenaShrinkTo <blocks> - final radius (default 15); arenaShrinkTime <time> - with no timer (default 2m)",
                 "unstick on|off - a mob stuck 10 s on another level (cave, mountain; fliers 20 s, walls too) appears next to its opponent",
+                "duelCard on|off - read-only card with both fighters' stats (health, attack, defense, size, with their buffs) in a 1 vs 1 duel, from the countdown to the end (default off)",
                 "tieBreak damage|kills|random|draw - timeUp health/judge when even on health",
                 "snap - half of the mobs within snapRadius (fighting or not) turn to dust, like the Snap Wand",
                 "snapMode global|team - half of everyone, or half of each side",
                 "snapPercent <1-100> - share that turns to dust (default 50)",
                 "snapTime <1-30> - seconds over which they turn to dust (default 5)",
                 "snapHitDelay <ms> - Snap Wand: wait after the click until the slam hits and the snap fires (default 310, 0-2000)",
-                "snapRadius <blocks> - snap reach without battles (default 30, separate from areaRadius)",
+                "snapRadius <blocks> - snap reach without battles (default 60, separate from areaRadius)",
                 "snapPlayers on|off - the snap takes players in reach too (never you, never Creative; default off)",
                 "timerStyle custom|portal - our own timer box (default) or the game's Void portal box",
                 "timeUp <kind|all> draw|kill|continue|health|judge - when the timer ends (health: most health in % wins; judge: and the losers die, the winners heal)",
-                "stop - end every battle, countdown, timer box, arena, camera shot and battle music",
+                "watch - spectate the nearest running battle (yours first), even after it started: the camera follows a fighter",
+                "  right click: nearest fighter (not seen yet), left click: back to the previous one, mouse: turn the camera, Q or watch exit: leave",
+                "  when the fighter dies the camera goes to its killer; a card shows its stats; after the battle you come back",
+                "stop - end every battle, countdown, timer box, arena, camera shot, battle music and watch",
                 "skipTimer - every running timer jumps to 0: the battles end by their timeUp rule (draw, judge...)",
                 "army clearAll - disband every player's army",
                 "resetAll - stop + teams clearAll + army clearAll + morph reset",
@@ -375,11 +385,17 @@ public class MobBattleCommand extends CommandBase {
     private static Sub buffWho(String who, String desc) {
         java.util.List<Sub> kids = new java.util.ArrayList<>();
         for (Buffs.Stat st : Buffs.Stat.values()) {
-            kids.add(new Sub(st.key, st.key + " %, 0-" + st.max + ("streak".equals(who) ? " per kill" : ""),
+            kids.add(new Sub(st.key, st.key + " %, 0-" + st.max + ("streak".equals(who) ? " per kill" : "wand".equals(who) ? " per click" : ""),
                     words("Percent", "0", "10", "25", "50")));
         }
         kids.add(new Sub("all", "Every stat to the same % (size stops at 200, defense at 90)", words("Percent", "0", "10", "25", "50")));
         kids.add(new Sub("off", "Every stat back to 0"));
+        kids.add(new Sub("heal", "lone".equals(who) ? "Heal the target to full when it is picked (default off)"
+                : "This buff also fills the health (default off: only max health goes up)",
+                new Sub("on", "Heal to full"), new Sub("off", "Don't heal (default)")));
+        if ("wand".equals(who)) {
+            kids.add(new Sub("maxstacks", "Clicks that stack at most (1-" + Buffs.MAX_WAND + ", default 5)", words("Stacks", "1", "3", "5", "10")));
+        }
         if ("streak".equals(who)) {
             kids.add(new Sub("maxkills", "Kills that count at most (1-" + Buffs.MAX_STREAK + ", default 5)", words("Kills", "3", "5", "10")));
         }
@@ -389,8 +405,23 @@ public class MobBattleCommand extends CommandBase {
     /** /mobbattle buff ...; false (after an error reply) if the input is invalid. */
     private static boolean setBuff(CommandContext ctx) {
         String[] a = argsAfter(ctx, "buff");
-        String usage = "Usage: /mobbattle buff <lone|streak|champion> <size|health|damage|defense|all|off> <percent>, "
-                + "buff streak maxKills <1-" + Buffs.MAX_STREAK + ">, buff crown gold|<color>|off";
+        String usage = "Usage: /mobbattle buff <lone|streak|champion|wand> <size|health|damage|defense|all|off> <percent>, "
+                + "buff streak maxKills <1-" + Buffs.MAX_STREAK + ">, buff wand maxStacks <1-" + Buffs.MAX_WAND + ">, "
+                + "buff <who> heal on|off, buff crown gold|<color>|off, buff sparks <1-" + Buffs.MAX_SPARKS_EVERY + " seconds>|off";
+        if (a.length >= 2 && "sparks".equalsIgnoreCase(a[0])) {
+            int s = -1;
+            if ("off".equalsIgnoreCase(a[1])) s = 0;
+            else try {
+                s = Integer.parseInt(a[1].replace("s", ""));
+            } catch (NumberFormatException ignored) {
+            }
+            if (s < 0 || s > Buffs.MAX_SPARKS_EVERY) {
+                reply(ctx, usage, ERR);
+                return false;
+            }
+            Buffs.sparksEvery = s;
+            return true;
+        }
         if (a.length >= 2 && "crown".equalsIgnoreCase(a[0])) {
             String c = Buffs.parseCrown(a[1]);
             if (c == null) {
@@ -406,6 +437,15 @@ public class MobBattleCommand extends CommandBase {
             return false;
         }
         String what = a[1].toLowerCase(java.util.Locale.ROOT);
+        if (what.equals("heal")) {
+            Boolean on = a.length >= 3 ? parseOnOff(a[2]) : null;
+            if (on == null) {
+                reply(ctx, usage, ERR);
+                return false;
+            }
+            Buffs.setHeal(who, on);
+            return true;
+        }
         if (what.equals("off")) {
             for (Buffs.Stat st : Buffs.Stat.values()) Buffs.setPercent(who, st, 0);
             return true;
@@ -421,6 +461,14 @@ public class MobBattleCommand extends CommandBase {
                 return false;
             }
             Buffs.streakMax = v;
+            return true;
+        }
+        if (what.equals("maxstacks") && who == Buffs.Source.WAND) {
+            if (v < 1 || v > Buffs.MAX_WAND) {
+                reply(ctx, usage, ERR);
+                return false;
+            }
+            Buffs.wandMax = v;
             return true;
         }
         Buffs.Stat stat = Buffs.Stat.of(what);
@@ -503,6 +551,7 @@ public class MobBattleCommand extends CommandBase {
             case "camerashots" -> KindFx.Opt.CAMERA_SHOTS;
             case "endcamera" -> KindFx.Opt.END_CAMERA;
             case "endcameratime" -> KindFx.Opt.END_CAMERA_TIME;
+            case "autowatch" -> KindFx.Opt.AUTO_WATCH;
             case "runes" -> KindFx.Opt.RUNES;
             default -> throw new IllegalArgumentException("Not a KindFx option: " + key);
         };
@@ -613,6 +662,8 @@ public class MobBattleCommand extends CommandBase {
                 battleKind("all", "Every kind at once")));
         addSubCommand(new Sub("crown", "Everyone vs one: crown with rays of light over the lone target, 20 s: gold (default), a palette color or off",
                 crownWords()));
+        addSubCommand(new Sub("buffcolor", "Buff Wand look (tint, swirl, burst, aura, rune): a palette color (default yellow = gold)",
+                colorWords()));
         addSubCommand(new Sub("cleansecolor", "Cleanse Wand look (light from above, burst, aura, rune): a palette color (default white)",
                 colorWords()));
         addSubCommand(new Sub("mobfx", "Look on battle mobs per role: <duel|allVsOne|attackers|royale|all> <palette color|default|off>",
@@ -637,6 +688,8 @@ public class MobBattleCommand extends CommandBase {
                 .withDuration());
         addSubCommand(new Sub("unstick", "Battle mobs stuck on another level than their opponent (cave, mountain) appear next to it",
                 new Sub("on", "Bring them together after 10 s (default)"), new Sub("off", "Leave them")));
+        addSubCommand(new Sub("duelcard", "Read-only card with both fighters' stats (health, attack, defense, size) in a 1 vs 1 duel (default off)",
+                new Sub("on", "Show the card from the countdown to the end of the duel"), new Sub("off", "No card")));
         addSubCommand(new Sub("tiebreak", "timeUp health/judge when even on health: damage (default), kills, random or draw",
                 new Sub("damage", "The side that dealt more damage wins"), new Sub("kills", "The side with more kills wins"),
                 new Sub("random", "A coin toss"), new Sub("draw", "It stays a draw")));
@@ -645,7 +698,7 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("snaptime", "Snap: seconds over which they turn to dust, 1-" + FxSettings.MAX_SNAP_SECONDS + " (default 5)"));
         addSubCommand(new Sub("killhitdelay", "Kill Wand: ms from the click to the cast's hit, when the Hakai sound and the disintegration start, 0-" + FxSettings.MAX_SNAP_HIT_DELAY_MS + " (default " + FxSettings.DEFAULT_KILL_HIT_DELAY_MS + ")"));
         addSubCommand(new Sub("snaphitdelay", "Snap Wand: ms from the click to the slam's hit, when the snap fires, 0-" + FxSettings.MAX_SNAP_HIT_DELAY_MS + " (default " + FxSettings.DEFAULT_SNAP_HIT_DELAY_MS + ")"));
-        addSubCommand(new Sub("snapradius", "Snap without battles: reach in blocks (default 30, separate from areaRadius)"));
+        addSubCommand(new Sub("snapradius", "Snap without battles: reach in blocks (default 60, separate from areaRadius)"));
         addSubCommand(new Sub("snapmode", "Snap: global (half of everyone, default) or team (half of each side)",
                 new Sub("global", "Half of everyone, at random"), new Sub("team", "Half of each side")));
         addSubCommand(new Sub("timerstyle", "Timer box: custom (our own, default) or portal (the game's Void portal box)",
@@ -668,7 +721,13 @@ public class MobBattleCommand extends CommandBase {
                 buffWho("lone", "Everyone vs one: the lone target, for that battle"),
                 buffWho("streak", "Per kill in a battle (times its kills, up to maxKills), for that battle"),
                 buffWho("champion", "The winners of a battle, until they die or get the Cleanse Wand"),
-                new Sub("crown", "Crown on streak and champion mobs: gold, a palette color or off", crownWords())));
+                buffWho("wand", "Buff Wand: per click (stacks up to maxStacks), mobs and players, until they die or get cleansed"),
+                new Sub("crown", "Crown on streak, champion and Buff Wand mobs: gold, a palette color or off", crownWords()),
+                new Sub("sparks", "Replay the crown's sparks and rays every N seconds on buffed mobs (default 3, off = only once)",
+                        words("Seconds", "2", "3", "5", "10", "off"))));
+        addSubCommand(new Sub("skipcamera", "End your intro or end camera now (same as crouching while it plays)"));
+        addSubCommand(new Sub("watch","Spectate a running battle: right click = nearest fighter, left click = previous, mouse turns the camera, Q exits",
+                new Sub("exit", "Stop watching: back to your game mode and position")));
         addSubCommand(new Sub("stop", "End every battle, countdown, timer box, arena, camera shot and battle music"));
         addSubCommand(new Sub("reset", "Settings of one group back to default",
                 new Sub("effects", "Waves, border glow, mob looks, crown, runes, area, lasers, team look, wand effects"),
@@ -687,10 +746,12 @@ public class MobBattleCommand extends CommandBase {
                 "auto", "orbit", "duel", "showcase", "teams", "focus", "drone"));
         addSubCommand(kindFxSub("cameratime", "Intro camera seconds, 0 = as long as the countdown; >0 films even with no countdown",
                 "0", "3", "5", "10"));
-        addSubCommand(kindFxSub("camerashots", "Showcase camera: how many fighters it shows", "3", "4", "6"));
+        addSubCommand(kindFxSub("camerashots", "Showcase camera: how many fighters it shows (1 to maxMobs)", "3", "4", "6", "12", "25"));
         addSubCommand(kindFxSub("endcamera", "Camera at the end: off, winner, or lastHit (who landed the final kill), with its kill count",
                 "off", "winner", "lasthit"));
         addSubCommand(kindFxSub("endcameratime", "End camera seconds", "3", "5", "8"));
+        addSubCommand(kindFxSub("autowatch", "Start watching (spectator camera on the fighters) by yourself as soon as the battle starts, after the countdown; it ends any intro camera",
+                "on", "off"));
         addSubCommand(kindFxSub("runes", "Summoning runes and fighter marks at the start", "on", "off"));
         addSubCommand(new Sub("preset", "Presets: built-in or your own (preset list, save, load, delete)",
                 new Sub("list", "Built-in and saved presets"),
@@ -817,7 +878,7 @@ public class MobBattleCommand extends CommandBase {
                 return;
             }
             case "laser", "title", "wintitle", "music", "camera", "countdown", "area",
-                 "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "runes" -> {
+                 "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch", "runes" -> {
                 if (!setKindFx(ctx, optFor(key))) return;
             }
             case "color" -> {
@@ -893,6 +954,15 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.unstick = on;
                 if (!on) Unstick.clear();
+            }
+            case "duelcard" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle duelCard on|off", ERR);
+                    return;
+                }
+                FxSettings.duelCard = on;
+                if (!on) DuelCard.clearAll();
             }
             case "arenashrink" -> {
                 if (!setBattleRule(ctx, "arenashrink", FxSettings.SHRINK, BattleManager.Kind.values())) {
@@ -983,6 +1053,36 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.snapMode = val.toLowerCase(java.util.Locale.ROOT);
+            }
+            case "skipcamera" -> {
+                var ref = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
+                if (ref == null || !ref.isValid()) {
+                    reply(ctx, "Only a player has a camera to skip.", ERR);
+                    return;
+                }
+                var store = ref.getStore();
+                store.getExternalData().getWorld().execute(() -> {
+                    var pr = store.getComponent(ref, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
+                    reply(ctx, pr != null && FightCamera.cancel(pr) ? "Camera skipped." : "No camera to skip.", OK);
+                });
+                return;
+            }
+            case "watch" -> {
+                String[] w = argsAfter(ctx, "watch");
+                var ref = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
+                boolean exit = w.length == 1 && "exit".equalsIgnoreCase(w[0]);
+                if (ref == null || !ref.isValid() || w.length > 1 || (w.length == 1 && !exit)) {
+                    reply(ctx, "Usage (player): /mobbattle watch [exit]", ERR);
+                    return;
+                }
+                var store = ref.getStore();
+                store.getExternalData().getWorld().execute(() -> {
+                    var pr = store.getComponent(ref, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
+                    if (pr == null) return;
+                    if (exit) BattleWatch.exit(pr, ref, store);
+                    else BattleWatch.start(pr, ref, store);
+                });
+                return;
             }
             case "snap" -> {
                 var ref = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
@@ -1329,6 +1429,14 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.cleanseColor = c;
+            }
+            case "buffcolor" -> {
+                String c = Buffs.parseCrown(val);
+                if (c == null || c.equals("off") || c.equals("Gold")) {
+                    reply(ctx, "Usage: /mobbattle buffColor <palette color>  (default yellow = gold)", ERR);
+                    return;
+                }
+                FxSettings.buffColor = c;
             }
             case "wave", "glow" -> {
                 boolean glow = key.equals("glow");
@@ -1680,6 +1788,8 @@ public class MobBattleCommand extends CommandBase {
             int shots = FightCamera.stopAll();
             BattleMusic.stopAll();
             Scoreboard.clearAll();
+            DuelCard.clearAll();
+            BattleWatch.exitAll();
             var sender = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
             FightFx.clearAreas(sender != null && sender.isValid() ? sender.getStore().getExternalData().getWorld() : null);
             String msg = BattleManager.stopAll() + " battles stopped, " + countdowns + " countdowns cancelled"

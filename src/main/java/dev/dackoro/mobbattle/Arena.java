@@ -56,12 +56,16 @@ final class Arena {
     /** Pushed back from this close to the edge; teleported back beyond this far outside it. */
     private static final double EDGE_MARGIN = 1.0;
     private static final double TELEPORT_BEYOND = 8.0;
+    /** Pushes in a row (one per 250 ms) that didn't bring a fighter in (wedged in rock, a cave pocket): teleport it. */
+    private static final int MAX_PUSHES = 8;
     /** Push toward the center (horizontal and up), like a strong hit's knockback. */
     private static final double PUSH = 7.0;
     private static final double PUSH_UP = 2.5;
 
     private static final class State {
         final BattleManager.Battle battle;
+        /** Fighter -> pushes in a row while still outside (world thread only): stuck ones get teleported in. */
+        final java.util.Map<Ref<EntityStore>, Integer> pushes = new java.util.HashMap<>();
         final Store<EntityStore> store;
         final Vector3d center;
         /** Radius at the start; with arenaShrink it closes linearly to endRadius between shrinkFrom and shrinkUntil. */
@@ -164,6 +168,8 @@ final class Arena {
     static void setup(BattleManager.Battle battle, Vector3d center, double radius, String color,
                       ComponentAccessor<EntityStore> buffer) {
         if (battle == null || center == null) return;
+        // /mobbattle autoWatch: right after the battle starts (its countdown is over).
+        BattleWatch.auto(battle);
         Mode mode = FxSettings.arenaMode(battle.kind);
         int seconds = FxSettings.timerSeconds(battle.kind);
         ARENAS.removeIf(s -> s.battle == battle);
@@ -294,9 +300,16 @@ final class Arena {
             if (p == null) continue;
             double dx = p.x - s.center.x, dz = p.z - s.center.z;
             double d = Math.sqrt(dx * dx + dz * dz);
-            if (d <= radius - EDGE_MARGIN || d < 0.01) continue;
+            if (d <= radius - EDGE_MARGIN || d < 0.01) {
+                s.pushes.remove(npc);
+                continue;
+            }
             double ox = dx / d, oz = dz / d;   // outward
-            if (d > radius + TELEPORT_BEYOND) {
+            // Still outside the edge after MAX_PUSHES pushes: the knockback can't move it (e.g. the closing wall
+            // passed a mob wedged in rock). An edge mob just inside the margin is never counted.
+            int pushed = d > radius ? s.pushes.merge(npc, 1, Integer::sum) : 0;
+            if (d > radius + TELEPORT_BEYOND || pushed > MAX_PUSHES) {
+                s.pushes.remove(npc);
                 double r = Math.max(1, radius - 3);
                 double x = s.center.x + ox * r, z = s.center.z + oz * r;
                 // A spot to stand on at about its own height (a cave mob stays low, a mountain one high), else at

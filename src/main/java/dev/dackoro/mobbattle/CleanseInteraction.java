@@ -25,6 +25,28 @@ public class CleanseInteraction extends SimpleInstantInteraction {
             .documentation("Cleanse Wand: removes every effect from the clicked entity.")
             .build();
 
+    /**
+     * Look to the light landing on the mob: MobBattle_Light_&lt;Color&gt; rays start 0.15 s in, 2.5-3 blocks above
+     * the head, falling at 10-15 blocks/s (Effect_Crown_Gold spawners).
+     */
+    private static final long LIGHT_LANDS_MS = 400;
+
+    /** Every buff and effect goes, except the Cleanse look itself. World thread. */
+    static void cleanseNow(com.hypixel.hytale.component.Ref<EntityStore> target, String keepFx,
+                           com.hypixel.hytale.component.ComponentAccessor<EntityStore> accessor) {
+        // Buffs first: they take their crown and put back the scale and max health.
+        Buffs.clearNow(target, accessor);
+        EffectControllerComponent effects = accessor.getComponent(target, EffectControllerComponent.getComponentType());
+        if (effects == null) return;
+        int keep = com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + keepFx);
+        int unmorph = com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + WandFx.UNMORPH);
+        for (int index : effects.getActiveEffectIndexes()) {
+            if (index == keep || index == unmorph) continue;
+            effects.removeEffect(target, index,
+                    com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior.COMPLETE, accessor);
+        }
+    }
+
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
@@ -41,12 +63,20 @@ public class CleanseInteraction extends SimpleInstantInteraction {
             context.getState().state = InteractionState.Failed;
             return;
         }
-        // Buffs first: they put back the model the mob had before its size buff.
-        Buffs.clearNow(target, buffer);
-        effects.clearEffects(target, buffer);
-        boolean unmorphed = MorphWand.restore(target, buffer);
-        WandFx.onTarget(target, WandFx.cleanse(), buffer);
-        if (unmorphed) WandFx.onTarget(target, WandFx.UNMORPH, buffer);
+        // The light comes down now; everything happens when it lands: effects and buffs go (size and health back),
+        // and the morph is undone. The unmorph swaps the model, which drops the look's leftover particles on the
+        // client, so it comes last, with its own Unmorph burst on the restored model.
+        String fx = WandFx.cleanse();
+        WandFx.onTarget(target, fx, buffer);
+        // Played here, not by the effect: re-applying the effect on a quick second click didn't replay its sound.
+        WandFx.burst(null, "SFX_Deployable_Totem_Heal_Despawn", ChaosWand.positionOf(target, buffer), buffer);
+        var store = target.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown() || !target.isValid()) return;
+            cleanseNow(target, fx, store);
+            if (MorphWand.restore(target, store)) WandFx.onTarget(target, WandFx.UNMORPH, store);
+        }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         player.sendMessage(Message.raw("Removed every effect from " + ChaosWand.nameOf(target, buffer) + ".").color("#7fd3ff"));
     }
 }

@@ -29,6 +29,7 @@ import java.util.function.Consumer;
 final class Countdown {
 
     private static final class Pending {
+        final BattleManager.Kind kind;
         final long dueAt;
         final Store<EntityStore> store;
         final PlayerRef player;
@@ -37,8 +38,9 @@ final class Countdown {
         final Consumer<ComponentAccessor<EntityStore>> start;
         volatile boolean cancelled;
 
-        Pending(long dueAt, Store<EntityStore> store, PlayerRef player, String label, Set<Ref<EntityStore>> mobs,
+        Pending(BattleManager.Kind kind, long dueAt, Store<EntityStore> store, PlayerRef player, String label, Set<Ref<EntityStore>> mobs,
                 Consumer<ComponentAccessor<EntityStore>> start) {
+            this.kind = kind;
             this.dueAt = dueAt;
             this.store = store;
             this.player = player;
@@ -72,7 +74,7 @@ final class Countdown {
             return;
         }
         Store<EntityStore> store = buffer.getExternalData().getWorld().getEntityStore().getStore();
-        Pending p = new Pending(System.currentTimeMillis() + seconds * 1000L, store, player, label, set, start);
+        Pending p = new Pending(kind, System.currentTimeMillis() + seconds * 1000L, store, player, label, set, start);
         synchronized (Countdown.class) {
             // With recomputeNextDue: an add on one world thread is never lost by a recompute on another.
             PENDING.add(p);
@@ -153,6 +155,20 @@ final class Countdown {
             if (!p.cancelled && p.player.getUuid().equals(player)) return true;
         }
         return false;
+    }
+
+    /** A duel's countdown still running: who started it and its fighters (DuelCard shows them before the fight). */
+    record PendingDuel(PlayerRef player, Store<EntityStore> store, List<Ref<EntityStore>> mobs) {
+    }
+
+    static List<PendingDuel> pendingDuels() {
+        List<PendingDuel> out = new java.util.ArrayList<>();
+        for (Pending p : PENDING) {
+            if (!p.cancelled && p.kind == BattleManager.Kind.DUEL && p.mobs.size() == 2) {
+                out.add(new PendingDuel(p.player, p.store, new java.util.ArrayList<>(p.mobs)));
+            }
+        }
+        return out;
     }
 
     static boolean hasPending() {

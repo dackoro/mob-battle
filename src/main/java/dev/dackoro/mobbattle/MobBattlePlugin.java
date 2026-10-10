@@ -54,6 +54,8 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(TeamSelectInteraction.TYPE, TeamSelectInteraction.class, TeamSelectInteraction.CODEC)
                 .register(TeamActionInteraction.TYPE, TeamActionInteraction.class, TeamActionInteraction.CODEC)
                 .register(CleanseInteraction.TYPE, CleanseInteraction.class, CleanseInteraction.CODEC)
+                .register(BuffGiveInteraction.TYPE, BuffGiveInteraction.class, BuffGiveInteraction.CODEC)
+                .register(BuffTakeInteraction.TYPE, BuffTakeInteraction.class, BuffTakeInteraction.CODEC)
                 .register(EffectGiveInteraction.TYPE, EffectGiveInteraction.class, EffectGiveInteraction.CODEC)
                 .register(EffectCycleInteraction.TYPE, EffectCycleInteraction.class, EffectCycleInteraction.CODEC)
                 .register(SummonToggleInteraction.TYPE, SummonToggleInteraction.class, SummonToggleInteraction.CODEC)
@@ -61,12 +63,17 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(MorphCopyInteraction.TYPE, MorphCopyInteraction.class, MorphCopyInteraction.CODEC)
                 .register(MorphApplyInteraction.TYPE, MorphApplyInteraction.class, MorphApplyInteraction.CODEC)
                 .register(ArmyToggleInteraction.TYPE, ArmyToggleInteraction.class, ArmyToggleInteraction.CODEC)
-                .register(ArmyDisbandInteraction.TYPE, ArmyDisbandInteraction.class, ArmyDisbandInteraction.CODEC);
+                .register(ArmyDisbandInteraction.TYPE, ArmyDisbandInteraction.class, ArmyDisbandInteraction.CODEC)
+                .register(WatchInteraction.Prev.TYPE, WatchInteraction.Prev.class, WatchInteraction.Prev.CODEC)
+                .register(WatchInteraction.Next.TYPE, WatchInteraction.Next.class, WatchInteraction.Next.CODEC)
+                .register(WatchInteraction.Exit.TYPE, WatchInteraction.Exit.class, WatchInteraction.Exit.CODEC);
         getEntityStoreRegistry().registerSystem(new FightDamageSystem());
         getEntityStoreRegistry().registerSystem(new ArmyPlayerDamageSystem());
         getEntityStoreRegistry().registerSystem(new PlayerBattleDamageSystem());
+        getEntityStoreRegistry().registerSystem(new BuffDamageSystem());
         getEntityStoreRegistry().registerSystem(new PlayerDeathSystem());
         getEntityStoreRegistry().registerSystem(new KillTracker());
+        getEntityStoreRegistry().registerSystem(new BattleUnloadSystem());
         getEntityStoreRegistry().registerSystem(new FightTickSystem());
         getEntityStoreRegistry().registerSystem(new BattleLifecycleSystem());
         FxSettings.load(getDataDirectory());

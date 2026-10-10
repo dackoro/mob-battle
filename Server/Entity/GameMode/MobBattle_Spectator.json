@@ -1,0 +1,33 @@
+{
+  "Parent": "Spectator",
+  "OverrideAllInteractions": true,
+  "InteractionOverrides": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_WatchPrev"
+        }
+      ],
+      "RequireNewClick": true,
+      "HudInputBindingEntry": "server.mobbattle.watch.prev"
+    },
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_WatchNext"
+        }
+      ],
+      "RequireNewClick": true,
+      "HudInputBindingEntry": "server.mobbattle.watch.next"
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_WatchExit"
+        }
+      ],
+      "RequireNewClick": true,
+      "HudInputBindingEntry": "server.mobbattle.watch.exit"
+    }
+  }
+}

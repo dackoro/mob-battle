@@ -107,7 +107,8 @@ for color, hexc in PALETTE.items():
                 {'SystemId': 'MobBattle_Mark_Aura_' + color, 'TargetEntityPart': 'Entity'},
                 {'SystemId': 'MobBattle_Mark_Rune_' + color, 'TargetEntityPart': 'Entity'},
             ],
-            'WorldSoundEventId': 'SFX_Deployable_Totem_Heal_Despawn',
+            # No sound here: CleanseInteraction plays it on every click (an effect put on again within a moment
+            # did not replay its sound on quick clicks).
         },
         'OverlapBehavior': 'Overwrite',
         'Debuff': False,

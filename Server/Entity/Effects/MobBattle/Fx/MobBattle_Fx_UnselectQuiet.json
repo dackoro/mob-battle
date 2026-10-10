@@ -1,0 +1,17 @@
+{
+  "$Comment": "Buff Wand right click: same grey look as Unselect without its sound (BuffTakeInteraction plays the sound itself, because an effect's sound does not replay on a quick second click).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#9a9a9a",
+    "EntityBottomTint": "#3a3a3a",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Grey_Burst",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

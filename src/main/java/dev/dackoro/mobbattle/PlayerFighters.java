@@ -47,10 +47,11 @@ final class PlayerFighters {
         return ref != null && ref.isValid() && accessor.getComponent(ref, PlayerRef.getComponentType()) != null;
     }
 
-    /** True if {@code ref} is a player in Creative (they never fight). */
+    /** True if {@code ref} is a player in Creative or spectating (/spectate, /mobbattle watch): they never fight. */
     static boolean isCreative(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
         Player p = ref != null && ref.isValid() ? accessor.getComponent(ref, Player.getComponentType()) : null;
-        return p != null && p.getGameMode() == GameMode.Creative;
+        return p != null && (p.getGameMode() == GameMode.Creative
+                || com.hypixel.hytale.server.core.modules.entity.component.Spectating.isSpectating(ref, accessor));
     }
 
     /**

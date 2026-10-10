@@ -42,6 +42,8 @@ final class WandFx {
     static final String SUMMON_REMOVE = "SummonRemove";
     static final String FAIL = "Fail";
     static final String UNSELECT = "Unselect";
+    /** Unselect without its sound (Buff Wand right click plays the sound itself, see BuffTakeInteraction). */
+    static final String UNSELECT_QUIET = "UnselectQuiet";
     static final String ARMY_ADD = "ArmyAdd";
     static final String ARMY_REMOVE = "ArmyRemove";
     /**
@@ -56,7 +58,7 @@ final class WandFx {
     static final String MARK = "Mark_";
     private static final String[] ALL_FX = java.util.stream.Stream.concat(
             java.util.stream.Stream.of(HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, EFFECT,
-                    COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, ARMY_ADD, ARMY_REMOVE),
+                    COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, UNSELECT_QUIET, ARMY_ADD, ARMY_REMOVE),
             Teams.PALETTE.keySet().stream().flatMap(c -> java.util.stream.Stream.of(MARK + c, CLEANSE + c)))
             .toArray(String[]::new);
 
@@ -130,6 +132,48 @@ final class WandFx {
                 effects.addEffect(target, effect, buffer);
             }
         }
+    }
+
+    /** Gap between taking a running swirl off and putting it on again, so the client sees a new one. */
+    private static final long SWIRL_RESTART_MS = 60;
+
+    /**
+     * The swirl effect (Swirl_&lt;color&gt;, follows the mob) on every click. A swirl still running (1 s) only
+     * refreshes its time on a new add, and a remove plus add in the same tick shows nothing either, so a running one
+     * is taken off now and put on again a moment later. Only the swirl: other wand effects are untouched.
+     */
+    static void swirlNow(Ref<EntityStore> target, String color, ComponentAccessor<EntityStore> buffer) {
+        if (!FxSettings.wandFx || target == null || !target.isValid()) return;
+        String fx = SWIRL + color;
+        EffectControllerComponent effects = buffer.getComponent(target, EffectControllerComponent.getComponentType());
+        int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + fx);
+        if (effects == null || index < 0 || !effects.hasEffect(index)) {
+            onTarget(target, fx, buffer);
+            return;
+        }
+        effects.removeEffect(target, index,
+                com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior.COMPLETE, buffer);
+        com.hypixel.hytale.component.Store<EntityStore> store = target.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (!store.isShutdown() && target.isValid()) onTarget(target, fx, store);
+        }), SWIRL_RESTART_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** Time for a size change (EntityScaleComponent) to reach the client before particles go on the mob. */
+    static final long MODEL_SETTLE_MS = 200;
+
+    /**
+     * {@link #swirlNow} once a size change made in this tick has reached the client: a new scale rebuilds the mob
+     * there and drops the particles already on it (Buff Wand give/take changed the size and lost the swirl).
+     */
+    static void swirlLater(Ref<EntityStore> target, String color) {
+        if (!FxSettings.wandFx || target == null || !target.isValid()) return;
+        com.hypixel.hytale.component.Store<EntityStore> store = target.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (!store.isShutdown() && target.isValid()) swirlNow(target, color, store);
+        }), MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** The swirl in the palette color {@code hex} (#RRGGBB of Teams.PALETTE); nothing for other colors. */

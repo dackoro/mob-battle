@@ -31,6 +31,7 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
     @Override
     public void onComponentAdded(Ref<EntityStore> ref, DeathComponent death, Store<EntityStore> store,
                                  CommandBuffer<EntityStore> buffer) {
+        Buffs.onPlayerDeath(ref);
         if (!BattleManager.isPlayerFighter(ref)) {
             return;
         }

@@ -55,6 +55,8 @@ public class KillTracker extends RefChangeSystem<EntityStore, DeathComponent> {
             return;
         }
         battle.recordKill(killer, ChaosWand.nameOf(killer, buffer), team);
+        // /mobbattle watch: whoever watched the victim now follows its killer.
+        BattleWatch.onKill(victim, killer, buffer);
         // /mobbattle buff streak: % per kill in this battle, up to maxKills.
         BattleManager.Kills k = battle.kills.get(killer);
         if (k != null && Buffs.enabled(Buffs.Source.STREAK)) {

@@ -78,7 +78,8 @@ final class FightCamera {
         // Never let a camera problem break the fight that called it.
         try {
             int seconds = KindFx.introSeconds(kind);
-            if (seconds <= 0 || player == null || !player.isValid()) return;
+            // A /mobbattle watch spectator keeps the camera they chose.
+            if (seconds <= 0 || player == null || !player.isValid() || BattleWatch.isWatching(player)) return;
             List<List<Ref<EntityStore>>> live = new ArrayList<>();
             List<Ref<EntityStore>> all = new ArrayList<>();
             for (List<Ref<EntityStore>> side : sides) {
@@ -112,6 +113,10 @@ final class FightCamera {
                 case "drone" -> drone(player, center, all, total, buffer);
                 default -> showcase(player, all, KindFx.cameraShots(kind), total, buffer);
             }
+            // Remember what this intro films, so the battle's end cuts it (battleOver); the end camera is never cut.
+            Long shot = SHOT.get(player.getUuid());
+            INTROS.put(player.getUuid(), new Intro(shot != null ? shot : ORBIT_ID, java.util.Set.copyOf(all)));
+            watchSkip(player, buffer.getExternalData().getWorld());
         } catch (RuntimeException e) {
             MobBattlePlugin.log("Fight camera failed: " + e);
             reset(player);
@@ -131,7 +136,7 @@ final class FightCamera {
                                   ComponentAccessor<EntityStore> buffer) {
         try {
             if ("off".equals(KindFx.endCamera(kind)) || player == null || !player.isValid()
-                    || focus == null || !focus.isValid()) return;
+                    || focus == null || !focus.isValid() || BattleWatch.isWatching(player)) return;
             Ref<EntityStore> me = player.getReference();
             // Dead (respawn screen) or in another world: nothing to film for them.
             if (me == null || !me.isValid() || me.getStore() != focus.getStore() || !BattleManager.isAlive(me, buffer)) return;
@@ -145,6 +150,7 @@ final class FightCamera {
                 return closeUp(p, track.yaw(focus, acc), eye, swing, Math.max(4, eye * 2.6), eye * 0.6 + 1.2);
             }));
             playShots(player, buffer.getExternalData().getWorld(), shots);
+            watchSkip(player, buffer.getExternalData().getWorld());
         } catch (RuntimeException e) {
             MobBattlePlugin.log("End camera failed: " + e);
             reset(player);
@@ -639,11 +645,13 @@ final class FightCamera {
     /** Per player: when their orbit sequence ends, so /mobbattle stop can cut it short. */
     private static final Map<UUID, Long> ORBITS = new ConcurrentHashMap<>();
 
-    /** BattleManager.maintain: forgets orbits that already ended. */
+    /** BattleManager.maintain: forgets orbits and intros that already ended. */
     static void prune() {
-        if (ORBITS.isEmpty()) return;
+        if (ORBITS.isEmpty() && INTROS.isEmpty()) return;
         long now = System.currentTimeMillis();
         ORBITS.values().removeIf(end -> end <= now);
+        INTROS.entrySet().removeIf(e -> e.getValue().id() == ORBIT_ID
+                ? !ORBITS.containsKey(e.getKey()) : !Long.valueOf(e.getValue().id()).equals(SHOT.get(e.getKey())));
     }
 
     /**
@@ -655,29 +663,111 @@ final class FightCamera {
         long now = System.currentTimeMillis();
         java.util.Set<UUID> players = new java.util.HashSet<>(SHOT.keySet());
         SHOT.clear();
+        INTROS.clear();
         ORBITS.forEach((id, end) -> { if (end > now) players.add(id); });
         java.util.Set<UUID> orbiting = new java.util.HashSet<>(ORBITS.keySet());
         ORBITS.clear();
         for (UUID id : players) {
             PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(id);
-            if (p == null || !p.isValid()) continue;
-            Ref<EntityStore> ref = p.getReference();
-            if (ref == null || !ref.isValid()) continue;
-            var store = ref.getStore();
-            store.getExternalData().getWorld().execute(() -> {
-                if (orbiting.contains(id)) {
-                    Eye eye = eyeOf(p, store);
-                    if (eye != null) {
-                        CameraSequenceBuilder cut = new CameraSequenceBuilder();
-                        cut.keyframe(eye.pos, eye.look, 0.3f, EasingType.SineOut);
-                        cut.addFlag(CameraSequenceFlags.ReturnToGameplayCameraOnEnd);
-                        cut.sendTo(p);
-                    }
-                }
-                reset(p);
-            });
+            if (p != null && p.isValid()) cut(p, orbiting.contains(id));
         }
         return players.size();
+    }
+
+    /** Intro shots that a player's battle ending cuts short: the sequence id (or ORBIT_ID) and who it films. */
+    private record Intro(long id, java.util.Set<Ref<EntityStore>> fighters) {
+    }
+
+    private static final long ORBIT_ID = -1;
+    private static final Map<UUID, Intro> INTROS = new ConcurrentHashMap<>();
+
+    /**
+     * BattleManager.finish: an intro still filming any of these fighters ends at once (the battle is over, e.g. a
+     * quick duel). The end camera (endCamera winner / lastHit) is not an intro, so it keeps playing.
+     */
+    static void battleOver(java.util.Collection<Ref<EntityStore>> fighters) {
+        if (INTROS.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        for (Map.Entry<UUID, Intro> e : INTROS.entrySet()) {
+            Intro intro = e.getValue();
+            if (java.util.Collections.disjoint(intro.fighters(), fighters)) continue;
+            UUID id = e.getKey();
+            INTROS.remove(id, intro);
+            PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(id);
+            if (p == null || !p.isValid()) continue;
+            if (intro.id() == ORBIT_ID) {
+                Long end = ORBITS.get(id);
+                if (end != null && end > now && ORBITS.remove(id, end)) cut(p, true);
+            } else if (SHOT.remove(id, intro.id())) {
+                cut(p, false);
+            }
+        }
+    }
+
+    /** Crouching or /mobbattle skipCamera: this player's intro or end camera ends now. Returns false if none. */
+    static boolean cancel(PlayerRef player) {
+        if (player == null) return false;
+        UUID id = player.getUuid();
+        INTROS.remove(id);
+        Long end = ORBITS.remove(id);
+        boolean orbit = end != null && end > System.currentTimeMillis();
+        boolean shot = SHOT.remove(id) != null;
+        if (orbit || shot) cut(player, orbit);
+        return orbit || shot;
+    }
+
+    /** Back to the player's view: a short glide for an orbit (a new sequence replaces it), then the normal camera. */
+    private static void cut(PlayerRef p, boolean orbiting) {
+        Ref<EntityStore> ref = p.getReference();
+        if (ref == null || !ref.isValid()) return;
+        var store = ref.getStore();
+        store.getExternalData().getWorld().execute(() -> {
+            if (orbiting) {
+                Eye eye = eyeOf(p, store);
+                if (eye != null) {
+                    CameraSequenceBuilder cut = new CameraSequenceBuilder();
+                    cut.keyframe(eye.pos, eye.look, 0.3f, EasingType.SineOut);
+                    cut.addFlag(CameraSequenceFlags.ReturnToGameplayCameraOnEnd);
+                    cut.sendTo(p);
+                }
+            }
+            reset(p);
+        });
+    }
+
+    private static final long SKIP_POLL_MS = 100;
+    /** Players already told once this session that crouching skips a camera. */
+    private static final java.util.Set<UUID> SKIP_HINTED = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Crouching skips the running camera. Polled on the world thread while the shot or orbit lasts; a crouch held
+     * when it started has to be let go first, so the crouch + Battle Wand that started a fight doesn't skip it.
+     */
+    private static void watchSkip(PlayerRef player, com.hypixel.hytale.server.core.universe.world.World world) {
+        UUID id = player.getUuid();
+        Long shot = SHOT.get(id);
+        boolean orbit = shot == null && ORBITS.containsKey(id);
+        if (shot == null && !orbit) return;
+        if (SKIP_HINTED.add(id)) {
+            player.sendMessage(com.hypixel.hytale.server.core.Message.raw("Crouch to skip the camera.").color("#aaaaaa"));
+        }
+        boolean[] armed = {false};
+        Runnable[] poll = new Runnable[1];
+        poll[0] = () -> world.execute(() -> {
+            boolean running = orbit ? ORBITS.getOrDefault(id, 0L) > System.currentTimeMillis() : shot.equals(SHOT.get(id));
+            Ref<EntityStore> ref = player.getReference();
+            if (!running || !player.isValid() || ref == null || !ref.isValid()) return;
+            boolean crouch = PlayerFighters.crouching(ref, ref.getStore());
+            if (!crouch) {
+                armed[0] = true;
+            } else if (armed[0]) {
+                MobBattlePlugin.debug("camera skipped by " + player.getUsername());
+                cancel(player);
+                return;
+            }
+            HytaleServer.SCHEDULED_EXECUTOR.schedule(poll[0], SKIP_POLL_MS, TimeUnit.MILLISECONDS);
+        });
+        HytaleServer.SCHEDULED_EXECUTOR.schedule(poll[0], SKIP_POLL_MS, TimeUnit.MILLISECONDS);
     }
 
     /** Ends on the player's own eye view (a glide back) and plays it. */

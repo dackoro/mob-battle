@@ -24,6 +24,7 @@ final class KindFx {
         CAMERA_SHOTS("cameraShots"),
         END_CAMERA("endCamera"),
         END_CAMERA_TIME("endCameraTime"),
+        AUTO_WATCH("autoWatch"),
         START_TITLE("startTitle"),
         WIN_TITLE("winTitle"),
         MUSIC("music"),
@@ -46,7 +47,10 @@ final class KindFx {
     static final String[] CAMERA_STYLES = {"auto", "orbit", "duel", "showcase", "teams", "focus", "drone"};
     static final String[] END_CAMERAS = {"off", "winner", "lasthit"};
     static final int MAX_CAMERA_TIME = 30;
-    static final int MAX_CAMERA_SHOTS = 12;
+    /** cameraShots goes up to maxMobs: a battle never has more fighters to show. */
+    static int maxCameraShots() {
+        return FxSettings.maxMobs;
+    }
     static final int MAX_END_CAMERA_TIME = 15;
 
     /** Kind -> option -> value (canonical, see {@link #parse}). Missing = the global value. */
@@ -108,6 +112,11 @@ final class KindFx {
 
     static int endCameraSeconds(BattleManager.Kind kind) {
         return Math.max(1, intOf(get(kind, Opt.END_CAMERA_TIME)));
+    }
+
+    /** /mobbattle autoWatch: the camera viewers start watching (BattleWatch) as soon as the battle starts. */
+    static boolean autoWatch(BattleManager.Kind kind) {
+        return "on".equals(get(kind, Opt.AUTO_WATCH));
     }
 
     static boolean startTitle(BattleManager.Kind kind) {
@@ -177,6 +186,7 @@ final class KindFx {
             case CAMERA_SHOTS -> String.valueOf(FxSettings.cameraShots);
             case END_CAMERA -> FxSettings.endCamera;
             case END_CAMERA_TIME -> String.valueOf(FxSettings.endCameraSeconds);
+            case AUTO_WATCH -> onOff(FxSettings.autoWatch);
             case START_TITLE -> onOff(FxSettings.titleEnabled);
             case WIN_TITLE -> onOff(FxSettings.winTitleEnabled);
             case MUSIC -> FxSettings.battleMusic ? FxSettings.musicTrack : "off";
@@ -196,6 +206,7 @@ final class KindFx {
             case CAMERA_SHOTS -> FxSettings.cameraShots = intOf(value);
             case END_CAMERA -> FxSettings.endCamera = value;
             case END_CAMERA_TIME -> FxSettings.endCameraSeconds = intOf(value);
+            case AUTO_WATCH -> FxSettings.autoWatch = "on".equals(value);
             case START_TITLE -> FxSettings.titleEnabled = "on".equals(value);
             case WIN_TITLE -> FxSettings.winTitleEnabled = "on".equals(value);
             case MUSIC -> {
@@ -223,9 +234,9 @@ final class KindFx {
         return switch (opt) {
             case COUNTDOWN -> number(lower, 0, FxSettings.MAX_COUNTDOWN);
             case CAMERA_TIME -> number(lower, 0, MAX_CAMERA_TIME);
-            case CAMERA_SHOTS -> number(lower, 1, MAX_CAMERA_SHOTS);
+            case CAMERA_SHOTS -> number(lower, 1, maxCameraShots());
             case END_CAMERA_TIME -> number(lower, 1, MAX_END_CAMERA_TIME);
-            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES -> onOffWord(lower);
+            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH -> onOffWord(lower);
             case CAMERA_STYLE -> oneOf(lower, CAMERA_STYLES);
             case END_CAMERA -> oneOf(lower, END_CAMERAS);
             case AREA_STYLE -> FxSettings.parseAreaStyle(lower);
@@ -243,9 +254,9 @@ final class KindFx {
         return switch (opt) {
             case COUNTDOWN -> "<seconds 0-" + FxSettings.MAX_COUNTDOWN + ">";
             case CAMERA_TIME -> "<seconds 0-" + MAX_CAMERA_TIME + "> (0 = as long as the countdown)";
-            case CAMERA_SHOTS -> "<1-" + MAX_CAMERA_SHOTS + ">";
+            case CAMERA_SHOTS -> "<1-" + maxCameraShots() + "> (up to maxMobs)";
             case END_CAMERA_TIME -> "<seconds 1-" + MAX_END_CAMERA_TIME + ">";
-            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES -> "on|off";
+            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH -> "on|off";
             case CAMERA_STYLE -> "auto|orbit|duel|showcase|teams|focus|drone";
             case END_CAMERA -> "off|winner|lastHit";
             case AREA_STYLE -> String.join("|", FxSettings.AREA_STYLES);

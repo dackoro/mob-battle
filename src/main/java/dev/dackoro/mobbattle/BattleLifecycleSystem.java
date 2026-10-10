@@ -29,7 +29,11 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextScore =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextCard =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextPlayers =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextWatch =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     @Override
@@ -63,6 +67,15 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             nextScore.put(store, now + INTERVAL_MS);
             // HUD changes on the world thread, outside the system iteration.
             store.getExternalData().getWorld().execute(() -> Scoreboard.tick(store));
+        }
+        if (DuelCard.any() && now >= nextCard.getOrDefault(store, 0L)) {
+            nextCard.put(store, now + INTERVAL_MS);
+            store.getExternalData().getWorld().execute(() -> DuelCard.tick(store));
+        }
+        if (BattleWatch.any() && now >= nextWatch.getOrDefault(store, 0L)) {
+            nextWatch.put(store, now + FightFx.TEAM_RING_REFRESH_MS);
+            // Camera targets and the watch card outside the system iteration, on the world thread.
+            store.getExternalData().getWorld().execute(() -> BattleWatch.tick(store));
         }
         if (Arena.any() && now >= nextArena.getOrDefault(store, 0L)) {
             nextArena.put(store, now + ARENA_MS);

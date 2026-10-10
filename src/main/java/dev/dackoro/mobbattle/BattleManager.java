@@ -82,6 +82,8 @@ public final class BattleManager {
         volatile boolean over;
         /** Time up with timeUp continue or kill: the end gets no winner title. */
         volatile boolean silent;
+        /** A living fighter was unloaded with its chunk (BattleUnloadSystem): checkWinner cancels it, no winner. */
+        volatile boolean abandoned;
         /** Time up with timeUp kill / judge: members are disintegrated (FightTickSystem), except survivorTeam's. */
         volatile boolean killAll;
         /** Damage each side dealt to its enemies (FightDamageSystem), for the tieBreak damage rule. */
@@ -331,10 +333,21 @@ public final class BattleManager {
     }
 
     private static void finish(Battle battle, List<Ref<EntityStore>> formerMembers) {
+        finish(battle, formerMembers, Set.of());
+    }
+
+    /** How long the winning team keeps its team look (tint, mist) after a team battle, to see who won. */
+    static final int WINNER_LOOK_SECONDS = 8;
+
+    /** keepLook: winners whose team look stays WINNER_LOOK_SECONDS longer. */
+    private static void finish(Battle battle, List<Ref<EntityStore>> formerMembers, Set<Ref<EntityStore>> keepLook) {
         battle.over = true;
         BATTLES.remove(battle);
         killSummary(battle);
         List<Ref<EntityStore>> all = battle.snapshot();
+        // An intro camera still filming this battle ends with it (the end camera keeps playing).
+        FightCamera.battleOver(formerMembers);
+        FightCamera.battleOver(all);
         // The lone and streak buffs go (formerMembers: a mob may have just been detached), and the lone target's crown.
         for (Ref<EntityStore> r : formerMembers) Buffs.endBattle(r);
         if (battle.kind == Kind.ALL_VS_ONE) WandFx.removeCrownsLater(formerMembers);
@@ -345,8 +358,22 @@ public final class BattleManager {
                 continue;
             }
             FightManager.queueStop(npc, formerMembers);
-            if (battle.isTeams()) TeamFx.clear(npc);
+            if (battle.isTeams() && !keepLook.contains(npc)) TeamFx.clear(npc);
         }
+        if (battle.isTeams() && !keepLook.isEmpty()) {
+            List<Ref<EntityStore>> winners = new ArrayList<>(keepLook);
+            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+                for (Ref<EntityStore> npc : winners) {
+                    // Put in a new team or battle meanwhile: it keeps its new look.
+                    if (npc.isValid() && battleOf(npc) == null && !inDraft(npc)) TeamFx.clear(npc);
+                }
+            }, WINNER_LOOK_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
+        }
+    }
+
+    private static boolean inDraft(Ref<EntityStore> npc) {
+        for (Draft d : DRAFTS.values()) if (d.teamOf(npc) >= 0) return true;
+        return false;
     }
 
     private BattleManager() {
@@ -659,6 +686,15 @@ public final class BattleManager {
         if (battle.over) {
             return;
         }
+        if (battle.abandoned) {
+            // Fighters unloaded with their chunks (no player near): they didn't die, so nobody wins.
+            finish(battle);
+            MobBattlePlugin.log("Battle cancelled: fighters were unloaded");
+            if (!battle.silent && battle.owner != null && battle.owner.isValid()) {
+                battle.owner.sendMessage(Message.raw("Battle cancelled: some fighters were unloaded (too far from every player). No winner.").color("#aaaaaa"));
+            }
+            return;
+        }
         Set<Integer> aliveTeams = new HashSet<>();
         Ref<EntityStore> lastAlive = null;
         int alive = 0;
@@ -677,7 +713,14 @@ public final class BattleManager {
         }
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " over: " + outcome + ", sides alive " + aliveTeams
                 + ", fighters alive " + alive + ", damage by side " + battle.damageBy + (expired ? " (15 min limit)" : ""));
-        finish(battle);
+        Set<Ref<EntityStore>> keepLook = new HashSet<>();
+        if (outcome == BattleOutcome.WIN && battle.isTeams()) {
+            int side = aliveTeams.iterator().next();
+            for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+                if (e.getValue() == side && !isPlayerFighter(e.getKey()) && isAlive(e.getKey(), buffer)) keepLook.add(e.getKey());
+            }
+        }
+        finish(battle, battle.snapshot(), keepLook);
         // /mobbattle buff champion: the winners keep an edge (after finish, which took their battle buffs).
         if (outcome == BattleOutcome.WIN && Buffs.enabled(Buffs.Source.CHAMPION)) {
             int side = aliveTeams.iterator().next();
