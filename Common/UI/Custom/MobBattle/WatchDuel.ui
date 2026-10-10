@@ -1,0 +1,45 @@
+// Mob Battle /mobbattle watch card for a 1v1 duel (BattleWatch.java): both fighters and their stats, the watched one
+// tagged "Watching" (two mobs of the same kind have the same name). Same spot and look as WatchCard.ui / DuelCard.ui.
+// Paths are relative to this file. A malformed property makes the client reject the whole HUD, so change one thing
+// at a time.
+Group {
+  Anchor: (Left: 24, Top: 110, Width: 270);
+  LayoutMode: Top;
+
+  Group #Header {
+    Anchor: (Height: 34);
+    Background: (TexturePath: "../Common/ContainerHeader.png", HorizontalBorder: 50, VerticalBorder: 0);
+    Padding: (Top: 6);
+
+    Label #Title {
+      Text: "Duel";
+      Style: (FontSize: 14, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
+              HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+  }
+
+  Group #Body {
+    Anchor: (Height: 298);
+    LayoutMode: Top;
+    Padding: (Horizontal: 16, Vertical: 8);
+    Background: (TexturePath: "../Common/ContainerPatch.png", Border: 23);
+
+    Label #NameA { Anchor: (Height: 22); Text: ""; Style: (FontSize: 15, RenderBold: true, RenderUppercase: true); }
+    Label #TagA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #HealthA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #AttackA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #DefenseA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #SizeA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+
+    Label #Vs { Anchor: (Height: 26); Text: "VS"; Style: (FontSize: 14, TextColor: #96a9be, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center); }
+
+    Label #NameB { Anchor: (Height: 22); Text: ""; Style: (FontSize: 15, RenderBold: true, RenderUppercase: true); }
+    Label #TagB { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #HealthB { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #AttackB { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #DefenseB { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+    Label #SizeB { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
+
+    Label #Left { Anchor: (Height: 22); Text: ""; Style: (FontSize: 12, RenderBold: true, VerticalAlignment: Center); }
+  }
+}

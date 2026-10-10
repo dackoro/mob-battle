@@ -64,6 +64,8 @@ final class WandFx {
     /** Every wand effect except SOUL_RIP, removed before a new one is put on (their tints would mix). */
     /** Swirl (remolino) in a palette color, no tint: MobBattle_Fx_Swirl_<Color> (Team Wand pick). */
     static final String SWIRL = "Swirl_";
+    /** Buff Wand light from the sky in a palette color (/mobbattle buffLight), no tint: MobBattle_Fx_BuffLight_<Color>. */
+    static final String BUFF_LIGHT = "BuffLight_";
     /** Battle mark in a palette color (/mobbattle mobFx): MobBattle_Fx_Mark_<Color>. */
     static final String MARK = "Mark_";
     private static final String[] ALL_FX = java.util.stream.Stream.concat(
@@ -162,7 +164,7 @@ final class WandFx {
             // Two tints at once mix (e.g. green + red = a washed-out white): remove every other wand tint
             // first, so only the newest one shows (tintless ones, e.g. Unmorph on top of Cleanse, only restart
             // themselves). The soul rip (pending kill) is never replaced.
-            boolean tinted = !TINTLESS.contains(fx) && !fx.startsWith(SWIRL) && !fx.startsWith("Crown");
+            boolean tinted = !TINTLESS.contains(fx) && !fx.startsWith(SWIRL) && !fx.startsWith("Crown") && !fx.startsWith(BUFF_LIGHT);
             for (String other : ALL_FX) {
                 if (!tinted && !other.equals(fx)) continue;
                 int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + other);

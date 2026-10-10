@@ -454,7 +454,9 @@ final class ConfigSchema {
                 choice("fx.crown", "Crown on the lone target", "Gold, a palette color or off.",
                         () -> with(opts("Gold", "off"), palette())),
                 choice("wand.cleanse.color", "Cleanse Wand color", "Light and look of the Cleanse Wand.", ConfigSchema::palette),
-                choice("wand.buff.color", "Buff Wand color", "Tint, swirl and aura of the Buff Wand.", ConfigSchema::palette)));
+                choice("wand.buff.color", "Buff color", "Buff Wand mark and swirl, and the shimmer of buffed mobs (default purple).", ConfigSchema::palette),
+                choice("wand.buff.light", "Buff Wand light", "Light from the sky that brings the buff: buff = in the buff color (default), a color, or off (the buff lands at once).",
+                        () -> with(opts("buff", "off"), palette()))));
         looks.add(section("Waves and borders per action"));
         for (ActionFx.Action a : ActionFx.Action.values()) {
             looks.add(choice("wave." + a.key, label(a.key) + " wave", "Shockwave color when it happens (off = none).",
@@ -487,8 +489,7 @@ final class ConfigSchema {
         buffs.add(section("Limits and looks"));
         buffs.add(number("buff.streak.maxkills", "Streak max kills", 1, Buffs.MAX_STREAK, "kills", "Kills that count at most for the streak buff."));
         buffs.add(number("buff.wand.maxstacks", "Buff Wand max stacks", 1, Buffs.MAX_WAND, "clicks", "Most Buff Wand clicks on one mob."));
-        buffs.add(number("buff.sparks", "Aura repeat", 0, Buffs.MAX_SPARKS_EVERY, "seconds, 0 = off", "How often the buff aura repeats."));
-        buffs.add(choice("buff.crown", "Buffed mobs' crown", "Crown of streak, champion and Buff Wand mobs.",
+        buffs.add(choice("buff.crown", "Buffed mobs' crown", "Crown of streak, champion and Buff Wand mobs (default off).",
                 () -> with(opts("Gold", "off"), palette())));
         pages.add(new Page("Buffs", "Battle buffs: size, health, damage and defense.", buffs, null, false));
 

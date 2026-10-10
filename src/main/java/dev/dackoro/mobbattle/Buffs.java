@@ -3,6 +3,7 @@ package dev.dackoro.mobbattle;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.modules.entity.component.EntityScaleComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
@@ -81,14 +82,11 @@ final class Buffs {
     /** Streak: kills that count at most. */
     static int streakMax = 5;
     static final int MAX_STREAK = 50;
-    /** Crown on streak, champion and wand-buffed mobs: Gold, a palette color, or off. */
-    static String crown = "Gold";
     /**
-     * Seconds between crown replays on buffed mobs (/mobbattle buff sparks), 0 = off. The game's crown fires its
-     * rays, sparks and flash once (burst spawners); only its glow stays, so the crown is put on again.
+     * Crown on streak, champion and wand-buffed mobs: Gold, a palette color, or off (default: the crown belongs to
+     * the everyone-vs-one target, user 2026-10-10).
      */
-    static int sparksEvery = 3;
-    static final int MAX_SPARKS_EVERY = 60;
+    static String crown = "off";
     /** Buff Wand: clicks that stack at most. */
     static int wandMax = 5;
     static final int MAX_WAND = 50;
@@ -106,9 +104,11 @@ final class Buffs {
         Float baseScale;
         boolean health;
         String crownFx;
-        /** Last time its crown was put on (ms), for the sparks replay. */
-        long crownAt;
-        /** Buff Wand: lasting tint and aura, MobBattle_Fx_BuffLook_<buffColor>. */
+        /**
+         * Wand, streak and champion buffs: the shimmer in buffColor while the buff lasts, BuffShimmer_&lt;Color&gt; (veins,
+         * eye flames, runes; guarded by LookKeeper), or only its runes and eyes, BuffRunes_&lt;Color&gt;, on a mob with a
+         * look of its own (a jade summon keeps its jade). scripts/gen-looks.py.
+         */
         String lookFx;
     }
 
@@ -133,9 +133,8 @@ final class Buffs {
         PERCENT.get(Source.WAND).putAll(Map.of(Stat.SIZE, 10, Stat.HEALTH, 20, Stat.DAMAGE, 10, Stat.DEFENSE, 5));
         streakMax = 5;
         wandMax = 5;
-        sparksEvery = 3;
         for (Source s : Source.values()) HEAL.put(s, false);
-        crown = "Gold";
+        crown = "off";
     }
 
     static int percent(Source s, Stat st) {
@@ -194,34 +193,40 @@ final class Buffs {
             if (heals(source)) run(mob, store -> fill(mob, store));
             return;
         }
-        run(mob, store -> {
-            State s = STATES.get(mob);
-            if (weight <= 0) {
-                if (s == null || s.weight.remove(source) == null) return;
-            } else {
-                if (!enabled(source)) {
-                    if (heals(source)) fill(mob, store);
-                    return;
-                }
-                // Queued just before its battle ended (e.g. the last kill): a battle-only buff would then never go.
-                if (source.battleOnly() && BattleManager.battleOf(mob) == null
-                        && !(source == Source.LONE && PRE_LONE.contains(mob))) return;
-                // Same weight (a streak already at maxKills): nothing to redo, no new model sent.
-                if (s != null && Integer.valueOf(weight).equals(s.weight.get(source))) return;
-                if (s == null) STATES.put(mob, s = new State());
-                s.weight.put(source, weight);
+        run(mob, store -> setHere(mob, source, weight, true, store));
+    }
+
+    /**
+     * {@link #set} on the mob's world thread, right now. {@code swirl} false: the caller already showed the swirl
+     * (Buff Wand light: on the click).
+     */
+    private static void setHere(Ref<EntityStore> mob, Source source, int weight, boolean swirl, Store<EntityStore> store) {
+        State s = STATES.get(mob);
+        if (weight <= 0) {
+            if (s == null || s.weight.remove(source) == null) return;
+        } else {
+            if (!enabled(source)) {
+                if (heals(source)) fill(mob, store);
+                return;
             }
-            apply(mob, s, heals(source) && weight > 0, store);
-            // The mob can die in the same tick: its position can't be read any more.
-            if (!mob.isValid()) return;
-            // The gold swirl (buffColor) when a Buff Wand click or a duel win buffs it; a moment after apply, since
-            // the size change rebuilds the mob on the client and would drop a swirl put on now.
-            if (weight > 0 && (source == Source.WAND || source == Source.CHAMPION)) {
-                WandFx.swirlLater(mob, FxSettings.buffColor);
-                // The Heal Wand's sound, played here (an effect's sound doesn't replay on a quick second click).
-                WandFx.burst(null, "SFX_Deployable_Totem_Heal_Spawn", ChaosWand.positionOf(mob, store), store);
-            }
-        });
+            // Queued just before its battle ended (e.g. the last kill): a battle-only buff would then never go.
+            if (source.battleOnly() && BattleManager.battleOf(mob) == null
+                    && !(source == Source.LONE && PRE_LONE.contains(mob))) return;
+            // Same weight (a streak already at maxKills): nothing to redo, no new model sent.
+            if (s != null && Integer.valueOf(weight).equals(s.weight.get(source))) return;
+            if (s == null) STATES.put(mob, s = new State());
+            s.weight.put(source, weight);
+        }
+        apply(mob, s, heals(source) && weight > 0, store);
+        // The mob can die in the same tick: its position can't be read any more.
+        if (!mob.isValid()) return;
+        // The gold swirl (buffColor) when a Buff Wand click or a duel win buffs it; a moment after apply, since
+        // the size change rebuilds the mob on the client and would drop a swirl put on now.
+        if (weight > 0 && (source == Source.WAND || source == Source.CHAMPION)) {
+            if (swirl) WandFx.swirlLater(mob, FxSettings.buffColor);
+            // The Heal Wand's sound, played here (an effect's sound doesn't replay on a quick second click).
+            WandFx.burst(null, "SFX_Deployable_Totem_Heal_Spawn", ChaosWand.positionOf(mob, store), store);
+        }
     }
 
     /** Health to its max. World thread. */
@@ -236,6 +241,46 @@ final class Buffs {
         int next = Math.min(wandMax, wandStacks(mob) + 1);
         set(mob, Source.WAND, next);
         return next;
+    }
+
+    /**
+     * Buff Wand clicks whose light is still coming down (mob -> how many): they count for maxStacks at once and land
+     * later (addWandStackLater). Pruned in prune.
+     */
+    private static final Map<Ref<EntityStore>, Integer> FALLING = new ConcurrentHashMap<>();
+
+    /** Stacks the mob has plus the ones still coming down with the light. */
+    static int wandStacksSoon(Ref<EntityStore> mob) {
+        return wandStacks(mob) + (mob != null ? FALLING.getOrDefault(mob, 0) : 0);
+    }
+
+    /**
+     * Buff Wand left click with buffLight: one more stack once the light lands, {@code delayMs} from now; {@code onLand}
+     * runs then too (the mark). The swirl is the caller's, on the click (feedback that the click landed). Returns the stacks it will have, 0 if the wand is off. The stack is counted when it
+     * lands (on the world thread, not queued again), so quick clicks each add one.
+     */
+    static int addWandStackLater(Ref<EntityStore> mob, long delayMs, java.util.function.Consumer<Store<EntityStore>> onLand) {
+        if (mob == null || !mob.isValid() || !enabled(Source.WAND)) return 0;
+        int next = Math.min(wandMax, wandStacksSoon(mob) + 1);
+        FALLING.merge(mob, 1, Integer::sum);
+        Store<EntityStore> store = mob.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            FALLING.computeIfPresent(mob, (k, v) -> v <= 1 ? null : v - 1);
+            if (store.isShutdown() || !mob.isValid() || !BattleManager.isAlive(mob, store)) return;
+            onLand.accept(store);
+            float before = scaleOf(mob, store);
+            setHere(mob, Source.WAND, Math.min(wandMax, wandStacks(mob) + 1), false, store);
+            // The swirl went on with the click; a size change now rebuilds the mob on the client and cuts it, so it
+            // goes on again once the new size is there.
+            if (mob.isValid() && Math.abs(scaleOf(mob, store) - before) > 0.001f) WandFx.swirlLater(mob, FxSettings.buffColor);
+        }), delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        return next;
+    }
+
+    private static float scaleOf(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
+        EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
+        return scale != null ? scale.getScale() : 1f;
     }
 
     /** Stacks of the Buff Wand on a mob (0 = none). */
@@ -348,8 +393,6 @@ final class Buffs {
         float scaled = scaleNow != null ? scaleNow.getScale() : 1f;
         // A new scale rebuilds the mob on the client and drops the particles on it (WandFx.MODEL_SETTLE_MS).
         boolean resized = Math.abs(scaled - scaleBefore) > 0.001f;
-        // Same for a Jade/Shimmer look (Effect Wand): LookKeeper puts it on again after the rebuild.
-        if (resized) LookKeeper.resized(mob);
         // Health.
         int health = total(s, Stat.HEALTH);
         EntityStatMap stats = accessor.getComponent(mob, EntityStatMap.getComponentType());
@@ -391,23 +434,47 @@ final class Buffs {
         }
         if (want != null && (!want.equals(s.crownFx) || resized)) {
             s.crownFx = want;
-            s.crownAt = System.currentTimeMillis();
-            if (resized) crownLater(mob, s, want);
+            if (resized) putAgainLater(mob, want, () -> s.crownFx);
             else WandFx.addFx(mob, want, accessor);
         }
-        // Wand, streak and champion buffs: their tint and aura stay while the buff lasts (scripts/gen-bufflook.py).
+        applyLook(mob, s, resized, accessor);
+        // A Jade/Shimmer look of its own (Effect Wand) also loses its ModelVFX in the rebuild: LookKeeper re-sends it.
+        if (resized) LookKeeper.resized(mob);
+        if (s.weight.isEmpty()) STATES.remove(mob, s);
+    }
+
+    private static final String BUFF_SHIMMER = "BuffShimmer_";
+    private static final String BUFF_RUNES = "BuffRunes_";
+
+    /**
+     * Wand, streak and champion buffs: the shimmer in buffColor while the buff lasts, or only its runes and eyes on a
+     * mob with a look of its own (one ModelVFX per mob: a jade summon keeps its jade). Put on again after a resize,
+     * since the rebuilt model drops particles put on now.
+     */
+    private static void applyLook(Ref<EntityStore> mob, State s, boolean resized, ComponentAccessor<EntityStore> accessor) {
         boolean looks = s.weight.containsKey(Source.STREAK) || s.weight.containsKey(Source.CHAMPION)
                 || s.weight.containsKey(Source.WAND);
-        String look = looks ? "BuffLook_" + FxSettings.buffColor : null;
+        String look = looks ? (LookKeeper.hasOwnLook(mob) ? BUFF_RUNES : BUFF_SHIMMER) + FxSettings.buffColor : null;
         if (s.lookFx != null && !s.lookFx.equals(look)) {
+            LookKeeper.untrackBuff(mob);
             WandFx.removeFx(mob, s.lookFx, accessor);
             s.lookFx = null;
         }
-        if (look != null && !look.equals(s.lookFx)) {
+        if (look == null) return;
+        if (!look.equals(s.lookFx)) {
             WandFx.addFx(mob, look, accessor);
             s.lookFx = look;
+            if (look.startsWith(BUFF_SHIMMER)) {
+                LookKeeper.trackBuff(mob, EntityEffect.getAssetMap().getAsset("MobBattle_Fx_" + look));
+            }
         }
-        if (s.weight.isEmpty()) STATES.remove(mob, s);
+        if (resized) putAgainLater(mob, look, () -> s.lookFx);
+    }
+
+    /** The mob got a look of its own (Effect Wand): its buff look turns from the shimmer into runes and eyes. */
+    static void refreshLook(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
+        State s = mob == null ? null : STATES.get(mob);
+        if (s != null && mob.isValid()) applyLook(mob, s, false, accessor);
     }
 
     /** "size +20%, health +40%" for that many Buff Wand stacks (each stat capped at its max). */
@@ -444,12 +511,15 @@ final class Buffs {
         return amount;
     }
 
-    /** The crown, put on again once a size change has reached the client (it would drop one put on now). */
-    private static void crownLater(Ref<EntityStore> mob, State s, String fx) {
+    /**
+     * The crown or the buff look, put on again once a size change has reached the client (it would drop one put on
+     * now), if it is still the current one.
+     */
+    private static void putAgainLater(Ref<EntityStore> mob, String fx, java.util.function.Supplier<String> current) {
         Store<EntityStore> store = mob.getStore();
         if (store.isShutdown()) return;
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> run(mob, st -> {
-            if (!mob.isValid() || !fx.equals(s.crownFx)) return;
+            if (!mob.isValid() || !fx.equals(current.get())) return;
             WandFx.removeFx(mob, fx, st);
             WandFx.addFx(mob, fx, st);
         }), WandFx.MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
@@ -459,20 +529,7 @@ final class Buffs {
     static void prune() {
         STATES.keySet().removeIf(r -> !r.isValid());
         PRE_LONE.removeIf(r -> !r.isValid());
-        if (sparksEvery <= 0) return;
-        long now = System.currentTimeMillis();
-        STATES.forEach((mob, s) -> {
-            // Replays the lasting Buff Wand look (tint + aura), not the crown: the crown stays as it was put on.
-            String fx = s.lookFx;
-            if (fx == null || now - s.crownAt < sparksEvery * 1000L) return;
-            s.crownAt = now;
-            // Removed and put on again: a running effect only refreshes its time, without replaying particles.
-            run(mob, store -> {
-                if (!mob.isValid() || !fx.equals(s.lookFx)) return;
-                WandFx.removeFx(mob, fx, store);
-                WandFx.addFx(mob, fx, store);
-            });
-        });
+        FALLING.keySet().removeIf(r -> !r.isValid());
     }
 
     private static void run(Ref<EntityStore> mob, java.util.function.Consumer<Store<EntityStore>> task) {
@@ -509,10 +566,6 @@ final class Buffs {
         for (Source s : Source.values()) {
             HEAL.put(s, Boolean.parseBoolean(p.getProperty("buff." + s.key + ".heal", oldHeal != null ? oldHeal : "false").trim()));
         }
-        try {
-            sparksEvery = Math.max(0, Math.min(MAX_SPARKS_EVERY, Integer.parseInt(p.getProperty("buff.sparks", "3").trim())));
-        } catch (NumberFormatException ignored) {
-        }
         String c = parseCrown(p.getProperty("buff.crown"));
         if (c != null) crown = c;
     }
@@ -523,7 +576,6 @@ final class Buffs {
         }
         p.setProperty("buff.streak.maxkills", String.valueOf(streakMax));
         p.setProperty("buff.wand.maxstacks", String.valueOf(wandMax));
-        p.setProperty("buff.sparks", String.valueOf(sparksEvery));
         for (Source s : Source.values()) p.setProperty("buff." + s.key + ".heal", String.valueOf(heals(s)));
         p.setProperty("buff.crown", crown);
     }
@@ -548,6 +600,6 @@ final class Buffs {
             if (s == Source.WAND) b.append(" per click");
         }
         return b.append(" | maxKills ").append(streakMax).append(" | wand maxStacks ").append(wandMax)
-                .append(" | sparks ").append(sparksEvery > 0 ? sparksEvery + " s" : "off").append(" | crown ").append(crown.toLowerCase(Locale.ROOT)).toString();
+                .append(" | crown ").append(crown.toLowerCase(Locale.ROOT)).toString();
     }
 }

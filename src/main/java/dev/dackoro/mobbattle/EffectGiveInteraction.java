@@ -54,6 +54,8 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
         if (ok) {
             // A Jade or Shimmer look stays visible: LookKeeper re-sends it when the mob loses another effect.
             LookKeeper.track(target, effect);
+            // A buffed mob wearing the buff's shimmer keeps only its runes and eyes under its new look.
+            if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, buffer);
             WandFx.onTarget(target, WandFx.EFFECT, buffer);
             giveRestLater(target, chain, 1, effect);
         }
@@ -76,6 +78,7 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
             EntityEffect next = chain.get(i);
             if (fx != null && fx.addEffect(target, next, store)) {
                 LookKeeper.track(target, next);
+                if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, store);
             }
             giveRestLater(target, chain, i + 1, next);
         }), (long) (wait * 1000), java.util.concurrent.TimeUnit.MILLISECONDS);

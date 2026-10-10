@@ -43,6 +43,8 @@ final class BattleWatch extends CustomUIHud {
     static final String GAME_MODE = "MobBattle_Spectator";
     static final String KEY = "MobBattleWatch";
     private static final String UI = "MobBattle/WatchCard.ui";
+    /** A 1v1 duel: both fighters, the watched one tagged (two mobs of one kind share a name). */
+    private static final String UI_DUEL = "MobBattle/WatchDuel.ui";
     private static final long END_MS = 5000;
     private static final long CARD_MS = 1000;
     private static final String WARN = "#ffcc55";
@@ -58,6 +60,8 @@ final class BattleWatch extends CustomUIHud {
         final java.util.ArrayDeque<Ref<EntityStore>> history = new java.util.ArrayDeque<>();
         /** Fighters already shown in this round of right clicks (identity set; pruned of the gone ones each tick). */
         final java.util.Set<Ref<EntityStore>> seen = ConcurrentHashMap.newKeySet();
+        /** A 1v1 duel's two fighters, in team order, kept once seen (the fallen one leaves the battle's members). */
+        List<Ref<EntityStore>> duelPair;
 
         Watch(BattleManager.Battle battle, Store<EntityStore> store, Vector3d home, Rotation3f homeLook) {
             this.battle = battle;
@@ -70,13 +74,17 @@ final class BattleWatch extends CustomUIHud {
     /** Watching players by UUID (never a PlayerRef: a reconnect makes a new one). */
     private static final Map<UUID, Watch> WATCHING = new ConcurrentHashMap<>();
 
-    private BattleWatch(PlayerRef player) {
+    /** Built with the duel layout (UI_DUEL) or the one-fighter card (UI). */
+    private final boolean duel;
+
+    private BattleWatch(PlayerRef player, boolean duel) {
         super(player, KEY);
+        this.duel = duel;
     }
 
     @Override
     protected void build(UICommandBuilder builder) {
-        builder.append(UI);
+        builder.append(duel ? UI_DUEL : UI);
     }
 
     static boolean any() {
@@ -468,12 +476,18 @@ final class BattleWatch extends CustomUIHud {
         Player p = store.getComponent(me, Player.getComponentType());
         if (p == null) return;
         var huds = p.getHudManager();
+        BattleManager.Battle b = w.battle;
+        List<Ref<EntityStore>> pair = duelPair(w, store);
         CustomUIHud hud = huds.getCustomHud(KEY);
-        if (!(hud instanceof BattleWatch)) {
-            hud = new BattleWatch(player);
+        if (!(hud instanceof BattleWatch bw) || bw.duel != (pair != null)) {
+            if (hud != null) huds.removeCustomHud(player, KEY);
+            hud = new BattleWatch(player, pair != null);
             huds.addCustomHud(player, hud);
         }
-        BattleManager.Battle b = w.battle;
+        if (pair != null) {
+            showDuel(hud, b, pair, mob, store);
+            return;
+        }
         UICommandBuilder ui = new UICommandBuilder();
         ui.set("#Title.TextSpans", Message.translation("server.mobbattle.timer." + b.kind.key));
         int left = aliveSorted(b, store).size();
@@ -499,6 +513,46 @@ final class BattleWatch extends CustomUIHud {
                 scaled ? "#7dff8a" : "#c8d4e0");
         BattleManager.Kills k = b.kills.get(mob);
         line(ui, "#Kills", "Kills  " + (k != null ? k.count() : 0), k != null ? "#ffd23e" : "#c8d4e0");
+        hud.update(false, ui);
+    }
+
+    /** The duel's two fighters (team order), or null when the battle is not a 1v1 duel. */
+    private static List<Ref<EntityStore>> duelPair(Watch w, Store<EntityStore> store) {
+        BattleManager.Battle b = w.battle;
+        if (b.kind != BattleManager.Kind.DUEL) return null;
+        if (w.duelPair == null) {
+            List<Ref<EntityStore>> members = new ArrayList<>(b.members());
+            if (members.size() != 2) return null;
+            members.sort((x, y) -> Integer.compare(b.team(x), b.team(y)));
+            w.duelPair = List.copyOf(members);
+        }
+        return w.duelPair;
+    }
+
+    /** The duel layout: both fighters (DuelCard's lines), the watched one tagged "Watching". */
+    private static void showDuel(CustomUIHud hud, BattleManager.Battle b, List<Ref<EntityStore>> pair,
+                                 Ref<EntityStore> watched, Store<EntityStore> store) {
+        UICommandBuilder ui = new UICommandBuilder();
+        ui.set("#Title.TextSpans", Message.translation("server.mobbattle.timer." + b.kind.key));
+        String[] sides = {"A", "B"};
+        for (int i = 0; i < 2; i++) {
+            Ref<EntityStore> mob = pair.get(i);
+            String side = sides[i];
+            boolean up = mob.isValid() && BattleManager.isAlive(mob, store);
+            boolean on = mob == watched;
+            String name = mob.isValid() ? ChaosWand.nameOf(mob, store) : null;
+            line(ui, "#Name" + side, DuelCard.shorten(name == null ? "?" : name.replace('_', ' ')),
+                    up ? (on ? "#ffd23e" : "#e8eef5") : "#888888");
+            line(ui, "#Tag" + side, on ? "Watching" : "", "#ffd23e");
+            line(ui, "#Health" + side, DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
+            line(ui, "#Attack" + side, "Attack  " + DuelCard.stat(mob, Buffs.Stat.DAMAGE), DuelCard.color(mob, Buffs.Stat.DAMAGE));
+            line(ui, "#Defense" + side, "Defense  " + DuelCard.stat(mob, Buffs.Stat.DEFENSE), DuelCard.color(mob, Buffs.Stat.DEFENSE));
+            float scale = DuelCard.scaleOf(mob, store);
+            boolean scaled = Math.abs(scale - 1f) > 0.01f;
+            line(ui, "#Size" + side, "Size  " + (scaled ? "x" + String.format(java.util.Locale.ROOT, "%.2f", scale) : "base"),
+                    scaled ? "#7dff8a" : "#c8d4e0");
+        }
+        line(ui, "#Left", b.over ? "Battle over" : "", "#c8d4e0");
         hud.update(false, ui);
     }
 

@@ -153,8 +153,30 @@ public final class FxSettings {
     public static String snapMode = "global";
     /** Cleanse Wand look, a palette color (/mobbattle cleanseColor). */
     public static String cleanseColor = "White";
-    /** Buff Wand look, a palette color (/mobbattle buffColor): tint, swirl, burst, aura, rune. Yellow = gold. */
-    public static String buffColor = "Yellow";
+    /**
+     * Buff look, a palette color (/mobbattle buffColor): the Buff Wand's mark and swirl, and the shimmer of wand,
+     * streak and champion mobs (Buffs).
+     */
+    public static String buffColor = "Purple";
+    /**
+     * Buff Wand light from the sky (/mobbattle buffLight): "buff" (in buffColor, default), a palette color, or "off";
+     * the buff lands with the light (BuffGiveInteraction), off = at once.
+     */
+    public static String buffLight = "buff";
+
+    /** The Buff Wand light's palette color now, or null when it is off. */
+    static String buffLightColor() {
+        if ("off".equals(buffLight)) return null;
+        return "buff".equals(buffLight) ? buffColor : buffLight;
+    }
+
+    /** "buff", "off" or a palette name (canonical case); null if {@code value} is none of them. */
+    static String parseBuffLight(String value) {
+        if (value == null) return null;
+        if ("buff".equalsIgnoreCase(value.trim())) return "buff";
+        String c = Buffs.parseCrown(value.trim());
+        return c == null || c.equals("Gold") ? null : c;
+    }
 
     /** Snap: share of the fighters that turn to dust, 1-100 % (/mobbattle snapPercent). */
     public static int snapPercent = 50;
@@ -541,6 +563,8 @@ public final class FxSettings {
                 if (c.equalsIgnoreCase(p.getProperty("wand.cleanse.color", cleanseColor))) cleanseColor = c;
                 if (c.equalsIgnoreCase(p.getProperty("wand.buff.color", buffColor))) buffColor = c;
             }
+            String light = parseBuffLight(p.getProperty("wand.buff.light", buffLight));
+            if (light != null) buffLight = light;
             areaStyle = loadAreaStyle(p.getProperty("chaos.area"), currentAreaStyles(p), areaStyle);
             String savedArea = p.getProperty("chaos.area.color", areaColor);
             areaColor = parseAreaColor(savedArea) != null ? parseAreaColor(savedArea) : areaColor;
@@ -718,6 +742,7 @@ public final class FxSettings {
         Buffs.save(p);
         p.setProperty("wand.cleanse.color", cleanseColor);
         p.setProperty("wand.buff.color", buffColor);
+        p.setProperty("wand.buff.light", buffLight);
         p.setProperty("snap.time", String.valueOf(snapSeconds));
         p.setProperty("snap.hitdelay", String.valueOf(snapHitDelayMs));
         p.setProperty("snap.radius", String.valueOf(snapRadius));
@@ -870,7 +895,7 @@ public final class FxSettings {
                         + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
                         + ", onlyWand " + onOff(teamLookOnlyWand),
-                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", debugLog " + onOff(debug),
+                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", debugLog " + onOff(debug),
                 "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
         };
     }
@@ -882,7 +907,7 @@ public final class FxSettings {
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
-            case "debuglog", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor" -> 6;
+            case "debuglog", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor", "bufflight" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
                  "summondespawn", "summonlifetime", "summonexit" -> 4;
             case "teamfx", "teambytype" -> 5;

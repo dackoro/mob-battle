@@ -16,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Lasting looks (Jade, Shimmer: infinite effects whose ModelVFX shows the look) kept on the mobs that got them
  * from the Effect Wand. The client drops a ModelVFX as soon as the entity loses ANY effect, although the look is
  * still active on the server, so the guardian re-sends the look (remove + add) whenever another effect ends.
- * A look removed on purpose (Cleanse) or a dead mob is untracked.
+ * A look removed on purpose (Cleanse) or a dead mob is untracked. The Buff Wand's shimmer (Buffs, an Fx effect) is
+ * guarded the same way ({@link #trackBuff}) unless the mob already has its own look, which always wins.
  */
 final class LookKeeper {
 
@@ -36,9 +37,14 @@ final class LookKeeper {
         int[] seen;
         /** Some effect was removed and put back within one tick (same index set): re-send anyway. */
         volatile boolean touched;
+        /** The buff's shimmer (Buffs), not a look of its own. */
+        final boolean buff;
+        /** Taken off by the guardian, going back on in RESEND_GAP_MS. Only touched on the world thread. */
+        boolean pending;
 
-        Tracked(Style style, String color, EntityEffect effect, int effectIndex, int index) {
+        Tracked(Style style, String color, EntityEffect effect, int effectIndex, int index, boolean buff) {
             this.style = style;
+            this.buff = buff;
             this.color = color;
             this.effect = effect;
             this.effectIndex = effectIndex;
@@ -114,7 +120,27 @@ final class LookKeeper {
         }
         int keepIndex = EntityEffect.getAssetMap().getIndex(keep.getId());
         if (keepIndex < 0) return;
-        TRACKED.put(ref, new Tracked(style, colorOf(effect.getId()), keep, keepIndex, index));
+        TRACKED.put(ref, new Tracked(style, colorOf(effect.getId()), keep, keepIndex, index, false));
+    }
+
+    /** True when {@code ref} wears a look of its own (Effect Wand), not just the buff's shimmer. */
+    static boolean hasOwnLook(Ref<EntityStore> ref) {
+        Tracked t = ref == null ? null : TRACKED.get(ref);
+        return t != null && !t.buff;
+    }
+
+    /** Guards the buff's shimmer {@code effect} (already added) on {@code ref}, unless it has its own look. */
+    static void trackBuff(Ref<EntityStore> ref, EntityEffect effect) {
+        if (ref == null || !ref.isValid() || effect == null || hasOwnLook(ref)) return;
+        int index = EntityEffect.getAssetMap().getIndex(effect.getId());
+        if (index < 0) return;
+        TRACKED.put(ref, new Tracked(Style.SHIMMER, colorOf(effect.getId()), effect, index, index, true));
+    }
+
+    /** Stops guarding the buff's shimmer on {@code ref} (buff gone or turned into runes); an own look stays. */
+    static void untrackBuff(Ref<EntityStore> ref) {
+        Tracked t = ref == null ? null : TRACKED.get(ref);
+        if (t != null && t.buff) TRACKED.remove(ref, t);
     }
 
     /** Stops guarding {@code ref} (Cleanse, death). */
@@ -179,6 +205,8 @@ final class LookKeeper {
                 TRACKED.remove(ref, t);
                 continue;
             }
+            // Taken off by the guardian itself, waiting to go back on (resendLater).
+            if (t.pending) continue;
             int[] now = effects.getActiveEffectIndexes().clone();
             if (!contains(now, t.index)) {
                 // The look is gone: it was removed on purpose (e.g. Cleanse), so it is not kept any more.
@@ -189,14 +217,40 @@ final class LookKeeper {
             t.touched = false;
             t.seen = now;
             if (lost) {
-                // Another effect ended: the client dropped the look's ModelVFX. Send the look again.
+                // Another effect ended: the client dropped the look's ModelVFX. Send the look again: off now, back on
+                // RESEND_GAP_MS later. A remove + add in the same tick may reach the client as nothing new (the
+                // swirl showed nothing that way, WandFx.swirlNow), so the look would stay lost.
                 effects.removeEffect(ref, t.index, RemovalBehavior.COMPLETE, store);
-                effects.addEffect(ref, t.effect, store);
-                t.index = t.effectIndex;
-                // What is active now (the look may have changed index): not a loss on the next pass.
-                t.seen = effects.getActiveEffectIndexes().clone();
+                t.pending = true;
+                resendLater(ref, t, store);
             }
         }
+    }
+
+    /** Gap between taking the look off and putting it back (two ticks; the swirl restart works with 60 ms). */
+    private static final long RESEND_GAP_MS = 100;
+
+    /** Second half of a re-send: the look goes back on, if the mob is still tracked with it and alive. */
+    private static void resendLater(Ref<EntityStore> ref, Tracked t, Store<EntityStore> store) {
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            t.pending = false;
+            if (store.isShutdown() || !ref.isValid() || TRACKED.get(ref) != t
+                    || store.getComponent(ref, DeathComponent.getComponentType()) != null) {
+                TRACKED.remove(ref, t);
+                return;
+            }
+            EffectControllerComponent effects = store.getComponent(ref, EffectControllerComponent.getComponentType());
+            if (effects == null || !effects.addEffect(ref, t.effect, store)) {
+                TRACKED.remove(ref, t);
+                return;
+            }
+            t.index = t.effectIndex;
+            // What is active now: not a loss on the next pass. Something removed during the gap is covered: the
+            // look was off then and goes on fresh now.
+            t.seen = effects.getActiveEffectIndexes().clone();
+            t.touched = false;
+        }), RESEND_GAP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** From WandFx.prune (BattleManager.maintain, 1/s): a Ref keeps its whole world alive. */

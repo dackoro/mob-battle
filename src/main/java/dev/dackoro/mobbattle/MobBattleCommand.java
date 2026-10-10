@@ -111,8 +111,7 @@ public class MobBattleCommand extends CommandBase {
                 "buff lone|streak|champion size|health|damage|defense|all|off <percent> - battle buffs: lone = everyone-vs-one target, streak = per kill (up to buff streak maxKills, default 5), champion = the winners until they die or get cleansed (default 0 = none)",
                 "buff wand size|health|damage|defense|all|off <percent> - Buff Wand, per click (default size 10, health 20, damage 10, defense 5; stacks up to buff wand maxStacks, default 5)",
                 "buff lone|streak|champion|wand heal on|off - that buff also fills the health (lone: heals the target when picked, even with no lone buff); default off: health keeps the same share of the new max",
-                "buff crown gold|<color>|off - crown on streak, champion and Buff Wand mobs (default gold)",
-                "buff sparks <seconds>|off - replay the crown's sparks and rays on buffed mobs every N seconds (default 3)",
+                "buff crown gold|<color>|off - crown on streak, champion and Buff Wand mobs (default off: the crown is the everyone-vs-one target's)",
                 "fightLaser on|off - laser between fighters at the start (per kind too)",
                 "fightLaserColor <color>|random - laser color (palette; random = a bright one each fight)",
                 "battleIsolation <duel|allVsOne|royale|teams|all> on|off - outside mobs cannot hurt battle mobs",
@@ -130,7 +129,8 @@ public class MobBattleCommand extends CommandBase {
                 "mobFx <duel|allVsOne|attackers|royale|all> <color|default|off> - tint, aura and rune on the battle mobs (default = original look; royale purple by default)",
                 "crown gold|<color>|off - everyone vs one: crown with rays of light over the lone target for 20 s (default gold)",
                 "cleanseColor <color> - Cleanse Wand look: light from above, burst, aura and rune (default white)",
-                "buffColor <color> - Buff Wand look: tint, swirl, burst, aura and rune (default yellow = gold; taking the buff off is grey)",
+                "buffLight buff|<color>|off - Buff Wand: a light comes down from the sky and the buff lands with it (default buff = in buffColor; off = at once)",
+                "buffColor <color> - buff look: the Buff Wand's mark and swirl, and the shimmer (veins, eye flames, runes) of buffed mobs (default purple; taking the buff off is grey)",
                 "borderColor <summon|snap|slam|allVsOne|royale|all> <color|off|area> - border glow color per action (area = areaColor; default summon green, allVsOne yellow, royale purple, snap/slam off: a color draws a ring at their reach)",
                 "arenaShrink <kind|all> on|off - the arena closes in like a battle royale zone (default: royale on)",
                 "arenaShrinkTo <blocks> - final radius (default 15); arenaShrinkTime <time> - with no timer (default 2m)",
@@ -458,21 +458,7 @@ public class MobBattleCommand extends CommandBase {
         String[] a = argsAfter(ctx, "buff");
         String usage = "Usage: /mobbattle buff <lone|streak|champion|wand> <size|health|damage|defense|all|off> <percent>, "
                 + "buff streak maxKills <1-" + Buffs.MAX_STREAK + ">, buff wand maxStacks <1-" + Buffs.MAX_WAND + ">, "
-                + "buff <who> heal on|off, buff crown gold|<color>|off, buff sparks <1-" + Buffs.MAX_SPARKS_EVERY + " seconds>|off";
-        if (a.length >= 2 && "sparks".equalsIgnoreCase(a[0])) {
-            int s = -1;
-            if ("off".equalsIgnoreCase(a[1])) s = 0;
-            else try {
-                s = Integer.parseInt(a[1].replace("s", ""));
-            } catch (NumberFormatException ignored) {
-            }
-            if (s < 0 || s > Buffs.MAX_SPARKS_EVERY) {
-                reply(ctx, usage, ERR);
-                return false;
-            }
-            Buffs.sparksEvery = s;
-            return true;
-        }
+                + "buff <who> heal on|off, buff crown gold|<color>|off";
         if (a.length >= 2 && "crown".equalsIgnoreCase(a[0])) {
             String c = Buffs.parseCrown(a[1]);
             if (c == null) {
@@ -726,8 +712,10 @@ public class MobBattleCommand extends CommandBase {
                 battleKind("all", "Every kind at once")));
         addSubCommand(new Sub("crown", "Everyone vs one: crown with rays of light over the lone target, 20 s: gold (default), a palette color or off",
                 crownWords()));
-        addSubCommand(new Sub("buffcolor", "Buff Wand look (tint, swirl, burst, aura, rune): a palette color (default yellow = gold)",
+        addSubCommand(new Sub("buffcolor", "Buff look (Buff Wand mark and swirl, shimmer of buffed mobs): a palette color (default purple)",
                 colorWords()));
+        addSubCommand(new Sub("bufflight", "Buff Wand light from the sky, the buff lands with it: buff (in buffColor, default), a palette color or off",
+                colorWords("buff", "off")));
         addSubCommand(new Sub("cleansecolor", "Cleanse Wand look (light from above, burst, aura, rune): a palette color (default white)",
                 colorWords()));
         addSubCommand(new Sub("mobfx", "Look on battle mobs per role: <duel|allVsOne|attackers|royale|all> <palette color|default|off>",
@@ -788,9 +776,7 @@ public class MobBattleCommand extends CommandBase {
                 buffWho("streak", "Per kill in a battle (times its kills, up to maxKills), for that battle"),
                 buffWho("champion", "The winners of a battle, until they die or get the Cleanse Wand"),
                 buffWho("wand", "Buff Wand: per click (stacks up to maxStacks), mobs and players, until they die or get cleansed"),
-                new Sub("crown", "Crown on streak, champion and Buff Wand mobs: gold, a palette color or off", crownWords()),
-                new Sub("sparks", "Replay the crown's sparks and rays every N seconds on buffed mobs (default 3, off = only once)",
-                        words("Seconds", "2", "3", "5", "10", "off"))));
+                new Sub("crown", "Crown on streak, champion and Buff Wand mobs: gold, a palette color or off (default off)", crownWords())));
         addSubCommand(new Sub("skipcamera", "End your intro or end camera now (same as crouching while it plays)"));
         addSubCommand(new Sub("watch","Spectate a running battle: right click = nearest fighter, left click = previous, mouse turns the camera, Q exits",
                 new Sub("exit", "Stop watching: back to your game mode and position")));
@@ -1665,10 +1651,18 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.cleanseColor = c;
             }
+            case "bufflight" -> {
+                String l = FxSettings.parseBuffLight(val);
+                if (l == null) {
+                    reply(ctx, "Usage: /mobbattle buffLight buff|<palette color>|off  (default buff = in buffColor)", ERR);
+                    return;
+                }
+                FxSettings.buffLight = l;
+            }
             case "buffcolor" -> {
                 String c = Buffs.parseCrown(val);
                 if (c == null || c.equals("off") || c.equals("Gold")) {
-                    reply(ctx, "Usage: /mobbattle buffColor <palette color>  (default yellow = gold)", ERR);
+                    reply(ctx, "Usage: /mobbattle buffColor <palette color>  (default purple)", ERR);
                     return;
                 }
                 FxSettings.buffColor = c;

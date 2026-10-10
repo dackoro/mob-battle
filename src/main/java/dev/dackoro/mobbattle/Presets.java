@@ -297,7 +297,8 @@ final class Presets {
         }
         if (key.startsWith("wave.") || key.startsWith("glow.") || key.startsWith("mobfx.") || key.startsWith("fx.")
                 || key.startsWith("chaos.area") || key.equals("chaos.height") || key.startsWith("laser.")
-                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")) return "effects";
+                || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")
+                || key.equals("wand.buff.light")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
         if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";

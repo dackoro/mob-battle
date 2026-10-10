@@ -10,6 +10,8 @@ Writes, per color <C>:
   Server/Entity/ModelVFX/MobBattle/Death/MobBattle_Death_{Jade,Shimmer}_<C>.json
   Server/Entity/Effects/MobBattle/Look/MobBattle_Look_{Jade,JadeAppear,Shimmer}_<C>.json   (Infinite)
   Server/Entity/Effects/MobBattle/Fx/Death/MobBattle_Fx_Death_{Jade,Shimmer}_<C>.json       (WandFx death looks)
+  Server/Entity/Effects/MobBattle/Fx/Buff/MobBattle_Fx_Buff{Shimmer,Runes}_<C>.json         (Buffs: the buff's look;
+      Runes = only the runes and eye flames, for a mob with a look of its own, e.g. a jade summon)
   Server/Particles/MobBattle/Look/MobBattle_Look_EyeFlame_<C>.particlesystem (+ spawner in Spawners/Look/)
   Server/Particles/MobBattle/Look/MobBattle_Look_Runes_<C>.particlesystem (+ 4 spawners), not for Purple:
       Purple uses the vanilla Coffer_Goblin_Void_Glow itself.
@@ -37,10 +39,13 @@ VFX_LOOK = os.path.join(ROOT, 'Server', 'Entity', 'ModelVFX', 'MobBattle', 'Look
 VFX_DEATH = os.path.join(ROOT, 'Server', 'Entity', 'ModelVFX', 'MobBattle', 'Death')
 FX_LOOK = os.path.join(ROOT, 'Server', 'Entity', 'Effects', 'MobBattle', 'Look')
 FX_DEATH = os.path.join(ROOT, 'Server', 'Entity', 'Effects', 'MobBattle', 'Fx', 'Death')
+FX_BUFF = os.path.join(ROOT, 'Server', 'Entity', 'Effects', 'MobBattle', 'Fx', 'Buff')
 PARTICLES = os.path.join(ROOT, 'Server', 'Particles', 'MobBattle', 'Look')
 SPAWNERS = os.path.join(ROOT, 'Server', 'Particles', 'MobBattle', 'Spawners', 'Look')
 TEXTURES = os.path.join(ROOT, 'Common', 'Particles', 'Textures', 'MobBattle')
 TEXTURE_PATH = 'Particles/Textures/MobBattle/Runes_%s.png'
+# Size of the runes over the head (the Coffer Feastmaster uses 1.5, which covered big mobs; 1.0 picked in game, 2026-10-10).
+RUNE_SCALE = 1.0
 
 # Teams.PALETTE (keep in sync).
 PALETTE = {
@@ -251,6 +256,15 @@ def effect(text, apply, duration=None):
 
 
 def look_effects(name, s, flame, rune_system):
+    runes = [{'SystemId': rune_system, 'TargetNodeName': 'Head', 'Scale': RUNE_SCALE}]
+    write(FX_BUFF, 'MobBattle_Fx_BuffShimmer_%s.json' % name, effect(
+        'Buff Wand, streak and champion buff in %s (buffColor): the shimmer look while the buff lasts. '
+        'Guarded by LookKeeper.' % name,
+        {'ModelVFXId': 'MobBattle_Look_Shimmer_%s' % name, 'Particles': eyes(flame) + runes}))
+    write(FX_BUFF, 'MobBattle_Fx_BuffRunes_%s.json' % name, effect(
+        'The %s buff on a mob with a look of its own (one ModelVFX per mob, e.g. a jade summon): only the shimmer '
+        'runes and eye flames.' % name,
+        {'Particles': eyes(flame) + runes}))
     write(FX_LOOK, 'MobBattle_Look_Jade_%s.json' % name, effect(
         '%s jade look: the model turns to jade (texture shows), glowing eye flames. Kept by LookKeeper.' % name,
         {'ModelVFXId': 'MobBattle_Look_Jade_%s' % name, 'Particles': eyes(flame)}))
@@ -259,9 +273,9 @@ def look_effects(name, s, flame, rune_system):
         'MobBattle_Look_Jade_%s.' % (name, name),
         {'ModelVFXId': 'MobBattle_Look_JadeAppear_%s' % name, 'Particles': eyes(flame)}))
     write(FX_LOOK, 'MobBattle_Look_Shimmer_%s.json' % name, effect(
-        '%s shimmer look: veins pulsing under the texture, eye flames, runes on the head. Kept by LookKeeper.' % name,
+        '%s shimmer look: veins pulsing under the texture, eye flames, runes over the head. Kept by LookKeeper.' % name,
         {'ModelVFXId': 'MobBattle_Look_Shimmer_%s' % name,
-         'Particles': eyes(flame) + [{'SystemId': rune_system, 'TargetNodeName': 'Head', 'Scale': 1.5}]}))
+         'Particles': eyes(flame) + runes}))
     write(FX_DEATH, 'MobBattle_Fx_Death_Jade_%s.json' % name, effect(
         '%s jade mob dies (Kill Wand, Snap): the jade breaks into pieces, crystal and gem sparks. No tint.' % name,
         {'ModelVFXId': 'MobBattle_Death_Jade_%s' % name,
