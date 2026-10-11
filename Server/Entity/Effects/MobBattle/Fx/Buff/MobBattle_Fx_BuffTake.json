@@ -1,0 +1,16 @@
+{
+  "$Comment": "Buff Wand right click: one purple liquid splash after the buff is removed.",
+  "Duration": 0.4,
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false,
+  "ApplicationEffects": {
+    "Particles": [
+      {
+        "SystemId": "Water_Splash",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Chest",
+        "Color": "#8a3dff"
+      }
+    ]
+  }
+}

@@ -52,8 +52,10 @@ final class WandFx {
     static final String SUMMON_REMOVE = "SummonRemove";
     static final String FAIL = "Fail";
     static final String UNSELECT = "Unselect";
-    /** Unselect without its sound (Buff Wand right click plays the sound itself, see BuffTakeInteraction). */
+    /** Grey Unselect feedback without a bundled sound. */
     static final String UNSELECT_QUIET = "UnselectQuiet";
+    /** Buff Wand right click: one purple liquid splash after the mob's size has settled. */
+    static final String BUFF_TAKE = "BuffTake";
     static final String ARMY_ADD = "ArmyAdd";
     static final String ARMY_REMOVE = "ArmyRemove";
     /**
@@ -70,7 +72,7 @@ final class WandFx {
     static final String MARK = "Mark_";
     private static final String[] ALL_FX = java.util.stream.Stream.concat(
             java.util.stream.Stream.of(HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, EFFECT,
-                    COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, UNSELECT_QUIET, ARMY_ADD, ARMY_REMOVE),
+                    COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, UNSELECT_QUIET, BUFF_TAKE, ARMY_ADD, ARMY_REMOVE),
             Teams.PALETTE.keySet().stream().flatMap(c -> java.util.stream.Stream.of(MARK + c, CLEANSE + c,
                     DEATH_JADE + c, DEATH_SHIMMER + c)))
             .toArray(String[]::new);
@@ -130,7 +132,7 @@ final class WandFx {
     static final String CHAOS_SOUND = "SFX_Portal_Neutral_Open";
 
     /** Effects that have no tint: they only restart themselves instead of clearing the other wand tints. */
-    private static final java.util.Set<String> TINTLESS = java.util.Set.of(UNMORPH, EFFECT);
+    private static final java.util.Set<String> TINTLESS = java.util.Set.of(UNMORPH, EFFECT, BUFF_TAKE);
 
     /** Mob -> time its soul rip ends (then it is removed). */
     private static final Map<Ref<EntityStore>, Long> KILLS = new ConcurrentHashMap<>();
@@ -230,6 +232,16 @@ final class WandFx {
         var world = store.getExternalData().getWorld();
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
             if (!store.isShutdown() && target.isValid()) swirlNow(target, color, store);
+        }), MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** Buff Wand removal splash, after the size change rebuild has reached the client. */
+    static void buffTakeLater(Ref<EntityStore> target) {
+        if (!FxSettings.wandFx || target == null || !target.isValid()) return;
+        com.hypixel.hytale.component.Store<EntityStore> store = target.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (!store.isShutdown() && target.isValid()) onTarget(target, BUFF_TAKE, store);
         }), MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 

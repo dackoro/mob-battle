@@ -247,11 +247,22 @@ final class Buffs {
      * Buff Wand clicks whose light is still coming down (mob -> how many): they count for maxStacks at once and land
      * later (addWandStackLater). Pruned in prune.
      */
-    private static final Map<Ref<EntityStore>, Integer> FALLING = new ConcurrentHashMap<>();
+    private static final Map<Ref<EntityStore>, Falling> FALLING = new ConcurrentHashMap<>();
+
+    /** One mob's stacks still coming down. A new holder after cancelFalling, so the old lights land on nothing. */
+    private static final class Falling {
+        volatile int count;
+    }
 
     /** Stacks the mob has plus the ones still coming down with the light. */
     static int wandStacksSoon(Ref<EntityStore> mob) {
-        return wandStacks(mob) + (mob != null ? FALLING.getOrDefault(mob, 0) : 0);
+        Falling f = mob != null ? FALLING.get(mob) : null;
+        return wandStacks(mob) + (f != null ? f.count : 0);
+    }
+
+    /** Buff Wand right click / resetAll: stacks still coming down don't land (the buff would come back). */
+    static void cancelFalling(Ref<EntityStore> mob) {
+        if (mob != null) FALLING.remove(mob);
     }
 
     /**
@@ -262,11 +273,15 @@ final class Buffs {
     static int addWandStackLater(Ref<EntityStore> mob, long delayMs, java.util.function.Consumer<Store<EntityStore>> onLand) {
         if (mob == null || !mob.isValid() || !enabled(Source.WAND)) return 0;
         int next = Math.min(wandMax, wandStacksSoon(mob) + 1);
-        FALLING.merge(mob, 1, Integer::sum);
+        // Clicks and landings both run on the mob's world thread.
+        Falling falling = FALLING.computeIfAbsent(mob, k -> new Falling());
+        falling.count++;
         Store<EntityStore> store = mob.getStore();
         var world = store.getExternalData().getWorld();
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
-            FALLING.computeIfPresent(mob, (k, v) -> v <= 1 ? null : v - 1);
+            // Taken off (cancelFalling) while it came down: it doesn't land.
+            if (FALLING.get(mob) != falling) return;
+            if (--falling.count <= 0) FALLING.remove(mob, falling);
             if (store.isShutdown() || !mob.isValid() || !BattleManager.isAlive(mob, store)) return;
             onLand.accept(store);
             float before = scaleOf(mob, store);
@@ -332,6 +347,7 @@ final class Buffs {
 
     /** /mobbattle resetAll: every buff of every mob goes. */
     static int clearEverything() {
+        FALLING.clear();
         int n = 0;
         for (Ref<EntityStore> mob : new java.util.ArrayList<>(STATES.keySet())) {
             State s = STATES.get(mob);

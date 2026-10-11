@@ -34,17 +34,20 @@ public class BuffTakeInteraction extends SimpleInstantInteraction {
             return;
         }
         Ref<EntityStore> target = context.getTargetEntity();
-        if (target == null || !target.isValid() || Buffs.wandStacks(target) == 0) {
+        // Stacks still coming down with the light count: they are cancelled, else they would land after this.
+        if (target == null || !target.isValid() || Buffs.wandStacksSoon(target) == 0) {
             player.sendMessage(Message.raw("Look at a mob or player with a Buff Wand buff and right click it.").color("#ffcc55"));
             context.getState().state = InteractionState.Failed;
             return;
         }
+        Buffs.cancelFalling(target);
         Buffs.set(target, Buffs.Source.WAND, 0);
         WandFx.onTarget(target, WandFx.UNSELECT_QUIET, buffer);
         // Played here, not by the effect: an effect's sound does not replay on a quick second click.
         WandFx.burst(null, "SFX_Deployable_Totem_Heal_Despawn", ChaosWand.positionOf(target, buffer), buffer);
-        // After the size goes back (Buffs.set, queued): the new scale rebuilds the mob and would drop it.
+        // After the size goes back (Buffs.set, queued): the new scale rebuilds the mob and would drop particles.
         WandFx.swirlLater(target, "Gray");
+        WandFx.buffTakeLater(target);
         player.sendMessage(Message.raw("Took the buff off " + ChaosWand.nameOf(target, buffer) + ".").color("#7fd3ff"));
     }
 }
