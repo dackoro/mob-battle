@@ -228,6 +228,9 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 
 ## Effect Wand (`MobBattle_EffectWand`)
 
+![The Effect Wand jade look in four colors](images/looks-colors.jpg)
+![The Effect Wand shimmer look in four colors](images/looks-shimmer.jpg)
+
 **Left click any mob or player:** gives it the selected effect (default `Burn`), with a purple burst. The chat says if the target rejected it (immune, or the effect doesn't apply).
 
 **Right click:** switches to the next effect in the quick list: `Burn`, `Poison_T2`, `Freeze`, `Slow`, `Stun`, `Root`, `Vulnerable`, `Ability_Enrage_Buff`, `Potion_Health_Regen`, `Immune`, `jade`, `shimmer`.

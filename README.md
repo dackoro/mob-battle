@@ -109,4 +109,4 @@ To add a client language, copy `Server/Languages/en-US/server.lang` to `Server/L
 
 ## License
 
-TBD.
+Open source under the [MIT License](LICENSE) © Dackoro. Use, copy, change and publish the code and the mod's own assets (models, textures, particles, effects, sounds, UI) in your own Hytale mods, servers and modpacks; just keep the copyright notice. A credit or a link back is appreciated, not required. Parts that come from Hytale's own game assets stay under Hytale's modding terms.

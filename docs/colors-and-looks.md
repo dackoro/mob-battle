@@ -133,6 +133,9 @@ The other wands have fixed colors:
 
 ## Jade and Shimmer looks
 
+![Skeletons in jade, one per color: blue, red, green and yellow](images/looks-colors.jpg)
+![Skeletons in shimmer at night, one per color: purple, red, green and yellow](images/looks-shimmer.jpg)
+
 Two special looks change the whole body of a mob. Both come in every palette color.
 
 | Look | What it looks like | Default color |

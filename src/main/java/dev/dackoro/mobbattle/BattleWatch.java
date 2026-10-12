@@ -178,6 +178,7 @@ final class BattleWatch extends CustomUIHud {
         // ends exactly when the battle starts and autoWatch runs) sends its own camera reset after ours.
         reattachLater(player, store, REATTACH_MS);
         reattachLater(player, store, REATTACH_LATE_MS);
+        reattachLater(player, store, REATTACH_LAST_MS);
         MobBattlePlugin.debug("watch: " + player.getUsername() + " watches battle #" + battle.id.toString().substring(0, 8));
         player.sendMessage(Message.raw("Watching the battle: right click = nearest fighter, left click = back to the previous one, "
                 + "mouse = turn the camera, Q = exit (or /mobbattle watch exit).").color("#ffd23e"));
@@ -238,7 +239,15 @@ final class BattleWatch extends CustomUIHud {
     /** Second try, after a camera reset that left the world queue late. */
     private static final long REATTACH_LATE_MS = 1500;
 
-    /** Puts the watcher's Spectating again (same target), so OnSpectatingChange sends the attached camera anew. */
+    /** Third try: a drone/showcase intro that ended with the battle start can send its reset this late. */
+    private static final long REATTACH_LAST_MS = 3000;
+
+    /**
+     * Sends the watcher's follow camera again, on the same target. Putting the same Spectating again does nothing:
+     * vanilla OnSpectatingChange.onComponentSet skips it when the target is equal (javap, 2026-10-12), so the old
+     * re-put never re-attached and a watcher whose intro reset came after the watch start was left floating free
+     * (user). Calls vanilla's private applyFollowCamera instead.
+     */
     private static void reattachLater(PlayerRef player, Store<EntityStore> store, long delayMs) {
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
             if (store.isShutdown()) return;
@@ -247,9 +256,34 @@ final class BattleWatch extends CustomUIHud {
                 if (me == null || !me.isValid() || me.getStore() != store || !WATCHING.containsKey(player.getUuid())) return;
                 Spectating sp = store.getComponent(me, Spectating.getComponentType());
                 Ref<EntityStore> target = sp != null ? sp.getTargetRef() : null;
-                if (target != null && target.isValid()) store.putComponent(me, Spectating.getComponentType(), new Spectating(target));
+                if (target != null && target.isValid()) followCamera(me, target, store);
             });
         }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    private static java.lang.reflect.Method applyFollowCamera;
+    private static boolean applyFollowCameraMissing;
+
+    /** Vanilla SpectatorSystems.OnSpectatingChange.applyFollowCamera(me, target, accessor) (world thread). */
+    private static void followCamera(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        if (applyFollowCamera == null && !applyFollowCameraMissing) {
+            try {
+                java.lang.reflect.Method m = Class.forName(
+                        "com.hypixel.hytale.server.core.modules.entity.spectator.SpectatorSystems$OnSpectatingChange")
+                        .getDeclaredMethod("applyFollowCamera", Ref.class, Ref.class, ComponentAccessor.class);
+                m.setAccessible(true);
+                applyFollowCamera = m;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                applyFollowCameraMissing = true;
+                MobBattlePlugin.log("Watch: can't re-attach the spectator camera (" + e + ")");
+            }
+        }
+        if (applyFollowCamera == null) return;
+        try {
+            applyFollowCamera.invoke(null, me, target, acc);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            MobBattlePlugin.log("Watch: re-attaching the spectator camera failed: " + e);
+        }
     }
 
     /** How many fighters left click can go back through. */
