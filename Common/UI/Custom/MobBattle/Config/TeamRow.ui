@@ -1,22 +1,23 @@
 $C = "../../Common.ui";
 
-// One team of the team list: color swatch, name (rename), color, remove.
+// One team of the team list: unsaved mark, color swatch, name, color, remove. Name and color are kept in the
+// panel's draft ("*" in gold) until Save changes.
 Group {
   LayoutMode: Left;
   Anchor: (Height: 40, Bottom: 6);
 
+  Label #Mark {
+    Anchor: (Width: 14, Left: 2);
+    Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center);
+  }
+
   Group #Swatch {
-    Anchor: (Width: 26, Height: 26, Top: 7, Left: 6, Right: 12);
+    Anchor: (Width: 26, Height: 26, Top: 7, Right: 12);
     Background: #808080;
   }
 
   $C.@TextField #Name {
-    @Anchor = (Width: 200, Right: 8);
-  }
-
-  $C.@SmallSecondaryTextButton #Rename {
-    @Text = "Rename";
-    @Anchor = (Width: 110, Top: 4, Right: 16);
+    @Anchor = (Width: 260, Right: 24);
   }
 
   $C.@DropdownBox #Color {

@@ -38,7 +38,6 @@ public class ChaosFocusInteraction extends SimpleInstantInteraction {
         if (PlayerFighters.isPlayer(target, buffer)) {
             // Everyone vs that player (/mobbattle playerFights allvsone).
             if (!PlayerFighters.eligible(player, target, BattleManager.Kind.ALL_VS_ONE, buffer)) {
-                context.getState().state = InteractionState.Failed;
                 return;
             }
             BattleManager.markPlayer(target, player.getUuid());
@@ -48,7 +47,6 @@ public class ChaosFocusInteraction extends SimpleInstantInteraction {
         if (target == null || !target.isValid() || buffer.getComponent(target, NPCEntity.getComponentType()) == null
                 || !BattleManager.isAlive(target, buffer)) {
             player.sendMessage(Message.raw("Look at a living mob and click it.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         ChaosWand.focus(player, context.getEntity(), target, buffer);

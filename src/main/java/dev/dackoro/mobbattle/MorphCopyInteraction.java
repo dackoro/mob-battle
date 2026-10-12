@@ -44,7 +44,10 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
         }
         MorphWand.setCopy(player.getUuid(), copy);
         WandFx.onTarget(target, WandFx.COPY, buffer);
+        // The omnitrix "recalibrated" sound, played here and not by the effect: a re-applied effect (quick clicks)
+        // does not replay its sound.
+        WandFx.burst(null, "SFX_MobBattle_OmnitrixCopy", ChaosWand.positionOf(target, buffer), buffer);
         player.sendMessage(Message.raw("Copied the model of " + ChaosWand.nameOf(target, buffer) + " (" + copy.modelId()
-                + "). Left click a mob to give it this look.").color("#c88bff"));
+                + "). Left click a mob to give it this look.").color("#7dff8a"));
     }
 }

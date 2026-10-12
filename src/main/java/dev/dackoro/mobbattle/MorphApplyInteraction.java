@@ -40,18 +40,15 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         String look = FxSettings.morphPlayers ? "Look at a mob or player and click it." : "Look at a mob and click it.";
         if (target == null || !target.isValid()) {
             player.sendMessage(Message.raw(look).color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         boolean isPlayer = PlayerFighters.isPlayer(target, buffer);
         if (isPlayer && !FxSettings.morphPlayers) {
             player.sendMessage(Message.raw("Players can't be morphed. Turn it on with /mobbattle morphPlayers on").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         if (!isPlayer && buffer.getComponent(target, NPCEntity.getComponentType()) == null) {
             player.sendMessage(Message.raw(look).color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         MorphWand.Copy copy = MorphWand.copyOf(player.getUuid());
@@ -75,9 +72,12 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         // The new model is rebuilt on the client, which can drop particles attached to the old one:
         // also play the burst in the world at the mob.
         Vector3d at = ChaosWand.positionOf(target, buffer);
-        if (at != null) WandFx.burst("MobBattle_Copy_Burst", null, at.add(0, 0.8, 0), buffer);
+        if (at != null) WandFx.burst("MobBattle_Morph_Burst", null, at.add(0, 0.8, 0), buffer);
+        // The omnitrix transformation sound, played here and not by the effect: a re-applied effect (quick clicks)
+        // does not replay its sound.
+        WandFx.burst(null, "SFX_MobBattle_OmnitrixTransform", ChaosWand.positionOf(target, buffer), buffer);
         player.sendMessage(Message.raw(name + " now looks like " + copy.modelId()
                 + (isPlayer ? ". Cleanse Wand or /mobbattle morph reset to undo."
-                : ". It keeps its own AI and attacks. Cleanse Wand or /mobbattle morph reset to undo.")).color("#c88bff"));
+                : ". It keeps its own AI and attacks. Cleanse Wand or /mobbattle morph reset to undo.")).color("#7dff8a"));
     }
 }

@@ -39,7 +39,6 @@ public class ArmyToggleInteraction extends SimpleInstantInteraction {
                 || !BattleManager.isAlive(target, buffer)) {
             player.sendMessage(Message.raw("Look at a mob and click it to add it to your army. Right click the air to disband it.")
                     .color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         String name = ChaosWand.nameOf(target, buffer);

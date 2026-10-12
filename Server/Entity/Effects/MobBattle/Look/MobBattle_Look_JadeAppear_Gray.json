@@ -14,6 +14,7 @@
         "SystemId": "MobBattle_Look_EyeFlame_Gray",
         "TargetNodeName": "R-Eye"
       }
-    ]
+    ],
+    "FirstPersonParticles": []
   }
 }

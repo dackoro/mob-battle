@@ -132,13 +132,13 @@ final class Unstick {
     }
 
     /** True if the NPC's role can fly (has a "Fly" motion controller), even while it walks or perches. */
-    private static boolean canFly(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+    static boolean canFly(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
         Role role = roleOf(ref, accessor);
         return role != null && role.hasMotionController(MotionControllerFly.TYPE);
     }
 
     /** True if the NPC is flying right now (its active motion controller is the "Fly" one). */
-    private static boolean flyingNow(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+    static boolean flyingNow(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
         Role role = roleOf(ref, accessor);
         return role != null && role.getActiveMotionController() instanceof MotionControllerFly;
     }

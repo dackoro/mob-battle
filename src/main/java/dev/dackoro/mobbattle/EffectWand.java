@@ -53,8 +53,11 @@ public final class EffectWand {
         String color = jade ? JADE_COLOR : SHIMMER_COLOR;
         if (parts.length == 2) {
             color = null;
+            String asked = parts[1].trim();
+            // "gold" is how the crowns name it; the palette calls it Yellow.
+            if (asked.equalsIgnoreCase("gold")) asked = "Yellow";
             for (String c : Teams.PALETTE.keySet()) {
-                if (c.equalsIgnoreCase(parts[1].trim())) color = c;
+                if (c.equalsIgnoreCase(asked)) color = c;
             }
             if (color == null) return null;
         }

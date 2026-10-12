@@ -34,16 +34,26 @@ public class MobBattlePlugin extends JavaPlugin {
         return instance != null ? instance.getIdentifier().toString() : "Dackoro:Mob Battle";
     }
 
-    /** Writes to the server log (Saves/&lt;world&gt;/logs). */
+    /** Writes to the server log (Saves/&lt;world&gt;/logs), and to the debug recorder when it is on. */
     public static void log(String message) {
         if (instance != null) {
             instance.getLogger().at(Level.INFO).log(message);
         }
+        DebugRecorder.add(message);
     }
 
-    /** /mobbattle debug on: detailed battle decisions in the server log, prefixed "[debug]". */
+    /**
+     * Battle decisions, prefixed "[debug]": in the server log with debugLog on, in the debug recorder with
+     * debugRecord on. Builds nothing when both are off.
+     */
     public static void debug(String message) {
         if (FxSettings.debug) log("[debug] " + message);
+        else DebugRecorder.add("[debug] " + message);
+    }
+
+    /** True when [debug] lines go anywhere (debugLog or debugRecord): guard costly messages in hot paths with it. */
+    public static boolean debugging() {
+        return FxSettings.debug || FxSettings.debugRecord;
     }
 
     @Override
@@ -85,6 +95,8 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new BattleUnloadSystem());
         getEntityStoreRegistry().registerSystem(new FightTickSystem());
         getEntityStoreRegistry().registerSystem(new BattleLifecycleSystem());
+        getEntityStoreRegistry().registerSystem(new WandEquipSoundSystem());
+        getEntityStoreRegistry().registerSystem(new LookLoadSystem());
         FxSettings.load(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).

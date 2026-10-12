@@ -4,6 +4,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
+import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -133,6 +135,7 @@ public final class SummonList {
         StringBuilder summary = new StringBuilder();
         // One copy: the list can change from a command while this runs (see snapshot()).
         Map<String, String> entries = snapshot();
+        EntityEffect look = lookEffect();
         int planned = 0;
         for (String value : entries.values()) {
             planned += value.equalsIgnoreCase("random") ? Math.max(1, (randomMin + randomMax) / 2) : countOf(value);
@@ -166,6 +169,7 @@ public final class SummonList {
                         }
                         WandFx.burst(WandFx.SUMMON_PARTICLE, null, pos, store);
                         playSpawnAnimation(result.first(), store);
+                        if (look != null) giveLook(result.first(), look, store);
                         ok++;
                         spawned++;
                     } else {
@@ -192,6 +196,38 @@ public final class SummonList {
         player.sendMessage(Message.raw("Summoned " + spawned + " mobs: " + summary
                 + (failed > 0 ? " (" + failed + " failed)" : "")
                 + (attempted >= FxSettings.maxMobs ? " — capped by /mobbattle maxMobs (spawn attempts)" : "")).color("#4bff6a"));
+    }
+
+    // ---- Summon jade (/mobbattle summonJade, summonJadeColor) ----
+
+    /** The jade goes on this long after the spawn, once the new mob's components are in place. */
+    private static final long LOOK_DELAY_MS = 150;
+
+    /** A palette color (its palette spelling; "gold" = Yellow), or null. */
+    static String parseJadeColor(String value) {
+        if (value == null) return null;
+        String v = value.trim();
+        if (v.equalsIgnoreCase("gold")) v = "Yellow";
+        for (String c : Teams.PALETTE.keySet()) {
+            if (c.equalsIgnoreCase(v)) return c;
+        }
+        return null;
+    }
+
+    /** The jade summons get now (the Effect Wand's jade:&lt;color&gt;), or null when summonJade is off. */
+    static EntityEffect lookEffect() {
+        return FxSettings.summonJade ? EffectWand.find("jade:" + FxSettings.summonJadeColor) : null;
+    }
+
+    /** Puts {@code look} on a fresh summon a moment after it spawned, kept by LookKeeper like an Effect Wand look. */
+    private static void giveLook(Ref<EntityStore> mob, EntityEffect look, Store<EntityStore> store) {
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown() || !mob.isValid()) return;
+            EffectControllerComponent effects = store.getComponent(mob, EffectControllerComponent.getComponentType());
+            if (effects == null || !effects.addEffect(mob, look, store)) return;
+            LookKeeper.track(mob, look);
+        }), LOOK_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** The summon area is a quick flash, not the Chaos Wand's 6 s. */

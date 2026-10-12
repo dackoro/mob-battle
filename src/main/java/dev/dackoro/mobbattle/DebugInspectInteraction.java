@@ -14,7 +14,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
 
-/** Debug Wand left click: full report of the clicked entity (chat summary, server log, debug/ file). */
+/** Debug Wand left click: full report of the clicked entity (chat summary, server log, debug/ file), then a follow. */
 public class DebugInspectInteraction extends SimpleInstantInteraction {
 
     public static final String TYPE = "MobBattle_DebugInspect";
@@ -36,7 +36,6 @@ public class DebugInspectInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> target = context.getTargetEntity();
         if (target == null || !target.isValid()) {
             player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         DebugWand.inspect(player, target, buffer);

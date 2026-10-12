@@ -13,6 +13,7 @@
   "Model": "Items/MobBattle/HealWand/MobBattle_HealWand.blockymodel",
   "Texture": "Items/MobBattle/HealWand/MobBattle_HealWand_Texture.png",
   "PlayerAnimationsId": "Wand",
+  "Animation": "Items/MobBattle/HealWand/idle.blockyanim",
   "Utility": {
     "Compatible": true
   },

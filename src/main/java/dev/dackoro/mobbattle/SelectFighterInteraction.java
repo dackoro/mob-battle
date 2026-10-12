@@ -57,13 +57,11 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             if (!isLivingNpc(mob, buffer) || mob.getStore() != context.getEntity().getStore()) {
                 player.sendMessage(Message.raw("Crouch and click a mob to fight it yourself (or select one, then crouch "
                         + "and click the air).").color(COLOR_WARN));
-                context.getState().state = InteractionState.Failed;
                 return;
             }
             FightManager.clear(player.getUuid());
             Ref<EntityStore> me = context.getEntity();
             if (!PlayerFighters.eligible(player, me, BattleManager.Kind.DUEL, buffer)) {
-                context.getState().state = InteractionState.Failed;
                 return;
             }
             BattleManager.markPlayer(me, player.getUuid());
@@ -79,7 +77,6 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         boolean targetIsPlayer = PlayerFighters.isPlayer(target, buffer);
         if (targetIsPlayer && (target == context.getEntity()
                 || !PlayerFighters.eligible(player, target, BattleManager.Kind.DUEL, buffer))) {
-            context.getState().state = InteractionState.Failed;
             return;
         }
         if (!targetIsPlayer && !isLivingNpc(target, buffer)) {
@@ -121,7 +118,6 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
             player.sendMessage(Message.raw("Neither " + nameOf(picked, buffer) + " nor " + targetName
                     + " can attack. No fight.").color(COLOR_WARN));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         if (PlayerFighters.isPlayer(picked, buffer)) BattleManager.markPlayer(picked, player.getUuid());

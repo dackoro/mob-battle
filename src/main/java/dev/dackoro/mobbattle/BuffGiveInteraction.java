@@ -40,14 +40,12 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> target = context.getTargetEntity();
         if (target == null || !target.isValid() || buffer.getComponent(target, EntityStatMap.getComponentType()) == null) {
             player.sendMessage(Message.raw("Look at a mob or player and click it.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         String name = ChaosWand.nameOf(target, buffer);
         if (!Buffs.enabled(Buffs.Source.WAND)) {
             player.sendMessage(Message.raw("The Buff Wand is off: set it with /mobbattle buff wand <stat> <percent>").color("#ffcc55"));
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            context.getState().state = InteractionState.Failed;
             return;
         }
         // Stacks still coming down with the light count too, so quick clicks can't go past the max.
@@ -57,7 +55,6 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
             player.sendMessage(Message.raw(name + " is already at the max: " + before + "/" + Buffs.wandMax + " stacks ("
                     + Buffs.describeWand(before) + "). Raise it with /mobbattle buff wand maxStacks <n>").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         // buffLight: a light comes down from the sky (as the Cleanse Wand's) and the buff lands with it: the mark
@@ -69,7 +66,7 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
             stacks = Buffs.addWandStack(target);
             WandFx.onTarget(target, WandFx.MARK + FxSettings.buffColor, buffer);
         } else {
-            WandFx.onTarget(target, WandFx.BUFF_LIGHT + light, buffer);
+            WandFx.onTarget(target, WandFx.BUFF_LIGHT + light + WandFx.lightHeight(target, buffer), buffer);
             // The swirl right on the click, so it shows the click was taken; the rest lands with the light.
             WandFx.swirlNow(target, FxSettings.buffColor, buffer);
             stacks = Buffs.addWandStackLater(target, LIGHT_LANDS_MS,

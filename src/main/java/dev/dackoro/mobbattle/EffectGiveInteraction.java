@@ -40,7 +40,6 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
                 ? buffer.getComponent(target, EffectControllerComponent.getComponentType()) : null;
         if (effects == null) {
             player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         java.util.List<EntityEffect> chain = EffectWand.chain(FxSettings.effect);
@@ -50,6 +49,12 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
         }
         EntityEffect effect = chain.get(0);
         String name = ChaosWand.nameOf(target, buffer);
+        // Re-applying a look: the old one goes first. The very same effect goes back on a moment later.
+        if (LookKeeper.dropLook(target, effect, effects, buffer)) {
+            giveLater(target, chain, effect);
+            player.sendMessage(Message.raw("Gave " + FxSettings.effect + " to " + name + ".").color("#b44bff"));
+            return;
+        }
         boolean ok = effects.addEffect(target, effect, buffer);
         if (ok) {
             // A Jade or Shimmer look stays visible: LookKeeper re-sends it when the mob loses another effect.
@@ -61,6 +66,21 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
         }
         player.sendMessage(Message.raw(ok ? "Gave " + FxSettings.effect + " to " + name + "."
                 : name + " rejected " + effect.getId() + " (immune or not applicable).").color(ok ? "#b44bff" : "#ffcc55"));
+    }
+
+    /** Adds {@code effect} (chain[0]) after LookKeeper.REAPPLY_GAP_MS, then the rest of the chain. */
+    private static void giveLater(Ref<EntityStore> target, java.util.List<EntityEffect> chain, EntityEffect effect) {
+        var store = target.getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown() || !target.isValid()) return;
+            EffectControllerComponent fx = store.getComponent(target, EffectControllerComponent.getComponentType());
+            if (fx == null || !fx.addEffect(target, effect, store)) return;
+            LookKeeper.track(target, effect);
+            if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, store);
+            WandFx.onTarget(target, WandFx.EFFECT, store);
+            giveRestLater(target, chain, 1, effect);
+        }), LookKeeper.REAPPLY_GAP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**

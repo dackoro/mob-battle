@@ -78,15 +78,23 @@ public final class FxSettings {
     public static int killDelayMs = 500;
     public static final int MAX_KILL_DELAY_MS = 3000;
     /**
+     * Light around mobs wearing a Jade/Shimmer look or the buff's shimmer, in the look's color, 0-15 like block light
+     * (/mobbattle lookGlow, 0 = off). Default 6: a soft glow. See LookLight.
+     */
+    public static int lookGlow = 6;
+    /** Kill Wand disintegration flash: starts at this light level and fades out (/mobbattle deathGlow, 0 = off). */
+    public static int deathGlow = 12;
+    public static final int MAX_GLOW = 15;
+    /**
      * Kill Wand: ms from the click to the cast's hit, when the Hakai sound and the disintegration start
      * (/mobbattle killHitDelay). Default 175: the hit frame (0.175 s) of KillCast.blockyanim.
      */
     public static final int DEFAULT_KILL_HIT_DELAY_MS = 175;
     public static int killHitDelayMs = DEFAULT_KILL_HIT_DELAY_MS;
-    /** Kill Wand: the disintegrated mob drops its normal loot (/mobbattle killLoot). Default: on. */
-    public static boolean killLoot = true;
-    /** Kill Wand: works on players too; they disintegrate, then die normally (/mobbattle killPlayers). Default: off. */
-    public static boolean killPlayers = false;
+    /** Kill Wand and Snap: the killed mob drops its normal loot (/mobbattle killLoot). Default: off (user, 2026-10-11). */
+    public static boolean killLoot = false;
+    /** Kill Wand: works on players too; they disintegrate, then die normally (/mobbattle killPlayers). Default: on. */
+    public static boolean killPlayers = true;
 
     /** Area only for its owner, only while holding the Chaos Wand (/mobbattle areaonlywand). Default: off. */
     public static boolean areaOnlyWand = false;
@@ -147,6 +155,14 @@ public final class FxSettings {
     public static int arenaSize = 0;
     /** /mobbattle debug: battle decisions (config, arena, health scores, winner) in the server log. */
     public static volatile boolean debug = false;
+    /**
+     * /mobbattle debugRecord: keep the last 5 min of log and [debug] lines in memory for /mobbattle debugDump
+     * (DebugRecorder). Default off. Admin only, like debug (Presets.isSecurityKey).
+     */
+    public static volatile boolean debugRecord = false;
+    /** Debug Wand: seconds a left-clicked mob is followed after its report (/mobbattle debugTrack, 0 = report only). */
+    public static int debugTrackSeconds = 30;
+    static final int MAX_DEBUG_TRACK_SECONDS = 600;
     /** timeUp health/judge when even on health: "damage" (default), "random" or "draw" (/mobbattle tieBreak). */
     public static String tieBreak = "damage";
     /** Snap Wand and /mobbattle snap: "global" (half of everyone, default) or "team" (half of each side). */
@@ -232,7 +248,8 @@ public final class FxSettings {
     /** Kinds where friendly fire means something (duels and royales have no allies). */
     public static final BattleManager.Kind[] ALLY_KINDS = {BattleManager.Kind.ALL_VS_ONE, BattleManager.Kind.TEAMS};
     /**
-     * Per battle kind: players can fight in it (/mobbattle playerFights). Default: off for every kind.
+     * Per battle kind: players can fight in it (/mobbattle playerFights). Default: on for every kind (user,
+     * 2026-10-12: every wand works on players); Creative players never fight.
      * Duel: Battle Wand while crouching; allvsone: /mobbattle chaos me; teams: /mobbattle teams join.
      */
     public static final java.util.Map<BattleManager.Kind, Boolean> PLAYER_FIGHTS = new java.util.EnumMap<>(BattleManager.Kind.class);
@@ -245,7 +262,7 @@ public final class FxSettings {
     public static boolean battlePvp = false;
 
     public static boolean playerFights(BattleManager.Kind kind) {
-        return kind != null && PLAYER_FIGHTS.getOrDefault(kind, false);
+        return kind != null && PLAYER_FIGHTS.getOrDefault(kind, true);
     }
 
     static {
@@ -260,7 +277,7 @@ public final class FxSettings {
         FRIENDLY_FIRE.put(BattleManager.Kind.ALL_VS_ONE, true);
         FRIENDLY_FIRE.put(BattleManager.Kind.TEAMS, false);
         for (BattleManager.Kind k : PLAYER_KINDS) {
-            PLAYER_FIGHTS.put(k, false);
+            PLAYER_FIGHTS.put(k, true);
         }
         for (BattleManager.Kind k : BattleManager.Kind.values()) {
             boolean chaos = k == BattleManager.Kind.ALL_VS_ONE || k == BattleManager.Kind.ROYALE;
@@ -321,6 +338,10 @@ public final class FxSettings {
     public static String summonDespawn = SummonDespawn.NEVER;
     /** Seconds a summon lives with summonDespawn timer (/mobbattle summonLifetime). */
     public static int summonLifetime = 60;
+    /** Summons come out wearing the jade look (/mobbattle summonJade). Default off. The shimmer is the buff's look. */
+    public static boolean summonJade = false;
+    /** Color of the summons' jade (/mobbattle summonJadeColor), a palette color. Default green. */
+    public static String summonJadeColor = EffectWand.JADE_COLOR;
     /** How a summon leaves: disintegrate (the Kill Wand's soul rip, no loot) or vanish (removed at once) (/mobbattle summonExit). */
     public static String summonExit = SummonDespawn.DISINTEGRATE;
 
@@ -354,7 +375,7 @@ public final class FxSettings {
     /** Team Wand: a clicked mob brings every mob of its type in areaRadius into the team (/mobbattle teamByType). */
     public static boolean teamByType = false;
     /** Snap: players in reach (not Creative, not the one snapping) can turn to dust too (/mobbattle snapPlayers). */
-    public static boolean snapPlayers = false;
+    public static boolean snapPlayers = true;
     /** Morph Wand: players can be morphed too (/mobbattle morphPlayers). */
     public static boolean morphPlayers = true;
 
@@ -548,6 +569,9 @@ public final class FxSettings {
             summonLifetime = SummonDespawn.clampLifetime(intOr(p, "summon.lifetime", summonLifetime));
             String exit = SummonDespawn.parseExit(p.getProperty("summon.exit"));
             if (exit != null) summonExit = exit;
+            summonJade = Boolean.parseBoolean(p.getProperty("summon.jade", String.valueOf(summonJade)));
+            String jadeColor = SummonList.parseJadeColor(p.getProperty("summon.jade.color"));
+            if (jadeColor != null) summonJadeColor = jadeColor;
             effect = p.getProperty("effect.id", effect);
             Teams.load(p);
             SummonList.load(p);
@@ -577,6 +601,14 @@ public final class FxSettings {
             }
             wandFx = Boolean.parseBoolean(p.getProperty("wand.fx", String.valueOf(wandFx)));
             debug = Boolean.parseBoolean(p.getProperty("debug", String.valueOf(debug)));
+            debugRecord = Boolean.parseBoolean(p.getProperty("debug.record", String.valueOf(debugRecord)));
+            if (!debugRecord) DebugRecorder.clear();
+            try {
+                debugTrackSeconds = Math.max(0, Math.min(MAX_DEBUG_TRACK_SECONDS,
+                        Integer.parseInt(p.getProperty("wand.debug.track", String.valueOf(debugTrackSeconds)))));
+            } catch (NumberFormatException ignored) {
+                // keep the default
+            }
             try {
                 killDelayMs = Math.max(0, Math.min(MAX_KILL_DELAY_MS,
                         Integer.parseInt(p.getProperty("kill.delay.millis", String.valueOf(killDelayMs)))));
@@ -584,6 +616,16 @@ public final class FxSettings {
                 // keep the default
             }
             killLoot = Boolean.parseBoolean(p.getProperty("kill.loot", String.valueOf(killLoot)));
+            try {
+                lookGlow = Math.max(0, Math.min(MAX_GLOW, Integer.parseInt(p.getProperty("fx.glow.look", String.valueOf(lookGlow)))));
+            } catch (NumberFormatException ignored) {
+                // keep the default
+            }
+            try {
+                deathGlow = Math.max(0, Math.min(MAX_GLOW, Integer.parseInt(p.getProperty("fx.glow.death", String.valueOf(deathGlow)))));
+            } catch (NumberFormatException ignored) {
+                // keep the default
+            }
             try {
                 killHitDelayMs = Math.max(0, Math.min(MAX_SNAP_HIT_DELAY_MS,
                         Integer.parseInt(p.getProperty("kill.hitdelay", String.valueOf(killHitDelayMs)))));
@@ -715,8 +757,12 @@ public final class FxSettings {
         p.setProperty("fight.countdown", String.valueOf(countdownSeconds));
         p.setProperty("wand.fx", String.valueOf(wandFx));
         p.setProperty("debug", String.valueOf(debug));
+        p.setProperty("debug.record", String.valueOf(debugRecord));
+        p.setProperty("wand.debug.track", String.valueOf(debugTrackSeconds));
         p.setProperty("kill.delay.millis", String.valueOf(killDelayMs));
         p.setProperty("kill.loot", String.valueOf(killLoot));
+        p.setProperty("fx.glow.look", String.valueOf(lookGlow));
+        p.setProperty("fx.glow.death", String.valueOf(deathGlow));
         p.setProperty("kill.hitdelay", String.valueOf(killHitDelayMs));
         p.setProperty("kill.players", String.valueOf(killPlayers));
         p.setProperty("chaos.area.onlywand", String.valueOf(areaOnlyWand));
@@ -756,6 +802,8 @@ public final class FxSettings {
         p.setProperty("summon.despawn", summonDespawn);
         p.setProperty("summon.lifetime", String.valueOf(summonLifetime));
         p.setProperty("summon.exit", summonExit);
+        p.setProperty("summon.jade", String.valueOf(summonJade));
+        p.setProperty("summon.jade.color", summonJadeColor);
         p.setProperty("chaos.height", String.valueOf(pillarHeight));
         p.setProperty("camera.style", cameraStyle);
         p.setProperty("camera.time", String.valueOf(cameraSeconds));
@@ -892,10 +940,10 @@ public final class FxSettings {
                 "Chaos area: areaStyle " + areaStyle + ", areaColor " + areaColor.toLowerCase() + ", areaRadius " + radius
                         + ", areaHeight " + pillarHeight + ", areaOnlyWand " + onOff(areaOnlyWand) + ", maxMobs " + maxMobs
                         + ", summonRadius " + (summonRadius > 0 ? summonRadius : "auto") + ", summonDespawn " + summonDespawn
-                        + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + " | " + ActionFx.describe() + " (wave/borderColor)",
+                        + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
                         + ", onlyWand " + onOff(teamLookOnlyWand),
-                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", debugLog " + onOff(debug),
+                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
                 "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
         };
     }
@@ -907,7 +955,7 @@ public final class FxSettings {
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
-            case "debuglog", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor", "bufflight" -> 6;
+            case "debuglog", "debugrecord", "debugtrack", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor", "bufflight" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
                  "summondespawn", "summonlifetime", "summonexit" -> 4;
             case "teamfx", "teambytype" -> 5;

@@ -39,7 +39,7 @@ public class SnapInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> clicked = target != null && target.isValid() ? target : null;
         if (!FxSettings.wandFx) {
             // No wand effects: no slam animation to wait for either.
-            if (Snap.snap(player, self, clicked, buffer) == 0) context.getState().state = InteractionState.Failed;
+            Snap.snap(player, self, clicked, buffer);
             return;
         }
         // The slam animation lands its hit about /mobbattle snapHitDelay ms in (default 310: frame ~30 of 60 at Speed 1.6): the snap (sound, shockwave, targets) waits for it.

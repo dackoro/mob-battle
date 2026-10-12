@@ -1,17 +1,16 @@
 {
-  "$Comment": "Morph Wand copy (right click): like the Cleanse flash, in blue: blue tint and the burst ring in blue.",
+  "$Comment": "Morph Wand copy (right click): like the Cleanse flash, in the wand's green: green tint and the green burst ring. Its sound (SFX_MobBattle_OmnitrixCopy) is played by MorphCopyInteraction.",
   "Duration": 1.0,
   "ApplicationEffects": {
-    "EntityTopTint": "#1f6bff",
-    "EntityBottomTint": "#0a2a8a",
+    "EntityTopTint": "#2bd94a",
+    "EntityBottomTint": "#0a6a1e",
     "Particles": [
       {
-        "SystemId": "MobBattle_Copy_Burst",
+        "SystemId": "MobBattle_Morph_Burst",
         "TargetEntityPart": "Entity",
         "TargetNodeName": "Pelvis"
       }
-    ],
-    "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
+    ]
   },
   "OverlapBehavior": "Overwrite",
   "Debuff": false

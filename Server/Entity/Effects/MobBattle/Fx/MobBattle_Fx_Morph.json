@@ -1,17 +1,16 @@
 {
-  "$Comment": "Morph Wand transform: like the Cleanse flash, in blue (same as the copy). The burst also plays in the world (MorphApplyInteraction), since the model swap can drop attached particles.",
+  "$Comment": "Morph Wand transform: like the Cleanse flash, in green (same as the copy). The burst also plays in the world (MorphApplyInteraction), since the model swap can drop attached particles. Its sound (SFX_MobBattle_OmnitrixTransform) is played by MorphApplyInteraction.",
   "Duration": 1.0,
   "ApplicationEffects": {
-    "EntityTopTint": "#1f6bff",
-    "EntityBottomTint": "#0a2a8a",
+    "EntityTopTint": "#2bd94a",
+    "EntityBottomTint": "#0a6a1e",
     "Particles": [
       {
-        "SystemId": "MobBattle_Copy_Burst",
+        "SystemId": "MobBattle_Morph_Burst",
         "TargetEntityPart": "Entity",
         "TargetNodeName": "Pelvis"
       }
-    ],
-    "WorldSoundEventId": "SFX_Portal_Neutral_Open"
+    ]
   },
   "OverlapBehavior": "Overwrite",
   "Debuff": false

@@ -46,7 +46,24 @@
     "Secondary": {
       "Interactions": [
         {
-          "Type": "MobBattle_Clear"
+          "Type": "Chaining",
+          "ChainingAllowance": 1.25,
+          "Next": [
+            {
+              "Type": "MobBattle_Clear",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            },
+            {
+              "Type": "MobBattle_Clear",
+              "Effects": {
+                "ItemAnimationId": "SwingRight"
+              },
+              "RunTime": 0.1
+            }
+          ]
         }
       ]
     }

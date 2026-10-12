@@ -211,6 +211,8 @@ final class ConfigSchema {
             ids.addAll(EntityEffect.getAssetMap().getAssetMap().keySet());
         } catch (RuntimeException ignored) {
         }
+        // Look twins are LookKeeper's internal copies, not choices.
+        ids.removeIf(id -> id.startsWith("MobBattle_LookTwin_"));
         Collections.addAll(ids, EffectWand.PRESETS);
         ids.add(FxSettings.effect);
         return categorized(EntityEffect.getAssetMap(), ids, "Effects");
@@ -502,7 +504,11 @@ final class ConfigSchema {
                 number("kill.delay.millis", "Soul rip time", 0, FxSettings.MAX_KILL_DELAY_MS, "ms, 0 = instant", "Time before the mob dies."),
                 number("kill.hitdelay", "Cast hit delay", 0, FxSettings.MAX_SNAP_HIT_DELAY_MS, "ms (default " + FxSettings.DEFAULT_KILL_HIT_DELAY_MS + ")",
                         "From the click to the cast's hit."),
-                toggle("kill.loot", "Drop loot", "A killed mob drops its normal loot."),
+                toggle("kill.loot", "Drop loot", "A mob killed by the Kill Wand or Snap drops its normal loot (default off)."),
+                number("fx.glow.look", "Look glow", 0, FxSettings.MAX_GLOW, "light level 0-15, 0 = off",
+                        "Light around mobs with a jade or shimmer look or the buff's shimmer, in the look's color."),
+                number("fx.glow.death", "Death glow", 0, FxSettings.MAX_GLOW, "light level 0-15, 0 = off",
+                        "Kill Wand: the disintegrating mob flashes in its color and fades out."),
                 toggle("kill.players", "Works on players", "Players disintegrate too, then die normally."),
                 section("Snap Wand"),
                 choice("snap.mode", "Snap mode", "global = half of everyone, team = half of each side.", "global", "team"),
@@ -513,15 +519,18 @@ final class ConfigSchema {
                 number("snap.radius", "Snap reach", FxSettings.MIN_RADIUS, FxSettings.MAX_RADIUS, "blocks (without battles)", "Reach of a snap with no battle running."),
                 toggle("snap.players", "Snap players", "Players in reach (not Creative, not you) can turn to dust."),
                 section("Morph Wand"),
-                toggle("morph.players", "Morph players", "Players can be morphed too.")
+                toggle("morph.players", "Morph players", "Players can be morphed too."),
+                section("Debug Wand"),
+                number("wand.debug.track", "Follow time", 0, FxSettings.MAX_DEBUG_TRACK_SECONDS, "seconds, 0 = report only",
+                        "After the left-click report, the mob's target, AI state, health and effects keep going into the same file (default 30).")
         ), "wands", false));
 
-        pages.add(new Page("Teams", "Team Wand teams: rename, recolor, remove or add. List changes apply at once; the setting below needs Save changes.", List.of(
+        pages.add(new Page("Teams", "Team Wand teams. Names and colors (marked * until saved) and the setting below need Save changes; add, remove and reset apply at once (Undo last change reverts them).", List.of(
                 section("Team Wand"),
                 toggle("team.bytype", "Team by type", "Clicking a mob brings every mob of its type within the area radius into the team.")
         ), "teams", false));
 
-        pages.add(new Page("Summon list", "Summon Wand list. List changes apply at once; the random range and the leave settings are settings (Save changes).", List.of(
+        pages.add(new Page("Summon list", "Summon Wand list. Add, remove and clear apply at once; counts and teams (gold until saved), the random range and the leave settings need Save changes.", List.of(
                 section("Random counts"),
                 number("summon.min", "Random count from", 0, 100, "mobs", "Lowest count for entries set to random."),
                 number("summon.max", "Random count to", 0, 100, "mobs", "Highest count for entries set to random."),
@@ -531,7 +540,10 @@ final class ConfigSchema {
                         "never", "battleEnd", "timer"),
                 number("summon.lifetime", "Summon lifetime", SummonDespawn.MIN_LIFETIME, SummonDespawn.MAX_LIFETIME, "seconds", "How long a summon lives with Summons leave = timer."),
                 choice("summon.exit", "How they leave", "disintegrate: the Kill Wand's soul rip, no loot (default). vanish: removed at once, no loot.",
-                        "disintegrate", "vanish")
+                        "disintegrate", "vanish"),
+                section("Look"),
+                toggle("summon.jade", "Summons in jade", "Summons come out wearing the jade look, as if given by the Effect Wand (default off)."),
+                choice("summon.jade.color", "Summon jade color", "Color of the summons' jade (default green).", ConfigSchema::palette)
         ), "summon", false));
 
         pages.add(new Page("Presets & reset", "A preset or reset fills the form: check it, then Save changes (or Discard).", List.of(), "presets", false));
@@ -543,6 +555,10 @@ final class ConfigSchema {
         Item debug = toggle("debug", "Debug log", "[debug] lines in the server log for battle decisions.");
         ((FieldItem) debug).field().admin = true;
         admin.add(debug);
+        Item record = toggle("debug.record", "Debug recorder", "Keeps the last 5 minutes of log and [debug] lines in memory; "
+                + "Save debug record writes them to debug/ (default off).");
+        ((FieldItem) record).field().admin = true;
+        admin.add(record);
         pages.add(new Page("Admin", "Needs dackoro.mob_battle.admin in every permission mode.", admin, "admin", true));
 
         PAGES = List.copyOf(pages);

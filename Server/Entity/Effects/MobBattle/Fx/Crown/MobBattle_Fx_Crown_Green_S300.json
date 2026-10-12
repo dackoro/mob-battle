@@ -9,7 +9,8 @@
         "TargetNodeName": "Head",
         "Scale": 3.0
       }
-    ]
+    ],
+    "FirstPersonParticles": []
   },
   "OverlapBehavior": "Overwrite",
   "Debuff": false

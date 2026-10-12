@@ -18,6 +18,7 @@
         "TargetNodeName": "Head",
         "Scale": 1.0
       }
-    ]
+    ],
+    "FirstPersonParticles": []
   }
 }

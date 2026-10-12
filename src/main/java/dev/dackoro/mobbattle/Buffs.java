@@ -105,8 +105,8 @@ final class Buffs {
         boolean health;
         String crownFx;
         /**
-         * Wand, streak and champion buffs: the shimmer in buffColor while the buff lasts, BuffShimmer_&lt;Color&gt; (veins,
-         * eye flames, runes; guarded by LookKeeper), or only its runes and eyes, BuffRunes_&lt;Color&gt;, on a mob with a
+         * Wand, streak and champion buffs: the shimmer in buffColor while the buff lasts, BuffShimmer_&lt;Color&gt;[_S200]
+         * (veins, eye flames, runes; guarded by LookKeeper), or only its runes and eyes, BuffRunes_&lt;Color&gt;, on a mob with a
          * look of its own (a jade summon keeps its jade). scripts/gen-looks.py.
          */
         String lookFx;
@@ -453,7 +453,7 @@ final class Buffs {
             if (resized) putAgainLater(mob, want, () -> s.crownFx);
             else WandFx.addFx(mob, want, accessor);
         }
-        applyLook(mob, s, resized, accessor);
+        applyLook(mob, s, resized, scaled, accessor);
         // A Jade/Shimmer look of its own (Effect Wand) also loses its ModelVFX in the rebuild: LookKeeper re-sends it.
         if (resized) LookKeeper.resized(mob);
         if (s.weight.isEmpty()) STATES.remove(mob, s);
@@ -465,12 +465,15 @@ final class Buffs {
     /**
      * Wand, streak and champion buffs: the shimmer in buffColor while the buff lasts, or only its runes and eyes on a
      * mob with a look of its own (one ModelVFX per mob: a jade summon keeps its jade). Put on again after a resize,
-     * since the rebuilt model drops particles put on now.
+     * since the rebuilt model drops particles put on now. Sized to the mob ({@link WandFx#lookSize}): attached particles
+     * don't grow with the entity scale, so a grown mob's runes hid inside its head (_S200 = x2).
      */
-    private static void applyLook(Ref<EntityStore> mob, State s, boolean resized, ComponentAccessor<EntityStore> accessor) {
+    private static void applyLook(Ref<EntityStore> mob, State s, boolean resized, float scaled,
+                                  ComponentAccessor<EntityStore> accessor) {
         boolean looks = s.weight.containsKey(Source.STREAK) || s.weight.containsKey(Source.CHAMPION)
                 || s.weight.containsKey(Source.WAND);
-        String look = looks ? (LookKeeper.hasOwnLook(mob) ? BUFF_RUNES : BUFF_SHIMMER) + FxSettings.buffColor : null;
+        String look = looks ? (LookKeeper.hasOwnLook(mob) ? BUFF_RUNES : BUFF_SHIMMER) + FxSettings.buffColor
+                + WandFx.lookSize(scaled) : null;
         if (s.lookFx != null && !s.lookFx.equals(look)) {
             LookKeeper.untrackBuff(mob);
             WandFx.removeFx(mob, s.lookFx, accessor);
@@ -487,10 +490,23 @@ final class Buffs {
         if (resized) putAgainLater(mob, look, () -> s.lookFx);
     }
 
+    /**
+     * The mob's model was swapped (Morph Wand, Cleanse): the client rebuilt it and dropped the crown and the buff look
+     * put on the old one, so both go on again once the new model has arrived.
+     */
+    static void modelChanged(Ref<EntityStore> mob) {
+        State s = mob == null ? null : STATES.get(mob);
+        if (s == null || !mob.isValid()) return;
+        if (s.crownFx != null) putAgainLater(mob, s.crownFx, () -> s.crownFx);
+        if (s.lookFx != null) putAgainLater(mob, s.lookFx, () -> s.lookFx);
+    }
+
     /** The mob got a look of its own (Effect Wand): its buff look turns from the shimmer into runes and eyes. */
     static void refreshLook(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
         State s = mob == null ? null : STATES.get(mob);
-        if (s != null && mob.isValid()) applyLook(mob, s, false, accessor);
+        if (s == null || !mob.isValid()) return;
+        EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
+        applyLook(mob, s, false, scale != null ? scale.getScale() : 1f, accessor);
     }
 
     /** "size +20%, health +40%" for that many Buff Wand stacks (each stat capped at its max). */

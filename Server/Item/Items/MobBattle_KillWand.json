@@ -13,6 +13,7 @@
   "Model": "Items/MobBattle/KillWand/MobBattle_KillWand.blockymodel",
   "Texture": "Items/MobBattle/KillWand/MobBattle_KillWand_Texture.png",
   "PlayerAnimationsId": "MobBattle_KillWand",
+  "Animation": "Items/MobBattle/KillWand/Idle.blockyanim",
   "Utility": {
     "Compatible": true
   },

@@ -135,10 +135,31 @@ public final class FightFx {
      * (CancelParticleSystems with a region, as the game does it). The floor / zone shapes can't be cancelled.
      */
     private static void cancelGlow(double x, double y, double z, double radius, ComponentAccessor<EntityStore> buffer) {
+        PlayerUtil.broadcastPacketToPlayers(buffer, glowCancel(x, y, z, radius));
+    }
+
+    private static com.hypixel.hytale.protocol.packets.world.CancelParticleSystems glowCancel(double x, double y, double z,
+                                                                                             double radius) {
         double r = radius + 3;
-        PlayerUtil.broadcastPacketToPlayers(buffer, new com.hypixel.hytale.protocol.packets.world.CancelParticleSystems(
+        return new com.hypixel.hytale.protocol.packets.world.CancelParticleSystems(
                 new com.hypixel.hytale.protocol.Position(x - r, y - 64, z - r),
-                new com.hypixel.hytale.protocol.Position(x + r, y + 160, z + r), GLOW_IDS, true));
+                new com.hypixel.hytale.protocol.Position(x + r, y + 160, z + r), GLOW_IDS, true);
+    }
+
+    /**
+     * Settings panel preview (ConfigPage): an area of {@code radius} in a style and color maybe not saved yet, drawn
+     * only for {@code viewer} (it ignores areaOnlyWand: the panel is open, no wand in hand). Replaces their previous
+     * preview, {@code previous} = {x, y, z, radius} or null: its glow is cancelled and their shapes cleared (arenas
+     * and team rings redraw themselves), so typing a radius doesn't pile circles up. Returns this one's {x, y, z, r}.
+     */
+    static double[] previewArea(PlayerRef viewer, org.joml.Vector3d center, double radius, String style, String colorName,
+                                double[] previous, ComponentAccessor<EntityStore> buffer) {
+        var out = viewer.getPacketHandler();
+        if (previous != null) out.write(glowCancel(previous[0], previous[1], previous[2], previous[3]));
+        out.write(new com.hypixel.hytale.protocol.packets.player.ClearDebugShapes());
+        drawArea(center, radius, FxSettings.groundOf(style), colorName, FxSettings.hasBorder(style) ? colorName : null,
+                RING_MILLIS / 1000f, viewer, buffer);
+        return new double[]{center.x(), center.y(), center.z(), radius};
     }
 
     /** Once per second per world (BattleLifecycleSystem): redraw held areas whose owner holds the Chaos Wand. */
@@ -259,7 +280,7 @@ public final class FightFx {
      * flashes. Shows how far the Snap Wand reached. To everyone in the world.
      */
     static void shockwave(org.joml.Vector3d center, double radius, String hex, ComponentAccessor<EntityStore> buffer) {
-        if (FxSettings.debug) {
+        if (MobBattlePlugin.debugging()) {
             MobBattlePlugin.debug("shockwave at " + Math.round(center == null ? 0 : center.x()) + ", "
                     + Math.round(center == null ? 0 : center.y()) + ", " + Math.round(center == null ? 0 : center.z())
                     + " radius " + radius + " color " + hex + (FxSettings.wandFx ? "" : " (skipped: wandFx off)"));

@@ -1,0 +1,16 @@
+{
+  "LifeSpan": 2.0,
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Morph_Implosion"
+    },
+    {
+      "SpawnerId": "MobBattle_Morph_Sparks",
+      "PositionOffset": {
+        "Y": 0.25
+      }
+    }
+  ],
+  "$Comment": "Morph Wand burst (copy, transform, unmorph) in the wand's green: MobBattle_Copy_Burst recolored.",
+  "CullDistance": 120
+}

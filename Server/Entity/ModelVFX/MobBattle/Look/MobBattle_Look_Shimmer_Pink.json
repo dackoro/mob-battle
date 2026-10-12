@@ -10,12 +10,12 @@
   "CurveType": "Linear",
   "LoopOption": "LoopMirror",
   "HighlightColor": "#ff97e2",
-  "HighlightThickness": 1.2,
+  "HighlightThickness": 1.0,
   "UseBloomOnHighlight": true,
   "UseProgessiveHighlight": false,
   "NoiseScale": {
-    "X": 60.0,
-    "Y": 60.0
+    "X": 30.0,
+    "Y": 30.0
   },
   "NoiseScrollSpeed": {
     "X": 0.0,

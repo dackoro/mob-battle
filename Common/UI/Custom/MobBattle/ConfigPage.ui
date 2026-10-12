@@ -193,8 +193,8 @@ $C.@DecoratedContainer {
       }
 
       $C.@SecondaryTextButton #UndoButton {
-        @Text = "Undo last save";
-        @Anchor = (Width: 200);
+        @Text = "Undo last change";
+        @Anchor = (Width: 220);
       }
 
       Group { Anchor: (Width: 10); }

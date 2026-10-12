@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * still active on the server, so the guardian re-sends the look (remove + add) whenever another effect ends.
  * A look removed on purpose (Cleanse) or a dead mob is untracked. The Buff Wand's shimmer (Buffs, an Fx effect) is
  * guarded the same way ({@link #trackBuff}) unless the mob already has its own look, which always wins.
+ * Each pass also hands the guarded mobs to {@link LookLight}, which makes them glow in their look's color.
  */
 final class LookKeeper {
 
@@ -41,6 +42,9 @@ final class LookKeeper {
         final boolean buff;
         /** Taken off by the guardian, going back on in RESEND_GAP_MS. Only touched on the world thread. */
         boolean pending;
+        /** Same look under another id (MobBattle_LookTwin_*), or null: a re-send swaps to it in one tick. */
+        final EntityEffect twin;
+        final int twinIndex;
 
         Tracked(Style style, String color, EntityEffect effect, int effectIndex, int index, boolean buff) {
             this.style = style;
@@ -49,6 +53,8 @@ final class LookKeeper {
             this.effect = effect;
             this.effectIndex = effectIndex;
             this.index = index;
+            this.twin = twinOf(effect);
+            this.twinIndex = twin != null ? EntityEffect.getAssetMap().getIndex(twin.getId()) : -1;
         }
     }
 
@@ -57,6 +63,16 @@ final class LookKeeper {
             "MobBattle_Test_JadeAppearHold", "MobBattle_Test_JadeOnce_C");
     private static final String JADE_APPEAR = "MobBattle_Look_JadeAppear_";
     private static final String JADE = "MobBattle_Look_Jade_";
+    private static final String LOOK = "MobBattle_Look_";
+    private static final String TWIN = "MobBattle_LookTwin_";
+
+    /** The twin of a lasting look (MobBattle_Look_Jade_Red -> MobBattle_LookTwin_Jade_Red), or null if it has none. */
+    private static EntityEffect twinOf(EntityEffect effect) {
+        String id = effect == null ? null : effect.getId();
+        if (id == null || !id.startsWith(LOOK)) return null;
+        EntityEffect twin = EntityEffect.getAssetMap().getAsset(TWIN + id.substring(LOOK.length()));
+        return twin != null && EntityEffect.getAssetMap().getIndex(twin.getId()) >= 0 ? twin : null;
+    }
 
     private static final Map<Ref<EntityStore>, Tracked> TRACKED = new ConcurrentHashMap<>();
     /** Stores with a guardian pass already queued on their world thread (one at a time per world). */
@@ -78,8 +94,9 @@ final class LookKeeper {
         return null;
     }
 
-    /** The palette color an effect id ends with ("_Red"), or null. */
+    /** The palette color an effect id ends with ("_Red", also before a size suffix: "_Red_S200"), or null. */
     static String colorOf(String effectId) {
+        if (effectId != null && effectId.matches(".*_S\\d+")) effectId = effectId.substring(0, effectId.lastIndexOf('_'));
         int cut = effectId == null ? -1 : effectId.lastIndexOf('_');
         if (cut < 0) return null;
         String c = effectId.substring(cut + 1);
@@ -95,6 +112,7 @@ final class LookKeeper {
     /** The lasting look the guardian re-sends for an appearing one, or null when it is lasting already. */
     private static String resendAs(String id) {
         if (id.startsWith(JADE_APPEAR)) return JADE + id.substring(JADE_APPEAR.length());
+        if (id.startsWith(TWIN)) return LOOK + id.substring(TWIN.length());
         return RESEND_AS.get(id);
     }
 
@@ -122,6 +140,61 @@ final class LookKeeper {
         if (keepIndex < 0) return;
         TRACKED.put(ref, new Tracked(style, colorOf(effect.getId()), keep, keepIndex, index, false));
     }
+
+    /**
+     * Before the Effect Wand gives a new look: takes the tracked look off (both the appearing and the lasting id), so
+     * the mob never wears two look effects (the old one held the ModelVFX slot and the guardian's re-send of the new
+     * one was swallowed until the next change). Returns true when {@code next} itself was removed: the caller must
+     * add it back a moment later, since a remove + add in the same tick reaches the client as nothing new.
+     */
+    static boolean dropLook(Ref<EntityStore> ref, EntityEffect next, EffectControllerComponent effects,
+                            com.hypixel.hytale.component.ComponentAccessor<EntityStore> accessor) {
+        if (ref == null || next == null || styleOf(next.getId()) == null) return false;
+        Tracked t = TRACKED.get(ref);
+        if (t != null && !t.buff) TRACKED.remove(ref, t);
+        // Every look on the mob goes, not only the tracked one: a look saved with the mob (world left and entered
+        // again) is not tracked, and a second look on top of it broke the re-send (user, 2026-10-12).
+        int nextIndex = EntityEffect.getAssetMap().getIndex(next.getId());
+        boolean same = false;
+        for (int index : activeLooks(effects)) {
+            effects.removeEffect(ref, index, RemovalBehavior.COMPLETE, accessor);
+            if (index == nextIndex) same = true;
+        }
+        return same;
+    }
+
+    /** Indexes of every own look effect active on the mob (looks and twins; not the buff's Fx shimmer). */
+    private static java.util.List<Integer> activeLooks(EffectControllerComponent effects) {
+        java.util.List<Integer> out = new java.util.ArrayList<>();
+        for (int index : effects.getActiveEffectIndexes()) {
+            EntityEffect e = EntityEffect.getAssetMap().getAsset(index);
+            if (e != null && styleOf(e.getId()) != null) out.add(index);
+        }
+        return out;
+    }
+
+    /** True when the mob wears a look effect of its own (checked when it loads). */
+    static boolean hasLookEffect(EffectControllerComponent effects) {
+        return effects != null && !activeLooks(effects).isEmpty();
+    }
+
+    /**
+     * A mob loaded with a look saved on it (infinite effects are saved; TRACKED only lives in memory): it is guarded
+     * again, so the look comes back when another effect ends and it glows (LookLight). Extra looks (two saved at once)
+     * are taken off. World thread.
+     */
+    static void adopt(Ref<EntityStore> ref, Store<EntityStore> store) {
+        if (store.isShutdown() || !ref.isValid() || TRACKED.containsKey(ref)) return;
+        EffectControllerComponent effects = store.getComponent(ref, EffectControllerComponent.getComponentType());
+        if (effects == null) return;
+        java.util.List<Integer> looks = activeLooks(effects);
+        if (looks.isEmpty()) return;
+        for (int i = 1; i < looks.size(); i++) effects.removeEffect(ref, looks.get(i), RemovalBehavior.COMPLETE, store);
+        track(ref, EntityEffect.getAssetMap().getAsset(looks.get(0)));
+    }
+
+    /** Delay before a look removed by {@link #dropLook} goes back on. */
+    static final long REAPPLY_GAP_MS = 100;
 
     /** True when {@code ref} wears a look of its own (Effect Wand), not just the buff's shimmer. */
     static boolean hasOwnLook(Ref<EntityStore> ref) {
@@ -188,6 +261,10 @@ final class LookKeeper {
     /** The guardian pass for the mobs of {@code store}. World thread. */
     static void tick(Store<EntityStore> store) {
         if (store.isShutdown()) return;
+        // The guarded mobs of this world, with their look's light color (LookLight). Only built with lookGlow on: this
+        // pass runs every tick while a look is kept.
+        boolean glow = FxSettings.lookGlow > 0;
+        Map<Ref<EntityStore>, LookLight.Want> glowing = glow ? new java.util.HashMap<>() : Map.of();
         for (Map.Entry<Ref<EntityStore>, Tracked> e : TRACKED.entrySet()) {
             Ref<EntityStore> ref = e.getKey();
             Tracked t = e.getValue();
@@ -205,6 +282,10 @@ final class LookKeeper {
                 TRACKED.remove(ref, t);
                 continue;
             }
+            if (glow) {
+                boolean jade = t.style == Style.JADE;
+                glowing.put(ref, new LookLight.Want(LookLight.hexOf(t.color, Teams.PALETTE.get(jade ? "Green" : "Purple")), jade));
+            }
             // Taken off by the guardian itself, waiting to go back on (resendLater).
             if (t.pending) continue;
             int[] now = effects.getActiveEffectIndexes().clone();
@@ -216,6 +297,7 @@ final class LookKeeper {
             boolean lost = t.touched || t.seen != null && anyMissing(t.seen, now);
             t.touched = false;
             t.seen = now;
+            if (lost && swap(ref, t, effects, store)) continue;
             if (lost) {
                 // Another effect ended: the client dropped the look's ModelVFX. Send the look again: off now, back on
                 // RESEND_GAP_MS later. A remove + add in the same tick may reach the client as nothing new (the
@@ -225,6 +307,37 @@ final class LookKeeper {
                 resendLater(ref, t, store);
             }
         }
+        if (!glowing.isEmpty() || LookLight.any()) LookLight.tick(store, glowing);
+    }
+
+    /**
+     * Re-sends the look in one tick by switching ids: the lasting look and its twin take turns (an appearing look
+     * goes to the lasting one). A different id reaches the client as a new effect, so there is no gap with the normal
+     * skin showing, unlike a remove + add of the same id, which needs {@link #resendLater}. False when there is no
+     * other id to switch to (no twin: the buff's shimmer).
+     */
+    private static boolean swap(Ref<EntityStore> ref, Tracked t, EffectControllerComponent effects, Store<EntityStore> store) {
+        EntityEffect next;
+        int nextIndex;
+        if (t.index != t.effectIndex) {
+            // On the twin or the appearing look: back to the lasting one.
+            next = t.effect;
+            nextIndex = t.effectIndex;
+        } else if (t.twin != null) {
+            next = t.twin;
+            nextIndex = t.twinIndex;
+        } else {
+            return false;
+        }
+        effects.removeEffect(ref, t.index, RemovalBehavior.COMPLETE, store);
+        if (!effects.addEffect(ref, next, store)) {
+            TRACKED.remove(ref, t);
+            return true;
+        }
+        t.index = nextIndex;
+        t.seen = effects.getActiveEffectIndexes().clone();
+        t.touched = false;
+        return true;
     }
 
     /** Gap between taking the look off and putting it back (two ticks; the swirl restart works with 60 ms). */

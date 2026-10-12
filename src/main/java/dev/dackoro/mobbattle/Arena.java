@@ -66,6 +66,8 @@ final class Arena {
         final BattleManager.Battle battle;
         /** Fighter -> pushes in a row while still outside (world thread only): stuck ones get teleported in. */
         final java.util.Map<Ref<EntityStore>, Integer> pushes = new java.util.HashMap<>();
+        /** [debug] "pushed in" lines: fighter -> {last line time, pushes since} (world thread only). */
+        final java.util.Map<Ref<EntityStore>, long[]> pushLog = new java.util.HashMap<>();
         final Store<EntityStore> store;
         final Vector3d center;
         /** Radius at the start; with arenaShrink it closes linearly to endRadius between shrinkFrom and shrinkUntil. */
@@ -173,7 +175,7 @@ final class Arena {
         Mode mode = FxSettings.arenaMode(battle.kind);
         int seconds = FxSettings.timerSeconds(battle.kind);
         ARENAS.removeIf(s -> s.battle == battle);
-        if (FxSettings.debug) {
+        if (MobBattlePlugin.debugging()) {
             StringBuilder who = new StringBuilder();
             for (Ref<EntityStore> m : battle.members()) {
                 who.append(who.length() > 0 ? ", " : "").append(ChaosWand.nameOf(m, buffer)).append(" (side ")
@@ -333,13 +335,26 @@ final class Arena {
                         + Math.round(d - radius) + " blocks outside, teleported back in");
                 continue;
             }
-            if (FxSettings.debug) {
-                MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store)
-                        + " at the edge (" + String.format(java.util.Locale.ROOT, "%.1f", d) + " of " + Math.round(radius) + "), pushed in");
+            if (MobBattlePlugin.debugging()) {
+                // Several pushes a second per mob filled the log (~130 lines a minute): one line per mob every
+                // PUSH_LOG_MS, with how many pushes it got since.
+                long now = System.currentTimeMillis();
+                long[] pl = s.pushLog.computeIfAbsent(npc, k -> new long[] {0, 0});
+                pl[1]++;
+                if (now - pl[0] >= PUSH_LOG_MS) {
+                    MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store)
+                            + " at the edge (" + String.format(java.util.Locale.ROOT, "%.1f", d) + " of " + Math.round(radius) + "), pushed in"
+                            + (pl[1] > 1 ? " x" + pl[1] : ""));
+                    pl[0] = now;
+                    pl[1] = 0;
+                }
             }
             push(npc, ox, oz, store);
         }
     }
+
+    /** At most one [debug] "pushed in" line per mob this often. */
+    private static final long PUSH_LOG_MS = 5000;
 
     /** How far up or down a teleport looks for a spot to stand on. */
     private static final int STAND_RANGE = 24;

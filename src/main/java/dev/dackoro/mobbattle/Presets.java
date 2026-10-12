@@ -263,20 +263,20 @@ final class Presets {
 
     /** summon.* keys that are settings, not part of the summon list (they go in presets and resets). */
     private static final java.util.Set<String> SUMMON_SETTINGS = java.util.Set.of(
-            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit",
+            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit", "summon.jade", "summon.jade.color",
             // The random count range is a setting too (panel "Save changes"), not part of the list.
             "summon.min", "summon.max", "summon.atleastone");
 
-    private static boolean isListKey(String key) {
+    static boolean isListKey(String key) {
         return key.startsWith("teams.") || key.startsWith("summon.") && !SUMMON_SETTINGS.contains(key);
     }
 
     /**
-     * Access policy and the debug log are security settings: they must survive every preset and reset group (only
-     * /mobbattle permissions and /mobbattle debugLog change them).
+     * Access policy, the debug log and the debug recorder are security settings: they must survive every preset and
+     * reset group (only /mobbattle permissions, debugLog and debugRecord change them).
      */
     private static boolean isSecurityKey(String key) {
-        return FxSettings.PERMISSIONS_KEY.equals(key) || "debug".equals(key);
+        return FxSettings.PERMISSIONS_KEY.equals(key) || "debug".equals(key) || "debug.record".equals(key);
     }
 
     /** /mobbattle reset groups, in help order. */
@@ -298,14 +298,15 @@ final class Presets {
         if (key.startsWith("wave.") || key.startsWith("glow.") || key.startsWith("mobfx.") || key.startsWith("fx.")
                 || key.startsWith("chaos.area") || key.equals("chaos.height") || key.startsWith("laser.")
                 || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")
-                || key.equals("wand.buff.light")) return "effects";
+                || key.equals("wand.buff.light") || key.startsWith("summon.jade")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
         if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
                 || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak")
                 || key.equals("battle.unstick") || key.equals("battle.duelCard")) return "arenas";
-        if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.equals("effect.id")) return "wands";
+        if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.equals("effect.id")
+                || key.equals("wand.debug.track")) return "wands";
         return "rules";
     }
 

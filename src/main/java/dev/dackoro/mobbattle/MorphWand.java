@@ -103,6 +103,7 @@ public final class MorphWand {
         float scale = copy.scale() > 0 ? copy.scale() : 1f;
         accessor.putComponent(entity, ModelComponent.getComponentType(),
                 new ModelComponent(Model.createScaledModel(asset, scale)));
+        modelChanged(entity);
         return true;
     }
 
@@ -116,7 +117,17 @@ public final class MorphWand {
         // A player's look comes from their skin: flag it so it is resent (as EffectControllerComponent.tryResetModelChange).
         PlayerSkinComponent skin = accessor.getComponent(entity, PlayerSkinComponent.getComponentType());
         if (skin != null) skin.setNetworkOutdated();
+        modelChanged(entity);
         return true;
+    }
+
+    /**
+     * The new model is rebuilt on the client, which drops the ModelVFX of a Jade/Shimmer look and the particles of the
+     * buff look and crown: put them on again once the model reached the client (as after a size buff).
+     */
+    private static void modelChanged(Ref<EntityStore> entity) {
+        LookKeeper.resized(entity);
+        Buffs.modelChanged(entity);
     }
 
     /** Restores every morphed mob still loaded. Returns how many. */

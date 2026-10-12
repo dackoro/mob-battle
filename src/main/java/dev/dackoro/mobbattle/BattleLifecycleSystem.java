@@ -86,8 +86,9 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             nextCard.put(store, now + INTERVAL_MS);
             store.getExternalData().getWorld().execute(() -> DuelCard.tick(store));
         }
-        if (LookKeeper.any()) {
-            // Looks kept on mobs (LookKeeper): every tick while one is tracked, on the world thread.
+        if (LookKeeper.any() || LookLight.any()) {
+            // Looks kept on mobs (LookKeeper) and their lights (LookLight): every tick while one is tracked or a
+            // light is still on, on the world thread.
             LookKeeper.schedule(store);
         }
         if (DebugWand.any() && now >= nextDebugWand.getOrDefault(store, 0L)) {

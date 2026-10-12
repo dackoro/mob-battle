@@ -2,10 +2,8 @@ package dev.dackoro.mobbattle;
 
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
-import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
@@ -14,14 +12,14 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
 
-/** Debug Wand right click: tracks the clicked entity's effects and health for 60 s (click it again to stop). */
+/** Debug Wand right click: stops following the mob of the last left click (works anywhere, no target needed). */
 public class DebugTrackInteraction extends SimpleInstantInteraction {
 
     public static final String TYPE = "MobBattle_DebugTrack";
 
     public static final BuilderCodec<DebugTrackInteraction> CODEC = BuilderCodec
             .builder(DebugTrackInteraction.class, DebugTrackInteraction::new, SimpleInstantInteraction.CODEC)
-            .documentation("Debug Wand: logs the clicked entity's effect and health changes for 60 seconds.")
+            .documentation("Debug Wand: stops following the mob of the last left click.")
             .build();
 
     @Override
@@ -33,12 +31,6 @@ public class DebugTrackInteraction extends SimpleInstantInteraction {
             context.getState().state = InteractionState.Failed;
             return;
         }
-        Ref<EntityStore> target = context.getTargetEntity();
-        if (target == null || !target.isValid()) {
-            player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
-            return;
-        }
-        DebugWand.toggleTrack(player, target, buffer);
+        DebugWand.stopTrack(player);
     }
 }

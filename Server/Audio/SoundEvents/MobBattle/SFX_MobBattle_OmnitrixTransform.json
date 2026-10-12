@@ -1,0 +1,17 @@
+{
+  "$Comment": "Morph Wand: played at the mob when it is transformed (omnitrix transformation). Mono, trimmed, -20 dB mean. Small random pitch.",
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/MobBattle/OmnitrixTransform.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -1.0,
+        "MaxPitch": 1.0
+      }
+    }
+  ],
+  "Volume": 0,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Moderate"
+}

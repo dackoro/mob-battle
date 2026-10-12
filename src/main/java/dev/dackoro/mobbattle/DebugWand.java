@@ -41,38 +41,49 @@ import java.util.function.Supplier;
 
 /**
  * Debug Wand. Left click a mob: a full report (chat summary, server log, and a file in the plugin data folder under
- * debug/). Right click: track that mob for 60 s, logging its effects and health changes once a second (one tracked
- * mob per player; a new click replaces it, the same mob again stops it). Read-only apart from the tracking state.
+ * debug/), then the mob is followed for {@link FxSettings#debugTrackSeconds} (0 = report only): once a second its
+ * target, AI state, health and effect changes, plus where it is every {@link #HEARTBEAT_MS}, go into the same file,
+ * the server log and chat (user, 2026-10-12: one log with the snapshot and what came after). One followed mob per
+ * player; a new left click replaces it, a right click stops it. Read-only apart from the tracking state.
  * Everything that reads components runs on the mob's world thread (the interactions and BattleLifecycleSystem.tick).
  * Tracks are keyed by the player's UUID, never a PlayerRef; a track whose mob is gone or dead is dropped.
  */
 final class DebugWand {
 
-    static final long TRACK_MS = 60_000;
+    /** While following, a line with position, health and distance to the target this often, even with no change. */
+    static final long HEARTBEAT_MS = 5000;
     private static final String INFO = "#7fd3ff";
     private static final String WARN = "#ffcc55";
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
-    /** Player UUID -> the mob they track. */
+    /** Player UUID -> the mob they follow. */
     private static final Map<UUID, Track> TRACKS = new ConcurrentHashMap<>();
 
     private DebugWand() {
     }
 
-    /** One tracked mob: the effects (id -> remaining seconds, -1 = infinite) and health seen last second. */
+    /** One followed mob: what was seen last second (effects id -> remaining seconds, -1 = infinite; health; AI). */
     private static final class Track {
         final UUID owner;
         final Ref<EntityStore> mob;
         final String name;
+        final long startMs;
         final long untilMs;
+        /** The report file the lines are appended to (null: it could not be written). */
+        final Path file;
         Map<String, Float> effects = new HashMap<>();
         float health = Float.NaN;
+        String ai = "";
+        long nextHeartbeat;
 
-        Track(UUID owner, Ref<EntityStore> mob, String name, long untilMs) {
+        Track(UUID owner, Ref<EntityStore> mob, String name, long startMs, long untilMs, Path file) {
             this.owner = owner;
             this.mob = mob;
             this.name = name;
+            this.startMs = startMs;
             this.untilMs = untilMs;
+            this.file = file;
+            this.nextHeartbeat = startMs + HEARTBEAT_MS;
         }
     }
 
@@ -81,28 +92,34 @@ final class DebugWand {
         return !TRACKS.isEmpty();
     }
 
-    // ---- right click: track ----
+    // ---- follow (after a left click) ----
 
-    /** Starts tracking {@code mob} for the player; clicking the mob already tracked stops it. */
-    static void toggleTrack(PlayerRef player, Ref<EntityStore> mob, ComponentAccessor<EntityStore> buffer) {
+    /** Starts following {@code mob} for debugTrack seconds, appending to {@code file}; replaces the player's last one. */
+    private static void startTrack(PlayerRef player, Ref<EntityStore> mob, ComponentAccessor<EntityStore> buffer,
+                                   String name, Path file) {
         UUID owner = player.getUuid();
-        String name = ChaosWand.nameOf(mob, buffer);
+        long now = System.currentTimeMillis();
         Track old = TRACKS.remove(owner);
-        if (old != null && old.mob.equals(mob)) {
-            say(player, "Stopped tracking " + old.name + ".", WARN);
-            MobBattlePlugin.log("[debug wand] track stopped by " + player.getUsername() + ": " + old.name);
-            return;
-        }
-        Track track = new Track(owner, mob, name, System.currentTimeMillis() + TRACK_MS);
+        if (old != null) finish(old, "the Debug Wand clicked " + (old.mob.equals(mob) ? "it again" : "another mob"));
+        Track track = new Track(owner, mob, name, now, now + FxSettings.debugTrackSeconds * 1000L, file);
         track.effects = effectsOf(mob, buffer);
         track.health = healthOf(mob, buffer);
+        track.ai = aiOf(mob);
         TRACKS.put(owner, track);
-        if (old != null) {
-            say(player, "Stopped tracking " + old.name + " (one mob at a time).", WARN);
+        append(track, "\n[Follow for " + FxSettings.debugTrackSeconds + " s]\n" + stamp(track, now) + "start: "
+                + track.ai + where(mob, buffer) + "\n");
+        MobBattlePlugin.log("[debug wand] follow started by " + player.getUsername() + ": " + name);
+    }
+
+    /** Right click: stops the player's follow, if any. */
+    static void stopTrack(PlayerRef player) {
+        Track old = TRACKS.remove(player.getUuid());
+        if (old == null) {
+            say(player, "Not following any mob. Left click one: report, then " + FxSettings.debugTrackSeconds
+                    + " s of follow (debugTrack).", WARN);
+            return;
         }
-        say(player, "Tracking " + name + " for 60 s: effect and health changes are logged each second. "
-                + "Click it again to stop.", INFO);
-        MobBattlePlugin.log("[debug wand] track started by " + player.getUsername() + ": " + name);
+        finish(old, "stopped by " + player.getUsername());
     }
 
     /** Once per second per world (BattleLifecycleSystem, on the world thread): reports changes and prunes. */
@@ -122,16 +139,17 @@ final class DebugWand {
                 continue;
             }
             if (now >= t.untilMs) {
-                if (TRACKS.remove(entry.getKey(), t)) finish(t, "60 s are up");
+                if (TRACKS.remove(entry.getKey(), t)) finish(t, (t.untilMs - t.startMs) / 1000 + " s are up");
                 continue;
             }
             PlayerRef owner = Universe.get().getPlayer(t.owner);
             if (owner == null) {
-                TRACKS.remove(entry.getKey(), t);
-                MobBattlePlugin.log("[debug wand] track of " + t.name + " dropped: owner offline");
+                if (TRACKS.remove(entry.getKey(), t)) finish(t, "owner offline");
                 continue;
             }
             List<String> changes = new ArrayList<>();
+            String ai = aiOf(t.mob);
+            if (!ai.equals(t.ai)) changes.add(ai + where(t.mob, store));
             Map<String, Float> effects = effectsOf(t.mob, store);
             for (Map.Entry<String, Float> e : effects.entrySet()) {
                 if (!t.effects.containsKey(e.getKey())) {
@@ -145,20 +163,69 @@ final class DebugWand {
             if (!Float.isNaN(health) && !Float.isNaN(t.health) && Math.abs(health - t.health) > 0.05f) {
                 changes.add("health " + f1(t.health) + " -> " + f1(health) + maxOf(t.mob, store));
             }
+            t.ai = ai;
             t.effects = effects;
             if (!Float.isNaN(health)) t.health = health;
+            StringBuilder file = new StringBuilder();
             for (String line : changes) {
-                say(owner, "[track " + t.name + "] " + line, INFO);
-                MobBattlePlugin.log("[debug wand] track " + t.name + ": " + line);
+                say(owner, "[follow " + t.name + "] " + line, INFO);
+                MobBattlePlugin.log("[debug wand] follow " + t.name + ": " + line);
+                file.append(stamp(t, now)).append(line).append('\n');
             }
+            if (now >= t.nextHeartbeat) {
+                // File only: where it is and how far its target is, so a mob wandering off shows even with no change.
+                t.nextHeartbeat = now + HEARTBEAT_MS;
+                file.append(stamp(t, now)).append("still: health ").append(Float.isNaN(health) ? "n/a" : f1(health))
+                        .append(where(t.mob, store)).append('\n');
+            }
+            if (file.length() > 0) append(t, file.toString());
         }
     }
 
     private static void finish(Track t, String reason) {
         PlayerRef owner = Universe.get().getPlayer(t.owner);
-        String text = "Tracking of " + t.name + " stopped: " + reason + ".";
+        String text = "Follow of " + t.name + " ended: " + reason + ".";
         if (owner != null) say(owner, text, WARN);
         MobBattlePlugin.log("[debug wand] " + text);
+        append(t, stamp(t, System.currentTimeMillis()) + text + "\n");
+    }
+
+    /** "[+12s] " from the start of the follow. */
+    private static String stamp(Track t, long now) {
+        return "[+" + (now - t.startMs) / 1000 + "s] ";
+    }
+
+    /** Appends to the follow's report file; a failure goes to the server log and is otherwise ignored. */
+    private static void append(Track t, String text) {
+        if (t.file == null) return;
+        try {
+            Files.writeString(t.file, text, StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException | RuntimeException ex) {
+            MobBattlePlugin.log("[debug wand] could not append to " + t.file.getFileName() + ": " + ex);
+        }
+    }
+
+    /** AI state, target, locked target and attitude: what the follow reports when it changes. */
+    private static String aiOf(Ref<EntityStore> mob) {
+        try {
+            return BattleDebug.followFields(mob, mob.getStore());
+        } catch (RuntimeException ex) {
+            return "AI n/a (" + ex.getClass().getSimpleName() + ")";
+        }
+    }
+
+    /** ", at x y z, target 4.2 blocks away". */
+    private static String where(Ref<EntityStore> mob, ComponentAccessor<EntityStore> buffer) {
+        Vector3d p = ChaosWand.positionOf(mob, buffer);
+        String at = p == null ? "" : String.format(Locale.ROOT, ", at %.1f %.1f %.1f", p.x, p.y, p.z);
+        String d;
+        try {
+            d = BattleDebug.targetDistance(mob, mob.getStore());
+        } catch (RuntimeException ex) {
+            d = null;
+        }
+        return at + (d == null ? "" : ", target " + d + " blocks away");
     }
 
     // ---- left click: inspect ----
@@ -171,6 +238,7 @@ final class DebugWand {
 
         String fileName = sanitize(role != null ? role : name) + "_" + LocalDateTime.now().format(STAMP) + ".txt";
         String where;
+        Path written = null;
         Path dir = FxSettings.dataDirectory();
         if (dir == null) {
             where = "not written (the plugin data folder is not known yet)";
@@ -178,7 +246,9 @@ final class DebugWand {
             try {
                 Path folder = dir.resolve("debug");
                 Files.createDirectories(folder);
-                Files.writeString(folder.resolve(fileName), report, StandardCharsets.UTF_8);
+                Path file = folder.resolve(fileName);
+                Files.writeString(file, report, StandardCharsets.UTF_8);
+                written = file;
                 where = "written to debug/" + fileName;
             } catch (IOException | RuntimeException ex) {
                 where = "not written (" + ex + ")";
@@ -198,6 +268,11 @@ final class DebugWand {
         say(player, "Buffs: " + buffs, INFO);
         say(player, "Report " + (where.startsWith("written") ? fileName + " (debug/ in the plugin data folder)"
                 : where), where.startsWith("written") ? INFO : WARN);
+        if (FxSettings.debugTrackSeconds > 0) {
+            startTrack(player, mob, buffer, name, written);
+            say(player, "Following " + name + " for " + FxSettings.debugTrackSeconds + " s (target, AI state, health, effects"
+                    + (written != null ? ", in the same file" : "") + "). Right click stops it.", INFO);
+        }
     }
 
     private static String report(PlayerRef player, Ref<EntityStore> mob, ComponentAccessor<EntityStore> buffer,

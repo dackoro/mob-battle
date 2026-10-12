@@ -3,7 +3,6 @@ package dev.dackoro.mobbattle;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
@@ -37,12 +36,10 @@ public class KillInteraction extends SimpleInstantInteraction {
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         Ref<EntityStore> target = context.getTargetEntity();
         if (buffer == null || target == null || !target.isValid()) {
-            context.getState().state = InteractionState.Failed;
             return;
         }
         EntityStatMap stats = buffer.getComponent(target, EntityStatMap.getComponentType());
         if (stats == null) {
-            context.getState().state = InteractionState.Failed;
             return;
         }
         NPCEntity npc = buffer.getComponent(target, NPCEntity.getComponentType());
@@ -55,7 +52,6 @@ public class KillInteraction extends SimpleInstantInteraction {
                 player.sendMessage(Message.raw("The Kill Wand doesn't work on players. Turn it on with /mobbattle killPlayers on")
                         .color("#ffcc55"));
             }
-            context.getState().state = InteractionState.Failed;
             return;
         }
         // NPCs get the soul rip first and die after /mobbattle killdelay; anything else dies right away.
@@ -84,7 +80,11 @@ public class KillInteraction extends SimpleInstantInteraction {
         }
     }
 
-    /** Damage far above max health (cause "Command", else "Physical"). */
+    /**
+     * Damage far above max health (cause "Command", else "Physical"). Every caller is a wand-style death (Kill Wand,
+     * Snap, timeUp kill/judge, a disintegrating summon), so an NPC drops nothing with killLoot off: its role counts the
+     * death items as dropped (vanilla DropDeathItems checks it).
+     */
     static void killNow(Ref<EntityStore> target, Ref<EntityStore> killer,
                         com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         if (target == null || !target.isValid() || !BattleManager.isAlive(target, buffer)) {
@@ -99,6 +99,10 @@ public class KillInteraction extends SimpleInstantInteraction {
         int cause = DamageCause.getAssetMap().getIndex("Command");
         if (cause < 0) {
             cause = DamageCause.getAssetMap().getIndex("Physical");
+        }
+        if (!FxSettings.killLoot) {
+            NPCEntity npc = buffer.getComponent(target, NPCEntity.getComponentType());
+            if (npc != null && npc.getRole() != null) npc.getRole().setDeathItemsDropped();
         }
         Damage.Source source = killer != null && killer.isValid() ? new Damage.EntitySource(killer) : Damage.NULL_SOURCE;
         DamageSystems.executeDamage(target, buffer, new Damage(source, cause, amount));

@@ -63,13 +63,12 @@ public class CleanseInteraction extends SimpleInstantInteraction {
                 ? buffer.getComponent(target, EffectControllerComponent.getComponentType()) : null;
         if (effects == null) {
             player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         // The light comes down now; everything happens when it lands: effects and buffs go (size and health back),
         // and the morph is undone. The unmorph swaps the model, which drops the look's leftover particles on the
         // client, so it comes last, with its own Unmorph burst on the restored model.
-        String fx = WandFx.cleanse();
+        String fx = WandFx.cleanse(target, buffer);
         WandFx.onTarget(target, fx, buffer);
         // Played here, not by the effect: re-applying the effect on a quick second click didn't replay its sound.
         WandFx.burst(null, "SFX_Deployable_Totem_Heal_Despawn", ChaosWand.positionOf(target, buffer), buffer);

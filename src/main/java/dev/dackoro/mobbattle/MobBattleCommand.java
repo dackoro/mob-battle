@@ -71,7 +71,7 @@ public class MobBattleCommand extends CommandBase {
                 "Heal / Kill / Effect / Cleanse: left click any entity",
                 "  Effect Wand right click: next effect; Kill Wand: soul rip, then death with loot",
                 "Snap Wand: half of the mobs turn to dust (clicked mob's battle, or every mob within snapRadius, fighting or not)",
-                "Debug Wand: left click a mob: full report (chat, server log, debug/ file); right click: log its effects and health for 60 s",
+                "Debug Wand: left click a mob: full report (chat, server log, debug/ file), then its target, AI state, health and effects for debugTrack seconds in the same file; right click: stop following",
         });
         HELP.put("titles", new String[] {
                 "Titles and cameras (global, or per kind: <option> <duel|allVsOne|royale|teams|all> <value>; <kind> default = follow global)",
@@ -106,7 +106,9 @@ public class MobBattleCommand extends CommandBase {
         HELP.put("battles", new String[] {
                 "Battles",
                 "debug - combat snapshots of 4 nearest NPCs within 20 blocks; hit log for 10s",
-                "debugLog on|off - battle decisions (config, arena, health scores, winner) in the server log",
+                "debugLog on|off - battle decisions (config, arena, target choices, health scores, winner) in the server log",
+                "debugRecord on|off - (admin) keep the last 5 min of log and [debug] lines in memory, saved setting (default off)",
+                "debugDump - (admin) write what the recorder kept to debug/record_<time>.txt",
                 "duelMode exclusive|accumulate - replace a duel or keep connected fights",
                 "buff lone|streak|champion size|health|damage|defense|all|off <percent> - battle buffs: lone = everyone-vs-one target, streak = per kill (up to buff streak maxKills, default 5), champion = the winners until they die or get cleansed (default 0 = none)",
                 "buff wand size|health|damage|defense|all|off <percent> - Buff Wand, per click (default size 10, health 20, damage 10, defense 5; stacks up to buff wand maxStacks, default 5)",
@@ -117,7 +119,7 @@ public class MobBattleCommand extends CommandBase {
                 "battleIsolation <duel|allVsOne|royale|teams|all> on|off - outside mobs cannot hurt battle mobs",
                 "selfDefense <duel|allVsOne|royale|teams|all> on|off - a mob hit by an enemy that isn't its target turns on it (default on)",
                 "friendlyFire <allVsOne|teams|all> on|off - allies hurt each other",
-                "playerFights <duel|allVsOne|royale|teams|all> on|off - players fight too (default off, never in Creative):",
+                "playerFights <duel|allVsOne|royale|teams|all> on|off - players fight too (default on, never in Creative):",
                 "  the wands work on players like on mobs; crouch + Battle Wand on a mob: it vs you",
                 "chaos me - every mob in the area attacks you (playerFights allVsOne on)",
                 "battlePvp on|off - enemy players in a battle hurt each other even with the world's PvP off",
@@ -145,7 +147,7 @@ public class MobBattleCommand extends CommandBase {
                 "snapTime <1-30> - seconds over which they turn to dust (default 5)",
                 "snapHitDelay <ms> - Snap Wand: wait after the click until the slam hits and the snap fires (default 310, 0-2000)",
                 "snapRadius <blocks> - snap reach without battles (default 60, separate from areaRadius)",
-                "snapPlayers on|off - the snap takes players in reach too (never you, never Creative; default off)",
+                "snapPlayers on|off - the snap takes players in reach too (never you, never Creative; default on)",
                 "timerStyle custom|portal - our own timer box (default) or the game's Void portal box",
                 "timeUp <kind|all> draw|kill|continue|health|judge - when the timer ends (health: the best judgeBy score wins, default most health in %; judge: and the losers die, the winners heal)",
                 "watch - spectate the nearest running battle (yours first), even after it started: the camera follows a fighter",
@@ -186,6 +188,8 @@ public class MobBattleCommand extends CommandBase {
                 "summonDespawn never|battleEnd|timer - summons leave on their own: never (default, they stay), battleEnd (the surviving summons of a battle go when it ends), timer (each goes summonLifetime seconds after it spawned)",
                 "summonLifetime <seconds> - how long a summon lives with summonDespawn timer (5-3600, default 60)",
                 "summonExit disintegrate|vanish - how summons leave: disintegrate like the Kill Wand (soul rip, no loot, default) or vanish at once (no loot)",
+                "summonJade on|off - summons come out wearing the jade look, like the Effect Wand's (default off)",
+                "summonJadeColor <color> - the summons' jade color, a palette color (default green)",
         });
         HELP.put("morph", new String[] {
                 "Morph and effects",
@@ -196,9 +200,12 @@ public class MobBattleCommand extends CommandBase {
                 "wandFx on|off - glow, soul rip, charm, summoning runes... on the clicked mob",
                 "killDelay <seconds> - Kill Wand soul rip before death (0-3, 0 = instant)",
                 "killHitDelay <ms> - Kill Wand: wait after the click until the cast hits; Hakai sound and disintegration start then (default 175, 0-2000)",
-                "killLoot on|off - the disintegrated mob drops its loot (default on)",
-                "killPlayers on|off - the Kill Wand works on players too: they disintegrate, then die normally (default off: players are not affected)",
+                "killLoot on|off - mobs killed by the Kill Wand or Snap drop their loot (default off)",
+                "lookGlow <0-15> - light around mobs with a jade/shimmer look or the buff's shimmer, in its color (default 6, 0 = off)",
+                "deathGlow <0-15> - Kill Wand: the disintegrating mob flashes in its color, fading out (default 12, 0 = off)",
+                "killPlayers on|off - the Kill Wand works on players too: they disintegrate, then die normally (default on)",
                 "morphPlayers on|off - the Morph Wand works on players too (default on)",
+                "debugTrack <seconds> - Debug Wand: how long a left-clicked mob is followed after its report (0-600, default 30, 0 = report only)",
                 "eyeTest [<color>|off] - (experimental, admin) recolors the eyes of the nearest mob (8 blocks) with a texture made at runtime (palette color, default Purple); off puts the original models back",
         });
         HELP.put("presets", new String[] {
@@ -672,10 +679,10 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("fightlasercolor", "Color of the fighter laser: a palette color or random", colorWords("random")));
         addSubCommand(new Sub("arearadius", "Chaos Wand area radius in blocks (" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS + ")"));
         addSubCommand(new Sub("playerfights", "Players can fight in battles: <duel|allvsone|royale|teams|all> on|off",
-                battleKind("duel", "Battle Wand on players, or crouching on a mob: it vs you (default off)"),
-                battleKind("allvsone", "Chaos Wand left click on a player, or chaos me (default off)"),
-                battleKind("royale", "Chaos Wand right click takes in the players in the area (default off)"),
-                battleKind("teams", "Team Wand on players, or teams join <team> (default off)"),
+                battleKind("duel", "Battle Wand on players, or crouching on a mob: it vs you (default on)"),
+                battleKind("allvsone", "Chaos Wand left click on a player, or chaos me (default on)"),
+                battleKind("royale", "Chaos Wand right click takes in the players in the area (default on)"),
+                battleKind("teams", "Team Wand on players, or teams join <team> (default on)"),
                 battleKind("all", "Every kind at once")));
         addSubCommand(new Sub("battlepvp", "Enemy players in a battle hurt each other even with the world's PvP off",
                 new Sub("on", "PvP inside battles"), new Sub("off", "The world's PvP rule (default)")));
@@ -817,7 +824,7 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("delete", "Delete a saved preset: delete <name>")));
         addSubCommand(new Sub("teambytype", "Team Wand: clicking a mob brings every mob of the same type within areaRadius into that team (default off)",
                 words("Team by type", "on", "off")));
-        addSubCommand(new Sub("snapplayers", "Snap also turns players in reach to dust (not Creative, never you; default off)",
+        addSubCommand(new Sub("snapplayers", "Snap also turns players in reach to dust (not Creative, never you; default on)",
                 words("Snap players", "on", "off")));
         addSubCommand(new Sub("morphplayers", "Morph Wand works on players too (default on)",
                 words("Morph players", "on", "off")));
@@ -830,13 +837,20 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("debuglog", "Battle decisions (config, arena, health scores, winner) in the server log",
                 new Sub("on", "Log them, prefixed [debug]"),
                 new Sub("off", "Normal log (default)")));
+        addSubCommand(new Sub("debugrecord", "Keep the last 5 min of log and [debug] lines in memory for debugDump",
+                new Sub("on", "Record (saved: stays on)"),
+                new Sub("off", "Off, nothing kept (default)")));
+        addSubCommand(new Sub("debugdump", "Write what the debug recorder kept to debug/record_<time>.txt"));
+        addSubCommand(new Sub("debugtrack", "Debug Wand: seconds a left-clicked mob is followed after its report (0-600, default 30, 0 = report only)"));
         addSubCommand(new Sub("killdelay", "Kill Wand: seconds of soul rip before the mob dies (0-3, 0 = instant)"));
+        addSubCommand(new Sub("lookglow", "Light around mobs with a jade/shimmer look or buff shimmer (0-15, default 6, 0 = off)"));
+        addSubCommand(new Sub("deathglow", "Kill Wand disintegration flash (0-15, default 12, 0 = off)"));
         addSubCommand(new Sub("killplayers", "Kill Wand on players: they disintegrate, then die a normal death",
-                new Sub("on", "The Kill Wand works on players"),
-                new Sub("off", "Players are not affected (default)")));
-        addSubCommand(new Sub("killloot", "Kill Wand: the disintegrated mob drops its loot",
-                new Sub("on", "Drop its normal loot (default)"),
-                new Sub("off", "No drops")));
+                new Sub("on", "The Kill Wand works on players (default)"),
+                new Sub("off", "Players are not affected")));
+        addSubCommand(new Sub("killloot", "Kill Wand and Snap: the killed mob drops its loot",
+                new Sub("on", "Drop its normal loot"),
+                new Sub("off", "No drops (default)")));
         addSubCommand(new Sub("summonradius", "Summon area radius in blocks (1-64), or auto (default: grows with the count)",
                 words("Radius", "auto")));
         addSubCommand(new Sub("summondespawn", "Summons leave on their own: never (default, they stay), battleEnd (the surviving summons of a battle go when it ends), or timer (summonLifetime after spawn)",
@@ -844,6 +858,10 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("summonlifetime", "Seconds a summon lives with summonDespawn timer (5-3600, default 60)"));
         addSubCommand(new Sub("summonexit", "How summons leave: disintegrate (the Kill Wand's soul rip, no loot, default) or vanish (removed at once, no loot)",
                 words("Exit", "disintegrate", "vanish")));
+        addSubCommand(new Sub("summonjade", "Summons come out wearing the jade look (default off)",
+                new Sub("on", "Summons in jade"),
+                new Sub("off", "Normal summons (default)")));
+        addSubCommand(new Sub("summonjadecolor", "Color of the summons' jade: a palette color (default green)"));
         addSubCommand(new Sub("maxmobs", "Max mobs per Chaos Wand click and per summon (2-200)"));
         addSubCommand(new Sub("wandeffect", "Effect Wand effect: any effect ID, e.g. Burn or Potion_Morph_Frog; A>B gives B when A ends; jade[:color] or shimmer[:color] (default green, purple)",
                 words("Effect", EffectWand.PRESETS)));
@@ -944,7 +962,8 @@ public class MobBattleCommand extends CommandBase {
         if (command.equals("preset")) return sub.isEmpty() || sub.equals("list") ? null : Perms.CONFIG;
         if (command.equals("permissions") || command.equals("reload") || command.equals("event")
                 || command.equals("give") || command.equals("stop")
-                || command.equals("resetall") || command.equals("debuglog") || command.equals("skiptimer")) return Perms.ADMIN;
+                || command.equals("resetall") || command.equals("debuglog") || command.equals("skiptimer")
+                || command.equals("debugrecord") || command.equals("debugdump")) return Perms.ADMIN;
         if (command.equals("army")) return Perms.ADMIN;
         if (command.equals("chaos")) return Perms.USE;
         if (command.equals("watch")) return sub.equals("exit") ? null : Perms.USE;
@@ -1536,6 +1555,22 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.summonLifetime = sec;
             }
+            case "summonjade" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle summonJade on|off", ERR);
+                    return;
+                }
+                FxSettings.summonJade = on;
+            }
+            case "summonjadecolor" -> {
+                String color = SummonList.parseJadeColor(val);
+                if (color == null) {
+                    reply(ctx, "Usage: /mobbattle summonJadeColor <palette color> (default green)", ERR);
+                    return;
+                }
+                FxSettings.summonJadeColor = color;
+            }
             case "summonexit" -> {
                 String exit = SummonDespawn.parseExit(val);
                 if (exit == null) {
@@ -1554,6 +1589,34 @@ public class MobBattleCommand extends CommandBase {
                 if (on) {
                     for (String line : FxSettings.describeLines()) MobBattlePlugin.debug("settings: " + line);
                 }
+            }
+            case "debugrecord" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle debugRecord on|off", ERR);
+                    return;
+                }
+                FxSettings.debugRecord = on;
+                if (!on) DebugRecorder.clear();
+            }
+            case "debugdump" -> {
+                DebugRecorder.Dump d = DebugRecorder.dump(ctx.isPlayer() ? ctx.sender().getUsername() : "console");
+                if (d.file() != null) {
+                    reply(ctx, "Debug record saved: debug/" + d.file() + " (" + d.lines() + " lines, plugin data folder).", OK);
+                } else {
+                    reply(ctx, "Debug record not saved: " + d.error() + ".", ERR);
+                }
+                return;
+            }
+            case "debugtrack" -> {
+                int n;
+                try {
+                    n = Integer.parseInt(val == null ? "" : val.replace("s", "").trim());
+                } catch (NumberFormatException e) {
+                    reply(ctx, "Usage: /mobbattle debugTrack <0-" + FxSettings.MAX_DEBUG_TRACK_SECONDS + " seconds> (0 = report only)", ERR);
+                    return;
+                }
+                FxSettings.debugTrackSeconds = Math.max(0, Math.min(FxSettings.MAX_DEBUG_TRACK_SECONDS, n));
             }
             case "wandfx" -> {
                 Boolean on = parseOnOff(val);
@@ -1588,6 +1651,18 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.killDelayMs = Math.max(0, Math.min(FxSettings.MAX_KILL_DELAY_MS, Math.round(sec * 1000)));
+            }
+            case "lookglow", "deathglow" -> {
+                int n;
+                try {
+                    n = Integer.parseInt(val == null ? "" : val.trim());
+                } catch (NumberFormatException e) {
+                    reply(ctx, "Usage: /mobbattle " + ("lookglow".equals(key) ? "lookGlow" : "deathGlow") + " <0-15> (0 = off)", ERR);
+                    return;
+                }
+                n = Math.max(0, Math.min(FxSettings.MAX_GLOW, n));
+                if ("lookglow".equals(key)) FxSettings.lookGlow = n;
+                else FxSettings.deathGlow = n;
             }
             case "maxmobs" -> {
                 int n;

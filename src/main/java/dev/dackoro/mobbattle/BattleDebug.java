@@ -101,6 +101,36 @@ final class BattleDebug {
                 + " distance=" + distance + " attitude=" + attitude + " vanillaCanDamage=" + canDamage;
     }
 
+    /** Debug Wand follow: AI state, battle, ordered/locked target and attitude (what changes now and then). */
+    static String followFields(Ref<EntityStore> self, Store<EntityStore> store) {
+        var battle = BattleManager.battleOf(self);
+        var marked = MarkedEntitySupport.get(self, store);
+        var locked = marked != null ? marked.getMarkedEntityRef(FightManager.TARGET_SLOT) : null;
+        var ordered = battle != null ? battle.targets.get(self) : FightManager.enemyOf(self);
+        var support = WorldSupport.get(self, store);
+        var target = ordered != null && ordered.isValid() ? ordered : locked;
+        String attitude = "?";
+        if (target != null && target.isValid() && target.getStore() == store && support != null) {
+            attitude = String.valueOf(support.getAttitude(self, target, store));
+        }
+        return "state=" + FightManager.stateOf(self, store)
+                + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
+                + " target=" + name(ordered, store) + " locked=" + name(locked, store) + " attitude=" + attitude;
+    }
+
+    /** Distance to the mob's battle/wand target (else its locked target), as "4.2", or null when it has none. */
+    static String targetDistance(Ref<EntityStore> self, Store<EntityStore> store) {
+        var battle = BattleManager.battleOf(self);
+        var marked = MarkedEntitySupport.get(self, store);
+        var locked = marked != null ? marked.getMarkedEntityRef(FightManager.TARGET_SLOT) : null;
+        var ordered = battle != null ? battle.targets.get(self) : FightManager.enemyOf(self);
+        var target = ordered != null && ordered.isValid() ? ordered : locked;
+        if (target == null || !target.isValid() || target.getStore() != store) return null;
+        var from = ChaosWand.positionOf(self, store);
+        var to = ChaosWand.positionOf(target, store);
+        return from == null || to == null ? null : String.format(java.util.Locale.ROOT, "%.1f", from.distance(to));
+    }
+
     private static String name(Ref<EntityStore> ref, Store<EntityStore> store) {
         if (ref == null || !ref.isValid() || ref.getStore() != store) return "none";
         return ChaosWand.nameOf(ref, store) + "#" + ref.getIndex();

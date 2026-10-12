@@ -37,7 +37,6 @@ public class BuffTakeInteraction extends SimpleInstantInteraction {
         // Stacks still coming down with the light count: they are cancelled, else they would land after this.
         if (target == null || !target.isValid() || Buffs.wandStacksSoon(target) == 0) {
             player.sendMessage(Message.raw("Look at a mob or player with a Buff Wand buff and right click it.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         Buffs.cancelFalling(target);

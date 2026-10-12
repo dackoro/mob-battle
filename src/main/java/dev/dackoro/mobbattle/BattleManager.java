@@ -95,6 +95,8 @@ public final class BattleManager {
         final Map<Ref<EntityStore>, Ref<EntityStore>> hitBy = new ConcurrentHashMap<>();
         /** selfDefense: member -> when it last turned on an attacker (no switching back and forth). */
         final Map<Ref<EntityStore>, Long> turnedAt = new ConcurrentHashMap<>();
+        /** Chase limit: member -> when it last hit an enemy, or got its current target (whichever is later). */
+        final Map<Ref<EntityStore>, Long> chaseFrom = new ConcurrentHashMap<>();
         /** (flock, member) pairs refreshed once per second, so pets can join without scanning every member. */
         volatile List<Ref<EntityStore>[]> flocks = List.of();
         /** Safety deadline; an arena timer longer than MAX_MILLIS pushes it past its own end (Arena.setup). */
@@ -249,6 +251,7 @@ public final class BattleManager {
         b.targets.remove(player);
         b.hitBy.remove(player);
         b.turnedAt.remove(player);
+        b.chaseFrom.remove(player);
         FightManager.endFightsOf(List.of(player));
         releasePlayer(player);
         return b;
@@ -572,6 +575,7 @@ public final class BattleManager {
                 b.targets.remove(npc);
                 b.hitBy.remove(npc);
                 b.turnedAt.remove(npc);
+                b.chaseFrom.remove(npc);
                 left.add(npc);
             }
             if (left == null) {
@@ -798,25 +802,83 @@ public final class BattleManager {
         return best;
     }
 
-    /** The NPC's current target, picking a new one if it has none or it died. */
+    /**
+     * Chase limit: a mob that hit nobody for this long gives up its target for the nearest other enemy (a walker
+     * prefers one that isn't flying). A target used to be kept until it died, so a goblin chased a flying owl or a
+     * fleeing squirrel along the arena wall for the whole battle (user, 2026-10-12).
+     */
+    static final long CHASE_GIVE_UP_MS = 8000;
+
+    /** The NPC's current target, picking a new one if it has none, it died, or the chase went on too long. */
     public static Ref<EntityStore> currentTarget(Battle battle, Ref<EntityStore> self, ComponentAccessor<EntityStore> buffer,
                                                  boolean[] changed) {
         Ref<EntityStore> target = battle.targets.get(self);
+        long now = System.currentTimeMillis();
         if (target != null && battle.has(target) && isAlive(target, buffer)) {
-            return target;
+            Long from = battle.chaseFrom.putIfAbsent(self, now);
+            if (from == null || now - from < CHASE_GIVE_UP_MS) return target;
+            // Hit nobody for a while: switch if there is anyone else, else keep chasing and look again later.
+            battle.chaseFrom.put(self, now);
+            Ref<EntityStore> other = otherEnemy(battle, self, target, buffer);
+            if (other == null) return target;
+            if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
+                    + ChaosWand.nameOf(self, buffer) + " gave up on " + ChaosWand.nameOf(target, buffer) + " after "
+                    + CHASE_GIVE_UP_MS / 1000 + " s without a hit, goes for " + ChaosWand.nameOf(other, buffer));
+            battle.targets.put(self, other);
+            changed[0] = true;
+            return other;
         }
+        Ref<EntityStore> lost = target;
         target = nearestEnemy(battle, self, buffer);
         if (target != null) {
             battle.targets.put(self, target);
+            battle.chaseFrom.put(self, now);
             changed[0] = true;
+            if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
+                    + ChaosWand.nameOf(self, buffer) + " targets " + ChaosWand.nameOf(target, buffer) + " (nearest; "
+                    + (lost == null ? "had none" : "previous one gone") + ")");
         } else {
             battle.targets.remove(self);
         }
         return target;
     }
 
+    /**
+     * The nearest living enemy other than {@code current}; a mob that can't fly skips enemies flying right now unless
+     * only those are left. Null when {@code current} is the only enemy.
+     */
+    private static Ref<EntityStore> otherEnemy(Battle battle, Ref<EntityStore> self, Ref<EntityStore> current,
+                                               ComponentAccessor<EntityStore> buffer) {
+        Vector3d me = ChaosWand.positionOf(self, buffer);
+        int myTeam = battle.team(self);
+        boolean walker = !Unstick.canFly(self, buffer);
+        Ref<EntityStore> best = null, bestFlying = null;
+        double bestDist = Double.MAX_VALUE, bestFlyingDist = Double.MAX_VALUE;
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            Ref<EntityStore> other = e.getKey();
+            if (other == self || other == current || e.getValue() == myTeam || !isAlive(other, buffer)) continue;
+            double d = me == null ? Double.MAX_VALUE - 1 : ChaosWand.distSq(me, other, buffer);
+            if (walker && Unstick.flyingNow(other, buffer)) {
+                if (d < bestFlyingDist) {
+                    bestFlyingDist = d;
+                    bestFlying = other;
+                }
+            } else if (d < bestDist) {
+                bestDist = d;
+                best = other;
+            }
+        }
+        return best != null ? best : bestFlying;
+    }
+
     /** selfDefense: after turning on an attacker, a mob keeps it at least this long (another hit can't pull it away). */
     private static final long SELF_DEFENSE_MS = 3000;
+    /**
+     * selfDefense: a mob that can't fly ignores a hit from an enemy flying farther than this (a ranged flier it could
+     * never reach). A flier that dives in to hit is closer, so it is answered; if it flies off again, the chase
+     * limit lets it go after CHASE_GIVE_UP_MS (user, 2026-10-12: melee goblin vs flying owl).
+     */
+    private static final double SELF_DEFENSE_FLIER_REACH = 4.0;
 
     /**
      * selfDefense (FightTickSystem, world thread): the enemy that hit {@code self} becomes its target, unless it
@@ -832,9 +894,20 @@ public final class BattleManager {
         long t = System.currentTimeMillis();
         Long last = battle.turnedAt.get(self);
         if (last != null && t - last < SELF_DEFENSE_MS && now != null && battle.has(now) && isAlive(now, buffer)) return false;
+        if (now != null && Unstick.flyingNow(by, buffer) && !Unstick.canFly(self, buffer)) {
+            Vector3d me = ChaosWand.positionOf(self, buffer);
+            double d = me == null ? Double.MAX_VALUE : Math.sqrt(ChaosWand.distSq(me, by, buffer));
+            if (d > SELF_DEFENSE_FLIER_REACH) {
+                if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
+                        + ChaosWand.nameOf(self, buffer) + " ignores a hit from " + ChaosWand.nameOf(by, buffer) + " (flying, "
+                        + String.format(java.util.Locale.ROOT, "%.1f", d) + " blocks away, out of reach)");
+                return false;
+            }
+        }
         battle.targets.put(self, by);
         battle.turnedAt.put(self, t);
-        if (FxSettings.debug) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
+        battle.chaseFrom.put(self, t);
+        if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
                 + ChaosWand.nameOf(self, buffer) + " defends itself against " + ChaosWand.nameOf(by, buffer));
         return true;
     }
@@ -1056,7 +1129,7 @@ public final class BattleManager {
                 second = score;
             }
         }
-        if (FxSettings.debug) {
+        if (MobBattlePlugin.debugging()) {
             StringBuilder sb = new StringBuilder();
             for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
                 double[] v = e.getValue();
@@ -1211,6 +1284,7 @@ public final class BattleManager {
             }
             Unstick.hit(attacker);
             Unstick.hurt(victim, attacker);
+            b.chaseFrom.put(attacker, System.currentTimeMillis());
         }
     }
 

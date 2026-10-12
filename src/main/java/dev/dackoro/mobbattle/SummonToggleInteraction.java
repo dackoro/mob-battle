@@ -38,7 +38,6 @@ public class SummonToggleInteraction extends SimpleInstantInteraction {
         NPCEntity npc = target != null && target.isValid() ? buffer.getComponent(target, NPCEntity.getComponentType()) : null;
         if (npc == null || npc.getRoleName() == null) {
             player.sendMessage(Message.raw("Look at a mob and click it to add its type to the summon list.").color("#ffcc55"));
-            context.getState().state = InteractionState.Failed;
             return;
         }
         String role = npc.getRoleName();

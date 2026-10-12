@@ -8,7 +8,8 @@
         "TargetEntityPart": "Entity",
         "TargetNodeName": "Head"
       }
-    ]
+    ],
+    "FirstPersonParticles": []
   },
   "OverlapBehavior": "Overwrite",
   "Debuff": false

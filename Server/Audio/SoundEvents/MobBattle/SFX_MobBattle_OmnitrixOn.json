@@ -1,0 +1,17 @@
+{
+  "$Comment": "Morph Wand: played at the player when they switch to the wand in the hotbar (omnitrix activation). Mono, trimmed, -20 dB mean. Small random pitch.",
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/MobBattle/OmnitrixOn.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -1.0,
+        "MaxPitch": 1.0
+      }
+    }
+  ],
+  "Volume": 0,
+  "AudioCategory": "AudioCat_Weapons",
+  "Parent": "SFX_Attn_Moderate"
+}

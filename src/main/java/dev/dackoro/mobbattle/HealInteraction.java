@@ -3,7 +3,6 @@ package dev.dackoro.mobbattle;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
@@ -37,12 +36,10 @@ public class HealInteraction extends SimpleInstantInteraction {
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         Ref<EntityStore> target = context.getTargetEntity();
         if (buffer == null || target == null || !target.isValid()) {
-            context.getState().state = InteractionState.Failed;
             return;
         }
         EntityStatMap stats = buffer.getComponent(target, EntityStatMap.getComponentType());
         if (stats == null) {
-            context.getState().state = InteractionState.Failed;
             return;
         }
         int health = DefaultEntityStatTypes.getHealth();

@@ -73,8 +73,21 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private final Map<Integer, String> draft = new LinkedHashMap<>();
     /** Field index -> its row selector in the current build. */
     private final Map<Integer, String> rowOf = new HashMap<>();
+    /**
+     * Summon list rows edited but not saved: role -> {count, team} (null = that part unchanged). Saved with the
+     * settings (Save changes), so editing a row never rebuilds the page (scroll and the other rows' inputs stay).
+     */
+    private final Map<String, String[]> summonDraft = new LinkedHashMap<>();
+    /** Role -> its summon row selector in the current build. */
+    private final Map<String, String> summonRowOf = new HashMap<>();
+    /** Team rows edited but not saved: slot -> {name, palette color} (null = unchanged), same as summonDraft. */
+    private final Map<Integer, String[]> teamDraft = new LinkedHashMap<>();
+    /** Slot -> its team row selector in the current build. */
+    private final Map<Integer, String> teamRowOf = new HashMap<>();
     private String notice;
     private String noticeColor = GRAY;
+    /** The area preview drawn last for this player ({x, y, z, radius}), so the next one replaces it. */
+    private double[] lastPreview;
     private String confirmAction;
     private long confirmUntil;
 
@@ -111,6 +124,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         ui.append(UI);
         rowOf.clear();
         previewOf.clear();
+        summonRowOf.clear();
+        teamRowOf.clear();
         Properties live = FxSettings.toProperties();
         if (SCHEMA_CHECKED.compareAndSet(false, true)) {
             List<String> missing = ConfigSchema.missingKeys(live);
@@ -275,7 +290,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private void status(UICommandBuilder ui) {
         boolean edit = canEdit();
         ui.set("#ReadOnly.Visible", !edit);
-        int n = draft.size();
+        int n = draft.size() + summonDraft.size() + teamDraft.size();
         String changes = !edit ? "Read only." : n == 0 ? "No unsaved changes." : n + (n == 1 ? " unsaved change." : " unsaved changes.");
         if (notice != null) {
             ui.set("#Status.TextSpans", Message.raw(notice + "  " + changes).color(noticeColor));
@@ -284,7 +299,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         }
         ui.set("#SaveButton.Disabled", !edit || n == 0);
         ui.set("#DiscardButton.Disabled", n == 0);
-        ui.set("#UndoButton.Disabled", !edit || beforeLastSave == null);
+        ui.set("#UndoButton.Disabled", !edit || !canUndo());
     }
 
     private void say(String text, String color) {
@@ -318,6 +333,91 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         rows.note("Right click a mob with the Morph Wand copies its model instead. Cleanse Wand or Admin > Undo morphs restore them.");
     }
 
+    /** A team row's "*" mark: gold while it has unsaved changes. */
+    private void teamMark(UICommandBuilder ui, int slot) {
+        String sel = teamRowOf.get(slot);
+        if (sel == null) return;
+        ui.set(sel + " #Mark.TextSpans", Message.raw(teamDraft.containsKey(slot) ? "*" : " ").color(GOLD));
+    }
+
+    /**
+     * A team row's name or color changed: kept in the draft (row marked, swatch shows the new color) until Save
+     * changes, no rebuild. Names and colors are checked together on Save, so two teams can swap them.
+     */
+    private void teamEdit(int slot, String kind, String raw) {
+        String sel = teamRowOf.get(slot);
+        if (sel == null || !Teams.exists(slot) || raw == null || !"name".equals(kind) && !"color".equals(kind)) return;
+        UICommandBuilder ui = new UICommandBuilder();
+        boolean isName = "name".equals(kind);
+        String saved = isName ? Teams.name(slot) : paletteName(Teams.color(slot));
+        if (!canEdit()) {
+            // Read only: put the control back.
+            ui.set(sel + (isName ? " #Name.Value" : " #Color.Value"), saved);
+            notice = "Read only.";
+            noticeColor = WARN;
+            status(ui);
+            sendUpdate(ui);
+            return;
+        }
+        String v = isName ? (validName(raw.trim()) ? raw.trim().toUpperCase(Locale.ROOT) : null) : paletteOf(raw);
+        String[] pending = teamDraft.getOrDefault(slot, new String[2]);
+        int part = isName ? 0 : 1;
+        if (v == null) {
+            // Half typed or not valid: not kept (Save leaves that part as it is).
+            pending[part] = null;
+            notice = isName ? "Team names: letters, numbers and _ (up to 16)." : null;
+            noticeColor = WARN;
+        } else {
+            pending[part] = v.equals(saved) ? null : v;
+            notice = null;
+        }
+        if (pending[0] == null && pending[1] == null) teamDraft.remove(slot);
+        else teamDraft.put(slot, pending);
+        if (!isName) {
+            String shown = pending[1] != null ? pending[1] : saved;
+            ui.setObject(sel + " #Swatch.Background", new PatchStyle().setColor(Value.of(Teams.PALETTE.get(shown))));
+        }
+        teamMark(ui, slot);
+        status(ui);
+        sendUpdate(ui);
+    }
+
+    /** Why the team rows can't be saved as they are (two teams with one name or one color), or null. */
+    private String teamDraftConflict() {
+        Map<String, Integer> names = new HashMap<>();
+        Map<String, Integer> colors = new HashMap<>();
+        for (int slot = 0; slot < Teams.MAX; slot++) {
+            if (!Teams.exists(slot)) continue;
+            String[] pending = teamDraft.get(slot);
+            String name = pending != null && pending[0] != null ? pending[0] : Teams.name(slot);
+            String color = pending != null && pending[1] != null ? pending[1] : paletteName(Teams.color(slot));
+            Integer other = names.put(name, slot);
+            if (other != null) return "Two teams can't both be called " + name + ".";
+            other = colors.put(color, slot);
+            if (other != null) return "Two teams can't share the color " + color + ": pick another one.";
+        }
+        return null;
+    }
+
+    /** Save changes: the pending team names and colors (checked by teamDraftConflict first). Returns how many rows. */
+    private int applyTeamDraft() {
+        int n = 0;
+        // A swap (A <-> B) is valid as a whole but not one rename at a time: free the names first.
+        for (var e : teamDraft.entrySet()) {
+            if (Teams.exists(e.getKey()) && e.getValue()[0] != null) Teams.rename(e.getKey(), "MOBBATTLE_TMP" + e.getKey());
+        }
+        for (var e : teamDraft.entrySet()) {
+            int slot = e.getKey();
+            if (!Teams.exists(slot)) continue;
+            String[] pending = e.getValue();
+            if (pending[0] != null) Teams.rename(slot, pending[0]);
+            if (pending[1] != null) Teams.recolor(slot, Teams.PALETTE.get(pending[1]));
+            n++;
+        }
+        teamDraft.clear();
+        return n;
+    }
+
     private static String paletteName(String hex) {
         for (var e : Teams.PALETTE.entrySet()) if (e.getValue().equalsIgnoreCase(hex)) return e.getKey();
         return Teams.nearestPalette(hex);
@@ -337,14 +437,18 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             if (!Teams.exists(slot)) continue;
             String name = Teams.name(slot);
             String sel = rows.add("TeamRow.ui");
-            rows.ui.setObject(sel + " #Swatch.Background", new PatchStyle().setColor(Value.of(Teams.color(slot))));
-            rows.ui.set(sel + " #Name.Value", name);
+            teamRowOf.put(slot, sel);
+            String[] pending = teamDraft.get(slot);
+            String color = pending != null && pending[1] != null ? pending[1] : paletteName(Teams.color(slot));
+            rows.ui.setObject(sel + " #Swatch.Background", new PatchStyle().setColor(Value.of(Teams.PALETTE.get(color))));
+            rows.ui.set(sel + " #Name.Value", pending != null && pending[0] != null ? pending[0] : name);
             rows.ui.set(sel + " #Color.Entries", entries(ConfigSchema.palette()));
-            rows.ui.set(sel + " #Color.Value", paletteName(Teams.color(slot)));
-            rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Rename",
-                    data("Act").append("A", "teamRename").append("N", name).append("@V", sel + " #Name.Value"), false);
+            rows.ui.set(sel + " #Color.Value", color);
+            teamMark(rows.ui, slot);
+            rows.ev.addEventBinding(CustomUIEventBindingType.ValueChanged, sel + " #Name",
+                    data("TeamEdit").append("N", String.valueOf(slot)).append("K", "name").append("@V", sel + " #Name.Value"), false);
             rows.ev.addEventBinding(CustomUIEventBindingType.ValueChanged, sel + " #Color",
-                    data("Act").append("A", "teamColor").append("N", name).append("@V", sel + " #Color.Value"), false);
+                    data("TeamEdit").append("N", String.valueOf(slot)).append("K", "color").append("@V", sel + " #Color.Value"), false);
             rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Remove",
                     data("Act").append("A", "teamRemove").append("N", name), false);
         }
@@ -423,16 +527,17 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         for (var e : list.entrySet()) {
             String role = e.getKey();
             String sel = rows.add("SummonRow.ui");
+            summonRowOf.put(role, sel);
+            String[] pending = summonDraft.get(role);
             icon(rows.ui, sel + " #Icon", role);
-            rows.ui.set(sel + " #Role.Text", role.replace('_', ' '));
-            rows.ui.set(sel + " #Count.Value", e.getValue());
-            Integer team = SummonList.TEAMS.get(role);
+            summonLabel(rows.ui, role);
+            rows.ui.set(sel + " #Count.Value", pending != null && pending[0] != null ? pending[0] : e.getValue());
             rows.ui.set(sel + " #Team.Entries", entries(teams));
-            rows.ui.set(sel + " #Team.Value", team != null && Teams.exists(team) ? Teams.name(team) : "none");
-            rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #SetCount",
-                    data("Act").append("A", "summonCount").append("N", role).append("@V", sel + " #Count.Value"), false);
+            rows.ui.set(sel + " #Team.Value", pending != null && pending[1] != null ? pending[1] : summonTeam(role));
+            rows.ev.addEventBinding(CustomUIEventBindingType.ValueChanged, sel + " #Count",
+                    data("SumEdit").append("N", role).append("K", "count").append("@V", sel + " #Count.Value"), false);
             rows.ev.addEventBinding(CustomUIEventBindingType.ValueChanged, sel + " #Team",
-                    data("Act").append("A", "summonTeam").append("N", role).append("@V", sel + " #Team.Value"), false);
+                    data("SumEdit").append("N", role).append("K", "team").append("@V", sel + " #Team.Value"), false);
             rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Remove",
                     data("Act").append("A", "summonRemove").append("N", role), false);
         }
@@ -455,6 +560,79 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                         .append("@E", sel + " #Extra.Value"), false);
         if (!list.isEmpty()) rows.action("Remove every mob from the list", "Clear list", data("Act").append("A", "summonClear"));
         rows.action("Summon the list around you now", "Summon", data("Act").append("A", "summonSpawn"));
+    }
+
+    /** The saved team of a listed role: its name, or "none". */
+    private static String summonTeam(String role) {
+        Integer now = SummonList.TEAMS.get(role);
+        return now != null && Teams.exists(now) ? Teams.name(now) : "none";
+    }
+
+    /** A summon row's mob name: gold with "* " while it has unsaved changes. */
+    private void summonLabel(UICommandBuilder ui, String role) {
+        String sel = summonRowOf.get(role);
+        if (sel == null) return;
+        boolean changed = summonDraft.containsKey(role);
+        String name = role.replace('_', ' ');
+        ui.set(sel + " #Role.TextSpans", changed ? Message.raw("* " + name).color(GOLD) : Message.raw(name));
+    }
+
+    /**
+     * A summon row's count or team changed: kept in the draft (gold until Save changes), no rebuild. A value equal to
+     * the saved one drops that part, so a dropdown echo or typing the old count back clears the mark.
+     */
+    private void summonEdit(String name, String kind, String raw) {
+        String role = listedRole(name);
+        String sel = role != null ? summonRowOf.get(role) : null;
+        if (sel == null || raw == null || !"count".equals(kind) && !"team".equals(kind)) return;
+        UICommandBuilder ui = new UICommandBuilder();
+        boolean isCount = "count".equals(kind);
+        String saved = isCount ? SummonList.snapshot().get(role) : summonTeam(role);
+        if (!canEdit()) {
+            // Read only: put the control back.
+            ui.set(sel + (isCount ? " #Count.Value" : " #Team.Value"), saved);
+            notice = "Read only.";
+            noticeColor = WARN;
+            status(ui);
+            sendUpdate(ui);
+            return;
+        }
+        String v = isCount ? count(raw) : "none".equalsIgnoreCase(raw) ? "none" : teamOf(raw);
+        String[] pending = summonDraft.getOrDefault(role, new String[2]);
+        int part = isCount ? 0 : 1;
+        if (v == null) {
+            // Half typed or not valid: not kept (Save leaves that part as it is).
+            pending[part] = null;
+            notice = isCount ? "Count: a number (0-999) or random." : null;
+            noticeColor = WARN;
+        } else {
+            pending[part] = v.equals(saved) ? null : v;
+            notice = null;
+        }
+        if (pending[0] == null && pending[1] == null) summonDraft.remove(role);
+        else summonDraft.put(role, pending);
+        summonLabel(ui, role);
+        status(ui);
+        sendUpdate(ui);
+    }
+
+    /** Save changes: the pending summon rows go into the list (roles removed meanwhile are skipped). Returns how many. */
+    private int applySummonDraft() {
+        int n = 0;
+        for (var e : summonDraft.entrySet()) {
+            String role = listedRole(e.getKey());
+            if (role == null) continue;
+            String[] pending = e.getValue();
+            if (pending[0] != null) SummonList.ENTRIES.put(role, pending[0]);
+            if (pending[1] != null) {
+                int team = "none".equals(pending[1]) ? -1 : BattleManager.teamIndex(pending[1]);
+                if (team < 0) SummonList.TEAMS.remove(role);
+                else SummonList.TEAMS.put(role, team);
+            }
+            n++;
+        }
+        summonDraft.clear();
+        return n;
     }
 
     /** Spawnable NPC roles, labelled "Category - Name [mod]" from the folder under NPC/Roles. */
@@ -661,6 +839,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         rows.action("One of each wand into your inventory", "Give wands", data("Act").append("A", "give"));
         rows.action("Every running timer ends now by its time-up rule", "End timers", data("Act").append("A", "skipTimer"));
         rows.action("Royale around you (area radius, max mobs), with no owner", "Royale event", data("Act").append("A", "eventRoyale"));
+        rows.action("Write what the debug recorder kept (last 5 min) to debug/ in the plugin data folder", "Save debug record",
+                data("Act").append("A", "debugDump"));
         rows.section("Clean up (asks to confirm)");
         rows.action("Stop every battle, countdown, camera and music", "Stop all", data("Act").append("A", "stop"));
         rows.action("Disband every army", "Disband armies", data("Act").append("A", "armyClear"));
@@ -700,10 +880,14 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             }
             case "Set" -> set(parseInt(str(doc, "F"), -1), str(doc, "@V"));
             case "Save" -> save();
+            case "SumEdit" -> summonEdit(str(doc, "N"), str(doc, "K"), str(doc, "@V"));
+            case "TeamEdit" -> teamEdit(parseInt(str(doc, "N"), -1), str(doc, "K"), str(doc, "@V"));
             case "Undo" -> undo();
             case "Discard" -> {
-                if (draft.isEmpty()) return;
+                if (draft.isEmpty() && summonDraft.isEmpty() && teamDraft.isEmpty()) return;
                 draft.clear();
+                summonDraft.clear();
+                teamDraft.clear();
                 notice = "Changes discarded.";
                 noticeColor = GRAY;
                 rebuild();
@@ -771,16 +955,67 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             notice = null;
             // A number out of range is shown clamped.
             if (f.type == ConfigSchema.Type.NUMBER && parseInt(raw, Integer.MIN_VALUE) != parseInt(v, 0)) setInput(ui, sel, f, v);
+            previewArea(f, v, live);
         }
         label(ui, f);
         status(ui);
         sendUpdate(ui);
     }
 
+    /** Radius fields drawn around the player as soon as they change (the draft value, before Save). */
+    private static final java.util.Set<String> AREA_PREVIEW = java.util.Set.of("chaos.radius", "battle.arena.size",
+            "battle.shrink.to", "summon.radius", "snap.radius", "chaos.area", "chaos.area.color");
+
+    /**
+     * Area radius, arena sizes, Snap reach, summon area, area look and color: the circle is drawn around the player
+     * right away (only for them, 6 s, replacing the last one), so a range is seen while editing it, without saving
+     * (as /mobbattle areaRadius does). Look and color come from the draft too. World thread (handleDataEvent).
+     */
+    private void previewArea(ConfigSchema.Field f, String v, Properties live) {
+        boolean kindStyle = KindFx.isOverrideKey(f.key) && f.key.endsWith("." + KindFx.Opt.AREA_STYLE.key());
+        if (!AREA_PREVIEW.contains(f.key) && !kindStyle) return;
+        int radius = parseInt(f.key.startsWith("chaos.") || kindStyle ? valueOf("chaos.radius", live) : v, 0);
+        if (radius <= 0) return; // 0 = auto: no fixed circle to show
+        String style = kindStyle && !v.isEmpty() ? v : valueOf("chaos.area", live);
+        String color = valueOf("chaos.area.color", live);
+        if (!Teams.PALETTE.containsKey(color)) color = FxSettings.pickAreaColorName();
+        PlayerRef viewer = store.getComponent(entity, PlayerRef.getComponentType());
+        TransformComponent t = store.getComponent(entity, TransformComponent.getComponentType());
+        if (viewer == null || t == null) return;
+        lastPreview = FightFx.previewArea(viewer, new org.joml.Vector3d(t.getPosition()), radius, style, color, lastPreview, store);
+    }
+
+    /** The value shown for the field with {@code key} (draft, else saved). */
+    private String valueOf(String key, Properties live) {
+        for (ConfigSchema.Field f : ConfigSchema.FIELDS) {
+            if (f.key.equals(key)) return value(f, live);
+        }
+        return live.getProperty(key, "");
+    }
+
     private void save() {
-        if (draft.isEmpty()) return;
+        if (draft.isEmpty() && summonDraft.isEmpty() && teamDraft.isEmpty()) return;
         if (!canEdit()) {
             say("Read only: you can't save settings.", WARN);
+            return;
+        }
+        String conflict = teamDraftConflict();
+        if (conflict != null) {
+            say(conflict + " Nothing was saved.", WARN);
+            return;
+        }
+        Properties before = FxSettings.toProperties();
+        Properties undoTarget = beforeLastSave;
+        // List rows first, so the settings below are written with the new lists. Summon rows before the teams: their
+        // team names are the ones shown when they were picked.
+        int rows = applySummonDraft() + applyTeamDraft();
+        if (draft.isEmpty()) {
+            FxSettings.save();
+            rememberSave(before, undoTarget);
+            MobBattlePlugin.log("Settings panel: " + playerRef.getUsername() + " saved " + rows + " list row(s)");
+            notice = "Saved " + rows + (rows == 1 ? " change." : " changes.");
+            noticeColor = "#7dff8a";
+            rebuild();
             return;
         }
         boolean admin = admin();
@@ -795,11 +1030,10 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         }
         // Never through the panel: the permission mode has its own admin action.
         p.setProperty(FxSettings.PERMISSIONS_KEY, FxSettings.permissionsMode);
-        Properties before = FxSettings.toProperties();
         FxSettings.applyAll(p);
-        beforeLastSave = before;
-        lastSaver = playerRef.getUsername();
+        rememberSave(before, undoTarget);
         draft.clear();
+        n += rows;
         MobBattlePlugin.log("Settings panel: " + playerRef.getUsername() + " saved " + n + " change(s)");
         notice = "Saved " + n + (n == 1 ? " change." : " changes.");
         noticeColor = "#7dff8a";
@@ -807,42 +1041,120 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     }
 
     /**
-     * Undo the last save: the settings from right before it go into the form (like a preset), so they are checked
-     * and then saved. The team and summon lists apply at once and are not part of it.
+     * After a save: {@code before} becomes what Undo goes back to, unless this save put everything back as it was
+     * before the last change (Undo + Save): then the undo is used up, else the next Undo would be a redo.
+     */
+    private void rememberSave(Properties before, Properties undoTarget) {
+        if (undoTarget != null && diffFrom(undoTarget, true).isEmpty() && !listsDiffer(undoTarget)) {
+            beforeLastSave = null;
+            lastSaver = null;
+        } else {
+            beforeLastSave = before;
+            lastSaver = playerRef.getUsername();
+        }
+    }
+
+    /** True when the team or summon lists in {@code target} differ from the current ones. */
+    private static boolean listsDiffer(Properties target) {
+        Properties live = FxSettings.toProperties();
+        java.util.Set<String> keys = new java.util.HashSet<>(target.stringPropertyNames());
+        keys.addAll(live.stringPropertyNames());
+        for (String k : keys) {
+            if (Presets.isListKey(k) && !java.util.Objects.equals(target.getProperty(k), live.getProperty(k))) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Puts the team and summon lists of {@code target} back at once (they never go through the form), keeping every
+     * setting as it is. A team that only exists now is removed the normal way first, so no draft keeps its slot.
+     */
+    private static void restoreLists(Properties target) {
+        Properties q = FxSettings.toProperties();
+        for (String k : q.stringPropertyNames()) if (Presets.isListKey(k)) q.remove(k);
+        for (String k : target.stringPropertyNames()) if (Presets.isListKey(k)) q.setProperty(k, target.getProperty(k));
+        Teams.load(q);
+        java.util.Set<Integer> wanted = new java.util.HashSet<>();
+        for (int i = 0; i < Teams.MAX; i++) if (Teams.exists(i)) wanted.add(i);
+        // Teams.load already rebuilt the slots; slots it dropped still need their drafts cleared.
+        for (int i = 0; i < Teams.MAX; i++) if (!wanted.contains(i)) BattleManager.removeConfiguredTeam(i);
+        SummonList.load(q);
+        FxSettings.save();
+    }
+
+    /**
+     * Undo the last change: the team and summon lists go back at once (they apply at once anyway), and the settings
+     * from right before it go into the form (like a preset), so they are checked and then saved.
      */
     private void undo() {
         Properties before = beforeLastSave;
         if (before == null) {
-            say("Nothing to undo: no save from this panel since the server started.", WARN);
+            say("Nothing to undo: no change from this panel since the server started.", WARN);
             return;
         }
         if (!canEdit()) {
             say("Read only: you can't change settings.", WARN);
             return;
         }
+        boolean lists = listsDiffer(before);
+        if (lists) {
+            restoreLists(before);
+            summonDraft.clear();
+            teamDraft.clear();
+            MobBattlePlugin.log("Settings panel: " + playerRef.getUsername() + " undid the team/summon list change by " + lastSaver);
+        }
+        String by = lastSaver;
         int n = loadIntoDraft(before);
-        if (n == 0) {
-            say("The settings already match how they were before the last save.", GRAY);
+        if (n == 0 && !lists) {
+            say("The settings already match how they were before the last change.", GRAY);
             return;
         }
-        notice = "Last save (by " + lastSaver + ") undone in the form (" + n + " changes): Save changes to apply it.";
+        if (n == 0) {
+            // Everything is back already: nothing left to save, so the undo is used up.
+            beforeLastSave = null;
+            lastSaver = null;
+            notice = "Last change (by " + by + ") undone: team and summon lists restored.";
+        } else {
+            notice = lists
+                    ? "Last change (by " + by + ") undone: lists restored; " + n + " settings in the form, Save changes to apply them."
+                    : "Last change (by " + by + ") undone in the form (" + n + " changes): Save changes to apply it.";
+        }
         noticeColor = GOLD;
         rebuild();
     }
 
     /** The draft becomes the difference between {@code target} and the saved settings (preset / reset preview). */
     private int loadIntoDraft(Properties target) {
-        Properties live = FxSettings.toProperties();
-        boolean admin = admin();
+        Map<Integer, String> diff = diffFrom(target, admin());
         draft.clear();
+        draft.putAll(diff);
+        return draft.size();
+    }
+
+    /** Field index -> canonical value of every field (admin ones only with {@code admin}) where {@code target} differs from the saved settings. */
+    private static Map<Integer, String> diffFrom(Properties target, boolean admin) {
+        Properties live = FxSettings.toProperties();
+        Map<Integer, String> diff = new LinkedHashMap<>();
         for (ConfigSchema.Field f : ConfigSchema.FIELDS) {
             if (f.admin && !admin) continue;
             String raw = target.getProperty(f.key);
             if (raw == null && !KindFx.isOverrideKey(f.key)) continue;
             String v = raw == null ? "" : f.canonical(raw);
-            if (v != null && !v.equals(saved(f, live))) draft.put(f.index, v);
+            if (v != null && !v.equals(saved(f, live))) diff.put(f.index, v);
         }
-        return draft.size();
+        return diff;
+    }
+
+    /**
+     * Undo has something to do: there is a last change, the settings still differ from how they were before it, and
+     * the form doesn't hold that undo already (a second click would change nothing).
+     */
+    private boolean canUndo() {
+        Properties before = beforeLastSave;
+        if (before == null) return false;
+        if (listsDiffer(before)) return true;
+        Map<Integer, String> diff = diffFrom(before, admin());
+        return !diff.isEmpty() && !diff.equals(draft);
     }
 
     private boolean confirmed(String action, String what) {
@@ -889,58 +1201,33 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         if (action == null) return;
         switch (action) {
             // Teams (config)
-            case "teamRename" -> {
-                String team = teamOf(name);
-                String to = value != null ? value.trim() : null;
-                if (team == null || !validName(to)) { say("Team names: letters, numbers and _ (up to 16).", WARN); return; }
-                if (to.equals(team)) return;
-                run("teams rename " + team + " " + to, false);
-            }
-            case "teamColor" -> {
-                String team = teamOf(name), color = paletteOf(value);
-                // Same color (also a ValueChanged echo of the value the build set): nothing to run, no rebuild loop.
-                if (team != null && color != null && !color.equals(paletteName(Teams.color(Teams.find(team)))))
-                    run("teams color " + team + " " + color.toLowerCase(Locale.ROOT), false);
-            }
             case "teamRemove" -> {
                 String team = teamOf(name);
-                if (team != null && confirmed(action + team, "remove team " + team)) run("teams remove " + team, false);
+                if (team != null && confirmed(action + team, "remove team " + team)) runList("teams remove " + team);
             }
             case "teamAdd" -> {
                 String color = paletteOf(value);
                 String n = text != null ? text.trim() : null;
                 if (!validName(n) || color == null) { say("Pick a name (letters, numbers, _) and a color.", WARN); return; }
-                run("teams add " + n + " " + color.toLowerCase(Locale.ROOT), false);
+                runList("teams add " + n + " " + color.toLowerCase(Locale.ROOT));
             }
             case "teamReset" -> {
-                if (confirmed(action, "reset the teams to the defaults")) run("teams reset", false);
+                if (confirmed(action, "reset the teams to the defaults")) runList("teams reset");
             }
             // Summon list (config)
-            case "summonCount" -> {
-                String role = listedRole(name), c = count(value);
-                if (role == null || c == null) { say("Count: a number (0-999) or random.", WARN); return; }
-                run("summon modify " + role + " " + c, false);
-            }
-            case "summonTeam" -> {
-                String role = listedRole(name);
-                String team = "none".equalsIgnoreCase(value) ? "none" : teamOf(value);
-                Integer now = role != null ? SummonList.TEAMS.get(role) : null;
-                String current = now != null && Teams.exists(now) ? Teams.name(now) : "none";
-                if (role != null && team != null && !team.equals(current)) run("summon team " + role + " " + team, false);
-            }
             case "summonRemove" -> {
                 String role = listedRole(name);
-                if (role != null) run("summon remove " + role, false);
+                if (role != null) runList("summon remove " + role);
             }
             case "summonAdd" -> {
                 String role = value != null ? SummonList.findRole(value.trim()) : null;
                 String c = count(count == null || count.isBlank() ? "1" : count);
                 String team = extra == null || "none".equalsIgnoreCase(extra) ? null : teamOf(extra);
                 if (role == null || !role.matches("[A-Za-z0-9_\\-]+") || c == null) { say("Pick a mob and a count (number or random).", WARN); return; }
-                run("summon add " + role + " " + c + (team != null ? " " + team : ""), false);
+                runList("summon add " + role + " " + c + (team != null ? " " + team : ""));
             }
             case "summonClear" -> {
-                if (confirmed(action, "empty the summon list")) run("summon clear", false);
+                if (confirmed(action, "empty the summon list")) runList("summon clear");
             }
             case "summonSpawn" -> run("summon spawn", true);
             // Presets and resets: into the form
@@ -986,52 +1273,53 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             // Tools (use)
             case "morph" -> {
                 String model = value != null ? value.trim() : null;
-                if (model != null && model.matches("[A-Za-z0-9_\\-]+")) run("morph " + model, false);
+                if (model != null && model.matches("[A-Za-z0-9_\\-]+")) run("morph " + model, false, false);
             }
             case "watch" -> run("watch", true);
             case "watchExit" -> run("watch exit", true);
-            case "skipCamera" -> run("skipcamera", false);
+            case "skipCamera" -> run("skipcamera", false, false);
             case "snap" -> run("snap", true);
             case "chaosMe" -> run("chaos me", true);
             case "debugNpcs" -> run("debug", true);
-            case "teamsAuto" -> run("teams auto", false);
+            case "teamsAuto" -> run("teams auto", false, false);
             case "teamsStart" -> run("teams start", true);
             case "teamsJoin" -> {
                 String team = teamOf(value);
                 if (team != null) run("teams join " + team, true);
             }
-            case "teamsLeave" -> run("teams leave", false);
-            case "teamsClear" -> run("teams clear", false);
+            case "teamsLeave" -> run("teams leave", false, false);
+            case "teamsClear" -> run("teams clear", false, false);
             // Admin
             case "permissions" -> {
                 if ("open".equals(name) || "server".equals(name)) run("permissions " + name, false);
             }
             case "reload" -> {
                 if (admin()) draft.clear();
-                run("reload", false);
+                runList("reload");
             }
-            case "give" -> run("give", false);
-            case "skipTimer" -> run("skiptimer", false);
+            case "give" -> run("give", false, false);
+            case "skipTimer" -> run("skiptimer", false, false);
+            case "debugDump" -> run("debugdump", false, false);
             case "eventRoyale" -> {
                 TransformComponent t = store.getComponent(entity, TransformComponent.getComponentType());
                 if (t == null) return;
                 var pos = t.getPosition();
-                run(String.format(Locale.ROOT, "event royale %.1f %.1f %.1f %d", pos.x, pos.y, pos.z, FxSettings.radius), false);
+                run(String.format(Locale.ROOT, "event royale %.1f %.1f %.1f %d", pos.x, pos.y, pos.z, FxSettings.radius), false, false);
             }
             case "stop" -> {
-                if (confirmed(action, "stop every battle")) run("stop", false);
+                if (confirmed(action, "stop every battle")) run("stop", false, false);
             }
             case "armyClear" -> {
-                if (confirmed(action, "disband every army")) run("army clearall", false);
+                if (confirmed(action, "disband every army")) run("army clearall", false, false);
             }
             case "teamsClearAll" -> {
-                if (confirmed(action, "empty every player's teams")) run("teams clearall", false);
+                if (confirmed(action, "empty every player's teams")) run("teams clearall", false, false);
             }
             case "morphReset" -> {
-                if (confirmed(action, "undo every morph")) run("morph reset", false);
+                if (confirmed(action, "undo every morph")) run("morph reset", false, false);
             }
             case "resetAll" -> {
-                if (confirmed(action, "reset all Mob Battle state")) run("resetall", false);
+                if (confirmed(action, "reset all Mob Battle state")) run("resetall", false, false);
             }
             default -> { }
         }
@@ -1042,7 +1330,27 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
      * the panel closes first (watch, snap, chaos me: the player wants to see the world). Otherwise the panel is built
      * again when the command is done, so lists and values show the result; the draft is kept.
      */
+    /**
+     * A team or summon list change (applies at once): the settings and lists from right before it become what Undo
+     * goes back to, as a save does.
+     */
+    private void runList(String args) {
+        if (canEdit()) {
+            beforeLastSave = FxSettings.toProperties();
+            lastSaver = playerRef.getUsername();
+        }
+        run(args, false);
+    }
+
     private void run(String args, boolean close) {
+        run(args, close, true);
+    }
+
+    /**
+     * Runs /mobbattle {@code args} as the player. {@code refresh}: rebuild the page when it finishes (the page shows
+     * what changed); otherwise only the status line is updated, so the scroll and typed inputs stay.
+     */
+    private void run(String args, boolean close, boolean refresh) {
         confirmAction = null;
         if (close) close();
         java.util.concurrent.CompletableFuture<Void> done;
@@ -1061,7 +1369,13 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                 if (p == null || p.getPageManager().getCustomPage() != this) return;
                 notice = error != null ? "/mobbattle " + args + " failed." : "Done: /mobbattle " + args + " (see chat).";
                 noticeColor = error != null ? WARN : GRAY;
-                rebuild();
+                if (refresh) {
+                    rebuild();
+                    return;
+                }
+                UICommandBuilder ui = new UICommandBuilder();
+                status(ui);
+                sendUpdate(ui);
             });
         });
     }
