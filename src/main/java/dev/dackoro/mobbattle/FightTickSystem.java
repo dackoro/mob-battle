@@ -98,6 +98,11 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         }
 
         if (battle != null) {
+            if (!battle.refocus.isEmpty() && battle.refocus.remove(self)) {
+                // All vs one: a fellow attacker hit it; back on the lone target at once (and it ignores that ally).
+                Ref<EntityStore> target = battle.targets.get(self);
+                if (target != null && target.isValid()) FightManager.turnAgainst(self, target, buffer);
+            }
             if (due(self, now, CHECK_INTERVAL_MS, t -> t.check, (t, v) -> t.check = v)) {
                 tickBattle(battle, self, buffer);
             }
@@ -164,8 +169,9 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             return;
         }
         if (changed[0]) {
-            // Previous target died: go for the next one.
-            FightManager.turnAgainst(self, target, buffer);
+            // Previous target died: go for the next one. In a royale the old target stays an enemy, so it is not
+            // ignored for 30 s: after a few switches a mob ignored most of the arena and stood confused (user, 2026-10-12).
+            FightManager.turnAgainst(self, target, buffer, !battle.royale);
             FightManager.provoke(self, target, buffer);
         } else {
             relock(self, target, buffer);

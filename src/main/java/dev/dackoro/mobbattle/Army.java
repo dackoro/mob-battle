@@ -72,9 +72,7 @@ final class Army {
     /** Empties the player's army. Returns how many mobs left it. */
     static int disband(UUID owner, Ref<EntityStore> playerEntity, ComponentAccessor<EntityStore> buffer) {
         List<Ref<EntityStore>> mobs = members(owner);
-        for (Ref<EntityStore> npc : mobs) {
-            release(npc, playerEntity, buffer);
-        }
+        releaseAll(mobs, playerEntity);
         OWNER.values().removeIf(owner::equals);
         FOUGHT.retainAll(OWNER.keySet());
         return mobs.size();
@@ -95,12 +93,38 @@ final class Army {
         return n;
     }
 
+    /** After a release, how long the mob and the ones it fought ignore each other (and it its ex-owner). */
+    static final double RELEASE_GRACE_SECONDS = 3;
+
     private static void release(Ref<EntityStore> npc, Ref<EntityStore> playerEntity, ComponentAccessor<EntityStore> buffer) {
-        OWNER.remove(npc);
-        FOUGHT.remove(npc);
-        FightManager.endFightsOf(List.of(npc));
-        // Back to its own AI; the owner stays ignored for a while instead of being attacked at once.
-        FightManager.queueStop(npc, playerEntity != null ? List.of(playerEntity) : List.of());
+        releaseAll(List.of(npc), playerEntity);
+    }
+
+    /**
+     * Back to their own AI after a short pause: a hostile mob turns on its ex-owner, and the fights the army gave them
+     * end on both sides, so same-faction mobs make peace again (user, 2026-10-12: disbanded goblins and the
+     * Feastmaster they fought kept going for the whole 10 min forced hostility). An opponent forgets every mob
+     * released together: it was turned against several of them over the fight, not only its current one.
+     */
+    private static void releaseAll(List<Ref<EntityStore>> mobs, Ref<EntityStore> playerEntity) {
+        java.util.Set<Ref<EntityStore>> opponents = new java.util.LinkedHashSet<>();
+        for (Ref<EntityStore> npc : mobs) {
+            OWNER.remove(npc);
+            FOUGHT.remove(npc);
+            opponents.addAll(FightManager.opponentsOf(npc));
+        }
+        opponents.removeAll(mobs);
+        FightManager.endFightsOf(mobs);
+        for (Ref<EntityStore> npc : mobs) {
+            List<Ref<EntityStore>> forget = new ArrayList<>(opponents);
+            if (playerEntity != null) forget.add(playerEntity);
+            FightManager.queueRelease(npc, forget, RELEASE_GRACE_SECONDS);
+        }
+        for (Ref<EntityStore> other : opponents) {
+            if (other.isValid() && ownerOf(other) == null && !BattleManager.isManaged(other) && !FightManager.isFighter(other)) {
+                FightManager.queueRelease(other, mobs, RELEASE_GRACE_SECONDS);
+            }
+        }
     }
 
     /*

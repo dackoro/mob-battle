@@ -273,6 +273,17 @@ final class ConfigSchema {
         return choice(key, label, tip, () -> list);
     }
 
+    /** passiveWinIgnore: free text, a comma list of role ids (* = any ending), empty = none. */
+    private static Item passiveIgnore() {
+        Field f = new Field("battle.passivewin.ignore", "Never ends against",
+                "Roles that keep a battle going while one is alive, e.g. a training dummy you test a mob against (default Test_Dummy*).",
+                Type.TEXT);
+        f.blankOk = true;
+        f.check = FxSettings::parsePassiveWinIgnore;
+        f.hint = "role ids, comma separated, * = any ending; empty = none";
+        return new FieldItem(add(f));
+    }
+
     /** A per-kind presentation override: empty / "Global" = follow the global value. */
     private static Item override(BattleManager.Kind kind, KindFx.Opt opt, String label) {
         String key = KindFx.propKey(kind, opt);
@@ -364,6 +375,9 @@ final class ConfigSchema {
                 toggle("battle.unstick", "Unstick stalled fighters", "A mob stuck on another level than its target (10 s, fliers 20 s) is moved next to it."),
                 number("battle.standoff", "Stand-off shove", 0, FxSettings.MAX_STANDOFF_SECONDS, "seconds, 0 = never",
                         "A mob on its target's level that this long gets no closer, hits nothing and isn't hit is shoved toward it (default 15)."),
+                number("battle.passivewin", "Win against passive mobs", 0, FxSettings.MAX_PASSIVE_WIN_SECONDS, "seconds, 0 = never",
+                        "When only one side can still fight back, it wins after this long without a hit (nobody can fight: a draw). An alert shows bottom left (default 15)."),
+                passiveIgnore(),
                 section("Arenas & timers"),
                 choice("battle.timer.style", "Timer box", "custom = Mob Battle's timer box, portal = the game's portal timer.", "custom", "portal"),
                 number("battle.arena.size", "Arena size (duels, teams)", 0, FxSettings.MAX_ARENA,
@@ -521,6 +535,9 @@ final class ConfigSchema {
         pages.add(new Page("Wands", "Wand feedback and what each wand does.", List.of(
                 section("Every wand"),
                 toggle("wand.fx", "Wand effects", "Glow, soul rip and sounds on the clicked mob."),
+                section("Heal Wand"),
+                choice("wand.heal.light", "Heal Wand light", "Light from the sky that brings the heal: a color (default green) or off (heals at once).",
+                        () -> with(opts("off"), palette())),
                 section("Effect Wand"),
                 choice("effect.id", "Effect Wand effect", "The effect the Effect Wand gives (right click cycles the quick list).",
                         ConfigSchema::effects),

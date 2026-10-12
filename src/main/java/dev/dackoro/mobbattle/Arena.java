@@ -147,6 +147,26 @@ final class Arena {
         return !ARENAS.isEmpty();
     }
 
+    /** Margin past the arena edge that still counts as inside (the wall pushes back from the edge itself). */
+    private static final double OUTSIDE_MARGIN = 3;
+
+    /**
+     * True when {@code pos} is clearly outside the walled arena of {@code battle} right now (horizontal distance).
+     * False with no arena, a shown-only one or no position. Target picking (BattleManager.reach): a skeleton chasing
+     * a duck flown off past the wall walked against it for the whole battle (user, 2026-10-12).
+     */
+    static boolean outside(BattleManager.Battle battle, Vector3d pos) {
+        if (pos == null || ARENAS.isEmpty()) return false;
+        for (State s : ARENAS) {
+            if (s.battle != battle) continue;
+            if (!s.wall) return false;
+            double r = s.radius(System.currentTimeMillis()) + OUTSIDE_MARGIN;
+            double dx = pos.x - s.center.x, dz = pos.z - s.center.z;
+            return dx * dx + dz * dz > r * r;
+        }
+        return false;
+    }
+
     /**
      * /mobbattle skipTimer: every running timer jumps to 0, so on its next tick (world thread) each battle ends by
      * its own timeUp rule, as if the time had run out. Returns how many timers were skipped.

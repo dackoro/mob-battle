@@ -292,17 +292,33 @@ public final class ChaosWand {
         // started before a short timer ran out, and some roles give up chasing that far.
         List<Vector3d> at = new ArrayList<>(around.size());
         for (Ref<EntityStore> r : around) at.add(positionOf(r, buffer));
+        // debugLog/debugRecord: who joined, per role, and how many of each turned aggressive.
+        java.util.Map<String, int[]> roles = MobBattlePlugin.debugging() ? new java.util.TreeMap<>() : null;
         for (int i = 0; i < around.size(); i++) {
             Ref<EntityStore> npc = around.get(i);
             Ref<EntityStore> enemy = nearbyOpponent(around, at, i);
             BattleManager.setTarget(battle, npc, enemy);
-            if (FightManager.turnAgainst(npc, enemy, buffer) == FightManager.Result.AGGRESSIVE) {
+            FightManager.Result result = FightManager.turnAgainst(npc, enemy, buffer);
+            if (result == FightManager.Result.AGGRESSIVE) {
                 aggressive++;
+            }
+            if (roles != null) {
+                int[] c = roles.computeIfAbsent(nameOf(npc, buffer) + (result == FightManager.Result.NOT_NPC ? " (not NPC)" : ""),
+                        k -> new int[2]);
+                c[0]++;
+                if (result == FightManager.Result.AGGRESSIVE) c[1]++;
             }
             FightManager.provoke(npc, enemy, buffer);
             FightFx.link(BattleManager.Kind.ROYALE, playerEntity, npc, enemy, buffer);
         }
         MobBattlePlugin.log("Chaos brawl: " + around.size() + " mobs, " + aggressive + " aggressive");
+        if (roles != null) {
+            StringBuilder sb = new StringBuilder("battle #" + battle.id.toString().substring(0, 8) + " members:");
+            roles.forEach((role, c) -> sb.append(' ').append(role).append(" x").append(c[0])
+                    .append(c[1] < c[0] ? " (" + c[1] + " aggressive)" : "").append(','));
+            sb.setLength(sb.length() - 1);
+            MobBattlePlugin.debug(sb.toString());
+        }
         player.sendMessage(Message.raw("BATTLE ROYALE! " + aggressive + " of " + around.size()
                 + " mobs fight until one is left (radius " + FxSettings.radius + ").").color(FIGHT));
         FightFx.title(BattleManager.Kind.ROYALE, player, "BATTLE ROYALE!", around.size() + " mobs, last one standing wins");

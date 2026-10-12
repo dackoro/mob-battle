@@ -117,6 +117,7 @@ public class FightDamageSystem extends DamageEventSystem {
                 return;
             }
         }
+        BattleManager.allyHit(attackerRef, victim);
         if (!FightManager.isFighting(source.getRef(), victim) && !BattleManager.areEnemies(source.getRef(), victim)) {
             // Unstick: a battle mob hit by an outsider (a player, a wild mob with isolation off) is in a fight too.
             if (Unstick.active() && !damage.isCancelled() && BattleManager.isManaged(victim)) {

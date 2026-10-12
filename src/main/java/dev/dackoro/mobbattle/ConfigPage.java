@@ -144,25 +144,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             // Only the open page gets its rows: a page change rebuilds (the draft lives here, not in the client).
             // All 14 at once was ~3500 dropdown entries (music tracks in 5 lists, NPC roles, models) per build.
             if (i != page) continue;
-            Rows rows = new Rows(ui, ev, "#Page" + i);
-            for (ConfigSchema.Item item : p.items()) {
-                switch (item) {
-                    case ConfigSchema.Section s -> rows.section(s.title());
-                    case ConfigSchema.Note n -> rows.note(n.text());
-                    case ConfigSchema.FieldItem f -> fieldRow(rows, f.field(), live);
-                }
-            }
-            if (p.custom() != null) {
-                switch (p.custom()) {
-                    case "wands" -> wandsRows(rows);
-                    case "teams" -> teamRows(rows);
-                    case "summon" -> summonRows(rows);
-                    case "presets" -> presetRows(rows);
-                    case "tools" -> toolRows(rows);
-                    case "admin" -> adminRows(rows);
-                    default -> { }
-                }
-            }
+            pageRows(new Rows(ui, ev, "#Page" + i), p, live);
         }
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#SaveButton", data("Save"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#DiscardButton", data("Discard"), false);
@@ -171,6 +153,53 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton", data("Close"), false);
         showPage(ui);
         status(ui);
+    }
+
+    /** The rows of one page (fields, then its custom list). */
+    private void pageRows(Rows rows, ConfigSchema.Page p, Properties live) {
+        for (ConfigSchema.Item item : p.items()) {
+            switch (item) {
+                case ConfigSchema.Section s -> rows.section(s.title());
+                case ConfigSchema.Note n -> rows.note(n.text());
+                case ConfigSchema.FieldItem f -> fieldRow(rows, f.field(), live);
+            }
+        }
+        if (p.custom() != null) {
+            switch (p.custom()) {
+                case "wands" -> wandsRows(rows);
+                case "teams" -> teamRows(rows);
+                case "summon" -> summonRows(rows);
+                case "presets" -> presetRows(rows);
+                case "tools" -> toolRows(rows);
+                case "admin" -> adminRows(rows);
+                default -> { }
+            }
+        }
+    }
+
+    /**
+     * Redraws only the open page's rows (a list row added or removed), not the whole panel: rebuild() sends the
+     * page with clear = true and the scroll goes back to the top (user, 2026-10-12). Here the page container is
+     * cleared and refilled in one update without clear, so the nav, the bottom bar and their bindings stay; the
+     * old rows' bindings go with their elements.
+     */
+    private void refreshPage() {
+        ConfigSchema.Page p = ConfigSchema.PAGES.get(page);
+        if (p.adminOnly() && !admin()) {
+            rebuild();
+            return;
+        }
+        UICommandBuilder ui = new UICommandBuilder();
+        UIEventBuilder ev = new UIEventBuilder();
+        String container = "#Page" + page;
+        ui.clear(container);
+        rowOf.clear();
+        previewOf.clear();
+        summonRowOf.clear();
+        teamRowOf.clear();
+        pageRows(new Rows(ui, ev, container), p, FxSettings.toProperties());
+        status(ui);
+        sendUpdate(ui, ev, false);
     }
 
     /** Appends rows to one page container and hands out their selectors. */
@@ -1442,7 +1471,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                 notice = error != null ? "/mobbattle " + args + " failed." : "Done: /mobbattle " + args + " (see chat).";
                 noticeColor = error != null ? WARN : GRAY;
                 if (refresh) {
-                    rebuild();
+                    refreshPage();
                     return;
                 }
                 UICommandBuilder ui = new UICommandBuilder();

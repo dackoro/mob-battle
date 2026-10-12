@@ -1,16 +1,13 @@
 package dev.dackoro.mobbattle;
 
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
-import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
-import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
-import com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
@@ -30,6 +27,9 @@ public class HealInteraction extends SimpleInstantInteraction {
             .documentation("Heal Wand: restores the clicked entity to full health.")
             .build();
 
+    /** The light reaching the mob, as CleanseInteraction.LIGHT_LANDS_MS (same MobBattle_Light_&lt;Color&gt; rays). */
+    private static final long LIGHT_LANDS_MS = 400;
+
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
         if (!Perms.interactionAllowed(context)) return;
@@ -38,18 +38,36 @@ public class HealInteraction extends SimpleInstantInteraction {
         if (buffer == null || target == null || !target.isValid()) {
             return;
         }
-        EntityStatMap stats = buffer.getComponent(target, EntityStatMap.getComponentType());
-        if (stats == null) {
+        if (buffer.getComponent(target, EntityStatMap.getComponentType()) == null) {
             return;
         }
-        int health = DefaultEntityStatTypes.getHealth();
         NPCEntity npc = buffer.getComponent(target, NPCEntity.getComponentType());
         String name = npc != null ? npc.getRoleName() : "target";
         PlayerRef player = buffer.getComponent(context.getEntity(), PlayerRef.getComponentType());
-        stats.maximizeStatValue(health);
-        WandFx.onTarget(target, WandFx.HEAL, buffer);
+        // healLight: a light comes down from the sky (the Buff Wand's, in healLight) and the heal lands with it.
+        // Off, or with wandFx off: at once.
+        String light = FxSettings.wandFx ? FxSettings.healLightColor() : null;
+        if (light == null) {
+            healNow(target, buffer);
+        } else {
+            WandFx.onTarget(target, WandFx.BUFF_LIGHT + light + WandFx.lightHeight(target, buffer), buffer);
+            var store = target.getStore();
+            var world = store.getExternalData().getWorld();
+            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+                if (store.isShutdown() || !target.isValid()) return;
+                healNow(target, store);
+            }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
         if (player != null) {
             player.sendMessage(Message.raw("Healed " + name + " to full health.").color("#55ff77"));
         }
+    }
+
+    /** Full health and the heal look (burst, totem fireflies and sound, green tint). World thread. */
+    private static void healNow(Ref<EntityStore> target, ComponentAccessor<EntityStore> accessor) {
+        EntityStatMap stats = accessor.getComponent(target, EntityStatMap.getComponentType());
+        if (stats == null) return;
+        stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());
+        WandFx.onTarget(target, WandFx.HEAL, accessor);
     }
 }

@@ -70,11 +70,40 @@ public final class FightManager {
             return;
         }
         PENDING_STOPS.put(npc, opponents);
+        STOP_SECONDS.remove(npc);
+    }
+
+    /** Ignore time of a pending stop queued with {@link #queueRelease}; absent = HOSTILE_SECONDS. */
+    private static final Map<Ref<EntityStore>, Double> STOP_SECONDS = new ConcurrentHashMap<>();
+
+    /**
+     * Like queueStop, but the IGNORE toward {@code others} only lasts {@code seconds}: afterwards the mob's own
+     * attitudes apply again (Army release: goblins go back to hating the player and liking other goblins).
+     * Adds to a stop already pending (a disband releases several mobs fighting the same opponent).
+     */
+    static void queueRelease(Ref<EntityStore> npc, List<Ref<EntityStore>> others, double seconds) {
+        if (BattleManager.isPlayerFighter(npc) || isOnlinePlayer(npc)) return;
+        PENDING_STOPS.merge(npc, others, (a, b) -> {
+            List<Ref<EntityStore>> all = new java.util.ArrayList<>(a);
+            all.addAll(b);
+            return all;
+        });
+        STOP_SECONDS.merge(npc, seconds, Math::min);
+    }
+
+    /** The other side of every wand fight {@code npc} is in. */
+    static List<Ref<EntityStore>> opponentsOf(Ref<EntityStore> npc) {
+        List<Ref<EntityStore>> out = new java.util.ArrayList<>();
+        for (Fight f : FIGHTS) {
+            if (!f.isOver() && f.has(npc)) out.add(f.other(npc));
+        }
+        return out;
     }
 
     /** Drops state of removed entities and finished fights (BattleManager.maintain, once per second). */
     static void prune() {
         PENDING_STOPS.keySet().removeIf(npc -> !npc.isValid());
+        STOP_SECONDS.keySet().removeIf(npc -> !PENDING_STOPS.containsKey(npc));
         long now = System.currentTimeMillis();
         PENDING_HEALS.values().removeIf(h -> !h.npc().isValid() || now > h.at() + HEAL_EXPIRE_MS);
         SELECTION.values().removeIf(npc -> !npc.isValid());
@@ -86,13 +115,15 @@ public final class FightManager {
     /** Runs on the NPC's own world thread; stale hostility must not survive a finished battle. */
     static void applyPendingStop(Ref<EntityStore> self, ComponentAccessor<EntityStore> accessor) {
         List<Ref<EntityStore>> others = PENDING_STOPS.remove(self);
+        Double custom = STOP_SECONDS.remove(self);
+        double seconds = custom != null ? custom : HOSTILE_SECONDS;
         if (others == null || !BattleManager.isAlive(self, accessor)) return;
         WorldSupport world = WorldSupport.get(self, accessor);
         StateSupport state = StateSupport.get(self, accessor);
         if (world != null) {
             for (Ref<EntityStore> other : others) {
                 if (other.isValid() && other.getStore() == self.getStore() && !same(self, other)) {
-                    tryOverride(world, other, Attitude.IGNORE, HOSTILE_SECONDS, combatStateOf(state) != null);
+                    tryOverride(world, other, Attitude.IGNORE, seconds, combatStateOf(state) != null);
                 }
             }
         }

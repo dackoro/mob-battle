@@ -98,7 +98,49 @@ final class BattleDebug {
                 + " attacking=" + (combat != null && combat.isExecutingAttack())
                 + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
                 + " ordered=" + name(ordered, store) + " locked=" + name(locked, store)
-                + " distance=" + distance + " attitude=" + attitude + " vanillaCanDamage=" + canDamage;
+                + " distance=" + distance + " attitude=" + attitude + " vanillaCanDamage=" + canDamage
+                + caeFields(self, store);
+    }
+
+    /**
+     * Combat Action Evaluator roles (Feastmaster, bosses): what the evaluator itself picked and remembers. Its target
+     * comes from its own hostile memory, not from LockedTarget (2026-10-12: a Feastmaster boss stood 3.7 blocks from
+     * its goblin opponent without one swing).
+     */
+    private static String caeFields(Ref<EntityStore> self, Store<EntityStore> store) {
+        StringBuilder out = new StringBuilder();
+        var memory = store.getComponent(self, com.hypixel.hytale.builtin.npccombatactionevaluator.memory.TargetMemory.getComponentType());
+        if (memory != null) {
+            out.append(" | memory hostiles=").append(names(memory.getKnownHostilesList(), store))
+                    .append(" friendlies=").append(names(memory.getKnownFriendliesList(), store))
+                    .append(" closestHostile=").append(name(memory.getClosestHostile(), store));
+        }
+        var cae = store.getComponent(self, com.hypixel.hytale.builtin.npccombatactionevaluator.evaluator.CombatActionEvaluator.getComponentType());
+        if (cae != null) {
+            var action = cae.getCurrentAction();
+            out.append(" | cae primary=").append(name(cae.getPrimaryTarget(), store))
+                    .append(" basicTarget=").append(name(cae.getBasicAttackTarget(), store))
+                    .append(" action=").append(action != null && action.getOption() != null ? action.getOption().getClass().getSimpleName() : "none")
+                    .append(" attack=").append(cae.getCurrentAttack())
+                    .append(" basicAttack=").append(cae.getCurrentBasicAttack())
+                    .append(" damageFriendlies=").append(cae.shouldDamageFriendlies());
+        }
+        return out.toString();
+    }
+
+    private static String names(java.util.List<Ref<EntityStore>> refs, Store<EntityStore> store) {
+        if (refs == null || refs.isEmpty()) return "[]";
+        StringBuilder b = new StringBuilder("[");
+        int n = 0;
+        for (Ref<EntityStore> r : refs) {
+            if (n > 0) b.append(", ");
+            if (n++ == 8) {
+                b.append("+").append(refs.size() - 8);
+                break;
+            }
+            b.append(name(r, store));
+        }
+        return b.append(']').toString();
     }
 
     /** Debug Wand follow: AI state, battle, ordered/locked target and attitude (what changes now and then). */
@@ -115,7 +157,18 @@ final class BattleDebug {
         }
         return "state=" + FightManager.stateOf(self, store)
                 + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
-                + " target=" + name(ordered, store) + " locked=" + name(locked, store) + " attitude=" + attitude;
+                + " target=" + name(ordered, store) + " locked=" + name(locked, store) + " attitude=" + attitude
+                + caeFollow(self, store);
+    }
+
+    /** Debug Wand follow: the evaluator's target and action (only roles with one). */
+    private static String caeFollow(Ref<EntityStore> self, Store<EntityStore> store) {
+        var cae = store.getComponent(self, com.hypixel.hytale.builtin.npccombatactionevaluator.evaluator.CombatActionEvaluator.getComponentType());
+        if (cae == null) return "";
+        var action = cae.getCurrentAction();
+        return " caeTarget=" + name(cae.getPrimaryTarget(), store)
+                + " caeAction=" + (action != null && action.getOption() != null ? action.getOption().getClass().getSimpleName() : "none")
+                + " caeAttack=" + cae.getCurrentAttack();
     }
 
     /** Distance to the mob's battle/wand target (else its locked target), as "4.2", or null when it has none. */

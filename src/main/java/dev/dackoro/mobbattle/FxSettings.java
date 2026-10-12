@@ -150,6 +150,43 @@ public final class FxSettings {
      */
     public static int standoffSeconds = 15;
     static final int MAX_STANDOFF_SECONDS = 120;
+    /**
+     * /mobbattle passiveWin: once only one side (or none) can still fight back, seconds without a hit before that
+     * side wins (none: a draw), with an alert bottom left (BattleManager.passiveEnd). 0 = off. Default 15.
+     */
+    public static int passiveWinSeconds = 15;
+    static final int MAX_PASSIVE_WIN_SECONDS = 120;
+    /**
+     * /mobbattle passiveWinIgnore: role ids (comma separated, a trailing * matches any ending, case-insensitive) that
+     * never let passiveWin start while one is alive in the battle, e.g. an immortal training dummy a modder tests a mob
+     * against (user, 2026-10-12). "" = none. Default Test_Dummy* (the game's six test dummies).
+     */
+    public static String passiveWinIgnore = "Test_Dummy*";
+
+    /** Canonical passiveWinIgnore list ("none"/blank = ""), or null if a name has characters a role id can't have. */
+    static String parsePassiveWinIgnore(String value) {
+        if (value == null) return null;
+        String v = value.trim();
+        if (v.isEmpty() || v.equalsIgnoreCase("none") || v.equalsIgnoreCase("off")) return "";
+        StringBuilder out = new StringBuilder();
+        for (String part : v.split("[,\\s]+")) {
+            if (part.isEmpty()) continue;
+            if (!part.matches("[A-Za-z0-9_\\-]+\\*?")) return null;
+            if (out.length() > 0) out.append(',');
+            out.append(part);
+        }
+        return out.toString();
+    }
+
+    /** Whether {@code role} is on the passiveWinIgnore list. */
+    static boolean passiveWinIgnored(String role) {
+        String list = passiveWinIgnore;
+        if (role == null || list.isEmpty()) return false;
+        for (String p : list.split(",")) {
+            if (p.endsWith("*") ? role.regionMatches(true, 0, p, 0, p.length() - 1) : role.equalsIgnoreCase(p)) return true;
+        }
+        return false;
+    }
     /** Read-only 1 vs 1 duel card with both fighters' stats, from the countdown to the end (/mobbattle duelCard). Default: off. */
     public static boolean duelCard = false;
 
@@ -190,6 +227,24 @@ public final class FxSettings {
     static String buffLightColor() {
         if ("off".equals(buffLight)) return null;
         return "buff".equals(buffLight) ? buffColor : buffLight;
+    }
+
+    /**
+     * Heal Wand light from the sky (/mobbattle healLight): a palette color (default Green) or "off"; the heal lands
+     * with the light (HealInteraction), off = at once. Same light effects as the Buff Wand's.
+     */
+    public static String healLight = "Green";
+
+    /** The Heal Wand light's palette color now, or null when it is off. */
+    static String healLightColor() {
+        return "off".equals(healLight) ? null : healLight;
+    }
+
+    /** "off" or a palette name (canonical case); null if {@code value} is neither. */
+    static String parseHealLight(String value) {
+        if (value == null) return null;
+        String c = Buffs.parseCrown(value.trim());
+        return c == null || c.equals("Gold") ? null : c;
     }
 
     /** "buff", "off" or a palette name (canonical case); null if {@code value} is none of them. */
@@ -605,6 +660,8 @@ public final class FxSettings {
             }
             String light = parseBuffLight(p.getProperty("wand.buff.light", buffLight));
             if (light != null) buffLight = light;
+            String healL = parseHealLight(p.getProperty("wand.heal.light", healLight));
+            if (healL != null) healLight = healL;
             areaStyle = loadAreaStyle(p.getProperty("chaos.area"), currentAreaStyles(p), areaStyle);
             String savedArea = p.getProperty("chaos.area.color", areaColor);
             areaColor = parseAreaColor(savedArea) != null ? parseAreaColor(savedArea) : areaColor;
@@ -677,6 +734,14 @@ public final class FxSettings {
             } catch (NumberFormatException ignored) {
                 // keep the default
             }
+            try {
+                passiveWinSeconds = Math.max(0, Math.min(MAX_PASSIVE_WIN_SECONDS,
+                        Integer.parseInt(p.getProperty("battle.passivewin", String.valueOf(passiveWinSeconds)))));
+            } catch (NumberFormatException ignored) {
+                // keep the default
+            }
+            String ignore = parsePassiveWinIgnore(p.getProperty("battle.passivewin.ignore", passiveWinIgnore));
+            if (ignore != null) passiveWinIgnore = ignore;
             duelCard = Boolean.parseBoolean(p.getProperty("battle.duelCard", String.valueOf(duelCard)));
             // Each key on its own: a bad value keeps that kind's current setting, the other keys still load.
             for (BattleManager.Kind k : BattleManager.Kind.values()) {
@@ -802,6 +867,8 @@ public final class FxSettings {
         p.setProperty("battle.shrink.to", String.valueOf(shrinkTo));
         p.setProperty("battle.unstick", String.valueOf(unstick));
         p.setProperty("battle.standoff", String.valueOf(standoffSeconds));
+        p.setProperty("battle.passivewin", String.valueOf(passiveWinSeconds));
+        p.setProperty("battle.passivewin.ignore", passiveWinIgnore);
         p.setProperty("battle.duelCard", String.valueOf(duelCard));
         p.setProperty("battle.shrink.time", String.valueOf(shrinkSeconds));
         p.setProperty("battle.timer.style", timerStyle);
@@ -812,6 +879,7 @@ public final class FxSettings {
         p.setProperty("wand.cleanse.color", cleanseColor);
         p.setProperty("wand.buff.color", buffColor);
         p.setProperty("wand.buff.light", buffLight);
+        p.setProperty("wand.heal.light", healLight);
         p.setProperty("snap.time", String.valueOf(snapSeconds));
         p.setProperty("snap.hitdelay", String.valueOf(snapHitDelayMs));
         p.setProperty("snap.radius", String.valueOf(snapRadius));
@@ -959,7 +1027,7 @@ public final class FxSettings {
                         + " | timeUp " + kinds(TIME_UP, v -> v.name().toLowerCase(java.util.Locale.ROOT))
                         + " | judgeBy " + kinds(JUDGE_BY, v -> v)
                         + " | arenaShrink " + rules(SHRINK) + " to " + shrinkTo + ", over " + MobBattleCommand.formatDuration(shrinkSeconds)
-                        + " with no timer | scoreboard " + rules(SCOREBOARD) + " | unstick " + onOff(unstick) + ", standoffTime " + (standoffSeconds > 0 ? standoffSeconds + " s" : "off")
+                        + " with no timer | scoreboard " + rules(SCOREBOARD) + " | unstick " + onOff(unstick) + ", standoffTime " + (standoffSeconds > 0 ? standoffSeconds + " s" : "off") + ", passiveWin " + (passiveWinSeconds > 0 ? passiveWinSeconds + " s" : "off") + " (ignore " + (passiveWinIgnore.isEmpty() ? "none" : passiveWinIgnore) + ")"
                         + " | duelCard " + onOff(duelCard)
                         + " | arenaSize " + (arenaSize > 0 ? arenaSize : "auto") + ", timerStyle " + timerStyle + ", tieBreak " + tieBreak + ", snapMode " + snapMode
                         + ", snapPercent " + snapPercent + "%, snapTime " + snapSeconds + " s, snapHitDelay " + snapHitDelayMs + " ms, snapRadius " + snapRadius,
@@ -969,7 +1037,7 @@ public final class FxSettings {
                         + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonArmy " + onOff(summonArmy) + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
                         + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase(),
-                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
+                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
                 "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
         };
     }
@@ -980,8 +1048,8 @@ public final class FxSettings {
             case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
-            case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
-            case "debuglog", "debugrecord", "debugtrack", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor", "bufflight" -> 6;
+            case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "passivewin", "passivewinignore", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
+            case "debuglog", "debugrecord", "debugtrack", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor", "bufflight", "heallight" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
                  "summondespawn", "summonlifetime", "summonexit", "summonarmy", "summonjade", "summonjadecolor" -> 4;
             case "teamfx", "teambytype", "armytint", "armytintcolor" -> 5;

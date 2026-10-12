@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Once per second: global cleanup (any world thread, whichever ticks first), then victory and timeout of
  * the battles of the ticking world (on its own thread). Nothing is keyed by world here, so an unloaded
- * instance leaves nothing behind. Exception: the look guardian (LookKeeper) runs every tick while a look is kept.
+ * instance leaves nothing behind. The look guardian (LookKeeper) has its own system, LookGuardSystem.
  */
 public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
     private static final long INTERVAL_MS = 1000;
@@ -85,11 +85,6 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
         if (DuelCard.any() && now >= nextCard.getOrDefault(store, 0L)) {
             nextCard.put(store, now + INTERVAL_MS);
             store.getExternalData().getWorld().execute(() -> DuelCard.tick(store));
-        }
-        if (LookKeeper.any() || LookLight.any()) {
-            // Looks kept on mobs (LookKeeper) and their lights (LookLight): every tick while one is tracked or a
-            // light is still on, on the world thread.
-            LookKeeper.schedule(store);
         }
         if (DebugWand.any() && now >= nextDebugWand.getOrDefault(store, 0L)) {
             nextDebugWand.put(store, now + INTERVAL_MS);

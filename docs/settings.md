@@ -1,0 +1,309 @@
+# Settings reference
+
+Every Mob Battle setting: the chat command that changes it, its key in `fx.properties`, the values it takes, its default and the reset group it belongs to. The settings are grouped like the tabs of the in-game [settings panel](settings-panel.md), which can change all of them without typing commands.
+
+## Basics
+
+### Where settings are stored
+
+- Settings live in **`fx.properties`** in the plugin's data directory (a folder named `Dackoro_Mob Battle`; in a single-player world it is inside that world's save, under `mods/`). Each world or server therefore has its own settings.
+- Every change from a command or from the panel's **Save changes** is written to the file at once, and the file is read when the plugin starts.
+- The same directory holds your saved presets (`presets/<name>.properties`) and debug files (`debug/`).
+- You can edit `fx.properties` by hand while the server is stopped, or edit it and then run **`/mobbattle reload`** (admin). Reload reads the whole file again: a key missing from the file goes back to its default, a value that isn't valid keeps the current one.
+- Files from older versions load fine: old values are converted (an old free laser color becomes the closest palette color, old area styles become `border`, one old global isolation/friendly-fire value becomes the value of every kind, an old `fx.crown=true/false` becomes `Gold`/`off`).
+
+### Commands
+
+- `/mobbattle settings` shows the current settings, one line per group (Titles, Fighter laser, Battles, Arenas, Chaos area, Team look, Wands, Permissions). After you change a setting, the reply shows only its group's line.
+- `/mobbattle help [topic]` lists the commands by topic (`wands`, `titles`, `chaos`, `battles`, `teams`, `summon`, `morph`, `presets`, `config`, `server`).
+- Commands are written in camelCase here (`areaRadius`), but any case works; the chat suggestions show them in lowercase (the game lowercases every command name).
+- Every word is a real subcommand, so the chat suggests the next word as you type (`/mobbattle te` shows `teams`, `teamLook`).
+- The value goes right after the setting: `/mobbattle areaRadius 20`. The `--value=20` style is not needed.
+- Only the full names work. The old short names `show`, `title`, `style`, `laser`, `color`, `radius`, `area`, `height`, `effect`, `teamfx`, `isolation` and `glow` (the old name of `borderColor`) were removed.
+- In Creative, joining a world shows a one-line hint about `/mobbattle help` and the settings panel, once per session.
+- On/off values accept `on`/`off`, `true`/`false` and `yes`/`no`.
+- Times (`timer`, `arenaShrinkTime`) accept `90`, `90s`, `2m`, `1m30s`, `--minutes=2 --seconds=30` or `off`.
+- Changing settings needs `dackoro.mob_battle.config` when the permission mode is `server` (anyone in `open` mode). See [server-setup.md](server-setup.md).
+
+### Palette colors
+
+Every color setting takes a palette name: `red`, `blue`, `green`, `yellow`, `orange`, `purple`, `pink`, `cyan`, `white`, `black`, `brown`, `lime`, `gray`, `magenta`. Free hex colors are not accepted. Some settings also take `random`, `off`, `gold`, `area` or `default`, as noted. See [colors-and-looks.md](colors-and-looks.md).
+
+### Battle kinds
+
+Per-kind settings use these words: `duel` (Battle Wand), `allVsOne` (Chaos Wand left click), `royale` (Chaos Wand right click), `teams` (Team Wand), or `all` for every kind at once. In `fx.properties` the kind is lowercase: `duel`, `allvsone`, `royale`, `teams`. See [battles.md](battles.md).
+
+## Per-kind overrides
+
+Fourteen presentation options have a **global value** and an optional **override per battle kind**:
+
+| Command | Sets |
+|---|---|
+| `/mobbattle <option> <value>` | The global value. |
+| `/mobbattle <option> <kind> <value>` | An override for that kind only. |
+| `/mobbattle <option> <kind> default` | Removes that kind's override (`global` works too): the kind follows the global value again. |
+| `/mobbattle <option> all <value>` | The global value, and removes every kind's override for that option. |
+
+Examples: `/mobbattle countdown royale 5`, `/mobbattle cameraStyle royale showcase`, `/mobbattle camera duel off`, `/mobbattle endCamera all winner`.
+
+By default no kind has an override: every kind follows the global value.
+
+Overrides are saved as `kind.<kind>.<option>` with the option word in lowercase, for example `kind.royale.countdown=5` or `kind.duel.camera=off`. On/off overrides are stored as `on`/`off`. In the panel they are the Presentation and Cameras sections of each battle-kind tab, where **Global** (or an empty number box) means no override. `/mobbattle settings` lists them after "per kind".
+
+| Option | Global key | Override key | Override values | Reset group |
+|---|---|---|---|---|
+| `countdown` | `fight.countdown` | `kind.<kind>.countdown` | 0-10 | titles |
+| `startTitle` | `title.enabled` | `kind.<kind>.starttitle` | on, off | titles |
+| `winTitle` | `wintitle.enabled` | `kind.<kind>.wintitle` | on, off | titles |
+| `music` | `battle.music`, `battle.music.track` | `kind.<kind>.music` | on (global track), off, or a track ID | titles |
+| `fightLaser` | `laser.enabled` | `kind.<kind>.fightlaser` | on, off | effects |
+| `runes` | `fx.runes` | `kind.<kind>.runes` | on, off | effects |
+| `areaStyle` | `chaos.area` | `kind.<kind>.areastyle` | border, disc, discBorder, wall, off | effects |
+| `camera` | `fight.camera` | `kind.<kind>.camera` | on, off | cameras |
+| `cameraStyle` | `camera.style` | `kind.<kind>.camerastyle` | auto, orbit, duel, showcase, teams, focus, drone | cameras |
+| `cameraTime` | `camera.time` | `kind.<kind>.cameratime` | 0-30 | cameras |
+| `cameraShots` | `camera.shots` | `kind.<kind>.camerashots` | 1 to maxMobs | cameras |
+| `endCamera` | `camera.end` | `kind.<kind>.endcamera` | off, winner, lastHit | cameras |
+| `endCameraTime` | `camera.end.time` | `kind.<kind>.endcameratime` | 1-15 | cameras |
+| `autoWatch` | `camera.autowatch` | `kind.<kind>.autowatch` | on, off | cameras |
+
+The battle rules, arena and timer settings (isolation, arena, timer and so on) are not overrides: they always have one value per kind, with no global value. `all` sets every kind.
+
+## Presets
+
+A preset changes many settings at once. In the panel, loading a preset only fills the form; with the command it applies at once.
+
+| Command | What it does |
+|---|---|
+| `/mobbattle preset list` | Built-in presets and your saved ones. |
+| `/mobbattle preset <name>` | Apply a built-in or saved preset (same as `preset load <name>`). |
+| `/mobbattle preset save <name>` | Save the current settings as your own preset. |
+| `/mobbattle preset load <name>` | Apply a saved preset. |
+| `/mobbattle preset delete <name>` | Delete a saved preset. |
+
+### Built-in presets
+
+| Preset | What it sets |
+|---|---|
+| `default` | Every setting back to its default and every per-kind override removed. |
+| `fight` | Just the fights: no countdown, intro or end camera, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
+| `effects` | All the show but no cameras: countdown 3, titles, music, runes, area `discBorder`, a scoreboard for every kind; duels, all vs one and teams get a 2 minute timer with `timeUp health`, the royale keeps its 3 minutes and `judge`. |
+| `debug` | Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
+| `cinematic` | Countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
+
+Every built-in preset except `default` first puts the presentation settings back to their defaults (countdown, cameras, titles, music, laser, area look, runes, crown, waves, border colors, mob looks, duel card, scoreboards) and removes every per-kind override, then applies its own values. Settings it doesn't name (area radius, max mobs, battle rules, buffs, wands and so on) stay as they are.
+
+### Saved presets
+
+- Saved in the plugin data directory as `presets/<name>.properties`. Names use letters, digits, `-` and `_` (up to 32) and can't be a built-in name.
+- A saved preset holds every setting **except** the team list, the summon list and the security settings (permission mode, debug log, debug recorder). Loading one keeps your current teams and summon list, and replaces every per-kind override with the preset's own.
+- The panel's **Save preset** button saves the form, including changes you have not saved yet.
+
+**No preset or reset ever changes** the permission mode, the debug log or the debug recorder, nor the team list and summon list. Only their own commands change them.
+
+## Reset groups
+
+`/mobbattle reset <group>` puts only one group of settings back to default. In the panel, the reset buttons on the Presets & reset tab fill the form instead.
+
+| Group | What it covers |
+|---|---|
+| `effects` | Fighter laser and its color, runes, area look, color, height and "only with the wand", waves, border colors, mob looks, lone-target crown, team look (mode, time, only with the wand), army tint and color, wand effects, Cleanse/Buff/Heal Wand colors and lights, look glow, death glow, summon jade and its color; per-kind `fightLaser`, `runes`, `areaStyle`. |
+| `cameras` | Intro camera, camera style, time, showcase shots, who sees the cameras, end camera and its time, auto watch; their per-kind overrides. |
+| `titles` | Countdown, start and winner titles, title style, who sees the titles, battle music and track; per-kind `countdown`, `startTitle`, `winTitle`, `music`. |
+| `arenas` | Arena, timer, at time up, judge by, closing arena (per kind, plus its final radius and time), scoreboard, arena size, timer box, tie break, unstick, stand-off shove, passive win and its "never ends against" list, duel card. |
+| `rules` | Isolation, self defense, friendly fire, players can fight, battle PvP, duel mode, area radius, max mobs, team by type, every buff setting, summon area, random counts, at least one, summons leave, lifetime, how they leave, summons join my army. |
+| `wands` | Effect Wand effect, Kill Wand (soul rip time, cast hit delay, loot, players), Snap Wand (mode, share, time, hit delay, reach, players), morph players, Debug Wand follow time. |
+| `all` | Everything (the same as `preset default`). |
+
+Teams, the summon list and the security settings are never reset. The reset group of each setting is also in the tables below.
+
+## All settings
+
+Defaults are the values the plugin starts with when `fx.properties` doesn't set them.
+
+### Presentation
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Countdown | `/mobbattle countdown <seconds>` | `fight.countdown` | 0-10, 0 = start at once | 0 | titles |
+| Start title | `/mobbattle startTitle on\|off` | `title.enabled` | true, false | on | titles |
+| Winner title | `/mobbattle winTitle on\|off` | `wintitle.enabled` | true, false | on | titles |
+| Title style | `/mobbattle titleStyle <style>` | `title.style` | `Default`, `Major`, `GoblinBreach`, `VoidEviction`, `random` | `Major` | titles |
+| Who sees the titles | `/mobbattle titleScope owner\|nearby\|world` | `title.scope` | owner, nearby (64 blocks), world | nearby | titles |
+| Battle music | `/mobbattle music on\|off\|<track>` | `battle.music` | true, false | on | titles |
+| Music track | `/mobbattle music <track>` | `battle.music.track` | any music container ID | `Track_Z1D_Goblin_Boss_Battle` | titles |
+| Fighter laser | `/mobbattle fightLaser on\|off` | `laser.enabled` | true, false | off | effects |
+| Laser color | `/mobbattle fightLaserColor <color>\|random` | `laser.color` | palette color (stored as its hex) or `random` | red (`#FF4B3E`) | effects |
+| Summoning runes | `/mobbattle runes on\|off` | `fx.runes` | true, false | on | effects |
+
+`music <track>` also turns the music on. Game battle tracks: `Track_Z1D_Goblin_Boss_Battle`, `Track_Void_Escalation`, `Track_Void_Tension`.
+
+### Cameras
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Intro camera | `/mobbattle camera on\|off` | `fight.camera` | true, false | on | cameras |
+| Camera style | `/mobbattle cameraStyle <style>` | `camera.style` | auto, orbit, duel, showcase, teams, focus, drone | auto | cameras |
+| Camera time | `/mobbattle cameraTime <seconds>` | `camera.time` | 0-30, 0 = as long as the countdown | 0 | cameras |
+| Showcase shots | `/mobbattle cameraShots <n>` | `camera.shots` | 1 to maxMobs | 4 | cameras |
+| Who sees the cameras | `/mobbattle cameraScope owner\|nearby\|world` | `camera.scope` | owner, nearby, world | owner | cameras |
+| End camera | `/mobbattle endCamera off\|winner\|lastHit` | `camera.end` | off, winner, lasthit | off | cameras |
+| End camera time | `/mobbattle endCameraTime <seconds>` | `camera.end.time` | 1-15 | 5 | cameras |
+| Auto watch | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
+| Duel card | `/mobbattle duelCard on\|off` | `battle.duelCard` | true, false | off | arenas |
+
+Not settings: `/mobbattle skipCamera` ends your running camera, `/mobbattle watch [exit]` spectates a battle.
+
+### Battles (every kind)
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Battle PvP | `/mobbattle battlePvp on\|off` | `battle.pvp` | true, false | off | rules |
+| Unstick stalled fighters | `/mobbattle unstick on\|off` | `battle.unstick` | true, false | on | arenas |
+| Stand-off shove | `/mobbattle standoffTime <seconds>\|off` | `battle.standoff` | 0-120, 0 = never | 15 | arenas |
+| Win against passive mobs | `/mobbattle passiveWin <seconds>\|off` | `battle.passivewin` | 0-120, 0 = never | 15 | arenas |
+| Never ends against | `/mobbattle passiveWinIgnore <role,role*,...>\|none` | `battle.passivewin.ignore` | Role IDs, comma separated, `*` = any ending, case-insensitive; empty/`none` = no exception | `Test_Dummy*` | arenas |
+| Timer box | `/mobbattle timerStyle custom\|portal` | `battle.timer.style` | custom, portal | custom | arenas |
+| Arena size (duels, teams) | `/mobbattle arenaSize <8-128>\|auto` | `battle.arena.size` | 0 = auto, or 8-128 | auto (0) | arenas |
+| Closing arena ends at | `/mobbattle arenaShrinkTo <blocks>` | `battle.shrink.to` | 4-128 | 15 | arenas |
+| Closing time without timer | `/mobbattle arenaShrinkTime <time>` | `battle.shrink.time` | 10 s to 60 min (seconds in the file) | 120 (2m) | arenas |
+| Tie break | `/mobbattle tieBreak damage\|kills\|random\|draw` | `battle.tiebreak` | damage, kills, random, draw | damage | arenas |
+
+### Duel, All vs one, Royale, Team battles (per kind)
+
+The presentation and camera overrides of these tabs are listed under [Per-kind overrides](#per-kind-overrides). These settings always have one value per kind (`<kind>` = `duel`, `allvsone`, `royale`, `teams` in the key; `all` in a command sets every kind; a bare `on`/`off` also means all).
+
+| Setting (panel) | Command | Key | Values | Default (duel / allVsOne / royale / teams) | Reset group |
+|---|---|---|---|---|---|
+| Battle Wand duels (Duel tab) | `/mobbattle duelMode exclusive\|accumulate` | `duel.mode` | exclusive, accumulate | exclusive (duels only) | rules |
+| Isolated | `/mobbattle battleIsolation <kind\|all> on\|off` | `battle.isolation.<kind>` | true, false | on / on / on / on | rules |
+| Self defense | `/mobbattle selfDefense <kind\|all> on\|off` | `battle.selfdefense.<kind>` | true, false | on / on / on / on | rules |
+| Friendly fire (All vs one, Team battles) | `/mobbattle friendlyFire <allVsOne\|teams\|all> on\|off` | `battle.friendlyfire.<kind>` | true, false | - / on / - / off | rules |
+| Players can fight | `/mobbattle playerFights <kind\|all> on\|off` | `battle.players.<kind>` | true, false | on / on / on / on | rules |
+| Arena | `/mobbattle arena <kind\|all> on\|show\|wall\|off` | `battle.arena.<kind>` | on, show, wall, off | off / on / on / off | arenas |
+| Timer | `/mobbattle timer <kind\|all> <time>\|off` | `battle.timer.<kind>` | 0-3600 seconds, 0 = none | off / off / 3 min (180) / off | arenas |
+| At time up | `/mobbattle timeUp <kind\|all> <rule>` | `battle.timeup.<kind>` | draw, kill, continue, health, judge | draw / draw / judge / draw | arenas |
+| Judge by | `/mobbattle judgeBy <kind\|all> <score>` | `battle.judgeby.<kind>` | health, damage, kills, mix | health for all | arenas |
+| Closing arena | `/mobbattle arenaShrink <kind\|all> on\|off` | `battle.shrink.<kind>` | true, false | off / off / on / off | arenas |
+| Scoreboard | `/mobbattle scoreboard <kind\|all> on\|off` | `battle.scoreboard.<kind>` | true, false | off / off / off / on | arenas |
+
+Creative players never fight, whatever Players can fight says.
+
+### Chaos area
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Area look | `/mobbattle areaStyle <style>` | `chaos.area` | border, disc, discBorder, wall, off | border | effects |
+| Area radius | `/mobbattle areaRadius <blocks>` | `chaos.radius` | 2-430 | 60 | rules |
+| Max mobs | `/mobbattle maxMobs <n>` | `chaos.maxmobs` | 2-200 | 200 | rules |
+| Area color | `/mobbattle areaColor <color>\|random` | `chaos.area.color` | palette color, random | Red | effects |
+| Area height | `/mobbattle areaHeight <blocks>` | `chaos.height` | 3-128 | 30 | effects |
+| Area only while holding the wand | `/mobbattle areaOnlyWand on\|off` | `chaos.area.onlywand` | true, false | off | effects |
+
+`areaStyle` is also a per-kind override. A bigger `areaRadius` searches a much larger sphere on every Chaos Wand click, and only loaded mobs are considered. A world keeps the radius it saved, so a world saved before the current default keeps its old value until you set it (`/mobbattle areaRadius 60`). Above about 60 mobs (`maxMobs`) the server may lag. Changing `areaRadius`, `areaStyle`, `areaColor`, `areaHeight` or `areaOnlyWand` by command draws the area around you as a preview. `maxMobs` also caps one summon. The file also holds `chaos.area.styles=2`, an internal marker for the area style format; leave it as it is.
+
+### Colors & looks
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Team look | `/mobbattle teamLook both\|tint\|mist\|off` | `team.fx` | both, tint, mist, off | tint | effects |
+| Team look time | `/mobbattle teamLook time <seconds>\|infinite` | `team.fx.seconds` | 0-600, 0 = while in the team | 0 (infinite) | effects |
+| Team look only with the Team Wand | `/mobbattle teamLook onlyWand on\|off` | `team.fx.onlywand` | true, false | off | effects |
+| Army tint | `/mobbattle armyTint on\|off` | `army.tint` | true, false | off | effects |
+| Army tint color | `/mobbattle armyTintColor <color>` | `army.tint.color` | palette color | Blue | effects |
+| Crown on the lone target | `/mobbattle crown gold\|<color>\|off` | `fx.crown` | Gold, palette color, off | Gold | effects |
+| Cleanse Wand color | `/mobbattle cleanseColor <color>` | `wand.cleanse.color` | palette color | White | effects |
+| Look glow | `/mobbattle lookGlow <0-15>` | `fx.glow.look` | 0-15, 0 = off | 6 | effects |
+
+**Waves and borders per action.** Actions: `summon` (Summon Wand), `snap` (Snap Wand), `slam` (Battle Wand crouch + click in the air), `allVsOne` and `royale` (Chaos Wand). `all` sets every action.
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Summon / Snap / Slam / All vs one / Royale wave | `/mobbattle wave <action\|all> <color\|off>` | `wave.summon`, `wave.snap`, `wave.slam`, `wave.allvsone`, `wave.royale` | palette color, off | summon Green, snap White, slam Purple, allVsOne Yellow, royale Purple | effects |
+| Summon / Snap / Slam / All vs one / Royale border | `/mobbattle borderColor <action\|all> <color\|off\|area>` | `glow.summon`, `glow.snap`, `glow.slam`, `glow.allvsone`, `glow.royale` | palette color, off, area (= the area color) | summon Green, snap off, slam off, allVsOne Yellow, royale Purple | effects |
+
+**Mob looks per role.** Roles: `duel` (duel fighters), `allVsOne` (the all vs one target), `attackers` (the all vs one attackers), `royale` (royale fighters), `all`.
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Duel fighters, All vs one target, All vs one attackers, Royale fighters | `/mobbattle mobFx <role\|all> <color\|default\|off>` | `mobfx.duel`, `mobfx.allvsone`, `mobfx.attackers`, `mobfx.royale` | palette color, default (the original look), off | default, default, default, Purple | effects |
+
+### Buffs
+
+Sources (`<who>`): `lone` (the all vs one target, for that battle), `streak` (per kill in a battle), `champion` (the winners of a battle), `wand` (the Buff Wand, per click). Stats: `size`, `health`, `damage`, `defense`. See [wands.md](wands.md) and [battles.md](battles.md).
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Size | `/mobbattle buff <who> size <percent>` | `buff.<who>.size` | 0-200 | 0; wand 10 | rules |
+| Health | `/mobbattle buff <who> health <percent>` | `buff.<who>.health` | 0-1000 | 0; wand 20 | rules |
+| Damage | `/mobbattle buff <who> damage <percent>` | `buff.<who>.damage` | 0-1000 | 0; wand 10 | rules |
+| Defense | `/mobbattle buff <who> defense <percent>` | `buff.<who>.defense` | 0-90 | 0; wand 5 | rules |
+| Heal when given | `/mobbattle buff <who> heal on\|off` | `buff.<who>.heal` | true, false | off | rules |
+| Streak max kills | `/mobbattle buff streak maxKills <n>` | `buff.streak.maxkills` | 1-50 | 5 | rules |
+| Buff Wand max stacks | `/mobbattle buff wand maxStacks <n>` | `buff.wand.maxstacks` | 1-50 | 5 | rules |
+| Buff color | `/mobbattle buffColor <color>` | `wand.buff.color` | palette color | Purple | effects |
+| Buff Wand light | `/mobbattle buffLight buff\|<color>\|off` | `wand.buff.light` | buff (= in the buff color), palette color, off | buff | effects |
+| Buffed mobs' crown | `/mobbattle buff crown gold\|<color>\|off` | `buff.crown` | Gold, palette color, off | off | rules |
+
+Shortcuts: `/mobbattle buff <who> all <percent>` sets the four stats at once (size stops at 200, defense at 90); `/mobbattle buff <who> off` sets them all to 0. `buff lone heal on` heals the all vs one target when it is picked, even with no lone buff.
+
+### Wands
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Wand effects | `/mobbattle wandFx on\|off` | `wand.fx` | true, false | on | effects |
+| Heal Wand light | `/mobbattle healLight <color>\|off` | `wand.heal.light` | palette color, off (heals at once) | Green | effects |
+| Effect Wand effect | `/mobbattle wandEffect <id>` | `effect.id` | any loaded effect ID; a chain `A>B>C`; `jade[:color]`, `shimmer[:color]` | `Burn` | wands |
+| Soul rip time | `/mobbattle killDelay <seconds>` | `kill.delay.millis` | 0-3 s in the command; 0-3000 ms in the file and panel; 0 = instant | 0.5 s (500) | wands |
+| Cast hit delay | `/mobbattle killHitDelay <ms>` | `kill.hitdelay` | 0-2000, 0 = on the click | 175 | wands |
+| Drop loot | `/mobbattle killLoot on\|off` | `kill.loot` | true, false | off | wands |
+| Death glow | `/mobbattle deathGlow <0-15>` | `fx.glow.death` | 0-15, 0 = off | 12 | effects |
+| Works on players (Kill Wand) | `/mobbattle killPlayers on\|off` | `kill.players` | true, false | on | wands |
+| Snap mode | `/mobbattle snapMode global\|team` | `snap.mode` | global, team | global | wands |
+| Share that turns to dust | `/mobbattle snapPercent <1-100>` | `snap.percent` | 1-100 | 50 | wands |
+| Dust time | `/mobbattle snapTime <1-30>` | `snap.time` | 1-30 seconds | 5 | wands |
+| Slam hit delay | `/mobbattle snapHitDelay <ms>` | `snap.hitdelay` | 0-2000 | 310 | wands |
+| Snap reach | `/mobbattle snapRadius <blocks>` | `snap.radius` | 2-430 | 60 | wands |
+| Snap players | `/mobbattle snapPlayers on\|off` | `snap.players` | true, false | on | wands |
+| Morph players | `/mobbattle morphPlayers on\|off` | `morph.players` | true, false | on | wands |
+| Follow time (Debug Wand) | `/mobbattle debugTrack <seconds>` | `wand.debug.track` | 0-600, 0 = report only | 30 | wands |
+
+`killHitDelay` (default 175: the hit at 0.175 s of the Kill Wand's cast animation) and `snapHitDelay` (default 310: frame ~30 of 60 at `Speed` 1.6 in `Server/Item/Animations/MobBattle_SnapWand.json`) line the effect up with the wand's animation; with `wandFx off` they are skipped and the action fires on the click. Raise one if the effect lands before the hit, lower it if after. If you change an animation or its `Speed`, retune with `delay = hit frame / 60 / Speed * 1000`. `snapRadius` is separate from `areaRadius`, so a big battle area does not make the snap reach farther.
+
+The Effect Wand's right click also changes `effect.id` (it cycles a quick list). The Morph Wand model (`/mobbattle morph <model>`, or the wand's right click) is not a saved setting: it is per player and lasts until the server restarts.
+
+### Teams
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Team by type | `/mobbattle teamByType on\|off` | `team.bytype` | true, false | off | rules |
+
+The team list itself (names and colors, at most 14 teams, at least 2) is saved as `teams.list` and changed with `/mobbattle teams add|color|rename|remove|reset`. Default: RED, BLUE, GREEN, YELLOW. Presets and resets never change it. See [teams-summon-army.md](teams-summon-army.md).
+
+### Summon list
+
+| Setting (panel) | Command | Key | Values | Default | Reset group |
+|---|---|---|---|---|---|
+| Summon area | `/mobbattle summonRadius <1-64>\|auto` | `summon.radius` | 0 = auto, 1-64 | auto (0) | rules |
+| Random count from / to | `/mobbattle summon random <min> <max>` | `summon.min`, `summon.max` | 0-100 each (a reversed range is reordered) | 1 / 5 | rules |
+| At least one | `/mobbattle summon atLeastOne true\|false` | `summon.atleastone` | true, false | true | rules |
+| Summons leave | `/mobbattle summonDespawn never\|battleEnd\|timer` | `summon.despawn` | never, battleEnd, timer | never | rules |
+| Summon lifetime | `/mobbattle summonLifetime <seconds>` | `summon.lifetime` | 5-3600 | 60 | rules |
+| How they leave | `/mobbattle summonExit disintegrate\|vanish\|shatter` | `summon.exit` | disintegrate, vanish, shatter | disintegrate | rules |
+| Summons join my army | `/mobbattle summonArmy on\|off` | `summon.army` | true, false | off | rules |
+| Summons in jade | `/mobbattle summonJade on\|off` | `summon.jade` | true, false | off | effects |
+| Summon jade color | `/mobbattle summonJadeColor <color>` | `summon.jade.color` | palette color | Green | effects |
+
+The list itself is saved as `summon.list` (mob type and count) and `summon.teams` (team rules), and changed with `/mobbattle summon add|modify|remove|clear|team` or the Summon Wand's left click. It starts empty. Presets and resets never change it.
+
+### Admin and security
+
+These are changed only by their own commands (admin), never by presets, resets or saved presets.
+
+| Setting (panel) | Command | Key | Values | Default |
+|---|---|---|---|---|
+| Debug log | `/mobbattle debugLog on\|off` | `debug` | true, false | off |
+| Debug recorder | `/mobbattle debugRecord on\|off` | `debug.record` | true, false | off |
+| Permission mode (Admin tab buttons) | `/mobbattle permissions open\|server` | `permissions.mode` | open, server | open |
+
+The panel can change the debug log and recorder (admins only), but never the permission mode through the form. Related admin commands that are not settings: `/mobbattle debugDump` (write the recorder's lines to `debug/`), `/mobbattle reload`. See [server-setup.md](server-setup.md).

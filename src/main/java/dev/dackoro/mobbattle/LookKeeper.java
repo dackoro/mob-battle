@@ -63,9 +63,6 @@ final class LookKeeper {
         }
     }
 
-    /** Appearing look -> the lasting look the guardian re-sends instead (MobBattle_Look_JadeAppear_<C>: see resendAs). */
-    private static final Map<String, String> RESEND_AS = Map.of(
-            "MobBattle_Test_JadeAppearHold", "MobBattle_Test_JadeOnce_C");
     private static final String JADE_APPEAR = "MobBattle_Look_JadeAppear_";
     private static final String JADE = "MobBattle_Look_Jade_";
     private static final String LOOK = "MobBattle_Look_";
@@ -80,7 +77,7 @@ final class LookKeeper {
     }
 
     private static final Map<Ref<EntityStore>, Tracked> TRACKED = new ConcurrentHashMap<>();
-    /** Stores with a guardian pass already queued on their world thread (one at a time per world). */
+    /** Stores with a LookLight pass already queued on their world thread (one at a time per world). */
     private static final Set<Store<EntityStore>> QUEUED = ConcurrentHashMap.newKeySet();
 
     private LookKeeper() {
@@ -118,7 +115,7 @@ final class LookKeeper {
     private static String resendAs(String id) {
         if (id.startsWith(JADE_APPEAR)) return JADE + id.substring(JADE_APPEAR.length());
         if (id.startsWith(TWIN)) return LOOK + id.substring(TWIN.length());
-        return RESEND_AS.get(id);
+        return null;
     }
 
     /** The look style of a tracked mob, or null when it is not tracked. */
@@ -287,18 +284,11 @@ final class LookKeeper {
     }
 
     /**
-     * Queues one guardian pass for {@code store} on its world thread (components are read there). At most one
-     * pass is queued per world, so a slow tick never piles them up.
+     * The guardian pass for the mobs of {@code store}, every tick from {@link LookGuardSystem}: on the world thread,
+     * right before the tracker sends this tick's effect changes, so a re-send goes in the same packet as the change
+     * that dropped the look and the client never shows the normal skin (a pass queued with world.execute ran a tick
+     * late: hit jade mobs blinked, user 2026-10-12). Only effect changes here; the lights go on the world thread.
      */
-    static void schedule(Store<EntityStore> store) {
-        if (store.isShutdown() || !QUEUED.add(store)) return;
-        store.getExternalData().getWorld().execute(() -> {
-            QUEUED.remove(store);
-            tick(store);
-        });
-    }
-
-    /** The guardian pass for the mobs of {@code store}. World thread. */
     static void tick(Store<EntityStore> store) {
         if (store.isShutdown()) return;
         // The guarded mobs of this world, with their look's light color (LookLight). Only built with lookGlow on: this
@@ -342,7 +332,8 @@ final class LookKeeper {
             // A renewed effect (Extend/Overwrite) goes to the client as another Add with no removal, and drops the
             // look too: Red_Flash on every hit, Hit_Interrupt_Eligible refreshed by the role every 0.25 s in combat
             // (user, 2026-10-12: hit jade mobs lost the look). Vanilla addEffect on an active effect only resets its
-            // duration (javap), so a remaining time that went up means it was renewed.
+            // duration (javap), so a remaining time that went up means it was renewed. Only visual effects count
+            // (visual): Hit_Interrupt_Eligible has no ApplicationEffects and re-sending for it restarted the shimmer.
             boolean lost = t.touched || t.seen != null && (anyMissing(t.seen, now) || renewed(t.seen, t.seenLeft, now, left));
             if (lost && MobBattlePlugin.debugging()) {
                 MobBattlePlugin.debug("look lost on " + ChaosWand.nameOf(ref, store) + ": " + why(t, now, left));
@@ -360,7 +351,19 @@ final class LookKeeper {
                 resendLater(ref, t, store);
             }
         }
-        if (!glowing.isEmpty() || LookLight.any()) LookLight.tick(store, glowing);
+        if (!glowing.isEmpty() || LookLight.any()) lightLater(store, glowing);
+    }
+
+    /**
+     * Queues the LookLight pass on the world thread, outside the system iteration (it puts components). At most one is
+     * queued per world, so a slow tick never piles them up.
+     */
+    private static void lightLater(Store<EntityStore> store, Map<Ref<EntityStore>, LookLight.Want> glowing) {
+        if (store.isShutdown() || !QUEUED.add(store)) return;
+        store.getExternalData().getWorld().execute(() -> {
+            QUEUED.remove(store);
+            if (!store.isShutdown()) LookLight.tick(store, glowing);
+        });
     }
 
     /**
@@ -442,7 +445,7 @@ final class LookKeeper {
             for (int i = 0; i < t.seen.length; i++) {
                 int j = indexOf(now, t.seen[i]);
                 if (j < 0) out.append("gone ").append(idOf(t.seen[i])).append(' ');
-                else if (t.seenLeft != null && t.seenLeft[i] >= 0 && left[j] > t.seenLeft[i] + 0.001f) {
+                else if (t.seenLeft != null && t.seenLeft[i] >= 0 && left[j] > t.seenLeft[i] + 0.001f && visual(t.seen[i])) {
                     out.append("renewed ").append(idOf(t.seen[i])).append(' ');
                 }
             }
@@ -473,11 +476,21 @@ final class LookKeeper {
         return out;
     }
 
-    /** True when an effect active at both passes has more time left now than before (it was renewed). */
+    /**
+     * True when the effect shows something on the client (tint, particles, ModelVFX, model). Only those count when
+     * renewed: Skeleton roles refresh the invisible Hit_Interrupt_Eligible every 0.25 s even idle, and re-sending the
+     * look for each restarted the shimmer's veins four times a second (user, 2026-10-12, debugLog).
+     */
+    private static boolean visual(int index) {
+        EntityEffect e = EntityEffect.getAssetMap().getAsset(index);
+        return e != null && (e.getApplicationEffects() != null || e.getModelOverride() != null || e.getModelChange() != null);
+    }
+
+    /** True when a visual effect active at both passes has more time left now than before (it was renewed). */
     private static boolean renewed(int[] before, float[] beforeLeft, int[] now, float[] nowLeft) {
         if (beforeLeft == null) return false;
         for (int j = 0; j < now.length; j++) {
-            if (nowLeft[j] < 0) continue;
+            if (nowLeft[j] < 0 || !visual(now[j])) continue;
             for (int i = 0; i < before.length; i++) {
                 if (before[i] == now[j]) {
                     if (beforeLeft[i] >= 0 && nowLeft[j] > beforeLeft[i] + 0.001f) return true;

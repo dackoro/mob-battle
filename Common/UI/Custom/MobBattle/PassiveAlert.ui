@@ -1,0 +1,34 @@
+// Mob Battle alert, bottom left (PassiveAlert.java): only mobs that can't fight back are left, so the battle
+// ends after /mobbattle passiveWin seconds without a hit. Same panel textures as TimerHud.ui; paths relative to
+// this file. A malformed property makes the client reject the whole HUD, so change one thing at a time.
+Group {
+  Anchor: (Left: 24, Bottom: 96, Width: 340, Height: 96);
+  LayoutMode: Top;
+  Padding: (Horizontal: 16, Vertical: 10);
+  Background: (TexturePath: "../Common/ContainerPatch.png", Border: 23);
+
+  Label #Title {
+    Anchor: (Height: 20);
+    Text: "";
+    Style: (FontSize: 13, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
+            VerticalAlignment: Center);
+  }
+
+  Group #Row {
+    Anchor: (Height: 46);
+    LayoutMode: Left;
+
+    Label #Text {
+      Anchor: (Width: 240);
+      Text: "";
+      Style: (FontSize: 13, TextColor: #d4dde8, Wrap: true, VerticalAlignment: Center);
+    }
+
+    Label #Time {
+      Anchor: (Width: 68);
+      Text: "";
+      Style: (FontSize: 24, TextColor: #ffffff, RenderBold: true,
+              HorizontalAlignment: End, VerticalAlignment: Center);
+    }
+  }
+}

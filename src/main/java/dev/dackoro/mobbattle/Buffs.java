@@ -110,6 +110,8 @@ final class Buffs {
          * look of its own (a jade summon keeps its jade). scripts/gen-looks.py.
          */
         String lookFx;
+        /** lookFx is the shimmer waiting for the wand's short effects to end (addLookLater), not on the mob yet. */
+        volatile boolean lookPending;
     }
 
     private static final Map<Ref<EntityStore>, State> STATES = new ConcurrentHashMap<>();
@@ -487,18 +489,65 @@ final class Buffs {
                 + WandFx.lookSize(scaled) : null;
         if (s.lookFx != null && !s.lookFx.equals(look)) {
             LookKeeper.untrackBuff(mob);
-            WandFx.removeFx(mob, s.lookFx, accessor);
+            if (!s.lookPending) WandFx.removeFx(mob, s.lookFx, accessor);
             s.lookFx = null;
+            s.lookPending = false;
         }
         if (look == null) return;
         if (!look.equals(s.lookFx)) {
-            WandFx.addFx(mob, look, accessor);
             s.lookFx = look;
             if (look.startsWith(BUFF_SHIMMER)) {
-                LookKeeper.trackBuff(mob, EntityEffect.getAssetMap().getAsset("MobBattle_Fx_" + look));
+                // Each of the wand's short effects ending (light, swirl, mark) makes LookKeeper re-send the shimmer,
+                // which restarts its veins: it went on three times after a click (user, 2026-10-12). It goes on
+                // once they are over instead.
+                s.lookPending = true;
+                addLookLater(mob, s, look, resized ? WandFx.MODEL_SETTLE_MS : LOOK_CHECK_MS, 0);
+                return;
             }
+            WandFx.addFx(mob, look, accessor);
         }
-        if (resized) putAgainLater(mob, look, () -> s.lookFx);
+        if (resized && !s.lookPending) putAgainLater(mob, look, () -> s.lookPending ? null : s.lookFx);
+    }
+
+    /** First check for the wand's short effects (they go on in the same tick as the stack). */
+    private static final long LOOK_CHECK_MS = 50;
+    /** The shimmer never waits longer than this for them (quick clicks keep adding new ones). */
+    private static final long LOOK_WAIT_CAP_MS = 3000;
+
+    /**
+     * Puts the buff's shimmer on once no short MobBattle_Fx_ effect (Buff Wand light, swirl, mark) is left on the mob,
+     * and only then lets LookKeeper guard it. Gives up when the buff look changed meanwhile.
+     */
+    private static void addLookLater(Ref<EntityStore> mob, State s, String look, long delayMs, long waited) {
+        Store<EntityStore> store = mob.getStore();
+        if (store.isShutdown()) return;
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> run(mob, st -> {
+            if (!mob.isValid() || STATES.get(mob) != s || !s.lookPending || !look.equals(s.lookFx)) return;
+            long total = waited + delayMs;
+            long left = total < LOOK_WAIT_CAP_MS ? shortFxLeftMs(mob, st) : 0;
+            if (left > 0) {
+                addLookLater(mob, s, look, Math.min(left + LOOK_CHECK_MS, LOOK_WAIT_CAP_MS - total + LOOK_CHECK_MS), total);
+                return;
+            }
+            s.lookPending = false;
+            WandFx.addFx(mob, look, st);
+            LookKeeper.trackBuff(mob, EntityEffect.getAssetMap().getAsset("MobBattle_Fx_" + look));
+        }), delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** Milliseconds until the last short (not infinite) MobBattle_Fx_ effect on the mob ends; 0 when none. */
+    private static long shortFxLeftMs(Ref<EntityStore> mob, Store<EntityStore> store) {
+        var effects = store.getComponent(mob, com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent.getComponentType());
+        if (effects == null) return 0;
+        var active = effects.getActiveEffects();
+        float left = 0;
+        for (int index : effects.getActiveEffectIndexes()) {
+            EntityEffect e = EntityEffect.getAssetMap().getAsset(index);
+            var a = active.get(index);
+            if (e == null || a == null || a.isInfinite() || !e.getId().startsWith("MobBattle_Fx_")) continue;
+            left = Math.max(left, a.getRemainingDuration());
+        }
+        return (long) (left * 1000);
     }
 
     /**
@@ -509,7 +558,7 @@ final class Buffs {
         State s = mob == null ? null : STATES.get(mob);
         if (s == null || !mob.isValid()) return;
         if (s.crownFx != null) putAgainLater(mob, s.crownFx, () -> s.crownFx);
-        if (s.lookFx != null) putAgainLater(mob, s.lookFx, () -> s.lookFx);
+        if (s.lookFx != null && !s.lookPending) putAgainLater(mob, s.lookFx, () -> s.lookPending ? null : s.lookFx);
     }
 
     /** The mob got a look of its own (Effect Wand): its buff look turns from the shimmer into runes and eyes. */

@@ -80,7 +80,10 @@ final class WandFx {
     /** Every wand effect except SOUL_RIP, removed before a new one is put on (their tints would mix). */
     /** Swirl (remolino) in a palette color, no tint: MobBattle_Fx_Swirl_<Color> (Team Wand pick). */
     static final String SWIRL = "Swirl_";
-    /** Buff Wand light from the sky in a palette color (/mobbattle buffLight), no tint: MobBattle_Fx_BuffLight_<Color>. */
+    /**
+     * Light from the sky in a palette color, no tint: MobBattle_Fx_BuffLight_&lt;Color&gt;. The Buff Wand's (/mobbattle
+     * buffLight) and the Heal Wand's (/mobbattle healLight).
+     */
     static final String BUFF_LIGHT = "BuffLight_";
     /** Battle mark in a palette color (/mobbattle mobFx): MobBattle_Fx_Mark_<Color>. */
     static final String MARK = "Mark_";

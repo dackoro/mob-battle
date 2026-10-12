@@ -51,7 +51,7 @@ public class MobBattleCommand extends CommandBase {
                 "  teams - Team Wand, teams and team look",
                 "  summon - Summon Wand list",
                 "  morph - Morph, Effect, Kill wands and wand effects",
-                "  presets - default, fight, debug, cinematic, your own",
+                "  presets - default, fight, effects, debug, cinematic, your own",
                 "  config - the settings panel (every setting, lists, presets, tools)",
                 "  server - permissions, server configuration file and reload",
         });
@@ -69,7 +69,7 @@ public class MobBattleCommand extends CommandBase {
                 "  right click: summon the whole list",
                 "Morph Wand: right click copies a model, left click applies it",
                 "Heal / Kill / Effect / Cleanse: left click any entity",
-                "  Effect Wand right click: next effect; Kill Wand: soul rip, then death with loot",
+                "  Effect Wand right click: next effect; Kill Wand: soul rip, then death (loot with killLoot on)",
                 "Snap Wand: half of the mobs turn to dust (clicked mob's battle, or every mob within snapRadius, fighting or not)",
                 "Debug Wand: left click a mob: full report (chat, server log, debug/ file), then its target, AI state, health and effects for debugTrack seconds in the same file; right click: stop following",
         });
@@ -131,14 +131,17 @@ public class MobBattleCommand extends CommandBase {
                 "mobFx <duel|allVsOne|attackers|royale|all> <color|default|off> - tint, aura and rune on the battle mobs (default = original look; royale purple by default)",
                 "crown gold|<color>|off - everyone vs one: crown with rays of light over the lone target for 20 s (default gold)",
                 "cleanseColor <color> - Cleanse Wand look: light from above, burst, aura and rune (default white)",
+                "healLight <color>|off - Heal Wand: a light comes down from the sky and the heal lands with it (default green; off = at once)",
                 "buffLight buff|<color>|off - Buff Wand: a light comes down from the sky and the buff lands with it (default buff = in buffColor; off = at once)",
                 "buffColor <color> - buff look: the Buff Wand's mark and swirl, and the shimmer (veins, eye flames, runes) of buffed mobs (default purple; taking the buff off is grey)",
                 "borderColor <summon|snap|slam|allVsOne|royale|all> <color|off|area> - border glow color per action (area = areaColor; default summon green, allVsOne yellow, royale purple, snap/slam off: a color draws a ring at their reach)",
                 "arenaShrink <kind|all> on|off - the arena closes in like a battle royale zone (default: royale on)",
-                "arenaShrinkTo <blocks> - final radius (default 15); arenaShrinkTime <time> - with no timer (default 2m)",
+                "arenaShrinkTo <blocks> - final radius of a closing arena (default 15)",
                 "arenaShrinkTime <90|2m|1m30s> - how long a closing arena takes when the battle has no timer (default 2m)",
                 "unstick on|off - a mob stuck 10 s on another level (cave, mountain; fliers 20 s, walls too) appears next to its opponent",
                 "standoffTime <seconds>|off - a mob on its opponent's level that this long gets no closer, hits nothing and isn't hit gets shoved toward it (0-120, default 15, 0 = off)",
+                "passiveWinIgnore <role,role*,...>|none - roles that never let passiveWin end a battle while one is alive, e.g. training dummies (default Test_Dummy*; * = any ending)",
+                "passiveWin <seconds>|off - when only one side can still fight back (the rest are passive mobs), it wins after this long without a hit; nobody can fight = draw; an alert shows bottom left (0-120, default 15, 0 = off)",
                 "duelCard on|off - read-only card with both fighters' stats (health, attack, defense, size, with their buffs) in a 1 vs 1 duel, from the countdown to the end (default off)",
                 "judgeBy <kind|all> health|damage|kills|mix - what timeUp health/judge scores: health % left (default), share of the damage or kills (per fighter, so bigger sides don't win for size), or the three averaged",
                 "tieBreak damage|kills|random|draw - timeUp health/judge when the judgeBy score is even (the same as judgeBy, damage or kills, takes the other one)",
@@ -217,9 +220,9 @@ public class MobBattleCommand extends CommandBase {
                 "preset list - built-in and saved presets",
                 "preset default - every setting back to default (team and summon lists stay)",
                 "preset fight - just the fights: no countdown, cameras, titles, music, lasers, runes, waves, borders, mob looks, crown, drawings or timers",
-                "preset effects - countdown 3, 2 min timer (most health wins), titles, music, lasers, runes, area discBorder, waves, borders, mob looks, scoreboards; no cameras",
-                "preset debug - everything visible: area wall, waves, borders, mob looks, lasers, runes, arenas (presets never change the debug log: it's admin only)",
-                "preset cinematic - countdown 5, cameras (duel western, royale drone, allVsOne focus, teams sweep), end camera with kill count, music, mob looks and crown; no waves or border glow",
+                "preset effects - countdown 3, 2 min timer (most health wins; royale keeps 3 min judge), titles, music, runes, area discBorder, waves, borders, mob looks, scoreboards; no cameras or lasers",
+                "preset debug - everything visible: area wall, waves, borders, mob looks, lasers, runes, arenas, team look both, duel card, scoreboards (presets never change the debug log: it's admin only)",
+                "preset cinematic - countdown 5, cameras (duel western, royale drone, allVsOne focus, teams sweep), end camera with kill count, music, area, waves, arenas, mob looks and crown; no lasers, runes or border glow",
                 "preset save <name> / load <name> / delete <name> - your own presets",
                 "reset effects|cameras|titles|arenas|rules|wands|all - only that group of settings back to default",
         });
@@ -727,6 +730,8 @@ public class MobBattleCommand extends CommandBase {
                 colorWords()));
         addSubCommand(new Sub("bufflight", "Buff Wand light from the sky, the buff lands with it: buff (in buffColor, default), a palette color or off",
                 colorWords("buff", "off")));
+        addSubCommand(new Sub("heallight", "Heal Wand light from the sky, the heal lands with it: a palette color (default green) or off",
+                colorWords("off")));
         addSubCommand(new Sub("cleansecolor", "Cleanse Wand look (light from above, burst, aura, rune): a palette color (default white)",
                 colorWords()));
         addSubCommand(new Sub("mobfx", "Look on battle mobs per role: <duel|allVsOne|attackers|royale|all> <palette color|default|off>",
@@ -752,6 +757,8 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("unstick", "Battle mobs stuck on another level than their opponent (cave, mountain) appear next to it",
                 new Sub("on", "Bring them together after 10 s (default)"), new Sub("off", "Leave them")));
         addSubCommand(new Sub("standofftime", "Seconds a battle mob may stand off from its opponent before it is shoved toward it (0-120, default 15, 0 = off)"));
+        addSubCommand(new Sub("passivewinignore", "Roles that never let passiveWin end a battle (comma list, * = any ending; default Test_Dummy*; none = no exception)"));
+        addSubCommand(new Sub("passivewin", "Seconds without a hit before the only side that can fight wins against passive mobs (0-120, default 15, 0 = off)"));
         addSubCommand(new Sub("duelcard", "Read-only card with both fighters' stats (health, attack, defense, size) in a 1 vs 1 duel (default off)",
                 new Sub("on", "Show the card from the countdown to the end of the duel"), new Sub("off", "No card")));
         addSubCommand(new Sub("tiebreak", "timeUp health/judge when the judgeBy score is even: damage (default), kills, random or draw",
@@ -821,9 +828,9 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("list", "Built-in and saved presets"),
                 new Sub("default", "Every setting back to default (keeps team and summon lists)"),
                 new Sub("fight", "Just the fights: no countdown, cameras, titles, music, lasers, runes, drawings or timers"),
-                new Sub("effects", "Countdown 3, 2 min timer (most health wins), titles, music, lasers, runes, area, scoreboards; no cameras"),
-                new Sub("debug", "Everything visible: area wall, waves, borders, mob looks, lasers, runes, arenas; no cinematics (the debug log is admin only: debugLog)"),
-                new Sub("cinematic", "Countdown, full camera work, end camera with kill count, music; no lasers or drawings"),
+                new Sub("effects", "Countdown 3, 2 min timer (most health wins; royale keeps its own), titles, music, runes, area, scoreboards; no cameras or lasers"),
+                new Sub("debug", "Everything visible: area wall, waves, borders, mob looks, lasers, runes, arenas, duel card, scoreboards; no cinematics (the debug log is admin only: debugLog)"),
+                new Sub("cinematic", "Countdown, full camera work, end camera with kill count, music, area, waves, arenas; no lasers, runes or border glow"),
                 new Sub("save", "Save your current settings: save <name>"),
                 new Sub("load", "Load a saved preset: load <name>"),
                 new Sub("delete", "Delete a saved preset: delete <name>")));
@@ -1172,6 +1179,29 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.standoffSeconds = Math.max(0, Math.min(FxSettings.MAX_STANDOFF_SECONDS, n));
                 if (!Unstick.active()) Unstick.clear();
+            }
+            case "passivewin" -> {
+                int n;
+                if ("off".equalsIgnoreCase(val)) {
+                    n = 0;
+                } else {
+                    try {
+                        n = Integer.parseInt(val == null ? "" : val.replace("s", "").trim());
+                    } catch (NumberFormatException e) {
+                        reply(ctx, "Usage: /mobbattle passiveWin <0-" + FxSettings.MAX_PASSIVE_WIN_SECONDS + " seconds>|off", ERR);
+                        return;
+                    }
+                }
+                FxSettings.passiveWinSeconds = Math.max(0, Math.min(FxSettings.MAX_PASSIVE_WIN_SECONDS, n));
+            }
+            case "passivewinignore" -> {
+                String[] a = argsAfter(ctx, "passivewinignore");
+                String l = FxSettings.parsePassiveWinIgnore(String.join(",", a));
+                if (a.length == 0 || l == null) {
+                    reply(ctx, "Usage: /mobbattle passiveWinIgnore <role,role*,...>|none  (default Test_Dummy*)", ERR);
+                    return;
+                }
+                FxSettings.passiveWinIgnore = l;
             }
             case "duelcard" -> {
                 Boolean on = parseOnOff(val);
@@ -1785,6 +1815,14 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.buffLight = l;
             }
+            case "heallight" -> {
+                String l = FxSettings.parseHealLight(val);
+                if (l == null) {
+                    reply(ctx, "Usage: /mobbattle healLight <palette color>|off  (default green)", ERR);
+                    return;
+                }
+                FxSettings.healLight = l;
+            }
             case "buffcolor" -> {
                 String c = Buffs.parseCrown(val);
                 if (c == null || c.equals("off") || c.equals("Gold")) {
@@ -1857,7 +1895,7 @@ public class MobBattleCommand extends CommandBase {
             }
             case "add" -> {
                 if (a.length < 2) {
-                    reply(ctx, "Usage: /mobbattle summon add <role> [count|random]", ERR);
+                    reply(ctx, "Usage: /mobbattle summon add <role> [count|random] [team]", ERR);
                     return;
                 }
                 String role = SummonList.findRole(a[1]);
@@ -2079,7 +2117,7 @@ public class MobBattleCommand extends CommandBase {
         });
     }
 
-    private static final String PRESET_USAGE = "Usage: /mobbattle preset [list | default|fight|debug|cinematic|<name> | save|load|delete <name>]";
+    private static final String PRESET_USAGE = "Usage: /mobbattle preset [list | default|fight|effects|debug|cinematic|<name> | save|load|delete <name>]";
 
     /** /mobbattle preset [list | <name> | load|save|delete <name>]: whole looks at once (see Presets). */
     private static void preset(CommandContext ctx) {
