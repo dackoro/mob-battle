@@ -12,6 +12,7 @@
   "MaxStack": 1,
   "Model": "Items/MobBattle/CleanseWand/MobBattle_CleanseWand.blockymodel",
   "Texture": "Items/MobBattle/CleanseWand/MobBattle_CleanseWand_Texture.png",
+  "Animation": "Items/MobBattle/CleanseWand/idle.blockyanim",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true

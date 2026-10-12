@@ -40,6 +40,7 @@ tasks.jar {
     from(".") {
         include("manifest.json")
         include("README.md")
+        include("icon-256.png")
         if (!codeOnly) {
             include("Common/**")
             include("Server/**")

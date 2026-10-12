@@ -108,7 +108,7 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
         }
         if (BattleManager.hasBattles()) {
             BattleManager.checkAll(store, now);
-            if (FxSettings.unstick && now >= nextUnstick.getOrDefault(store, 0L)) {
+            if (Unstick.active() && now >= nextUnstick.getOrDefault(store, 0L)) {
                 nextUnstick.put(store, now + INTERVAL_MS);
                 // Teleports outside the system iteration, on the world thread.
                 store.getExternalData().getWorld().execute(() -> Unstick.tick(store));

@@ -90,6 +90,7 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new ArmyPlayerDamageSystem());
         getEntityStoreRegistry().registerSystem(new PlayerBattleDamageSystem());
         getEntityStoreRegistry().registerSystem(new BuffDamageSystem());
+        getEntityStoreRegistry().registerSystem(new DebugHitSystem());
         getEntityStoreRegistry().registerSystem(new PlayerDeathSystem());
         getEntityStoreRegistry().registerSystem(new KillTracker());
         getEntityStoreRegistry().registerSystem(new BattleUnloadSystem());
@@ -97,6 +98,7 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new BattleLifecycleSystem());
         getEntityStoreRegistry().registerSystem(new WandEquipSoundSystem());
         getEntityStoreRegistry().registerSystem(new LookLoadSystem());
+        getEntityStoreRegistry().registerSystem(new LookDeathSystem());
         FxSettings.load(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).

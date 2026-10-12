@@ -27,11 +27,14 @@ final class Army {
      */
     private static final java.util.Set<Ref<EntityStore>> FOUGHT = ConcurrentHashMap.newKeySet();
 
+    /** Mob -> the army tint effect id we put on it (/mobbattle armyTint). Added and removed in follow(). */
+    private static final Map<Ref<EntityStore>, String> TINTED = new ConcurrentHashMap<>();
+
     private Army() {
     }
 
     static boolean any() {
-        return !OWNER.isEmpty();
+        return !OWNER.isEmpty() || !TINTED.isEmpty();
     }
 
     static UUID ownerOf(Ref<EntityStore> npc) {
@@ -227,8 +230,16 @@ final class Army {
         }
     }
 
-    /** Blocks from the owner after which an army mob that isn't fighting is teleported back next to them. */
+    /**
+     * Blocks from the owner after which an army mob that isn't fighting is teleported back next to them,
+     * plus the landing ring ({@link #landingRing}), so a big army isn't pulled back while it stands around them.
+     */
     static final double TELEPORT_DISTANCE = 20;
+
+    /** Radius around the owner where teleported army mobs land: grows with the army (as the summon ring), 4 to 20. */
+    static double landingRing(int armySize) {
+        return Math.max(4, Math.min(20, 3 + Math.sqrt(armySize) * 1.6));
+    }
     /** Blocks up or down from the owner's height within which the teleport spot must be (FightFx.standableY). */
     private static final int STAND_RANGE = 6;
 
@@ -238,6 +249,7 @@ final class Army {
      * farther than TELEPORT_DISTANCE and not fighting is teleported next to the owner.
      */
     static void follow(com.hypixel.hytale.component.Store<EntityStore> store) {
+        syncTints(store);
         // One pass over every army mob of this world, grouped by owner.
         Map<UUID, List<Ref<EntityStore>>> byOwner = new java.util.HashMap<>();
         OWNER.forEach((npc, owner) -> {
@@ -254,6 +266,8 @@ final class Army {
             var mt = store.getComponent(me, tType);
             if (mt == null) return;
             org.joml.Vector3d p = new org.joml.Vector3d(mt.getPosition());
+            double ring = landingRing(mobs.size());
+            double far = TELEPORT_DISTANCE + ring;
             for (Ref<EntityStore> npc : mobs) {
                 if (!BattleManager.isAlive(npc, store)) continue;
                 var entity = store.getComponent(npc, npcType);
@@ -261,8 +275,9 @@ final class Army {
                 if (entity == null || t == null) continue;
                 entity.setLeashPoint(new org.joml.Vector3d(p));
                 if (!isFree(npc, store)
-                        || t.getPosition().distanceSquared(p) < TELEPORT_DISTANCE * TELEPORT_DISTANCE) continue;
-                double angle = rnd.nextDouble(Math.PI * 2), dist = 2 + rnd.nextDouble(2);
+                        || t.getPosition().distanceSquared(p) < far * far) continue;
+                // Even spread over the ring's area (sqrt), never closer than 2 blocks.
+                double angle = rnd.nextDouble(Math.PI * 2), dist = 2 + Math.sqrt(rnd.nextDouble()) * (ring - 2);
                 double x = p.x + Math.cos(angle) * dist, z = p.z + Math.sin(angle) * dist;
                 // A standable spot nearest the owner's height; none in reach: no teleport this second.
                 double y = FightFx.standableY(x, z, p.y, STAND_RANGE, store);
@@ -288,7 +303,7 @@ final class Army {
 
     public static final String ARMY_WAND_ID = "MobBattle_ArmyWand";
     /** Ring color under army mobs (the Army Wand join color). */
-    static final String RING_COLOR = "#00e040";
+    static final String RING_COLOR = "#2a8cff";
 
     /**
      * Every FightFx.TEAM_RING_REFRESH_MS per world (BattleLifecycleSystem): while an owner holds the Army
@@ -306,8 +321,64 @@ final class Army {
         });
     }
 
+    /**
+     * Army tint (/mobbattle armyTint, armyTintColor; default off): army mobs wear the team tint effect of that
+     * color for as long as they are in the army. Once per second from follow() (world thread): members get the
+     * wanted tint, ex-members and a turned-off setting lose ours (so release, disband and clearAll need no buffer).
+     */
+    private static void syncTints(com.hypixel.hytale.component.Store<EntityStore> store) {
+        String want = FxSettings.armyTint ? Teams.effectIdForColor(Teams.PALETTE.get(FxSettings.armyTintColor), "Tint") : null;
+        var ecType = com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent.getComponentType();
+        var map = com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect.getAssetMap();
+        for (Map.Entry<Ref<EntityStore>, String> e : TINTED.entrySet()) {
+            Ref<EntityStore> npc = e.getKey();
+            if (!npc.isValid()) {
+                TINTED.remove(npc);
+                continue;
+            }
+            if (npc.getStore() != store || (OWNER.containsKey(npc) && e.getValue().equals(want))) continue;
+            TINTED.remove(npc);
+            var effects = store.getComponent(npc, ecType);
+            int index = map.getIndex(e.getValue());
+            if (effects != null && index >= 0 && effects.hasEffect(index)) {
+                effects.removeEffect(npc, index, store);
+                LookKeeper.touched(npc);
+            }
+        }
+        if (want == null) return;
+        var effect = map.getAsset(want);
+        if (effect == null) return;
+        OWNER.keySet().forEach(npc -> {
+            if (!npc.isValid() || npc.getStore() != store || !BattleManager.isAlive(npc, store)) return;
+            var effects = store.getComponent(npc, ecType);
+            // Also puts it back when something else took it off (Cleanse Wand).
+            if (effects == null || (TINTED.containsKey(npc) && effects.hasEffect(map.getIndex(want)))) return;
+            effects.addEffect(npc, effect, store);
+            TINTED.put(npc, want);
+        });
+    }
+
+    /**
+     * RoleChange: the same mob under a new Ref stays in its army. The new role has no attitude memory yet, so it is
+     * befriended with its owner again on the next tick (else it could turn on them).
+     */
+    static void carry(Ref<EntityStore> old, Ref<EntityStore> neu, com.hypixel.hytale.component.Store<EntityStore> store) {
+        UUID owner = OWNER.remove(old);
+        if (FOUGHT.remove(old) && owner != null) FOUGHT.add(neu);
+        TINTED.remove(old);
+        if (owner == null) return;
+        OWNER.put(neu, owner);
+        store.getExternalData().getWorld().execute(() -> {
+            if (store.isShutdown() || !neu.isValid()) return;
+            PlayerRef player = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(owner);
+            Ref<EntityStore> ref = player != null && player.isValid() ? player.getReference() : null;
+            if (ref != null && ref.isValid() && ref.getStore() == store) FightManager.befriend(neu, ref, store);
+        });
+    }
+
     /** Drops dead or unloaded mobs (BattleManager.maintain). */
     static void prune() {
+        TINTED.keySet().removeIf(npc -> !npc.isValid());
         OWNER.keySet().removeIf(npc -> !npc.isValid());
         FOUGHT.retainAll(OWNER.keySet());
     }

@@ -144,6 +144,12 @@ public final class FxSettings {
     public static final int MIN_SHRINK_TO = 4;
     /** Battle mobs stuck on another level than their opponent are brought next to it (/mobbattle unstick). Default: on. */
     public static boolean unstick = true;
+    /**
+     * Stand-off shove (/mobbattle standoffTime, Unstick): seconds a battle mob on its opponent's level may stand off
+     * (no closer, no hit given or taken, out of reach) before it is shoved toward it. 0 = never. Default 15.
+     */
+    public static int standoffSeconds = 15;
+    static final int MAX_STANDOFF_SECONDS = 120;
     /** Read-only 1 vs 1 duel card with both fighters' stats, from the countdown to the end (/mobbattle duelCard). Default: off. */
     public static boolean duelCard = false;
 
@@ -340,9 +346,15 @@ public final class FxSettings {
     public static int summonLifetime = 60;
     /** Summons come out wearing the jade look (/mobbattle summonJade). Default off. The shimmer is the buff's look. */
     public static boolean summonJade = false;
+    /** Summons join the summoner's army, as if added with the Army Wand (/mobbattle summonArmy). Default off. */
+    public static boolean summonArmy = false;
     /** Color of the summons' jade (/mobbattle summonJadeColor), a palette color. Default green. */
     public static String summonJadeColor = EffectWand.JADE_COLOR;
-    /** How a summon leaves: disintegrate (the Kill Wand's soul rip, no loot) or vanish (removed at once) (/mobbattle summonExit). */
+    /** Army mobs wear a tint for as long as they are in the army (/mobbattle armyTint). Default off. */
+    public static boolean armyTint = false;
+    /** Color of the army tint (/mobbattle armyTintColor), a palette color. Default blue (the Army Wand color). */
+    public static String armyTintColor = "Blue";
+    /** How a summon leaves: disintegrate (the Kill Wand's soul rip, no loot), vanish (removed at once) or shatter (jade glass) (/mobbattle summonExit). */
     public static String summonExit = SummonDespawn.DISINTEGRATE;
 
     /** Max mobs one Chaos Wand click affects (/mobbattle maxmobs). Mostly limited by the game's own AI cost. */
@@ -517,7 +529,7 @@ public final class FxSettings {
         apply(p);
         if (write) save();
         BattleMusic.stopSilenced();
-        if (!unstick) Unstick.clear();
+        if (!Unstick.active()) Unstick.clear();
         if (!duelCard) DuelCard.clearAll();
     }
 
@@ -570,8 +582,12 @@ public final class FxSettings {
             String exit = SummonDespawn.parseExit(p.getProperty("summon.exit"));
             if (exit != null) summonExit = exit;
             summonJade = Boolean.parseBoolean(p.getProperty("summon.jade", String.valueOf(summonJade)));
+            summonArmy = Boolean.parseBoolean(p.getProperty("summon.army", String.valueOf(summonArmy)));
             String jadeColor = SummonList.parseJadeColor(p.getProperty("summon.jade.color"));
             if (jadeColor != null) summonJadeColor = jadeColor;
+            armyTint = Boolean.parseBoolean(p.getProperty("army.tint", String.valueOf(armyTint)));
+            String tintColor = SummonList.parseJadeColor(p.getProperty("army.tint.color"));
+            if (tintColor != null) armyTintColor = tintColor;
             effect = p.getProperty("effect.id", effect);
             Teams.load(p);
             SummonList.load(p);
@@ -655,6 +671,12 @@ public final class FxSettings {
             }
             battlePvp = Boolean.parseBoolean(p.getProperty("battle.pvp", String.valueOf(battlePvp)));
             unstick = Boolean.parseBoolean(p.getProperty("battle.unstick", String.valueOf(unstick)));
+            try {
+                standoffSeconds = Math.max(0, Math.min(MAX_STANDOFF_SECONDS,
+                        Integer.parseInt(p.getProperty("battle.standoff", String.valueOf(standoffSeconds)))));
+            } catch (NumberFormatException ignored) {
+                // keep the default
+            }
             duelCard = Boolean.parseBoolean(p.getProperty("battle.duelCard", String.valueOf(duelCard)));
             // Each key on its own: a bad value keeps that kind's current setting, the other keys still load.
             for (BattleManager.Kind k : BattleManager.Kind.values()) {
@@ -779,6 +801,7 @@ public final class FxSettings {
         SHRINK.forEach((k, v) -> p.setProperty("battle.shrink." + k.key, String.valueOf(v)));
         p.setProperty("battle.shrink.to", String.valueOf(shrinkTo));
         p.setProperty("battle.unstick", String.valueOf(unstick));
+        p.setProperty("battle.standoff", String.valueOf(standoffSeconds));
         p.setProperty("battle.duelCard", String.valueOf(duelCard));
         p.setProperty("battle.shrink.time", String.valueOf(shrinkSeconds));
         p.setProperty("battle.timer.style", timerStyle);
@@ -803,7 +826,10 @@ public final class FxSettings {
         p.setProperty("summon.lifetime", String.valueOf(summonLifetime));
         p.setProperty("summon.exit", summonExit);
         p.setProperty("summon.jade", String.valueOf(summonJade));
+        p.setProperty("summon.army", String.valueOf(summonArmy));
         p.setProperty("summon.jade.color", summonJadeColor);
+        p.setProperty("army.tint", String.valueOf(armyTint));
+        p.setProperty("army.tint.color", armyTintColor);
         p.setProperty("chaos.height", String.valueOf(pillarHeight));
         p.setProperty("camera.style", cameraStyle);
         p.setProperty("camera.time", String.valueOf(cameraSeconds));
@@ -933,16 +959,16 @@ public final class FxSettings {
                         + " | timeUp " + kinds(TIME_UP, v -> v.name().toLowerCase(java.util.Locale.ROOT))
                         + " | judgeBy " + kinds(JUDGE_BY, v -> v)
                         + " | arenaShrink " + rules(SHRINK) + " to " + shrinkTo + ", over " + MobBattleCommand.formatDuration(shrinkSeconds)
-                        + " with no timer | scoreboard " + rules(SCOREBOARD) + " | unstick " + onOff(unstick)
+                        + " with no timer | scoreboard " + rules(SCOREBOARD) + " | unstick " + onOff(unstick) + ", standoffTime " + (standoffSeconds > 0 ? standoffSeconds + " s" : "off")
                         + " | duelCard " + onOff(duelCard)
                         + " | arenaSize " + (arenaSize > 0 ? arenaSize : "auto") + ", timerStyle " + timerStyle + ", tieBreak " + tieBreak + ", snapMode " + snapMode
                         + ", snapPercent " + snapPercent + "%, snapTime " + snapSeconds + " s, snapHitDelay " + snapHitDelayMs + " ms, snapRadius " + snapRadius,
                 "Chaos area: areaStyle " + areaStyle + ", areaColor " + areaColor.toLowerCase() + ", areaRadius " + radius
                         + ", areaHeight " + pillarHeight + ", areaOnlyWand " + onOff(areaOnlyWand) + ", maxMobs " + maxMobs
                         + ", summonRadius " + (summonRadius > 0 ? summonRadius : "auto") + ", summonDespawn " + summonDespawn
-                        + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
+                        + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonArmy " + onOff(summonArmy) + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
-                        + ", onlyWand " + onOff(teamLookOnlyWand),
+                        + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase(),
                 "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
                 "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
         };
@@ -954,11 +980,11 @@ public final class FxSettings {
             case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
-            case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
+            case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
             case "debuglog", "debugrecord", "debugtrack", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor", "bufflight" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
-                 "summondespawn", "summonlifetime", "summonexit" -> 4;
-            case "teamfx", "teambytype" -> 5;
+                 "summondespawn", "summonlifetime", "summonexit", "summonarmy", "summonjade", "summonjadecolor" -> 4;
+            case "teamfx", "teambytype", "armytint", "armytintcolor" -> 5;
             case "permissions" -> 7;
             default -> 6;
         };

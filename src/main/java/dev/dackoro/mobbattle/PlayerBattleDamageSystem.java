@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
 import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
+import com.hypixel.hytale.server.core.entity.knockback.KnockbackComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
@@ -79,6 +80,11 @@ public class PlayerBattleDamageSystem extends DamageEventSystem {
             }
             if (damage.isCancelled() && attackerIsPlayer && FxSettings.battlePvp && onlyPvpBlocks(index, chunk, store)) {
                 damage.setCancelled(false);
+                // Since 0.7.0 (release) the PvP rule also takes the hit's knockback off the victim
+                // (PlayerDamageFilterSystem.cancelKnockback): it comes back with the hit.
+                if (damage.getIfPresentMetaObject(Damage.KNOCKBACK_COMPONENT) instanceof KnockbackComponent knockback) {
+                    buffer.putComponent(victim, KnockbackComponent.getComponentType(), knockback);
+                }
             }
             if (!damage.isCancelled()) {
                 BattleManager.recordDamage(attacker, victim, damage.getAmount());

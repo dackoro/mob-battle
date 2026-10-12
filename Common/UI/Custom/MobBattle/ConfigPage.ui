@@ -1,7 +1,7 @@
 $C = "../Common.ui";
 
 // Dackoro's Mob Battle settings panel (/mobbattle config). ConfigPage.java fills the left menu (#Nav) and every
-// page (#Page0..#Page13) with the row templates in Config/. Changes are kept as a draft until "Save changes".
+// page (#Page0..#Page17, four spare) with the row templates in Config/. Changes are kept as a draft until "Save changes".
 $C.@DecoratedContainer {
   @CloseButton = true;
   Anchor: (Width: 1120, Height: 760);
@@ -168,6 +168,38 @@ $C.@DecoratedContainer {
           }
 
           Group #Page13 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page14 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page15 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page16 {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
+
+          Group #Page17 {
             Visible: false;
             FlexWeight: 1;
             LayoutMode: TopScrolling;

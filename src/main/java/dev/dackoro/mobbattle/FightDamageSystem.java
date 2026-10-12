@@ -72,7 +72,9 @@ public class FightDamageSystem extends DamageEventSystem {
         java.util.UUID victimOwner = Army.ownerOf(victim);
         var player = buffer.getComponent(attacker, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
         java.util.UUID attackerOwner = player != null ? player.getUuid() : Army.ownerOf(attacker);
-        if (victimOwner != null && victimOwner.equals(attackerOwner)) {
+        // Unless the battle put them on different sides (army summons in a royale): they target each other, so
+        // a cancelled hit left them hitting for nothing and the battle could never end (user, 2026-10-12).
+        if (victimOwner != null && victimOwner.equals(attackerOwner) && !BattleManager.areEnemies(attacker, victim)) {
             damage.setCancelled(true);
             return true;
         }
@@ -117,7 +119,7 @@ public class FightDamageSystem extends DamageEventSystem {
         }
         if (!FightManager.isFighting(source.getRef(), victim) && !BattleManager.areEnemies(source.getRef(), victim)) {
             // Unstick: a battle mob hit by an outsider (a player, a wild mob with isolation off) is in a fight too.
-            if (FxSettings.unstick && !damage.isCancelled() && BattleManager.isManaged(victim)) {
+            if (Unstick.active() && !damage.isCancelled() && BattleManager.isManaged(victim)) {
                 Unstick.hurt(victim, source.getRef());
             }
             return;

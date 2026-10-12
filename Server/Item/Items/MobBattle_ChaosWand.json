@@ -12,7 +12,7 @@
   "MaxStack": 1,
   "Model": "Items/MobBattle/ChaosWand/MobBattle_ChaosWand.blockymodel",
   "Texture": "Items/MobBattle/ChaosWand/MobBattle_ChaosWand_Texture.png",
-  "PlayerAnimationsId": "Wand",
+  "PlayerAnimationsId": "Staff",
   "Animation": "Items/MobBattle/ChaosWand/idle.blockyanim",
   "Utility": {
     "Compatible": true

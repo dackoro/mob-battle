@@ -30,6 +30,8 @@ final class SummonDespawn {
 
     static final String DISINTEGRATE = "disintegrate";
     static final String VANISH = "vanish";
+    /** Breaks like jade glass (the Jade death look), look or not. */
+    static final String SHATTER = "shatter";
 
     static final int MIN_LIFETIME = 5;
     static final int MAX_LIFETIME = 3600;
@@ -41,6 +43,12 @@ final class SummonDespawn {
     }
 
     /** Called by SummonList.spawn for every mob it spawns (world thread). */
+    /** RoleChange: a summon under a new Ref keeps its spawn time (summonDespawn timer / battleEnd). */
+    static void carry(Ref<EntityStore> old, Ref<EntityStore> neu) {
+        Long at = SPAWNED.remove(old);
+        if (at != null) SPAWNED.put(neu, at);
+    }
+
     static void track(Ref<EntityStore> mob) {
         if (mob != null) {
             SPAWNED.put(mob, System.currentTimeMillis());
@@ -57,12 +65,13 @@ final class SummonDespawn {
         return null;
     }
 
-    /** Canonical exit ("disintegrate" or "vanish") in any case, or null if it is neither. */
+    /** Canonical exit ("disintegrate", "vanish" or "shatter") in any case, or null if it is none of them. */
     static String parseExit(String value) {
         if (value == null) return null;
         String v = value.trim();
         if (DISINTEGRATE.equalsIgnoreCase(v)) return DISINTEGRATE;
         if (VANISH.equalsIgnoreCase(v)) return VANISH;
+        if (SHATTER.equalsIgnoreCase(v)) return SHATTER;
         return null;
     }
 
@@ -121,11 +130,15 @@ final class SummonDespawn {
             store.removeEntity(mob, RemoveReason.REMOVE);
             return;
         }
-        // Disintegrate like the Kill Wand (soul rip, then removal), but without loot: the role counts its death
+        // Disintegrate like the Kill Wand (or shatter like jade glass) (soul rip, then removal), but without loot: the role counts its death
         // items as already dropped. WandFx's loot drop and vanilla's DropDeathItems both check that flag first.
         NPCEntity npc = store.getComponent(mob, NPCEntity.getComponentType());
         if (npc != null && npc.getRole() != null) {
             npc.getRole().setDeathItemsDropped();
+        }
+        if (SHATTER.equals(FxSettings.summonExit)) {
+            WandFx.shatter(mob, store);
+            return;
         }
         WandFx.kill(mob, null, true, store);
     }

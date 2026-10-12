@@ -263,7 +263,7 @@ final class Presets {
 
     /** summon.* keys that are settings, not part of the summon list (they go in presets and resets). */
     private static final java.util.Set<String> SUMMON_SETTINGS = java.util.Set.of(
-            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit", "summon.jade", "summon.jade.color",
+            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit", "summon.jade", "summon.jade.color", "summon.army",
             // The random count range is a setting too (panel "Save changes"), not part of the list.
             "summon.min", "summon.max", "summon.atleastone");
 
@@ -298,13 +298,13 @@ final class Presets {
         if (key.startsWith("wave.") || key.startsWith("glow.") || key.startsWith("mobfx.") || key.startsWith("fx.")
                 || key.startsWith("chaos.area") || key.equals("chaos.height") || key.startsWith("laser.")
                 || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")
-                || key.equals("wand.buff.light") || key.startsWith("summon.jade")) return "effects";
+                || key.equals("wand.buff.light") || key.startsWith("summon.jade") || key.startsWith("army.tint")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
         if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
                 || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak")
-                || key.equals("battle.unstick") || key.equals("battle.duelCard")) return "arenas";
+                || key.equals("battle.unstick") || key.equals("battle.standoff") || key.equals("battle.duelCard")) return "arenas";
         if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.equals("effect.id")
                 || key.equals("wand.debug.track")) return "wands";
         return "rules";

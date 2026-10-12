@@ -167,6 +167,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#SaveButton", data("Save"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#DiscardButton", data("Discard"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#UndoButton", data("Undo"), false);
+        // The frame's X (Common.ui @DecoratedContainer #CloseButton) is a plain button: nothing closes the page unless we bind it.
+        ev.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton", data("Close"), false);
         showPage(ui);
         status(ui);
     }
@@ -362,6 +364,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         String v = isName ? (validName(raw.trim()) ? raw.trim().toUpperCase(Locale.ROOT) : null) : paletteOf(raw);
         String[] pending = teamDraft.getOrDefault(slot, new String[2]);
         int part = isName ? 0 : 1;
+        // An echo of the value already shown (Discard): nothing changed, so the notice stays.
+        if (v != null && v.equals(pending[part] != null ? pending[part] : saved) && !WARN.equals(noticeColor)) return;
         if (v == null) {
             // Half typed or not valid: not kept (Save leaves that part as it is).
             pending[part] = null;
@@ -600,6 +604,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         String v = isCount ? count(raw) : "none".equalsIgnoreCase(raw) ? "none" : teamOf(raw);
         String[] pending = summonDraft.getOrDefault(role, new String[2]);
         int part = isCount ? 0 : 1;
+        // An echo of the value already shown (Discard): nothing changed, so the notice stays.
+        if (v != null && v.equals(pending[part] != null ? pending[part] : saved) && !WARN.equals(noticeColor)) return;
         if (v == null) {
             // Half typed or not valid: not kept (Save leaves that part as it is).
             pending[part] = null;
@@ -883,14 +889,18 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             case "SumEdit" -> summonEdit(str(doc, "N"), str(doc, "K"), str(doc, "@V"));
             case "TeamEdit" -> teamEdit(parseInt(str(doc, "N"), -1), str(doc, "K"), str(doc, "@V"));
             case "Undo" -> undo();
+            case "Close" -> close();
             case "Discard" -> {
                 if (draft.isEmpty() && summonDraft.isEmpty() && teamDraft.isEmpty()) return;
+                Map<Integer, String> fields = new LinkedHashMap<>(draft);
+                List<String> roles = new ArrayList<>(summonDraft.keySet());
+                List<Integer> slots = new ArrayList<>(teamDraft.keySet());
                 draft.clear();
                 summonDraft.clear();
                 teamDraft.clear();
                 notice = "Changes discarded.";
                 noticeColor = GRAY;
-                rebuild();
+                refreshInPlace(fields, roles, slots, true);
             }
             case "Act" -> act(str(doc, "A"), str(doc, "N"), str(doc, "@V"), str(doc, "@N"), str(doc, "@C"), str(doc, "@E"));
             default -> { }
@@ -950,11 +960,14 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             notice = f.label + ": " + raw.trim() + " is not valid (" + (f.hint.isEmpty() ? "it won't be saved" : f.hint) + ").";
             noticeColor = WARN;
         } else {
+            boolean clamped = f.type == ConfigSchema.Type.NUMBER && parseInt(raw, Integer.MIN_VALUE) != parseInt(v, 0);
+            // The control echoing a value the panel put there itself (Discard, Undo): nothing changed, so the notice stays.
+            if (!clamped && v.equals(value(f, live)) && !WARN.equals(noticeColor)) return;
             if (v.equals(saved(f, live))) draft.remove(index);
             else draft.put(index, v);
             notice = null;
             // A number out of range is shown clamped.
-            if (f.type == ConfigSchema.Type.NUMBER && parseInt(raw, Integer.MIN_VALUE) != parseInt(v, 0)) setInput(ui, sel, f, v);
+            if (clamped) setInput(ui, sel, f, v);
             previewArea(f, v, live);
         }
         label(ui, f);
@@ -1006,6 +1019,10 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         }
         Properties before = FxSettings.toProperties();
         Properties undoTarget = beforeLastSave;
+        Map<Integer, String> fields = new LinkedHashMap<>(draft);
+        List<String> roles = new ArrayList<>(summonDraft.keySet());
+        // A team rename changes the Remove bindings and every team dropdown: that one needs a rebuild.
+        boolean teams = !teamDraft.isEmpty();
         // List rows first, so the settings below are written with the new lists. Summon rows before the teams: their
         // team names are the ones shown when they were picked.
         int rows = applySummonDraft() + applyTeamDraft();
@@ -1015,7 +1032,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             MobBattlePlugin.log("Settings panel: " + playerRef.getUsername() + " saved " + rows + " list row(s)");
             notice = "Saved " + rows + (rows == 1 ? " change." : " changes.");
             noticeColor = "#7dff8a";
-            rebuild();
+            if (teams) rebuild();
+            else refreshInPlace(fields, roles, List.of(), false);
             return;
         }
         boolean admin = admin();
@@ -1037,7 +1055,55 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         MobBattlePlugin.log("Settings panel: " + playerRef.getUsername() + " saved " + n + " change(s)");
         notice = "Saved " + n + (n == 1 ? " change." : " changes.");
         noticeColor = "#7dff8a";
-        rebuild();
+        if (teams) rebuild();
+        else refreshInPlace(fields, roles, List.of(), false);
+    }
+
+    /**
+     * After Save, Discard or Undo: only the rows that changed are put back to what they show now (draft, else saved)
+     * and the labels lose or get their gold, with no rebuild, so the page keeps its scroll (a rebuild sends it back to
+     * the top). {@code fields} maps each field to the value the client shows now (null = unknown): a control already
+     * showing the right value is not set again. {@code roles} and {@code slots} get their summon/team controls set
+     * only with {@code listInputs} (Discard); after a Save they already show the saved values, so only the marks go.
+     * Rows not on the open page are skipped.
+     */
+    private void refreshInPlace(Map<Integer, String> fields, java.util.Collection<String> roles, java.util.Collection<Integer> slots,
+            boolean listInputs) {
+        Properties live = FxSettings.toProperties();
+        UICommandBuilder ui = new UICommandBuilder();
+        for (var e : fields.entrySet()) {
+            ConfigSchema.Field f = ConfigSchema.field(e.getKey());
+            String sel = f != null ? rowOf.get(f.index) : null;
+            if (sel == null) continue;
+            String v = value(f, live);
+            if (!v.equals(e.getValue())) setInput(ui, sel, f, v);
+            label(ui, f);
+        }
+        Map<String, String> list = SummonList.snapshot();
+        for (String role : roles) {
+            String sel = summonRowOf.get(role);
+            if (sel == null || !list.containsKey(role)) continue;
+            if (listInputs) {
+                String[] pending = summonDraft.get(role);
+                ui.set(sel + " #Count.Value", pending != null && pending[0] != null ? pending[0] : list.get(role));
+                ui.set(sel + " #Team.Value", pending != null && pending[1] != null ? pending[1] : summonTeam(role));
+            }
+            summonLabel(ui, role);
+        }
+        for (int slot : slots) {
+            String sel = teamRowOf.get(slot);
+            if (sel == null || !Teams.exists(slot)) continue;
+            if (listInputs) {
+                String[] pending = teamDraft.get(slot);
+                String color = pending != null && pending[1] != null ? pending[1] : paletteName(Teams.color(slot));
+                ui.set(sel + " #Name.Value", pending != null && pending[0] != null ? pending[0] : Teams.name(slot));
+                ui.set(sel + " #Color.Value", color);
+                ui.setObject(sel + " #Swatch.Background", new PatchStyle().setColor(Value.of(Teams.PALETTE.get(color))));
+            }
+            teamMark(ui, slot);
+        }
+        status(ui);
+        sendUpdate(ui);
     }
 
     /**
@@ -1104,7 +1170,11 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             MobBattlePlugin.log("Settings panel: " + playerRef.getUsername() + " undid the team/summon list change by " + lastSaver);
         }
         String by = lastSaver;
+        // What each field shows now, so the in-place refresh below only sets the ones the undo changes.
+        Properties live = FxSettings.toProperties();
+        Map<Integer, String> shown = new LinkedHashMap<>(draft);
         int n = loadIntoDraft(before);
+        for (int index : draft.keySet()) shown.computeIfAbsent(index, i -> saved(ConfigSchema.field(i), live));
         if (n == 0 && !lists) {
             say("The settings already match how they were before the last change.", GRAY);
             return;
@@ -1120,7 +1190,9 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                     : "Last change (by " + by + ") undone in the form (" + n + " changes): Save changes to apply it.";
         }
         noticeColor = GOLD;
-        rebuild();
+        // Restored lists can add or drop rows: rebuild. Settings only: rows in place, the scroll stays.
+        if (lists) rebuild();
+        else refreshInPlace(shown, List.of(), List.of(), false);
     }
 
     /** The draft becomes the difference between {@code target} and the saved settings (preset / reset preview). */

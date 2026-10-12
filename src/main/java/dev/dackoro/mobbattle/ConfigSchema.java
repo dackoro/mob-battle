@@ -276,7 +276,7 @@ final class ConfigSchema {
     /** A per-kind presentation override: empty / "Global" = follow the global value. */
     private static Item override(BattleManager.Kind kind, KindFx.Opt opt, String label) {
         String key = KindFx.propKey(kind, opt);
-        String tip = "Only for " + kindLabel(kind).toLowerCase(Locale.ROOT) + " battles. Global = use the value from the Presentation/Cameras pages.";
+        String tip = "Only for " + kindLabel(kind).toLowerCase(Locale.ROOT) + " battles. Global = use the value from the Presentation/Cameras tabs.";
         switch (opt) {
             case COUNTDOWN, CAMERA_TIME, CAMERA_SHOTS, END_CAMERA_TIME -> {
                 Field f = new Field(key, label, tip, Type.TEXT);
@@ -321,7 +321,7 @@ final class ConfigSchema {
         List<Page> pages = new ArrayList<>();
 
         pages.add(new Page("Presentation", "How fights start and end: countdown, titles, music, laser and runes. "
-                + "Each battle kind can override these on the Per kind page.", List.of(
+                + "Each battle kind can override these on its own tab.", List.of(
                 section("Start"),
                 number("fight.countdown", "Countdown", 0, FxSettings.MAX_COUNTDOWN, "seconds, 0 = start at once",
                         "3, 2, 1 titles before a fight starts."),
@@ -335,12 +335,10 @@ final class ConfigSchema {
                 choice("battle.music.track", "Music track", "Track used when battle music is on.", ConfigSchema::musicTracks),
                 toggle("laser.enabled", "Fighter laser", "A laser between the fighters when a fight starts."),
                 choice("laser.color", "Laser color", "A palette color, or random (a new one each fight).", ConfigSchema::laserColors),
-                toggle("fx.runes", "Summoning runes", "Runes on the ground during the countdown and rage marks at the start."),
-                choice("chaos.area", "Area look", "What areas and arenas draw: border glow, disc on the ground, both, a wall, or nothing.",
-                        FxSettings.AREA_STYLES)
+                toggle("fx.runes", "Summoning runes", "Runes on the ground during the countdown and rage marks at the start.")
         ), null, false));
 
-        pages.add(new Page("Cameras", "Intro camera before the fight, end camera on the winner, and watch mode.", List.of(
+        pages.add(new Page("Cameras", "Intro camera before the fight, end camera on the winner, watch mode and the duel card.", List.of(
                 section("Intro camera"),
                 toggle("fight.camera", "Intro camera", "Camera shots of the fighters during the countdown."),
                 choice("camera.style", "Camera style", "auto = duel shots for duels, focus for all vs one, sweep for teams, orbit for royale.",
@@ -354,61 +352,19 @@ final class ConfigSchema {
                 section("End camera"),
                 choice("camera.end", "End camera", "Film the winner or who landed the last hit when a battle ends.", KindFx.END_CAMERAS),
                 number("camera.end.time", "End camera time", 1, KindFx.MAX_END_CAMERA_TIME, "seconds", "How long the end camera films."),
-                section("Watch mode"),
+                section("Watch & HUD"),
                 toggle("camera.autowatch", "Auto watch", "Camera viewers start watching (spectator camera) as soon as a battle starts."),
+                toggle("battle.duelCard", "Duel card", "Card with both fighters' stats during 1 vs 1 duels."),
                 note("Crouch skips a running camera. /mobbattle watch spectates a running battle (right click = next fighter, left = previous, Q = exit).")
         ), null, false));
 
-        List<Item> perKind = new ArrayList<>();
-        perKind.add(note("Empty or Global = the battle kind uses the global value. Number fields: leave empty for global."));
-        for (BattleManager.Kind k : BattleManager.Kind.values()) {
-            perKind.add(section(kindLabel(k)));
-            perKind.add(override(k, KindFx.Opt.COUNTDOWN, "Countdown"));
-            perKind.add(override(k, KindFx.Opt.START_TITLE, "Start title"));
-            perKind.add(override(k, KindFx.Opt.WIN_TITLE, "Winner title"));
-            perKind.add(override(k, KindFx.Opt.MUSIC, "Music"));
-            perKind.add(override(k, KindFx.Opt.LASER, "Fighter laser"));
-            perKind.add(override(k, KindFx.Opt.RUNES, "Runes"));
-            perKind.add(override(k, KindFx.Opt.AREA_STYLE, "Area look"));
-            perKind.add(override(k, KindFx.Opt.CAMERA, "Intro camera"));
-            perKind.add(override(k, KindFx.Opt.CAMERA_STYLE, "Camera style"));
-            perKind.add(override(k, KindFx.Opt.CAMERA_TIME, "Camera time"));
-            perKind.add(override(k, KindFx.Opt.CAMERA_SHOTS, "Showcase shots"));
-            perKind.add(override(k, KindFx.Opt.END_CAMERA, "End camera"));
-            perKind.add(override(k, KindFx.Opt.END_CAMERA_TIME, "End camera time"));
-            perKind.add(override(k, KindFx.Opt.AUTO_WATCH, "Auto watch"));
-        }
-        pages.add(new Page("Per kind", "Presentation per battle kind: duel (Battle Wand), all vs one and royale (Chaos Wand), teams (Team Wand).",
-                perKind, null, false));
-
-        List<Item> rules = new ArrayList<>(List.of(
-                section("Everyone"),
-                choice("duel.mode", "Battle Wand duels", "exclusive = a new duel replaces the old pair; accumulate = connected duels merge.",
-                        "exclusive", "accumulate"),
+        pages.add(new Page("Battles", "What every battle kind shares. Each kind has its own tab for its presentation, rules, arena and timer.", List.of(
+                section("Every battle"),
                 toggle("battle.pvp", "Battle PvP", "Enemy players of the same battle can hurt each other even where the world's PvP is off."),
                 toggle("battle.unstick", "Unstick stalled fighters", "A mob stuck on another level than its target (10 s, fliers 20 s) is moved next to it."),
-                toggle("battle.duelCard", "Duel card", "Card with both fighters' stats during 1 vs 1 duels."),
-                choice("battle.tiebreak", "Tie break", "When the Judge by score is even at time up: damage dealt, kills, a coin toss or a draw. If it is the same as Judge by (damage or kills), the other one is used.",
-                        "damage", "kills", "random", "draw")));
-        for (BattleManager.Kind k : BattleManager.Kind.values()) {
-            rules.add(section(kindLabel(k)));
-            rules.add(toggle("battle.isolation." + k.key, "Isolated", "Its mobs only fight their opponents and outside NPCs can't hurt them."));
-            rules.add(toggle("battle.selfdefense." + k.key, "Self defense",
-                    "A mob hit by an enemy that isn't its target turns on it (keeps it at least 3 s), like Army Wand mobs."));
-            if (k == BattleManager.Kind.ALL_VS_ONE || k == BattleManager.Kind.TEAMS) {
-                rules.add(toggle("battle.friendlyfire." + k.key, "Friendly fire", "Hits between allies hurt (allies still never target each other)."));
-            }
-            rules.add(toggle("battle.players." + k.key, "Players can fight", switch (k) {
-                case DUEL -> "Crouch + Battle Wand puts you in a duel.";
-                case ALL_VS_ONE -> "/mobbattle chaos me: every mob around attacks you.";
-                case ROYALE -> "Players can be fighters in a royale.";
-                case TEAMS -> "/mobbattle teams join <team> puts you in a team.";
-            }));
-        }
-        pages.add(new Page("Battle rules", "Who fights whom and how ties are broken.", rules, null, false));
-
-        List<Item> arenas = new ArrayList<>(List.of(
-                section("Every arena"),
+                number("battle.standoff", "Stand-off shove", 0, FxSettings.MAX_STANDOFF_SECONDS, "seconds, 0 = never",
+                        "A mob on its target's level that this long gets no closer, hits nothing and isn't hit is shoved toward it (default 15)."),
+                section("Arenas & timers"),
                 choice("battle.timer.style", "Timer box", "custom = Mob Battle's timer box, portal = the game's portal timer.", "custom", "portal"),
                 number("battle.arena.size", "Arena size (duels, teams)", 0, FxSettings.MAX_ARENA,
                         "blocks, 0 = auto (around the fighters), else " + FxSettings.MIN_ARENA + "-" + FxSettings.MAX_ARENA,
@@ -416,34 +372,85 @@ final class ConfigSchema {
                 number("battle.shrink.to", "Closing arena ends at", FxSettings.MIN_SHRINK_TO, FxSettings.MAX_ARENA, "blocks",
                         "Final radius of a closing arena."),
                 number("battle.shrink.time", "Closing time without timer", 10, FxSettings.MAX_TIMER, "seconds",
-                        "How long a closing arena takes when its battle has no timer.")));
-        for (BattleManager.Kind k : BattleManager.Kind.values()) {
-            arenas.add(section(kindLabel(k)));
-            arenas.add(choice("battle.arena." + k.key, "Arena", "on = drawn + wall, show = only drawn, wall = invisible wall, off = none.",
-                    "on", "show", "wall", "off"));
-            arenas.add(number("battle.timer." + k.key, "Timer", 0, FxSettings.MAX_TIMER, "seconds, 0 = no time limit",
-                    "Fight time limit with a timer box."));
-            arenas.add(choice("battle.timeup." + k.key, "At time up",
-                    "draw, kill everyone, continue, health (the best score by Judge by wins) or judge (same, and the losers die). An even score goes to Tie break (Battle rules).",
-                    "draw", "kill", "continue", "health", "judge"));
-            arenas.add(choice("battle.judgeby." + k.key, "Judge by",
-                    "What At time up health/judge scores: health % left (fallen = 0%), share of the damage or of the kills (per fighter, so a bigger side doesn't win for size), or mix (the three averaged).",
-                    FxSettings.JUDGE_BY_VALUES));
-            arenas.add(toggle("battle.shrink." + k.key, "Closing arena", "The arena closes in like a battle royale zone."));
-            arenas.add(toggle("battle.scoreboard." + k.key, "Scoreboard", "A row per side with fighters left and kills."));
-        }
-        pages.add(new Page("Arenas & timers", "Arenas keep fighters in, timers end battles.", arenas, null, false));
+                        "How long a closing arena takes when its battle has no timer."),
+                choice("battle.tiebreak", "Tie break", "When the Judge by score is even at time up: damage dealt, kills, a coin toss or a draw. If it is the same as Judge by (damage or kills), the other one is used.",
+                        "damage", "kills", "random", "draw")
+        ), null, false));
 
-        pages.add(new Page("Chaos area", "The Chaos Wand area (all vs one, royale), Snap reach and summon area.", List.of(
+        // One tab per battle kind: its presentation overrides, rules, arena and timer together (user, 2026-10-12:
+        // a royale took three tabs to set up).
+        for (BattleManager.Kind k : BattleManager.Kind.values()) {
+            List<Item> tab = new ArrayList<>();
+            tab.add(note("Presentation and cameras: Global = the value on the Presentation / Cameras tabs (number fields: leave empty)."));
+            tab.add(section("Presentation"));
+            tab.add(override(k, KindFx.Opt.COUNTDOWN, "Countdown"));
+            tab.add(override(k, KindFx.Opt.START_TITLE, "Start title"));
+            tab.add(override(k, KindFx.Opt.WIN_TITLE, "Winner title"));
+            tab.add(override(k, KindFx.Opt.MUSIC, "Music"));
+            tab.add(override(k, KindFx.Opt.LASER, "Fighter laser"));
+            tab.add(override(k, KindFx.Opt.RUNES, "Runes"));
+            tab.add(override(k, KindFx.Opt.AREA_STYLE, "Area look"));
+            tab.add(section("Cameras"));
+            tab.add(override(k, KindFx.Opt.CAMERA, "Intro camera"));
+            tab.add(override(k, KindFx.Opt.CAMERA_STYLE, "Camera style"));
+            tab.add(override(k, KindFx.Opt.CAMERA_TIME, "Camera time"));
+            tab.add(override(k, KindFx.Opt.CAMERA_SHOTS, "Showcase shots"));
+            tab.add(override(k, KindFx.Opt.END_CAMERA, "End camera"));
+            tab.add(override(k, KindFx.Opt.END_CAMERA_TIME, "End camera time"));
+            tab.add(override(k, KindFx.Opt.AUTO_WATCH, "Auto watch"));
+            tab.add(section("Rules"));
+            if (k == BattleManager.Kind.DUEL) {
+                tab.add(choice("duel.mode", "Battle Wand duels", "exclusive = a new duel replaces the old pair; accumulate = connected duels merge.",
+                        "exclusive", "accumulate"));
+            }
+            tab.add(toggle("battle.isolation." + k.key, "Isolated", "Its mobs only fight their opponents and outside NPCs can't hurt them."));
+            tab.add(toggle("battle.selfdefense." + k.key, "Self defense",
+                    "A mob hit by an enemy that isn't its target turns on it (keeps it at least 3 s), like Army Wand mobs."));
+            if (k == BattleManager.Kind.ALL_VS_ONE || k == BattleManager.Kind.TEAMS) {
+                tab.add(toggle("battle.friendlyfire." + k.key, "Friendly fire", "Hits between allies hurt (allies still never target each other)."));
+            }
+            tab.add(toggle("battle.players." + k.key, "Players can fight", switch (k) {
+                case DUEL -> "Crouch + Battle Wand puts you in a duel.";
+                case ALL_VS_ONE -> "/mobbattle chaos me: every mob around attacks you.";
+                case ROYALE -> "Players can be fighters in a royale.";
+                case TEAMS -> "/mobbattle teams join <team> puts you in a team.";
+            }));
+            tab.add(section("Arena & timer"));
+            tab.add(choice("battle.arena." + k.key, "Arena", "on = drawn + wall, show = only drawn, wall = invisible wall, off = none.",
+                    "on", "show", "wall", "off"));
+            tab.add(number("battle.timer." + k.key, "Timer", 0, FxSettings.MAX_TIMER, "seconds, 0 = no time limit",
+                    "Fight time limit with a timer box."));
+            tab.add(choice("battle.timeup." + k.key, "At time up",
+                    "draw, kill everyone, continue, health (the best score by Judge by wins) or judge (same, and the losers die). An even score goes to Tie break (Battles tab).",
+                    "draw", "kill", "continue", "health", "judge"));
+            tab.add(choice("battle.judgeby." + k.key, "Judge by",
+                    "What At time up health/judge scores: health % left (fallen = 0%), share of the damage or of the kills (per fighter, so a bigger side doesn't win for size), or mix (the three averaged). An even score goes to Tie break (Battles tab).",
+                    FxSettings.JUDGE_BY_VALUES));
+            tab.add(toggle("battle.shrink." + k.key, "Closing arena", "The arena closes in like a battle royale zone."));
+            tab.add(toggle("battle.scoreboard." + k.key, "Scoreboard", "A row per side with fighters left and kills."));
+            pages.add(new Page(switch (k) {
+                case DUEL -> "Duel";
+                case ALL_VS_ONE -> "All vs one";
+                case ROYALE -> "Royale";
+                case TEAMS -> "Team battles";
+            }, switch (k) {
+                case DUEL -> "Battle Wand duels: presentation, rules, arena and timer.";
+                case ALL_VS_ONE -> "Chaos Wand left click (everyone vs one): presentation, rules, arena and timer.";
+                case ROYALE -> "Chaos Wand right click (everyone vs everyone): presentation, rules, arena and timer.";
+                case TEAMS -> "Team Wand battles: presentation, rules, arena and timer. The teams themselves are on the Teams tab.";
+            }, tab, null, false));
+        }
+
+        pages.add(new Page("Chaos area", "The Chaos Wand area (all vs one, royale): look, size, color and height.", List.of(
                 section("Area"),
+                choice("chaos.area", "Area look", "What areas and arenas draw: border glow, disc on the ground, both, a wall, or nothing.",
+                        FxSettings.AREA_STYLES),
                 number("chaos.radius", "Area radius", FxSettings.MIN_RADIUS, FxSettings.MAX_RADIUS, "blocks", "Mobs within this radius join a Chaos Wand battle."),
                 number("chaos.maxmobs", "Max mobs", 2, FxSettings.MAX_MOBS_LIMIT, "more than 60 can lag the server",
                         "Most mobs one Chaos Wand click affects."),
                 choice("chaos.area.color", "Area color", "Palette color or random.", () -> with(List.of(new Opt(FxSettings.RANDOM, "Random")), palette())),
                 number("chaos.height", "Area height", FxSettings.MIN_HEIGHT, FxSettings.MAX_HEIGHT, "blocks", "Height of the area pillars and wall."),
-                toggle("chaos.area.onlywand", "Area only while holding the wand", "Only its owner sees the area, and only while holding the Chaos Wand."),
-                number("summon.radius", "Summon area", 0, FxSettings.MAX_SUMMON_RADIUS, "blocks, 0 = auto (grows with the mobs)",
-                        "Radius the Summon Wand spawns in.")
+                toggle("chaos.area.onlywand", "Area only while holding the wand", "Only its owner sees the area, and only while holding the Chaos Wand.")
         ), null, false));
 
         List<Item> looks = new ArrayList<>(List.of(
@@ -452,26 +459,34 @@ final class ConfigSchema {
                 number("team.fx.seconds", "Team look time", 0, FxSettings.TEAM_FX_MAX_SECONDS, "seconds, 0 = while in the team",
                         "How long the team look stays after a mob joins a team."),
                 toggle("team.fx.onlywand", "Team look only with the Team Wand", "Show it only to the owner holding the Team Wand."),
-                section("Crown and wand colors"),
+                section("Army look"),
+                toggle("army.tint", "Army tint", "Army mobs wear a tint for as long as they are in your army (default off)."),
+                choice("army.tint.color", "Army tint color", "Color of the army tint (default blue).", ConfigSchema::palette),
+                section("Crown, Cleanse and glow"),
                 choice("fx.crown", "Crown on the lone target", "Gold, a palette color or off.",
                         () -> with(opts("Gold", "off"), palette())),
                 choice("wand.cleanse.color", "Cleanse Wand color", "Light and look of the Cleanse Wand.", ConfigSchema::palette),
-                choice("wand.buff.color", "Buff color", "Buff Wand mark and swirl, and the shimmer of buffed mobs (default purple).", ConfigSchema::palette),
-                choice("wand.buff.light", "Buff Wand light", "Light from the sky that brings the buff: buff = in the buff color (default), a color, or off (the buff lands at once).",
-                        () -> with(opts("buff", "off"), palette()))));
+                number("fx.glow.look", "Look glow", 0, FxSettings.MAX_GLOW, "light level 0-15, 0 = off",
+                        "Light around mobs with a jade or shimmer look or the buff's shimmer, in the look's color.")));
         looks.add(section("Waves and borders per action"));
         for (ActionFx.Action a : ActionFx.Action.values()) {
             looks.add(choice("wave." + a.key, label(a.key) + " wave", "Shockwave color when it happens (off = none).",
                     () -> with(opts(ActionFx.OFF), palette())));
-            looks.add(choice("glow." + a.key, label(a.key) + " border", "Border glow color of its area (area = the area color).",
+            looks.add(choice("glow." + a.key, label(a.key) + " border", "Border glow color of its area (area = the area color)." + (a == ActionFx.Action.SUMMON ? " Also the color of the rune each summon rises from." : ""),
                     () -> with(opts(ActionFx.OFF, ActionFx.AREA), palette())));
         }
         looks.add(section("Mob looks per role"));
         for (ActionFx.Role r : ActionFx.Role.values()) {
-            looks.add(choice("mobfx." + r.key, label(r.key) + " mobs", "Mark on the mobs of that role at the start (default = its own look).",
+            String who = switch (r) {
+                case DUEL -> "Duel fighters";
+                case LONE -> "All vs one target";
+                case ATTACKERS -> "All vs one attackers";
+                case ROYALE -> "Royale fighters";
+            };
+            looks.add(choice("mobfx." + r.key, who, "Mark on these mobs at the start (default = its own look).",
                     () -> with(opts(ActionFx.DEFAULT, ActionFx.OFF), palette())));
         }
-        pages.add(new Page("Colors & looks", "Every palette color the mod draws with.", looks, null, false));
+        pages.add(new Page("Colors & looks", "Every palette color the mod draws with (the Buff Wand's are on the Buffs tab).", looks, null, false));
 
         List<Item> buffs = new ArrayList<>();
         buffs.add(note("Percent per source; sources add up on a mob. Streak counts per kill (up to Max kills), Buff Wand per click."));
@@ -487,17 +502,26 @@ final class ConfigSchema {
                         "Extra " + st.key + " for this source."));
             }
             buffs.add(toggle("buff." + s.key + ".heal", "Heal when given", "Fill the new max health when the buff is given."));
+            if (s == Buffs.Source.STREAK) {
+                buffs.add(number("buff.streak.maxkills", "Streak max kills", 1, Buffs.MAX_STREAK, "kills", "Kills that count at most for the streak buff."));
+            }
+            if (s == Buffs.Source.WAND) {
+                // Everything about the Buff Wand in one place (user, 2026-10-12).
+                buffs.add(number("buff.wand.maxstacks", "Buff Wand max stacks", 1, Buffs.MAX_WAND, "clicks", "Most Buff Wand clicks on one mob."));
+                buffs.add(choice("wand.buff.color", "Buff color", "Buff Wand mark and swirl, and the shimmer of buffed mobs (default purple).", ConfigSchema::palette));
+                buffs.add(choice("wand.buff.light", "Buff Wand light", "Light from the sky that brings the buff: buff = in the buff color (default), a color, or off (the buff lands at once).",
+                        () -> with(opts("buff", "off"), palette())));
+            }
         }
-        buffs.add(section("Limits and looks"));
-        buffs.add(number("buff.streak.maxkills", "Streak max kills", 1, Buffs.MAX_STREAK, "kills", "Kills that count at most for the streak buff."));
-        buffs.add(number("buff.wand.maxstacks", "Buff Wand max stacks", 1, Buffs.MAX_WAND, "clicks", "Most Buff Wand clicks on one mob."));
+        buffs.add(section("Crown"));
         buffs.add(choice("buff.crown", "Buffed mobs' crown", "Crown of streak, champion and Buff Wand mobs (default off).",
                 () -> with(opts("Gold", "off"), palette())));
-        pages.add(new Page("Buffs", "Battle buffs: size, health, damage and defense.", buffs, null, false));
+        pages.add(new Page("Buffs", "Battle buffs: size, health, damage and defense, and the Buff Wand.", buffs, null, false));
 
         pages.add(new Page("Wands", "Wand feedback and what each wand does.", List.of(
                 section("Every wand"),
                 toggle("wand.fx", "Wand effects", "Glow, soul rip and sounds on the clicked mob."),
+                section("Effect Wand"),
                 choice("effect.id", "Effect Wand effect", "The effect the Effect Wand gives (right click cycles the quick list).",
                         ConfigSchema::effects),
                 section("Kill Wand"),
@@ -505,8 +529,6 @@ final class ConfigSchema {
                 number("kill.hitdelay", "Cast hit delay", 0, FxSettings.MAX_SNAP_HIT_DELAY_MS, "ms (default " + FxSettings.DEFAULT_KILL_HIT_DELAY_MS + ")",
                         "From the click to the cast's hit."),
                 toggle("kill.loot", "Drop loot", "A mob killed by the Kill Wand or Snap drops its normal loot (default off)."),
-                number("fx.glow.look", "Look glow", 0, FxSettings.MAX_GLOW, "light level 0-15, 0 = off",
-                        "Light around mobs with a jade or shimmer look or the buff's shimmer, in the look's color."),
                 number("fx.glow.death", "Death glow", 0, FxSettings.MAX_GLOW, "light level 0-15, 0 = off",
                         "Kill Wand: the disintegrating mob flashes in its color and fades out."),
                 toggle("kill.players", "Works on players", "Players disintegrate too, then die normally."),
@@ -530,7 +552,10 @@ final class ConfigSchema {
                 toggle("team.bytype", "Team by type", "Clicking a mob brings every mob of its type within the area radius into the team.")
         ), "teams", false));
 
-        pages.add(new Page("Summon list", "Summon Wand list. Add, remove and clear apply at once; counts and teams (gold until saved), the random range and the leave settings need Save changes.", List.of(
+        pages.add(new Page("Summon list", "Summon Wand list. Add, remove and clear apply at once; counts and teams (gold until saved) and the settings below need Save changes.", List.of(
+                section("Where they appear"),
+                number("summon.radius", "Summon area", 0, FxSettings.MAX_SUMMON_RADIUS, "blocks, 0 = auto (grows with the mobs)",
+                        "Radius the Summon Wand spawns in."),
                 section("Random counts"),
                 number("summon.min", "Random count from", 0, 100, "mobs", "Lowest count for entries set to random."),
                 number("summon.max", "Random count to", 0, 100, "mobs", "Highest count for entries set to random."),
@@ -539,9 +564,10 @@ final class ConfigSchema {
                 choice("summon.despawn", "Summons leave", "never: they stay (default). battleEnd: the surviving summons of a battle go when it ends. timer: each one goes summonLifetime seconds after it spawned.",
                         "never", "battleEnd", "timer"),
                 number("summon.lifetime", "Summon lifetime", SummonDespawn.MIN_LIFETIME, SummonDespawn.MAX_LIFETIME, "seconds", "How long a summon lives with Summons leave = timer."),
-                choice("summon.exit", "How they leave", "disintegrate: the Kill Wand's soul rip, no loot (default). vanish: removed at once, no loot.",
-                        "disintegrate", "vanish"),
-                section("Look"),
+                choice("summon.exit", "How they leave", "disintegrate: the Kill Wand's soul rip, no loot (default). vanish: removed at once, no loot. shatter: breaks like jade glass (its look's color, else the summon jade color), no loot.",
+                        "disintegrate", "vanish", "shatter"),
+                section("When they spawn"),
+                toggle("summon.army", "Summons join my army", "Summoned mobs join your army, as if added with the Army Wand (default off). Not when they spawn into a team."),
                 toggle("summon.jade", "Summons in jade", "Summons come out wearing the jade look, as if given by the Effect Wand (default off)."),
                 choice("summon.jade.color", "Summon jade color", "Color of the summons' jade (default green).", ConfigSchema::palette)
         ), "summon", false));

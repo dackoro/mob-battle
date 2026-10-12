@@ -42,7 +42,8 @@ import java.util.function.Supplier;
 /**
  * Debug Wand. Left click a mob: a full report (chat summary, server log, and a file in the plugin data folder under
  * debug/), then the mob is followed for {@link FxSettings#debugTrackSeconds} (0 = report only): once a second its
- * target, AI state, health and effect changes, plus where it is every {@link #HEARTBEAT_MS}, go into the same file,
+ * target, AI state, health and effect changes, every hit it gives or takes (DebugHitSystem: amount, cause, cancelled),
+ * plus where it is every {@link #HEARTBEAT_MS}, go into the same file,
  * the server log and chat (user, 2026-10-12: one log with the snapshot and what came after). One followed mob per
  * player; a new left click replaces it, a right click stops it. Read-only apart from the tracking state.
  * Everything that reads components runs on the mob's world thread (the interactions and BattleLifecycleSystem.tick).
@@ -75,6 +76,9 @@ final class DebugWand {
         float health = Float.NaN;
         String ai = "";
         long nextHeartbeat;
+        /** Hits given/taken since the last tick (DebugHitSystem, world thread), written by the next tick. */
+        final List<String> hits = new ArrayList<>();
+        int hitsDropped;
 
         Track(UUID owner, Ref<EntityStore> mob, String name, long startMs, long untilMs, Path file) {
             this.owner = owner;
@@ -90,6 +94,38 @@ final class DebugWand {
     /** BattleLifecycleSystem checks this once per second: nothing tracked means nothing to do. */
     static boolean any() {
         return !TRACKS.isEmpty();
+    }
+
+    /** At most this many hit lines per followed mob and second; the rest are counted. */
+    private static final int MAX_HITS_PER_TICK = 12;
+
+    /**
+     * A hit (DebugHitSystem, world thread, after our damage filters): noted when the attacker or the victim is
+     * followed, with the amount, cause and whether it ends up cancelled.
+     */
+    static void onHit(Ref<EntityStore> attacker, Ref<EntityStore> victim, float amount, String cause, boolean cancelled,
+                      ComponentAccessor<EntityStore> accessor) {
+        for (Track t : TRACKS.values()) {
+            boolean gave = attacker != null && t.mob.equals(attacker);
+            boolean took = t.mob.equals(victim);
+            if (!gave && !took) continue;
+            if (t.hits.size() >= MAX_HITS_PER_TICK) {
+                t.hitsDropped++;
+                continue;
+            }
+            String other = gave ? nameOrNone(victim, accessor) : nameOrNone(attacker, accessor);
+            t.hits.add((gave && took ? "hit itself" : gave ? "hit " + other : "hit by " + other) + " for " + f1(amount)
+                    + " (" + cause + ")" + (cancelled ? ", CANCELLED (no damage)" : ""));
+        }
+    }
+
+    private static String nameOrNone(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        if (ref == null || !ref.isValid()) return "nothing (no entity source)";
+        try {
+            return ChaosWand.nameOf(ref, accessor) + "#" + ref.getIndex();
+        } catch (RuntimeException ex) {
+            return "?";
+        }
     }
 
     // ---- follow (after a left click) ----
@@ -147,7 +183,10 @@ final class DebugWand {
                 if (TRACKS.remove(entry.getKey(), t)) finish(t, "owner offline");
                 continue;
             }
-            List<String> changes = new ArrayList<>();
+            List<String> changes = new ArrayList<>(t.hits);
+            if (t.hitsDropped > 0) changes.add("(+" + t.hitsDropped + " more hits this second)");
+            t.hits.clear();
+            t.hitsDropped = 0;
             String ai = aiOf(t.mob);
             if (!ai.equals(t.ai)) changes.add(ai + where(t.mob, store));
             Map<String, Float> effects = effectsOf(t.mob, store);
@@ -411,12 +450,14 @@ final class DebugWand {
         EntityStatValue v = stats.get(index);
         if (v == null) return "absent";
         return f2(v.get()) + " (min " + f2(v.getMin()) + ", max " + f2(v.getMax()) + ")"
-                + (v.getModifiers().isEmpty() ? "" : ", modifiers " + v.getModifiers().keySet());
+                + (v.getModifiers() == null || v.getModifiers().isEmpty() ? "" : ", modifiers " + v.getModifiers().keySet());
     }
 
     private static ActiveEntityEffect[] activeOf(Ref<EntityStore> mob, ComponentAccessor<EntityStore> buffer) {
         EffectControllerComponent c = buffer.getComponent(mob, EffectControllerComponent.getComponentType());
-        return c == null ? new ActiveEntityEffect[0] : c.getAllActiveEntityEffects();
+        // getAllActiveEntityEffects is null (not empty) on a mob with no effect: a Spider crashed the click (2026-10-12).
+        ActiveEntityEffect[] all = c != null ? c.getAllActiveEntityEffects() : null;
+        return all != null ? all : new ActiveEntityEffect[0];
     }
 
     /** Effect id -> remaining seconds (-1 = infinite). An effect applied twice keeps the longer one. */

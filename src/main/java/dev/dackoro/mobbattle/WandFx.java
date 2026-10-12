@@ -7,6 +7,7 @@ import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -35,9 +36,16 @@ final class WandFx {
      */
     static final String DEATH_JADE = "Death_Jade_";
     static final String DEATH_SHIMMER = "Death_Shimmer_";
-    /** Shortest removal time of a death look: its animation has to play first (Jade 0.9 s, Shimmer 1.4 s). */
+    /**
+     * Shimmer death, step 2: Death_Shimmer_ only turns the body its color (0.5 s, then held); this bursts it into
+     * liquid (0.3 s), put on {@link #SHIMMER_BURST_MS} before the removal (user, 2026-10-12: the two-step test death).
+     */
+    static final String DEATH_SHIMMER_BURST = "Death_ShimmerBurst_";
+    private static final long SHIMMER_TURN_MS = 500;
+    private static final long SHIMMER_BURST_MS = 350;
+    /** Shortest removal time of a death look: its animation has to play first (Jade 0.9 s, Shimmer turn + burst). */
     private static final long DEATH_JADE_MS = 900;
-    private static final long DEATH_SHIMMER_MS = 1400;
+    private static final long DEATH_SHIMMER_MS = SHIMMER_TURN_MS + SHIMMER_BURST_MS;
     /**
      * A death look outlasts the removal by this much: lasting exactly the delay, it could end a tick before the mob
      * was removed, and the client showed the mob's normal skin for a moment (its animation is PlayOnce, so the mob
@@ -231,7 +239,8 @@ final class WandFx {
 
     /** The effects that show a mob disintegrating: they still go on a mob already dying (its own death look). */
     private static boolean isDeathFx(String fx) {
-        return SOUL_RIP.equals(fx) || SNAP_DUST.equals(fx) || fx.startsWith(DEATH_JADE) || fx.startsWith(DEATH_SHIMMER);
+        return SOUL_RIP.equals(fx) || SNAP_DUST.equals(fx) || fx.startsWith(DEATH_JADE) || fx.startsWith(DEATH_SHIMMER)
+                || fx.startsWith(DEATH_SHIMMER_BURST);
     }
 
     /** Gap between taking a running swirl off and putting it on again, so the client sees a new one. */
@@ -398,7 +407,7 @@ final class WandFx {
         // A Jade or Shimmer NPC melts or shatters instead of the ash, lasts until its look's animation is over.
         String look = lookDeath(target);
         long delayMs = look != null ? Math.max(SNAP_DUST_MS, deathLookMs(look)) : SNAP_DUST_MS;
-        if (look != null) onTarget(target, look, delayMs / 1000f + DEATH_LOOK_HOLD_S, buffer);
+        if (look != null) putDeathLook(target, look, delayMs, buffer);
         else onTarget(target, SNAP_DUST, buffer);
         if (MobBattlePlugin.debugging()) {
             // Why a mob might not show the ash: no effect controller, or other effects (spawn VFX...) on it.
@@ -435,6 +444,57 @@ final class WandFx {
         death = jade ? DEATH_JADE + (color != null ? color : "Green") : DEATH_SHIMMER + (color != null ? color : "Purple");
         LOOK_DEATHS.put(npc, death);
         return death;
+    }
+
+    /**
+     * LookDeathSystem: a Jade or Shimmer NPC died a normal death (vanilla already cleared its effects). It shatters or
+     * melts as with the Kill Wand and is removed once that is over, dropping the loot vanilla would drop at corpse
+     * removal (DropDeathItems: only with ItemsLossMode ALL). A mob already in a Kill Wand/Snap death only gets its
+     * death look back; that removal is queued already. Only with wandFx on.
+     */
+    static void lookDeathNatural(Ref<EntityStore> mob, DeathComponent death, CommandBuffer<EntityStore> buffer) {
+        if (!FxSettings.wandFx || LookKeeper.styleOf(mob) == null && !LOOK_DEATHS.containsKey(mob)) return;
+        boolean queued = isDying(mob);
+        String look = lookDeath(mob);
+        if (look == null) return;
+        long delayMs = deathLookMs(look);
+        if (queued) {
+            // Vanilla cleared the death look a Kill Wand/Snap put on: back on; that removal is queued already.
+            onTarget(mob, look, delayMs / 1000f + DEATH_LOOK_HOLD_S, buffer);
+            return;
+        }
+        putDeathLook(mob, look, delayMs, buffer);
+        LookLight.flash(mob, lookHex(look), delayMs);
+        boolean loot = death.getItemsLossMode() == com.hypixel.hytale.server.core.asset.type.gameplay.DeathConfig.ItemsLossMode.ALL;
+        var store = mob.getStore();
+        var world = buffer.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            LOOK_DEATHS.remove(mob);
+            // Vanilla corpse removal may have been first.
+            if (store.isShutdown() || !mob.isValid()) return;
+            if (loot) dropLoot(mob, store);
+            store.removeEntity(mob, com.hypixel.hytale.component.RemoveReason.REMOVE);
+        }), delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        if (MobBattlePlugin.debugging()) MobBattlePlugin.debug(look + " on " + ChaosWand.nameOf(mob, buffer) + " (normal death)");
+    }
+
+    /**
+     * Puts the death look on: a Jade one at once; a Shimmer one turns the body its color now and bursts
+     * SHIMMER_BURST_MS before the removal ({@code delayMs} from now). The turn is a wand tint (ALL_FX), so the
+     * burst replaces it in one tick (other id: no gap with the normal skin).
+     */
+    private static void putDeathLook(Ref<EntityStore> mob, String look, long delayMs, ComponentAccessor<EntityStore> buffer) {
+        onTarget(mob, look, delayMs / 1000f + DEATH_LOOK_HOLD_S, buffer);
+        if (!look.startsWith(DEATH_SHIMMER)) return;
+        String burst = DEATH_SHIMMER_BURST + look.substring(DEATH_SHIMMER.length());
+        long at = Math.max(SHIMMER_TURN_MS, delayMs - SHIMMER_BURST_MS);
+        float lasts = (delayMs - at) / 1000f + DEATH_LOOK_HOLD_S;
+        var store = mob.getStore();
+        var world = buffer.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown() || !mob.isValid()) return;
+            onTarget(mob, burst, lasts, store);
+        }), at, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** The light color of a death look id (Death_Jade_Red: the palette's Red). */
@@ -481,7 +541,7 @@ final class WandFx {
         // A Jade or Shimmer NPC shatters or melts instead of the soul rip, and is removed only after its animation.
         String look = npc ? lookDeath(target) : null;
         long delayMs = look != null ? Math.max(FxSettings.killDelayMs, deathLookMs(look)) : FxSettings.killDelayMs;
-        if (look != null) onTarget(target, look, delayMs / 1000f + DEATH_LOOK_HOLD_S, buffer);
+        if (look != null) putDeathLook(target, look, delayMs, buffer);
         else onTarget(target, SOUL_RIP, buffer);
         LookLight.flash(target, look != null ? lookHex(look) : LookLight.SOUL_RIP_HEX, delayMs);
         deathSound(target, buffer);
@@ -492,6 +552,30 @@ final class WandFx {
             KILLS.put(target, dueAt);
         }
         soulStream(target, killer, buffer);
+    }
+
+    /**
+     * Summon exit "shatter" (SummonDespawn): the NPC breaks like jade glass (the Jade death look), whether it wears a
+     * look or not, then is removed. Color: its own look's, else summonJadeColor. Without wandFx it dies at once, as
+     * the disintegrate exit does then. Loot is up to the caller (SummonDespawn marks it dropped).
+     */
+    static void shatter(Ref<EntityStore> mob, ComponentAccessor<EntityStore> buffer) {
+        if (!FxSettings.wandFx) {
+            KillInteraction.killNow(mob, null, buffer);
+            return;
+        }
+        String look = LOOK_DEATHS.get(mob);
+        if (look == null) {
+            String color = LookKeeper.colorOf(mob);
+            LookKeeper.untrack(mob);
+            look = DEATH_JADE + (color != null ? color : FxSettings.summonJadeColor);
+            LOOK_DEATHS.put(mob, look);
+        }
+        long delayMs = deathLookMs(look);
+        putDeathLook(mob, look, delayMs, buffer);
+        LookLight.flash(mob, lookHex(look), delayMs);
+        deathSound(mob, buffer);
+        KILLS.put(mob, System.currentTimeMillis() + delayMs);
     }
 
     /**
@@ -674,7 +758,7 @@ final class WandFx {
      * list (ItemModule.getRandomItemDrops), plus its inventory when the role picks up items, 1 block above the
      * feet. Marks the role as dropped so nothing drops twice.
      */
-    private static void dropLoot(Ref<EntityStore> mob, CommandBuffer<EntityStore> buffer) {
+    private static void dropLoot(Ref<EntityStore> mob, ComponentAccessor<EntityStore> buffer) {
         var npc = buffer.getComponent(mob, com.hypixel.hytale.server.npc.entities.NPCEntity.getComponentType());
         var role = npc != null ? npc.getRole() : null;
         var transform = buffer.getComponent(mob,

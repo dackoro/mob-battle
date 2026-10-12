@@ -25,6 +25,11 @@ public class WandEquipSoundSystem extends EntityEventSystem<EntityStore, Invento
     private static final Map<String, String> SOUNDS = Map.of(
             "MobBattle_MorphWand", "SFX_MobBattle_OmnitrixOn");
 
+    /** The equip sound plays at most once in this long per player (scrolling through the hotbar replayed it). */
+    private static final long COOLDOWN_MS = 5000;
+    /** Player UUID -> when its equip sound may play again. Tiny (one entry per player), entries expire on use. */
+    private static final Map<java.util.UUID, Long> READY_AT = new java.util.concurrent.ConcurrentHashMap<>();
+
     public WandEquipSoundSystem() {
         super(InventorySetActiveSlotEvent.class);
     }
@@ -45,6 +50,13 @@ public class WandEquipSoundSystem extends EntityEventSystem<EntityStore, Invento
         if (hotbar == null || hotbar.getInventory() == null) return;
         ItemStack item = hotbar.getInventory().getItemStack((short) slot);
         String sound = item == null ? null : SOUNDS.get(item.getItemId());
-        if (sound != null) WandFx.burst(null, sound, ChaosWand.positionOf(player, store), buffer);
+        if (sound == null) return;
+        PlayerRef who = store.getComponent(player, PlayerRef.getComponentType());
+        long now = System.currentTimeMillis();
+        if (who != null) {
+            if (READY_AT.getOrDefault(who.getUuid(), 0L) > now) return;
+            READY_AT.put(who.getUuid(), now + COOLDOWN_MS);
+        }
+        WandFx.burst(null, sound, ChaosWand.positionOf(player, store), buffer);
     }
 }

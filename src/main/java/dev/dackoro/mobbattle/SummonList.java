@@ -11,7 +11,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import org.joml.Vector3d;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ThreadLocalRandom;
@@ -127,75 +129,140 @@ public final class SummonList {
             player.sendMessage(Message.raw(describe()).color("#ffcc55"));
             return;
         }
-        NPCPlugin npc = NPCPlugin.get();
-        ThreadLocalRandom rnd = ThreadLocalRandom.current();
-        int spawned = 0;
-        int failed = 0;
-        int attempted = 0;
-        StringBuilder summary = new StringBuilder();
-        // One copy: the list can change from a command while this runs (see snapshot()).
+        // One copy: the list can change from a command while this runs (see snapshot()). The plan is one role per
+        // mob, in list order, capped by maxMobs; random counts are rolled here, once.
         Map<String, String> entries = snapshot();
-        EntityEffect look = lookEffect();
-        int planned = 0;
-        for (String value : entries.values()) {
-            planned += value.equalsIgnoreCase("random") ? Math.max(1, (randomMin + randomMax) / 2) : countOf(value);
-        }
-        planned = Math.min(planned, FxSettings.maxMobs);
-        // /mobbattle summonradius, or auto: about one mob per 5 square blocks, never past half the Chaos area radius.
-        double ring = FxSettings.summonRadius > 0 ? FxSettings.summonRadius
-                : Math.max(4, Math.min(FxSettings.radius / 2.0, 3 + Math.sqrt(planned) * 1.6));
-        var floor = FightFx.floorBelow(center.y, store);
+        List<String> plan = new ArrayList<>();
+        boolean capped = false;
         for (Map.Entry<String, String> e : entries.entrySet()) {
             int n = countOf(e.getValue());
-            int ok = 0;
-            for (int i = 0; i < n && attempted < FxSettings.maxMobs; i++) {
-                attempted++;
-                double angle = rnd.nextDouble(Math.PI * 2);
-                double dist = 1.5 + Math.sqrt(rnd.nextDouble()) * (ring - 1.5);
-                double x = center.x + Math.cos(angle) * dist;
-                double z = center.z + Math.sin(angle) * dist;
-                double y = floor.applyAsDouble(x, z);
-                // floorBelow is 0.25 above the block top; no floor loaded nearby: the player's height.
-                Vector3d pos = new Vector3d(x, Double.isFinite(y) ? y - 0.25 : center.y, z);
-                try {
-                    var result = npc.spawnNPC(store, e.getKey(), null, pos,
-                            new Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f));
-                    if (result != null && result.first() != null) {
-                        SummonDespawn.track(result.first());
-                        Integer team = TEAMS.get(e.getKey());
-                        if (team != null) {
-                            // Spawned straight into the player's team draft (Team Wand / teams start).
-                            BattleManager.assign(BattleManager.draft(player), result.first(), team);
-                        }
-                        WandFx.burst(WandFx.SUMMON_PARTICLE, null, pos, store);
-                        playSpawnAnimation(result.first(), store);
-                        if (look != null) giveLook(result.first(), look, store);
-                        ok++;
-                        spawned++;
-                    } else {
-                        failed++;
-                    }
-                } catch (RuntimeException ex) {
-                    failed++;
-                    MobBattlePlugin.log("Could not spawn " + e.getKey() + ": " + ex);
+            for (int i = 0; i < n; i++) {
+                if (plan.size() >= FxSettings.maxMobs) {
+                    capped = true;
+                    break;
                 }
-            }
-            if (ok > 0) {
-                summary.append(e.getKey()).append(" x").append(ok).append(", ");
+                plan.add(e.getKey());
             }
         }
-        if (summary.length() > 0) {
-            summary.setLength(summary.length() - 2);
-        }
-        if (spawned > 0) {
+        // /mobbattle summonradius, or auto: about one mob per 5 square blocks, never past half the Chaos area radius.
+        double ring = FxSettings.summonRadius > 0 ? FxSettings.summonRadius
+                : Math.max(4, Math.min(FxSettings.radius / 2.0, 3 + Math.sqrt(plan.size()) * 1.6));
+        Batch batch = new Batch(store, new Vector3d(center), player, owner, plan, capped, ring);
+        if (!plan.isEmpty()) {
+            // The ring, its shockwave and the sound right away; the mobs rise from it over the next ticks.
             FightFx.area(ActionFx.Action.SUMMON, null, owner, center, ring, SUMMON_AREA_SECONDS, store);
             // A shockwave out to the summoning ring (/mobbattle wave summon, default green).
             ActionFx.shockwave(ActionFx.Action.SUMMON, center, ring, store);
             WandFx.burst(null, WandFx.SUMMON_SOUND, center, store);
         }
-        player.sendMessage(Message.raw("Summoned " + spawned + " mobs: " + summary
-                + (failed > 0 ? " (" + failed + " failed)" : "")
-                + (attempted >= FxSettings.maxMobs ? " — capped by /mobbattle maxMobs (spawn attempts)" : "")).color("#4bff6a"));
+        batch.run();
+    }
+
+    /** Mobs spawned per world tick at most; also stops early once SPAWN_BUDGET_MS is used up (at least one). */
+    private static final int SPAWN_PER_TICK = 20;
+    private static final long SPAWN_BUDGET_MS = 25;
+    /** Gap between two spawn steps (one world tick). */
+    private static final long SPAWN_STEP_MS = 50;
+
+    /**
+     * One summon, spread over several ticks: spawning 100+ NPCs in one go held the world thread for up to 293 ms
+     * ("Task took", 2026-10-12). Each step runs on the world thread and schedules the next one itself (never all the
+     * steps up front); it stops if the world closed. The chat summary, the jade and the army join come at the end.
+     */
+    private static final class Batch implements Runnable {
+        final Store<EntityStore> store;
+        final Vector3d center;
+        final PlayerRef player;
+        final Ref<EntityStore> owner;
+        final List<String> plan;
+        final boolean capped;
+        final double ring;
+        final EntityEffect look = lookEffect();
+        final String rune = runeParticle();
+        final java.util.function.DoubleBinaryOperator floor;
+        /** Role -> how many came out, in list order, for the chat summary. */
+        final Map<String, Integer> ok = new LinkedHashMap<>();
+        final List<Ref<EntityStore>> toLook = new ArrayList<>();
+        final List<Ref<EntityStore>> toArmy = new ArrayList<>();
+        int next;
+        int spawned;
+        int failed;
+
+        Batch(Store<EntityStore> store, Vector3d center, PlayerRef player, Ref<EntityStore> owner, List<String> plan,
+              boolean capped, double ring) {
+            this.store = store;
+            this.center = center;
+            this.player = player;
+            this.owner = owner;
+            this.plan = plan;
+            this.capped = capped;
+            this.ring = ring;
+            this.floor = FightFx.floorBelow(center.y, store);
+        }
+
+        /** One step; world thread. */
+        @Override
+        public void run() {
+            if (store.isShutdown()) return;
+            NPCPlugin npc = NPCPlugin.get();
+            ThreadLocalRandom rnd = ThreadLocalRandom.current();
+            long until = System.currentTimeMillis() + SPAWN_BUDGET_MS;
+            int done = 0;
+            while (next < plan.size() && done < SPAWN_PER_TICK && (done == 0 || System.currentTimeMillis() < until)) {
+                spawnOne(npc, rnd, plan.get(next++));
+                done++;
+            }
+            if (next < plan.size()) {
+                var world = store.getExternalData().getWorld();
+                com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(this),
+                        SPAWN_STEP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+                return;
+            }
+            finish();
+        }
+
+        private void spawnOne(NPCPlugin npc, ThreadLocalRandom rnd, String role) {
+            double angle = rnd.nextDouble(Math.PI * 2);
+            double dist = 1.5 + Math.sqrt(rnd.nextDouble()) * (ring - 1.5);
+            double x = center.x + Math.cos(angle) * dist;
+            double z = center.z + Math.sin(angle) * dist;
+            double y = floor.applyAsDouble(x, z);
+            // floorBelow is 0.25 above the block top; no floor loaded nearby: the player's height.
+            Vector3d pos = new Vector3d(x, Double.isFinite(y) ? y - 0.25 : center.y, z);
+            try {
+                var result = npc.spawnNPC(store, role, null, pos, new Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f));
+                if (result == null || result.first() == null) {
+                    failed++;
+                    return;
+                }
+                SummonDespawn.track(result.first());
+                Integer team = TEAMS.get(role);
+                if (team != null) {
+                    // Spawned straight into the player's team draft (Team Wand / teams start).
+                    BattleManager.assign(BattleManager.draft(player), result.first(), team);
+                } else if (FxSettings.summonArmy && owner != null) {
+                    toArmy.add(result.first());
+                }
+                WandFx.burst(rune, null, pos, store);
+                playSpawnAnimation(result.first(), store);
+                if (look != null) toLook.add(result.first());
+                ok.merge(role, 1, Integer::sum);
+                spawned++;
+            } catch (RuntimeException ex) {
+                failed++;
+                MobBattlePlugin.log("Could not spawn " + role + ": " + ex);
+            }
+        }
+
+        private void finish() {
+            StringBuilder summary = new StringBuilder();
+            ok.forEach((role, n) -> summary.append(role).append(" x").append(n).append(", "));
+            if (summary.length() > 0) summary.setLength(summary.length() - 2);
+            afterSpawn(toLook, look, toArmy, player, owner, store);
+            player.sendMessage(Message.raw("Summoned " + spawned + " mobs: " + summary
+                    + (failed > 0 ? " (" + failed + " failed)" : "")
+                    + (capped ? " — capped by /mobbattle maxMobs (spawn attempts)" : "")).color("#4bff6a"));
+        }
     }
 
     // ---- Summon jade (/mobbattle summonJade, summonJadeColor) ----
@@ -219,15 +286,40 @@ public final class SummonList {
         return FxSettings.summonJade ? EffectWand.find("jade:" + FxSettings.summonJadeColor) : null;
     }
 
-    /** Puts {@code look} on a fresh summon a moment after it spawned, kept by LookKeeper like an Effect Wand look. */
-    private static void giveLook(Ref<EntityStore> mob, EntityEffect look, Store<EntityStore> store) {
+    /**
+     * A moment after the spawn (components in place), in ONE task for the whole summon: the jade on {@code toLook}
+     * (kept by LookKeeper like an Effect Wand look) and {@code toArmy} into the player's army (summonArmy).
+     */
+    private static void afterSpawn(List<Ref<EntityStore>> toLook, EntityEffect look, List<Ref<EntityStore>> toArmy,
+                                   PlayerRef player, Ref<EntityStore> owner, Store<EntityStore> store) {
+        if ((toLook.isEmpty() || look == null) && toArmy.isEmpty()) return;
         var world = store.getExternalData().getWorld();
+        java.util.UUID id = player.getUuid();
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
-            if (store.isShutdown() || !mob.isValid()) return;
-            EffectControllerComponent effects = store.getComponent(mob, EffectControllerComponent.getComponentType());
-            if (effects == null || !effects.addEffect(mob, look, store)) return;
-            LookKeeper.track(mob, look);
+            if (store.isShutdown()) return;
+            if (look != null) {
+                for (Ref<EntityStore> mob : toLook) {
+                    if (!mob.isValid()) continue;
+                    EffectControllerComponent effects = store.getComponent(mob, EffectControllerComponent.getComponentType());
+                    if (effects != null && effects.addEffect(mob, look, store)) LookKeeper.track(mob, look);
+                }
+            }
+            if (toArmy.isEmpty() || owner == null || !owner.isValid()) return;
+            for (Ref<EntityStore> mob : toArmy) {
+                if (mob.isValid() && !Army.isMember(id, mob)) Army.toggle(player, owner, mob, store);
+            }
         }), LOOK_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * The rune each summon rises from (gen-summonrunes.py): the summon border color (/mobbattle borderColor summon),
+     * else the summon wave's, else green.
+     */
+    static String runeParticle() {
+        String c = ActionFx.glowColor(ActionFx.Action.SUMMON, FxSettings.areaColor);
+        if (c == null) c = ActionFx.wave(ActionFx.Action.SUMMON);
+        if (c == null || !Teams.PALETTE.containsKey(c)) c = "Green";
+        return "MobBattle_SummonRune_" + c;
     }
 
     /** The summon area is a quick flash, not the Chaos Wand's 6 s. */

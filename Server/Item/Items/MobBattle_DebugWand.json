@@ -6,12 +6,13 @@
   "Categories": [
     "Items.Weapons"
   ],
-  "Icon": "Icons/Items/MobBattle/EffectWand.png",
+  "Icon": "Icons/Items/MobBattle/DebugWand.png",
   "Quality": "Common",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/MobBattle/EffectWand/MobBattle_EffectWand.blockymodel",
-  "Texture": "Items/MobBattle/EffectWand/MobBattle_EffectWand_Texture.png",
+  "Model": "Items/MobBattle/DebugWand/MobBattle_DebugWand.blockymodel",
+  "Texture": "Items/MobBattle/DebugWand/MobBattle_DebugWand_Texture.png",
+  "Animation": "Items/MobBattle/DebugWand/idle.blockyanim",
   "PlayerAnimationsId": "MobBattle_EffectWand",
   "Utility": {
     "Compatible": true

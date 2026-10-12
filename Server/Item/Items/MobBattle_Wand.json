@@ -13,6 +13,7 @@
   "Model": "Items/MobBattle/BattleWand/MobBattle_Wand.blockymodel",
   "Texture": "Items/MobBattle/BattleWand/MobBattle_Wand_Texture.png",
   "PlayerAnimationsId": "Wand",
+  "Animation": "Items/MobBattle/BattleWand/idle.blockyanim",
   "Utility": {
     "Compatible": true
   },

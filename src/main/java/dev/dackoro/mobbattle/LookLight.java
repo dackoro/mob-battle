@@ -175,6 +175,15 @@ final class LookLight {
                 (byte) Math.round(g * level / (float) max), (byte) Math.round(b * level / (float) max));
     }
 
+    /**
+     * RoleChange: the holder kept our DynamicLight, so the record (and the light it had before ours) follows the new
+     * Ref; else the next pass would take our own light as "the one it had" and put it back for good.
+     */
+    static void carry(Ref<EntityStore> old, Ref<EntityStore> neu) {
+        Lit lit = LIT.remove(old);
+        if (lit != null) LIT.put(neu, lit);
+    }
+
     /** From WandFx.prune (1/s): a Ref keeps its whole world alive. */
     static void prune() {
         LIT.keySet().removeIf(ref -> !ref.isValid() || ref.getStore().isShutdown());

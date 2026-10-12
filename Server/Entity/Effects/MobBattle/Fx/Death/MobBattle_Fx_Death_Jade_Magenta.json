@@ -18,6 +18,7 @@
         "TargetNodeName": "Chest",
         "Color": "#ff4cff"
       }
-    ]
+    ],
+    "FirstPersonParticles": []
   }
 }

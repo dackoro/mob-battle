@@ -1,12 +1,12 @@
 {
-  "$Comment": "Army Wand: the mob joins your army (green tint, green burst ring).",
+  "$Comment": "Army Wand: the mob joins your army (blue tint, blue burst ring).",
   "Duration": 1.0,
   "ApplicationEffects": {
-    "EntityTopTint": "#00e040",
-    "EntityBottomTint": "#007a1f",
+    "EntityTopTint": "#2a8cff",
+    "EntityBottomTint": "#0a2f8a",
     "Particles": [
       {
-        "SystemId": "MobBattle_Heal_Burst",
+        "SystemId": "MobBattle_Mark_Burst_Blue",
         "TargetEntityPart": "Entity",
         "TargetNodeName": "Pelvis"
       }

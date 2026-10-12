@@ -320,6 +320,7 @@ public final class BattleManager {
     static void maintain() {
         // Retired mobs stay managed on purpose (joinOwnersSide must not pull them back into a battle).
         MANAGED.removeIf(npc -> !npc.isValid());
+        RoleChange.prune();
         WandFx.prune();
         Snap.prune();
         Army.prune();
@@ -527,6 +528,32 @@ public final class BattleManager {
 
     public static boolean hasBattles() {
         return !BATTLES.isEmpty();
+    }
+
+    /**
+     * RoleChange: {@code old} came back as {@code neu} (same mob, new Ref). It keeps its side and kills in every
+     * battle; its target and the targets of those after it are picked again (the new role's AI starts fresh, and
+     * currentTarget turns it, and them, against the nearest enemy).
+     */
+    static void carry(Ref<EntityStore> old, Ref<EntityStore> neu) {
+        boolean managed = MANAGED.remove(old);
+        for (Battle b : BATTLES) {
+            Integer team = b.teamOf.remove(old);
+            if (team == null) continue;
+            b.add(neu, team);
+            b.targets.remove(old);
+            b.targets.values().removeIf(t -> t == old);
+            b.hitBy.remove(old);
+            b.hitBy.values().removeIf(t -> t == old);
+            b.turnedAt.remove(old);
+            b.chaseFrom.remove(old);
+            Kills k = b.kills.remove(old);
+            if (k != null) b.kills.put(neu, k);
+            if (b.lastKiller == old) b.lastKiller = neu;
+            managed = false;
+        }
+        // A retired mob (managed, in no battle) stays retired.
+        if (managed) MANAGED.add(neu);
     }
 
     public static List<Battle> battles() {

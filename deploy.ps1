@@ -13,7 +13,7 @@
 # Where to build against and install (first match wins):
 #   1. -ServerJar <path> / -ModsDir <path> parameters
 #   2. deploy.local.json next to this script (git-ignored; copy deploy.local.example.json)
-#   3. -Patchline release|pre-release (default pre-release): the Hytale launcher's default folders
+#   3. -Patchline release|pre-release (default release since 0.7.0 went out, 2026-10-12): the Hytale launcher's default folders
 #      release:     %APPDATA%\Hytale\install\release\...\HytaleServer.jar     + %APPDATA%\Hytale\UserData\Mods
 #      pre-release: %APPDATA%\Hytale\install\pre-release\...\HytaleServer.jar + %APPDATA%\Hytale\data\pre-release\Mods
 #   If the server jar does not exist, Gradle compiles against the release artifact from Maven instead.
@@ -30,7 +30,7 @@ Set-Location $PSScriptRoot
 
 $local = Join-Path $PSScriptRoot 'deploy.local.json'
 $cfg = if (Test-Path $local) { Get-Content $local -Raw | ConvertFrom-Json } else { $null }
-if (-not $Patchline) { $Patchline = if ($cfg -and $cfg.patchline) { $cfg.patchline } else { 'pre-release' } }
+if (-not $Patchline) { $Patchline = if ($cfg -and $cfg.patchline) { $cfg.patchline } else { 'release' } }
 $defaultJar  = "$env:APPDATA\Hytale\install\$Patchline\package\game\latest\Server\HytaleServer.jar"
 $defaultMods = if ($Patchline -eq 'release') { "$env:APPDATA\Hytale\UserData\Mods" } else { "$env:APPDATA\Hytale\data\pre-release\Mods" }
 $serverJar = if ($ServerJar) { $ServerJar } elseif ($cfg -and $cfg.serverJar) { $cfg.serverJar } else { $defaultJar }
@@ -75,7 +75,7 @@ if ($Dev) {
         Name              = 'Mob Battle Assets DEV'
         Version           = $main.Version
         ServerVersion     = $main.ServerVersion
-        Description       = "DEV ONLY: Mob Battle assets synced from $PSScriptRoot for hot reload. Remove with .\deploy.ps1 (no -Dev)."
+        Description       = "DEV ONLY: Mob Battle assets synced from $($PSScriptRoot.Replace('\', '/')) for hot reload. Remove with .\deploy.ps1 (no -Dev)."
         Authors           = @()
         Dependencies      = @{ 'Dackoro:Mob Battle' = '*' }
         DisabledByDefault = $false
@@ -83,6 +83,8 @@ if ($Dev) {
     } | ConvertTo-Json
     # Windows PowerShell's UTF8 encoding adds a BOM; Hytale's RawJsonReader rejects it.
     [IO.File]::WriteAllText("$devPack\manifest.json", $devManifest, [Text.UTF8Encoding]::new($false))
+    # Same icon as the jar, so the mod list shows it instead of "?" (Hytale finds icon-256.png next to the manifest).
+    if (Test-Path "$PSScriptRoot\icon-256.png") { Copy-Item "$PSScriptRoot\icon-256.png" "$devPack\icon-256.png" -Force }
     New-Item -ItemType Directory -Force "$PSScriptRoot\Common", "$PSScriptRoot\Server" | Out-Null
     $commonPath = Join-Path $devPack 'Common'
     $common = Get-Item -LiteralPath $commonPath -Force -ErrorAction SilentlyContinue
@@ -126,6 +128,7 @@ if ($Dev) {
         if ($link) { [IO.Directory]::Delete($link.FullName) }
     }
     Remove-Item "$devPack\manifest.json" -Force -ErrorAction SilentlyContinue
+    Remove-Item "$devPack\icon-256.png" -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $devPack 'asset-sync.log') -Force -ErrorAction SilentlyContinue
     Remove-Item $devPack -Force
     Write-Host "Removed the dev asset pack: the jar now carries all the assets." -ForegroundColor Green

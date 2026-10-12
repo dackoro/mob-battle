@@ -15,7 +15,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * /mobbattle unstick (default on): a battle mob that can't reach its opponent because they are on different levels
+ * /mobbattle unstick (default on) and the stand-off shove (/mobbattle standoffTime, default 15 s, 0 = off; either
+ * one keeps this running): a battle mob that can't reach its opponent because they are on different levels
  * (one in a cave, the other on the surface or up a mountain) is brought next to it. "Stuck" = for STUCK_MS it got
  * no closer than before, is not fighting and its opponent is more than MIN_HEIGHT_GAP blocks above or below it.
  * Fighting = it hit an enemy (a ranged mob shooting down from a cliff is not stuck), or something on its own level
@@ -24,6 +25,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * Fliers (roles with a "Fly" motion controller, as BodyMotionTakeOff checks): height does not trap them, but a cave
  * roof or a wall can, so they are moved after FLY_STUCK_MS whatever the height. A walker is never moved towards an
  * opponent that is flying right now (it would land under it): the flier comes down to attack.
+ * Stand-off (2026-10-12): a walker on its opponent's level that, for standoffTime, got no closer, hit nothing and was
+ * not hit, and is beyond melee reach, is shoved toward it (not teleported, user). Two Goblin_Feastmaster each keep 8
+ * blocks from their target (role CombatMaintainDistance) and only close in with a charge, which the role turns off
+ * while another goblin is within 5 blocks, so a duel of two in a crowd of goblins stood still for good. The shove goes
+ * straight to the role's motion controller: the Feastmaster's role has KnockbackScale 0, and Role.processSetVelocity /
+ * AddVelocity multiply any knockback by it (javap), so a KnockbackComponent push (the arena wall's) does not move it.
+ * Mobs that can't attack (passives) are never shoved.
  * Once per second per world (BattleLifecycleSystem, world thread, outside the systems). Players are never moved.
  */
 final class Unstick {
@@ -36,6 +44,13 @@ final class Unstick {
     /** It counts as getting closer only if it gained at least this much. */
     private static final double PROGRESS = 1;
     private static final int STAND_RANGE = 6;
+    /** Stand-off shove: horizontal speed per block of gap (gap = distance - SHOVE_STOP), clamped, plus a hop. */
+    private static final double SHOVE_PER_BLOCK = 1.6;
+    private static final double SHOVE_MIN = 5;
+    private static final double SHOVE_MAX = 14;
+    private static final double SHOVE_UP = 4;
+    /** The shove aims to land about this far from the opponent (inside melee reach). */
+    private static final double SHOVE_STOP = 2;
 
     private static final class Track {
         Ref<EntityStore> target;
@@ -56,21 +71,26 @@ final class Unstick {
     private Unstick() {
     }
 
+    /** Unstick or the stand-off shove is on: hits are tracked and the check runs. */
+    static boolean active() {
+        return FxSettings.unstick || FxSettings.standoffSeconds > 0;
+    }
+
     /** A battle hit by {@code attacker} (FightDamageSystem / PlayerBattleDamageSystem): it is fighting. */
     static void hit(Ref<EntityStore> attacker) {
-        if (FxSettings.unstick) LAST_HIT.put(attacker, System.currentTimeMillis());
+        if (active()) LAST_HIT.put(attacker, System.currentTimeMillis());
     }
 
     /** A battle mob took a hit from {@code attacker}: fighting, if the attacker is on its level (see check). */
     static void hurt(Ref<EntityStore> victim, Ref<EntityStore> attacker) {
-        if (FxSettings.unstick && attacker != null && attacker != victim) {
+        if (active() && attacker != null && attacker != victim) {
             LAST_HURT.put(victim, new Hurt(attacker, System.currentTimeMillis()));
         }
     }
 
     static void tick(Store<EntityStore> store) {
         // Queued with world.execute: the world may have closed since.
-        if (!FxSettings.unstick || store.isShutdown()) return;
+        if (!active() || store.isShutdown()) return;
         long now = System.currentTimeMillis();
         for (BattleManager.Battle battle : BattleManager.battles()) {
             if (battle.over || battle.store != store) continue;
@@ -101,8 +121,22 @@ final class Unstick {
             t.since = now;
             return;
         }
-        if (now - t.since < (flier ? FLY_STUCK_MS : STUCK_MS)) return;
-        if (!flier && Math.abs(them.y - me.y) <= MIN_HEIGHT_GAP) return;
+        if (!flier && Math.abs(them.y - me.y) <= MIN_HEIGHT_GAP) {
+            // Same level and still apart: a stand-off. Shove it toward the opponent; again after standoffTime if needed.
+            long standoffMs = FxSettings.standoffSeconds * 1000L;
+            if (standoffMs <= 0 || now - t.since < standoffMs) return;
+            long stood = now - t.since;
+            t.since = now;
+            t.best = dist;
+            if (!FightManager.canAttack(mob, store)) return;
+            if (shove(mob, me, them, dist, store)) {
+                MobBattlePlugin.debug("unstick: " + ChaosWand.nameOf(mob, store) + " stood off from " + ChaosWand.nameOf(target, store)
+                        + " (" + String.format(java.util.Locale.ROOT, "%.1f", dist) + " blocks, no hit) for " + stood / 1000
+                        + " s: shoved toward it");
+            }
+            return;
+        }
+        if (!FxSettings.unstick || now - t.since < (flier ? FLY_STUCK_MS : STUCK_MS)) return;
         // Stuck: next to the opponent, at its height.
         double angle = Math.atan2(me.z - them.z, me.x - them.x);
         for (int attempt = 0; attempt < 6; attempt++) {
@@ -120,6 +154,22 @@ final class Unstick {
             break;
         }
         TRACKS.remove(mob);
+    }
+
+    /**
+     * Stand-off shove toward {@code them}, through the role's active motion controller (not scaled by the role's
+     * KnockbackScale, see the class comment). False if the mob has no role or motion controller.
+     */
+    private static boolean shove(Ref<EntityStore> mob, Vector3d me, Vector3d them, double dist, Store<EntityStore> store) {
+        Role role = roleOf(mob, store);
+        var controller = role != null ? role.getActiveMotionController() : null;
+        if (controller == null) return false;
+        double dx = them.x - me.x, dz = them.z - me.z;
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        if (flat < 0.01) return false;
+        double speed = Math.max(SHOVE_MIN, Math.min(SHOVE_MAX, (dist - SHOVE_STOP) * SHOVE_PER_BLOCK));
+        controller.setVelocity(new Vector3d(dx / flat * speed, SHOVE_UP, dz / flat * speed), null, false);
+        return true;
     }
 
     /** True if something on the mob's level (or right next to it) hit it within STUCK_MS. */
@@ -161,7 +211,7 @@ final class Unstick {
         }
     }
 
-    /** /mobbattle unstick off: nothing is tracked any more. */
+    /** /mobbattle unstick off and standoffTime 0: nothing is tracked any more. */
     static void clear() {
         TRACKS.clear();
         LAST_HIT.clear();

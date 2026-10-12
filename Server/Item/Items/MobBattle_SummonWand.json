@@ -7,11 +7,12 @@
     "Items.Weapons"
   ],
   "Icon": "Icons/Items/MobBattle/SummonWand.png",
-  "Quality": "Epic",
+  "Quality": "Uncommon",
   "ItemLevel": 1,
   "MaxStack": 1,
   "Model": "Items/MobBattle/SummonWand/MobBattle_SummonWand.blockymodel",
   "Texture": "Items/MobBattle/SummonWand/MobBattle_SummonWand_Texture.png",
+  "Animation": "Items/MobBattle/SummonWand/idle.blockyanim",
   "PlayerAnimationsId": "Wand",
   "Utility": {
     "Compatible": true

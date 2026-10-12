@@ -2,14 +2,15 @@
 Jade and Shimmer looks in every palette color, with their deaths (run with: python scripts/gen-looks.py).
 Built from the test looks the user picked (scripts/gen-testlooks.py, 2026-10-10): jade = JadeOnce_C (appearing:
 JadeAppearC held), jade death = ShatterJadeA, shimmer = ShimmerRunes (Shimmer_A veins + eye flames + the Coffer
-goblin runes), shimmer death = MeltA. Green keeps the exact jade colors and Purple the exact shimmer colors that
+goblin runes), shimmer death = DeathTurnPurple then DeathBurst (turns its color from the feet up, then bursts into
+liquid; MeltA until 2026-10-12). Green keeps the exact jade colors and Purple the exact shimmer colors that
 were tuned in game; the other colors are derived from the palette (Teams.PALETTE).
 
 Writes, per color <C>:
   Server/Entity/ModelVFX/MobBattle/Look/MobBattle_Look_{Jade,JadeAppear,Shimmer}_<C>.json
-  Server/Entity/ModelVFX/MobBattle/Death/MobBattle_Death_{Jade,Shimmer}_<C>.json
+  Server/Entity/ModelVFX/MobBattle/Death/MobBattle_Death_{Jade,Shimmer,ShimmerBurst}_<C>.json
   Server/Entity/Effects/MobBattle/Look/MobBattle_Look_{Jade,JadeAppear,Shimmer}_<C>.json   (Infinite)
-  Server/Entity/Effects/MobBattle/Fx/Death/MobBattle_Fx_Death_{Jade,Shimmer}_<C>.json       (WandFx death looks)
+  Server/Entity/Effects/MobBattle/Fx/Death/MobBattle_Fx_Death_{Jade,Shimmer,ShimmerBurst}_<C>.json (WandFx death looks)
   Server/Entity/Effects/MobBattle/Fx/Buff/MobBattle_Fx_Buff{Shimmer,Runes}_<C>.json         (Buffs: the buff's look;
       Runes = only the runes and eye flames, for a mob with a look of its own, e.g. a jade summon)
   Server/Particles/MobBattle/Look/MobBattle_Look_EyeFlame_<C>.particlesystem (+ spawner in Spawners/Look/)
@@ -86,13 +87,16 @@ def shades(name):
         'vein': light(p, 0.3),           # Shimmer_A veins
         'melt_top': light(p, 0.25),      # MeltA tint
         'melt_bottom': scale(p, 0.36),
-        'melt_drops': p,                 # MeltA glass sparks
+        'melt_drops': p,                 # burst glass sparks
+        'turn': scale(p, 0.85),          # DeathTurnPurple body color
+        'splash': scale(p, 0.85),        # DeathBurst liquid
         'eye': light(p, 0.45),           # eye flames
     }
     if name == 'Green':
         s.update(jade='#3fcf6e', jade_crystal='#4fd37e', jade_sparks='#7dffa0', eye='#7dffa8')
     if name == 'Purple':
-        s.update(vein='#c77dff', melt_top='#b98cff', melt_bottom='#3a1a5c', melt_drops='#a24bff', eye='#e2c2ff')
+        s.update(vein='#c77dff', melt_top='#b98cff', melt_bottom='#3a1a5c', melt_drops='#a24bff', eye='#e2c2ff',
+                 turn='#8a3dff', splash='#8a3dff')
     return s
 
 
@@ -171,11 +175,15 @@ def look_vfx(name, s):
     write(VFX_DEATH, 'MobBattle_Death_Jade_%s.json' % name, vfx(
         '%s jade mob dies: the jade look breaks into pieces (ShatterJadeA, starts on the Jade look).' % name,
         SwitchTo='Disappear', AnimationDuration=0.9, AnimationRange={'X': 0.3, 'Y': 1.0}, HighlightColor=s['jade'], **JADE))
+    # Shimmer death in two steps (two effects, one ModelVFX each; WandFx puts the burst on near the end).
     write(VFX_DEATH, 'MobBattle_Death_Shimmer_%s.json' % name, vfx(
-        '%s shimmer mob dies: melts from the head down, rippling edge (MeltA).' % name,
-        SwitchTo='Disappear', EffectDirection='TopDown', AnimationDuration=1.4, CurveType='QuartIn',
-        HighlightColor=s['vein'], HighlightThickness=2.5, UseBloomOnHighlight=True,
-        NoiseScale={'X': 150.0, 'Y': 150.0}, NoiseScrollSpeed={'X': 0.0, 'Y': -0.25}))
+        '%s shimmer mob dies, step 1: the body turns %s from the feet up and stays so (DeathTurnPurple).' % (name, name),
+        EffectDirection='BottomUp', AnimationDuration=0.5, PostColor=s['turn'], PostColorOpacity=0.9,
+        HighlightColor=s['eye'], HighlightThickness=1.5, UseBloomOnHighlight=True))
+    write(VFX_DEATH, 'MobBattle_Death_ShimmerBurst_%s.json' % name, vfx(
+        '%s shimmer mob dies, step 2: bursts from the middle into liquid (DeathBurst).' % name,
+        SwitchTo='Disappear', EffectDirection='FromCenter', AnimationDuration=0.3,
+        HighlightColor=s['vein'], HighlightThickness=3.0, UseBloomOnHighlight=True, NoiseScale={'X': 30.0, 'Y': 30.0}))
 
 
 # ---- particles -----------------------------------------------------------------
@@ -320,12 +328,17 @@ def look_effects(name, s, flame, rune_system):
          'Particles': [chest('Block_Break_Crystal', s['jade_crystal']), chest('Block_Gem_Sparks', s['jade_sparks'])]},
         duration=0.9))
     write(FX_DEATH, 'MobBattle_Fx_Death_Shimmer_%s.json' % name, effect(
-        '%s shimmer mob dies (Kill Wand, Snap): melts from the head down, tinted, glass sparks.' % name,
-        {'ModelVFXId': 'MobBattle_Death_Shimmer_%s' % name, 'EntityTopTint': s['melt_top'],
+        '%s shimmer mob dies (any death), step 1: turns %s from the feet up. WandFx puts '
+        'MobBattle_Fx_Death_ShimmerBurst_%s on near the end.' % (name, name, name),
+        {'ModelVFXId': 'MobBattle_Death_Shimmer_%s' % name, 'Particles': []},
+        duration=0.6))
+    write(FX_DEATH, 'MobBattle_Fx_Death_ShimmerBurst_%s.json' % name, effect(
+        '%s shimmer mob dies, step 2: bursts from the middle into %s liquid, tinted, glass sparks.' % (name, name),
+        {'ModelVFXId': 'MobBattle_Death_ShimmerBurst_%s' % name, 'EntityTopTint': s['melt_top'],
          'EntityBottomTint': s['melt_bottom'],
-         'Particles': [{'SystemId': 'Item_Break_GlassMagic', 'TargetEntityPart': 'Entity', 'TargetNodeName': 'Pelvis',
-                        'Color': s['melt_drops']}]},
-        duration=1.4))
+         'Particles': [chest('Potion_Morph_Burst', s['melt_drops']), chest('Water_Splash', s['splash']),
+                       chest('Item_Break_GlassMagic', s['vein'])]},
+        duration=0.4))
 
 
 # ---- main ----------------------------------------------------------------------

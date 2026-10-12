@@ -64,7 +64,7 @@
                   "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
                   "shape": {
                     "type": "box",
-                    "offset": {"x": 0, "y": -43.5, "z": 3},
+                    "offset": {"x": 0, "y": -11.5, "z": 3},
                     "stretch": {"x": 1, "y": 1, "z": 1},
                     "settings": {
                       "isPiece": false,
@@ -111,7 +111,7 @@
                     {
                       "id": "5",
                       "name": "bone2",
-                      "position": {"x": 0, "y": 32.5, "z": -3},
+                      "position": {"x": 0, "y": -2.5, "z": -3},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
                       "shape": {
                         "type": "none",
@@ -130,7 +130,7 @@
                         {
                           "id": "6",
                           "name": "Spike--C1",
-                          "position": {"x": 0, "y": 0, "z": 0},
+                          "position": {"x": 0, "y": 35, "z": 0},
                           "orientation": {"x": 0.38268, "y": 0, "z": 0, "w": 0.92388},
                           "shape": {
                             "type": "box",
@@ -2177,7 +2177,7 @@
                     },
                     {
                       "id": "46",
-                      "name": "bone",
+                      "name": "bone15",
                       "position": {"x": 0, "y": 81, "z": -3},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
                       "shape": {
@@ -2245,10 +2245,31 @@
                             "doubleSided": false,
                             "shadingMode": "fullbright"
                           }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "48",
+                      "name": "bone",
+                      "position": {"x": 0, "y": 81, "z": -3},
+                      "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+                      "shape": {
+                        "type": "none",
+                        "offset": {"x": 0, "y": 0, "z": 0},
+                        "stretch": {"x": 1, "y": 1, "z": 1},
+                        "settings": {
+                          "isPiece": false
                         },
+                        "textureLayout": {},
+                        "unwrapMode": "custom",
+                        "visible": true,
+                        "doubleSided": false,
+                        "shadingMode": "flat"
+                      },
+                      "children": [
                         {
-                          "id": "48",
-                          "name": "Gem--C2",
+                          "id": "49",
+                          "name": "Gem--C1",
                           "position": {"x": 0, "y": 0, "z": -9},
                           "orientation": {"x": 0.38268, "y": 0, "z": 0, "w": 0.92388},
                           "shape": {
@@ -2299,8 +2320,8 @@
                           }
                         },
                         {
-                          "id": "49",
-                          "name": "Gem--C3",
+                          "id": "50",
+                          "name": "Gem--C2",
                           "position": {"x": 0, "y": 11, "z": -9},
                           "orientation": {"x": 0.38268, "y": 0, "z": 0, "w": 0.92388},
                           "shape": {
@@ -2351,8 +2372,8 @@
                           }
                         },
                         {
-                          "id": "50",
-                          "name": "Gem--C4",
+                          "id": "51",
+                          "name": "Gem--C3",
                           "position": {"x": 0, "y": 11, "z": 3},
                           "orientation": {"x": 0.38268, "y": 0, "z": 0, "w": 0.92388},
                           "shape": {
@@ -2403,8 +2424,8 @@
                           }
                         },
                         {
-                          "id": "51",
-                          "name": "Gem--C5",
+                          "id": "52",
+                          "name": "Gem--C4",
                           "position": {"x": 0, "y": 0, "z": 3},
                           "orientation": {"x": 0.38268, "y": 0, "z": 0, "w": 0.92388},
                           "shape": {
@@ -2457,109 +2478,61 @@
                       ]
                     },
                     {
-                      "id": "52",
+                      "id": "53",
                       "name": "bone10",
                       "position": {"x": -1, "y": 81.5, "z": -10.75},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
                       "shape": {
-                        "type": "box",
+                        "type": "quad",
                         "offset": {"x": 1, "y": 8.5, "z": 19.3},
                         "stretch": {"x": 1, "y": 1, "z": 1},
                         "settings": {
                           "isPiece": false,
-                          "size": {"x": 0, "y": 14, "z": 14}
+                          "size": {"x": 14, "y": 14},
+                          "normal": "+X"
                         },
                         "textureLayout": {
-                          "back": {
-                            "offset": {"x": 30, "y": 92},
-                            "mirror": {"x": false, "y": false},
-                            "angle": 0
-                          },
-                          "right": {
+                          "front": {
                             "offset": {"x": 40, "y": 32},
                             "mirror": {"x": false, "y": false},
                             "angle": 0
-                          },
-                          "front": {
-                            "offset": {"x": 31, "y": 92},
-                            "mirror": {"x": false, "y": false},
-                            "angle": 0
-                          },
-                          "left": {
-                            "offset": {"x": 24, "y": 42},
-                            "mirror": {"x": false, "y": false},
-                            "angle": 0
-                          },
-                          "top": {
-                            "offset": {"x": 81, "y": 93},
-                            "mirror": {"x": false, "y": false},
-                            "angle": 0
-                          },
-                          "bottom": {
-                            "offset": {"x": 81, "y": 107},
-                            "mirror": {"x": false, "y": true},
-                            "angle": 0
                           }
                         },
                         "unwrapMode": "custom",
                         "visible": true,
-                        "doubleSided": false,
-                        "shadingMode": "flat"
-                      }
-                    },
-                    {
-                      "id": "53",
-                      "name": "bone14",
-                      "position": {"x": -1, "y": 81.5, "z": 4.25},
-                      "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
-                      "shape": {
-                        "type": "box",
-                        "offset": {"x": 1, "y": 8.5, "z": -19.8},
-                        "stretch": {"x": 1, "y": 1, "z": 1},
-                        "settings": {
-                          "isPiece": false,
-                          "size": {"x": 0, "y": 14, "z": 14}
-                        },
-                        "textureLayout": {
-                          "back": {
-                            "offset": {"x": 31, "y": 92},
-                            "mirror": {"x": false, "y": false},
-                            "angle": 0
-                          },
-                          "right": {
-                            "offset": {"x": 54, "y": 32},
-                            "mirror": {"x": true, "y": false},
-                            "angle": 0
-                          },
-                          "front": {
-                            "offset": {"x": 30, "y": 92},
-                            "mirror": {"x": false, "y": false},
-                            "angle": 0
-                          },
-                          "left": {
-                            "offset": {"x": 38, "y": 42},
-                            "mirror": {"x": true, "y": false},
-                            "angle": 0
-                          },
-                          "top": {
-                            "offset": {"x": 81, "y": 107},
-                            "mirror": {"x": false, "y": true},
-                            "angle": 0
-                          },
-                          "bottom": {
-                            "offset": {"x": 81, "y": 93},
-                            "mirror": {"x": false, "y": false},
-                            "angle": 0
-                          }
-                        },
-                        "unwrapMode": "custom",
-                        "visible": true,
-                        "doubleSided": false,
+                        "doubleSided": true,
                         "shadingMode": "flat"
                       }
                     },
                     {
                       "id": "54",
+                      "name": "bone14",
+                      "position": {"x": 0, "y": 90, "z": -15.55},
+                      "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
+                      "shape": {
+                        "type": "quad",
+                        "offset": {"x": 0, "y": 0, "z": 0},
+                        "stretch": {"x": 1, "y": 1, "z": 1},
+                        "settings": {
+                          "isPiece": false,
+                          "size": {"x": 14, "y": 14},
+                          "normal": "+X"
+                        },
+                        "textureLayout": {
+                          "front": {
+                            "offset": {"x": 54, "y": 32},
+                            "mirror": {"x": true, "y": false},
+                            "angle": 0
+                          }
+                        },
+                        "unwrapMode": "custom",
+                        "visible": true,
+                        "doubleSided": true,
+                        "shadingMode": "flat"
+                      }
+                    },
+                    {
+                      "id": "55",
                       "name": "bone13",
                       "position": {"x": -2.11894, "y": 92.5, "z": 14.55027},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
@@ -2578,7 +2551,7 @@
                       }
                     },
                     {
-                      "id": "55",
+                      "id": "56",
                       "name": "bone9",
                       "position": {"x": -2.88106, "y": 92.5, "z": -20.94973},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
@@ -2597,7 +2570,7 @@
                       }
                     },
                     {
-                      "id": "56",
+                      "id": "57",
                       "name": "bone8",
                       "position": {"x": -6, "y": 72.5, "z": -10.75},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
@@ -2616,7 +2589,7 @@
                       }
                     },
                     {
-                      "id": "57",
+                      "id": "58",
                       "name": "bone11",
                       "position": {"x": -6, "y": 72.5, "z": 4.75},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
@@ -2635,7 +2608,7 @@
                       }
                     },
                     {
-                      "id": "58",
+                      "id": "59",
                       "name": "bone12",
                       "position": {"x": -2.88106, "y": 74.5, "z": -20.94973},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
@@ -2654,7 +2627,7 @@
                       }
                     },
                     {
-                      "id": "59",
+                      "id": "60",
                       "name": "bone7",
                       "position": {"x": -1.41894, "y": 74.5, "z": 13.45027},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
@@ -2673,7 +2646,7 @@
                       }
                     },
                     {
-                      "id": "60",
+                      "id": "61",
                       "name": "bone4",
                       "position": {"x": 0, "y": 85.5, "z": -11.5},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},
@@ -2692,7 +2665,7 @@
                       }
                     },
                     {
-                      "id": "61",
+                      "id": "62",
                       "name": "bone3",
                       "position": {"x": 0, "y": 82, "z": -13.5},
                       "orientation": {"x": 0, "y": 0, "z": 0, "w": 1},

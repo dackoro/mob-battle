@@ -433,9 +433,20 @@ final class Buffs {
             }
             if (changed) {
                 EntityStatValue after = stats.get(index);
-                if (fillHealth && health > 0) stats.maximizeStatValue(index);
+                float target = -1;
+                if (fillHealth && health > 0 && after != null) target = after.getMax();
                 else if (share > 0 && after != null && after.getMax() > 0) {
-                    stats.setStatValue(index, after.getMax() >= oldMax ? share * after.getMax() : Math.min(oldValue, after.getMax()));
+                    target = after.getMax() >= oldMax ? share * after.getMax() : Math.min(oldValue, after.getMax());
+                }
+                // A bigger value goes in a moment later: sent in the same tick as the new max, the client applied it
+                // first and cut it to the old max, so it thought the mob had less health than it has. Its predicted
+                // hits then "killed" it (death animation, no more hits sent) while the server still had health left
+                // (user, 2026-10-12: a Buff Wand skeleton froze dying at 8/84 and came back). A smaller one can't
+                // be cut, so it goes now.
+                if (target >= 0 && after != null && target > after.get() + 0.001f) {
+                    setHealthLater(mob, after.get(), target);
+                } else if (target >= 0) {
+                    stats.setStatValue(index, target);
                 }
             }
         }
@@ -555,6 +566,33 @@ final class Buffs {
             WandFx.removeFx(mob, fx, st);
             WandFx.addFx(mob, fx, st);
         }), WandFx.MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Raises health to {@code target} once the new max reached the client (Buffs.apply). Hits taken meanwhile still
+     * count: the value moves by what it changed since {@code valueNow}.
+     */
+    private static void setHealthLater(Ref<EntityStore> mob, float valueNow, float target) {
+        Store<EntityStore> store = mob.getStore();
+        if (store.isShutdown()) return;
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> run(mob, st -> {
+            if (!mob.isValid() || st.getComponent(mob, com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent.getComponentType()) != null) return;
+            EntityStatMap stats = st.getComponent(mob, EntityStatMap.getComponentType());
+            int index = DefaultEntityStatTypes.getHealth();
+            EntityStatValue v = stats != null ? stats.get(index) : null;
+            if (v == null || v.get() <= 0) return;
+            stats.setStatValue(index, Math.max(1f, Math.min(v.getMax(), target + v.get() - valueNow)));
+        }), WandFx.MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** RoleChange: the same mob under a new Ref keeps its buffs; its crown and look go on again on the new model. */
+    static void carry(Ref<EntityStore> old, Ref<EntityStore> neu) {
+        State s = STATES.remove(old);
+        if (s != null) STATES.put(neu, s);
+        if (PRE_LONE.remove(old)) PRE_LONE.add(neu);
+        Falling f = FALLING.remove(old);
+        if (f != null) FALLING.put(neu, f);
+        if (s != null) modelChanged(neu);
     }
 
     /** BattleManager.maintain: drops dead or unloaded mobs. */

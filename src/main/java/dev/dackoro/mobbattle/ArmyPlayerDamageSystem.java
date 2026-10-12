@@ -64,7 +64,8 @@ public class ArmyPlayerDamageSystem extends DamageEventSystem {
             return;
         }
         if (buffer.getComponent(attacker, NPCEntity.getComponentType()) != null) {
-            if (Army.isMember(player.getUuid(), attacker)) {
+            // Its own army mob may hurt a player fighter only when the battle made them enemies.
+            if (Army.isMember(player.getUuid(), attacker) && !BattleManager.areEnemies(attacker, victim)) {
                 damage.setCancelled(true);
             } else if (!damage.isCancelled()) {
                 Army.order(player.getUuid(), attacker, buffer);

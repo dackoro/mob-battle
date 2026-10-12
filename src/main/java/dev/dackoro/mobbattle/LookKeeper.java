@@ -6,6 +6,7 @@ import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffec
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.util.Map;
@@ -36,6 +37,8 @@ final class LookKeeper {
         int index;
         /** Null until the first guardian pass. Only touched on the world thread of the mob's store. */
         int[] seen;
+        /** Remaining seconds of each {@link #seen} effect at that pass (-1 = infinite or gone). World thread only. */
+        float[] seenLeft;
         /** Some effect was removed and put back within one tick (same index set): re-send anyway. */
         volatile boolean touched;
         /** The buff's shimmer (Buffs), not a look of its own. */
@@ -45,6 +48,8 @@ final class LookKeeper {
         /** Same look under another id (MobBattle_LookTwin_*), or null: a re-send swaps to it in one tick. */
         final EntityEffect twin;
         final int twinIndex;
+        /** Players that saw the mob at the last pass, or null before the first one. World thread only. */
+        Set<Ref<EntityStore>> viewers;
 
         Tracked(Style style, String color, EntityEffect effect, int effectIndex, int index, boolean buff) {
             this.style = style;
@@ -191,7 +196,38 @@ final class LookKeeper {
         if (looks.isEmpty()) return;
         for (int i = 1; i < looks.size(); i++) effects.removeEffect(ref, looks.get(i), RemovalBehavior.COMPLETE, store);
         track(ref, EntityEffect.getAssetMap().getAsset(looks.get(0)));
+        // Nobody has seen it get the look: whoever already sees it counts as a new viewer on the first pass.
+        Tracked t = TRACKED.get(ref);
+        if (t != null) t.viewers = new java.util.HashSet<>();
     }
+
+    /**
+     * The client shows a look's ModelVFX only when the effect is added while it already sees the mob, never from the
+     * effect list sent when the mob comes into view (user, 2026-10-12: jade goblins came back plain after re-entering
+     * the world, while the server still had the look). So a player starting to see a tracked mob (vanilla tracker
+     * Visible.visibleTo) gets the look re-sent once the mob reached their client. True when someone new sees it.
+     */
+    private static boolean newViewer(Ref<EntityStore> ref, Tracked t, Store<EntityStore> store) {
+        EntityTrackerSystems.Visible visible = store.getComponent(ref, EntityTrackerSystems.Visible.getComponentType());
+        Map<Ref<EntityStore>, ?> now = visible != null ? visible.visibleTo : Map.of();
+        if (t.viewers == null) {
+            // First pass after the Effect Wand gave the look: those viewers saw it being added.
+            t.viewers = new java.util.HashSet<>(now.keySet());
+            return false;
+        }
+        boolean added = false;
+        for (Ref<EntityStore> viewer : now.keySet()) {
+            if (!t.viewers.contains(viewer)) {
+                added = true;
+                break;
+            }
+        }
+        if (added || now.size() != t.viewers.size()) t.viewers = new java.util.HashSet<>(now.keySet());
+        return added;
+    }
+
+    /** How long after a player starts seeing a mob its look is re-sent (the mob must be on their client first). */
+    private static final long NEW_VIEWER_MS = 300;
 
     /** Delay before a look removed by {@link #dropLook} goes back on. */
     static final long REAPPLY_GAP_MS = 100;
@@ -237,8 +273,12 @@ final class LookKeeper {
      */
     static void resized(Ref<EntityStore> ref) {
         if (ref == null || !TRACKED.containsKey(ref)) return;
+        touchLater(ref, WandFx.MODEL_SETTLE_MS);
+    }
+
+    private static void touchLater(Ref<EntityStore> ref, long ms) {
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> touched(ref),
-                WandFx.MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+                ms, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** BattleLifecycleSystem checks this every tick: with nothing tracked there is nothing to do. */
@@ -286,6 +326,10 @@ final class LookKeeper {
                 boolean jade = t.style == Style.JADE;
                 glowing.put(ref, new LookLight.Want(LookLight.hexOf(t.color, Teams.PALETTE.get(jade ? "Green" : "Purple")), jade));
             }
+            if (newViewer(ref, t, store)) {
+                touchLater(ref, NEW_VIEWER_MS);
+                if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("look re-sent for a new viewer of " + ChaosWand.nameOf(ref, store));
+            }
             // Taken off by the guardian itself, waiting to go back on (resendLater).
             if (t.pending) continue;
             int[] now = effects.getActiveEffectIndexes().clone();
@@ -294,9 +338,18 @@ final class LookKeeper {
                 TRACKED.remove(ref, t);
                 continue;
             }
-            boolean lost = t.touched || t.seen != null && anyMissing(t.seen, now);
+            float[] left = remaining(effects, now);
+            // A renewed effect (Extend/Overwrite) goes to the client as another Add with no removal, and drops the
+            // look too: Red_Flash on every hit, Hit_Interrupt_Eligible refreshed by the role every 0.25 s in combat
+            // (user, 2026-10-12: hit jade mobs lost the look). Vanilla addEffect on an active effect only resets its
+            // duration (javap), so a remaining time that went up means it was renewed.
+            boolean lost = t.touched || t.seen != null && (anyMissing(t.seen, now) || renewed(t.seen, t.seenLeft, now, left));
+            if (lost && MobBattlePlugin.debugging()) {
+                MobBattlePlugin.debug("look lost on " + ChaosWand.nameOf(ref, store) + ": " + why(t, now, left));
+            }
             t.touched = false;
             t.seen = now;
+            t.seenLeft = left;
             if (lost && swap(ref, t, effects, store)) continue;
             if (lost) {
                 // Another effect ended: the client dropped the look's ModelVFX. Send the look again: off now, back on
@@ -336,6 +389,7 @@ final class LookKeeper {
         }
         t.index = nextIndex;
         t.seen = effects.getActiveEffectIndexes().clone();
+        t.seenLeft = remaining(effects, t.seen);
         t.touched = false;
         return true;
     }
@@ -362,6 +416,7 @@ final class LookKeeper {
             // What is active now: not a loss on the next pass. Something removed during the gap is covered: the
             // look was off then and goes on fresh now.
             t.seen = effects.getActiveEffectIndexes().clone();
+            t.seenLeft = remaining(effects, t.seen);
             t.touched = false;
         }), RESEND_GAP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
@@ -375,6 +430,60 @@ final class LookKeeper {
     private static boolean contains(int[] indexes, int value) {
         for (int i : indexes) {
             if (i == value) return true;
+        }
+        return false;
+    }
+
+    /** Debug: which effects made the guardian re-send (gone, renewed, or our own code touched it). */
+    private static String why(Tracked t, int[] now, float[] left) {
+        StringBuilder out = new StringBuilder();
+        if (t.touched) out.append("touched ");
+        if (t.seen != null) {
+            for (int i = 0; i < t.seen.length; i++) {
+                int j = indexOf(now, t.seen[i]);
+                if (j < 0) out.append("gone ").append(idOf(t.seen[i])).append(' ');
+                else if (t.seenLeft != null && t.seenLeft[i] >= 0 && left[j] > t.seenLeft[i] + 0.001f) {
+                    out.append("renewed ").append(idOf(t.seen[i])).append(' ');
+                }
+            }
+        }
+        return out.toString().trim();
+    }
+
+    private static int indexOf(int[] indexes, int value) {
+        for (int i = 0; i < indexes.length; i++) {
+            if (indexes[i] == value) return i;
+        }
+        return -1;
+    }
+
+    private static String idOf(int index) {
+        EntityEffect e = EntityEffect.getAssetMap().getAsset(index);
+        return e != null ? e.getId() : String.valueOf(index);
+    }
+
+    /** Remaining seconds of each effect in {@code indexes} (-1 for infinite ones). */
+    private static float[] remaining(EffectControllerComponent effects, int[] indexes) {
+        var active = effects.getActiveEffects();
+        float[] out = new float[indexes.length];
+        for (int i = 0; i < indexes.length; i++) {
+            var e = active.get(indexes[i]);
+            out[i] = e == null || e.isInfinite() ? -1f : e.getRemainingDuration();
+        }
+        return out;
+    }
+
+    /** True when an effect active at both passes has more time left now than before (it was renewed). */
+    private static boolean renewed(int[] before, float[] beforeLeft, int[] now, float[] nowLeft) {
+        if (beforeLeft == null) return false;
+        for (int j = 0; j < now.length; j++) {
+            if (nowLeft[j] < 0) continue;
+            for (int i = 0; i < before.length; i++) {
+                if (before[i] == now[j]) {
+                    if (beforeLeft[i] >= 0 && nowLeft[j] > beforeLeft[i] + 0.001f) return true;
+                    break;
+                }
+            }
         }
         return false;
     }

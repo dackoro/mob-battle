@@ -138,6 +138,7 @@ public class MobBattleCommand extends CommandBase {
                 "arenaShrinkTo <blocks> - final radius (default 15); arenaShrinkTime <time> - with no timer (default 2m)",
                 "arenaShrinkTime <90|2m|1m30s> - how long a closing arena takes when the battle has no timer (default 2m)",
                 "unstick on|off - a mob stuck 10 s on another level (cave, mountain; fliers 20 s, walls too) appears next to its opponent",
+                "standoffTime <seconds>|off - a mob on its opponent's level that this long gets no closer, hits nothing and isn't hit gets shoved toward it (0-120, default 15, 0 = off)",
                 "duelCard on|off - read-only card with both fighters' stats (health, attack, defense, size, with their buffs) in a 1 vs 1 duel, from the countdown to the end (default off)",
                 "judgeBy <kind|all> health|damage|kills|mix - what timeUp health/judge scores: health % left (default), share of the damage or kills (per fighter, so bigger sides don't win for size), or the three averaged",
                 "tieBreak damage|kills|random|draw - timeUp health/judge when the judgeBy score is even (the same as judgeBy, damage or kills, takes the other one)",
@@ -156,6 +157,8 @@ public class MobBattleCommand extends CommandBase {
                 "stop - end every battle, countdown, timer box, arena, camera shot, battle music and watch",
                 "skipTimer - every running timer jumps to 0: the battles end by their timeUp rule (draw, judge...)",
                 "army clearAll - disband every player's army",
+                "armyTint on|off - army mobs wear a tint while in your army (default off)",
+                "armyTintColor <color> - the army tint color, a palette color (default blue)",
                 "resetAll - stop + teams clearAll + army clearAll + morph reset",
         });
         HELP.put("teams", new String[] {
@@ -187,7 +190,8 @@ public class MobBattleCommand extends CommandBase {
                 "summon atLeastOne true|false - random types spawn 1+",
                 "summonDespawn never|battleEnd|timer - summons leave on their own: never (default, they stay), battleEnd (the surviving summons of a battle go when it ends), timer (each goes summonLifetime seconds after it spawned)",
                 "summonLifetime <seconds> - how long a summon lives with summonDespawn timer (5-3600, default 60)",
-                "summonExit disintegrate|vanish - how summons leave: disintegrate like the Kill Wand (soul rip, no loot, default) or vanish at once (no loot)",
+                "summonExit disintegrate|vanish|shatter - how summons leave: disintegrate like the Kill Wand (soul rip, no loot, default), vanish at once (no loot) or shatter like jade glass (no loot)",
+                "summonArmy on|off - summoned mobs join your army, like the Army Wand (default off)",
                 "summonJade on|off - summons come out wearing the jade look, like the Effect Wand's (default off)",
                 "summonJadeColor <color> - the summons' jade color, a palette color (default green)",
         });
@@ -240,8 +244,8 @@ public class MobBattleCommand extends CommandBase {
         HELP.put("config", new String[] {
                 "Configuration panel",
                 "/mobbattle config or /mobbattle panel - open the settings panel; both commands are public for reading.",
-                "Left menu: Presentation, Cameras, Per kind, Battle rules, Arenas & timers, Chaos area, Colors & looks, Buffs, Wands,",
-                "  Teams, Summon list, Presets & reset, Tools, Admin. Every setting the commands change is there.",
+                "Left menu: Presentation, Cameras, Battles, one tab per battle kind (Duel, All vs one, Royale, Team battles),",
+                "  Chaos area, Colors & looks, Buffs, Wands, Teams, Summon list, Presets & reset, Tools, Admin. Every setting the commands change is there.",
                 "Changing a value only marks it (gold): Save changes applies them all at once, Discard changes drops them.",
                 "Presets and Reset buttons fill the form first, so you can check them before saving.",
                 "Team list, summon list, tools and admin buttons run their command at once (chat shows the result).",
@@ -747,6 +751,7 @@ public class MobBattleCommand extends CommandBase {
                 .withDuration());
         addSubCommand(new Sub("unstick", "Battle mobs stuck on another level than their opponent (cave, mountain) appear next to it",
                 new Sub("on", "Bring them together after 10 s (default)"), new Sub("off", "Leave them")));
+        addSubCommand(new Sub("standofftime", "Seconds a battle mob may stand off from its opponent before it is shoved toward it (0-120, default 15, 0 = off)"));
         addSubCommand(new Sub("duelcard", "Read-only card with both fighters' stats (health, attack, defense, size) in a 1 vs 1 duel (default off)",
                 new Sub("on", "Show the card from the countdown to the end of the duel"), new Sub("off", "No card")));
         addSubCommand(new Sub("tiebreak", "timeUp health/judge when the judgeBy score is even: damage (default), kills, random or draw",
@@ -856,11 +861,18 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("summondespawn", "Summons leave on their own: never (default, they stay), battleEnd (the surviving summons of a battle go when it ends), or timer (summonLifetime after spawn)",
                 words("Leave", "never", "battleEnd", "timer")));
         addSubCommand(new Sub("summonlifetime", "Seconds a summon lives with summonDespawn timer (5-3600, default 60)"));
-        addSubCommand(new Sub("summonexit", "How summons leave: disintegrate (the Kill Wand's soul rip, no loot, default) or vanish (removed at once, no loot)",
-                words("Exit", "disintegrate", "vanish")));
+        addSubCommand(new Sub("summonexit", "How summons leave: disintegrate (the Kill Wand's soul rip, no loot, default), vanish (removed at once, no loot) or shatter (breaks like jade glass, no loot)",
+                words("Exit", "disintegrate", "vanish", "shatter")));
+        addSubCommand(new Sub("summonarmy", "Summoned mobs join your army, like the Army Wand (default off)",
+                new Sub("on", "Summons join your army"),
+                new Sub("off", "Summons stay wild (default)")));
         addSubCommand(new Sub("summonjade", "Summons come out wearing the jade look (default off)",
                 new Sub("on", "Summons in jade"),
                 new Sub("off", "Normal summons (default)")));
+        addSubCommand(new Sub("armytint", "Army mobs wear a tint while in your army (default off)",
+                new Sub("on", "Tinted army"),
+                new Sub("off", "No tint (default)")));
+        addSubCommand(new Sub("armytintcolor", "Color of the army tint: a palette color (default blue)"));
         addSubCommand(new Sub("summonjadecolor", "Color of the summons' jade: a palette color (default green)"));
         addSubCommand(new Sub("maxmobs", "Max mobs per Chaos Wand click and per summon (2-200)"));
         addSubCommand(new Sub("wandeffect", "Effect Wand effect: any effect ID, e.g. Burn or Potion_Morph_Frog; A>B gives B when A ends; jade[:color] or shimmer[:color] (default green, purple)",
@@ -1144,7 +1156,22 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.unstick = on;
-                if (!on) Unstick.clear();
+                if (!Unstick.active()) Unstick.clear();
+            }
+            case "standofftime" -> {
+                int n;
+                if ("off".equalsIgnoreCase(val)) {
+                    n = 0;
+                } else {
+                    try {
+                        n = Integer.parseInt(val == null ? "" : val.replace("s", "").trim());
+                    } catch (NumberFormatException e) {
+                        reply(ctx, "Usage: /mobbattle standoffTime <0-" + FxSettings.MAX_STANDOFF_SECONDS + " seconds>|off", ERR);
+                        return;
+                    }
+                }
+                FxSettings.standoffSeconds = Math.max(0, Math.min(FxSettings.MAX_STANDOFF_SECONDS, n));
+                if (!Unstick.active()) Unstick.clear();
             }
             case "duelcard" -> {
                 Boolean on = parseOnOff(val);
@@ -1555,6 +1582,14 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.summonLifetime = sec;
             }
+            case "summonarmy" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle summonArmy on|off", ERR);
+                    return;
+                }
+                FxSettings.summonArmy = on;
+            }
             case "summonjade" -> {
                 Boolean on = parseOnOff(val);
                 if (on == null) {
@@ -1562,6 +1597,22 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.summonJade = on;
+            }
+            case "armytint" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle armyTint on|off", ERR);
+                    return;
+                }
+                FxSettings.armyTint = on;
+            }
+            case "armytintcolor" -> {
+                String color = SummonList.parseJadeColor(val);
+                if (color == null) {
+                    reply(ctx, "Usage: /mobbattle armyTintColor <palette color> (default blue)", ERR);
+                    return;
+                }
+                FxSettings.armyTintColor = color;
             }
             case "summonjadecolor" -> {
                 String color = SummonList.parseJadeColor(val);
@@ -1574,7 +1625,7 @@ public class MobBattleCommand extends CommandBase {
             case "summonexit" -> {
                 String exit = SummonDespawn.parseExit(val);
                 if (exit == null) {
-                    reply(ctx, "Usage: /mobbattle summonExit disintegrate|vanish", ERR);
+                    reply(ctx, "Usage: /mobbattle summonExit disintegrate|vanish|shatter", ERR);
                     return;
                 }
                 FxSettings.summonExit = exit;
