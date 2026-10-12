@@ -17,6 +17,8 @@ The key is what you type when a setting works per kind, e.g. `/mobbattle arena r
 
 ### Duels (Battle Wand)
 
+▶ Watch: [duel](https://youtu.be/TV-EqNu036Y) · [against a test dummy](https://youtu.be/NU3Tpd9qQdU)
+
 Left click mob A, then mob B: they fight. Click a selected mob again to deselect it; right click clears the selection. A pair where neither mob can attack is refused before anything starts.
 
 With players allowed in duels (`playerFights duel on`, the default), players can be picked like mobs, and **crouch + click a mob** makes that mob fight you (or select a mob, then crouch and click the air).
@@ -32,15 +34,21 @@ Changing the mode affects new orders, not fights already running.
 
 ### All vs one (Chaos Wand left click)
 
+▶ [Watch it](https://youtu.be/VkftCvat9ng)
+
 Every mob within `areaRadius` of the clicked mob attacks it; the lone target fights back against the nearest attacker. The area holds at most `maxMobs` mobs (default 200, nearest first); the chat says how many were left out. Only loaded mobs count, and the radius is a 3D sphere, so a mob in a cave or on a roof can be in or out.
 
 `/mobbattle chaos me` does the same with you as the target (needs `playerFights allVsOne on`).
 
 ### Battle royale (Chaos Wand right click)
 
+▶ [Watch it](https://youtu.be/qorX35UQVe0)
+
 Every mob within `areaRadius` fights on its own, centered on the mob you aim at (or on you). Each fighter starts on one of its 3 closest opponents, picked at random; when its target falls it goes for the nearest survivor. Players in the area join too with `playerFights royale on`.
 
 ### Team battles (Team Wand)
+
+▶ [Watch it](https://youtu.be/jvpsDgs0lXM)
 
 Build the teams with the Team Wand, then right click a mob (or run `teams start`). You need at least 2 teams with living members. Each fighter starts on its nearest enemy. Team building, names, colors and the team commands are in [teams-summon-army.md](teams-summon-army.md).
 
@@ -177,6 +185,8 @@ Two separate helpers for fights that would otherwise never finish. Players are n
 
 ## Passive mobs: passiveWin
 
+▶ Watch: [a mob against a test dummy, which never ends the battle](https://youtu.be/NU3Tpd9qQdU)
+
 A skeleton can never finish off a duck flying out of its reach. `passiveWin <seconds>|off` (0-120, default 15) handles that:
 
 - When only one side can still fight back (the others are left with passive mobs only), that side wins after this many seconds without a hit.
@@ -232,6 +242,8 @@ Each source can raise size, max health, damage and defense by a percentage, e.g.
 
 ## Cameras
 
+▶ Watch: [duel intro and winner](https://youtu.be/eYbRIGjnRyw) · [battle royale orbit and spectator mode](https://youtu.be/urVVfprhp3o)
+
 ### Intro camera
 
 `camera on|off` (default on, global or per kind): during the countdown, or for `cameraTime` seconds, your camera films the fight, then glides back to your view as it starts. Your input does nothing meanwhile, but your physics keep running (you keep flying if you were). It is skipped when you are one of the fighters, and when you are watching (see below). With `countdown 0` it only plays if `cameraTime` is above 0.
@@ -267,6 +279,8 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 - If anything goes wrong, the game's `/camera reset` gives the normal camera back.
 
 ## Watching a battle
+
+▶ [Watch it](https://youtu.be/urVVfprhp3o)
 
 `/mobbattle watch` lets you spectate a running battle of any kind: your own battle in this world, else the nearest one. You enter the game's spectator mode (you fly, nobody sees you, nothing hurts you) and the camera follows one fighter in third person, starting with the top killer still standing (or the nearest fighter). The mouse turns the camera around the fighter.
 

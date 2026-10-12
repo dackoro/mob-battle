@@ -2,6 +2,8 @@
 
 Dackoro's Mob Battle adds thirteen wands. Each one uses the mobs' own AI: the wands only tell mobs who to fight, change how they look, or help you set up and inspect battles. This page covers every wand: what each click does, what you see and hear, which settings change it, and the quirks worth knowing.
 
+▶ Every clip in one place: [the Mob Battle playlist](https://www.youtube.com/playlist?list=PLbSYS5J690io).
+
 Settings are named as chat commands (`/mobbattle <setting>`). They are all described in [settings.md](settings.md) and can also be changed in the settings panel ([settings-panel.md](settings-panel.md)). Battle kinds, countdowns, cameras and arenas are covered in [battles.md](battles.md). Teams, the summon list and armies are covered in [teams-summon-army.md](teams-summon-army.md). Colors and looks are covered in [colors-and-looks.md](colors-and-looks.md).
 
 ## Getting the wands
@@ -45,6 +47,10 @@ The `playerFights`, `morphPlayers`, `killPlayers` and `snapPlayers` settings are
 
 ## Battle Wand (`MobBattle_Wand`)
 
+![Battle Wand](images/cards/MobBattle_Wand_card.png)
+
+▶ Watch: [duel](https://youtu.be/TV-EqNu036Y) · [against a test dummy](https://youtu.be/NU3Tpd9qQdU)
+
 Makes two mobs fight each other in a duel.
 
 **Left click**
@@ -71,6 +77,10 @@ Makes two mobs fight each other in a duel.
 
 ## Chaos Wand (`MobBattle_ChaosWand`)
 
+![Chaos Wand](images/cards/MobBattle_ChaosWand_card.png)
+
+▶ Watch: [everyone vs one](https://youtu.be/VkftCvat9ng) · [battle royale](https://youtu.be/qorX35UQVe0)
+
 Starts group battles among every mob within [`/mobbattle areaRadius`](settings.md) (default 60 blocks), capped at the [`/mobbattle maxMobs`](settings.md) nearest mobs (default 200). The chat tells you how many mobs were left out.
 
 **Left click: everyone vs one.** Aim at a living mob, or at a player with `playerFights allVsOne on`.
@@ -95,6 +105,10 @@ Starts group battles among every mob within [`/mobbattle areaRadius`](settings.m
 
 ## Team Wand (`MobBattle_TeamWand`)
 
+![Team Wand](images/cards/MobBattle_TeamWand_card.png)
+
+▶ [Watch it](https://youtu.be/jvpsDgs0lXM)
+
 Builds teams and starts a team battle. The last team standing wins. Full details are in [teams-summon-army.md](teams-summon-army.md).
 
 **Left click a mob:** adds it to your current team, with a swirl in the team color and the team look. Click it again to take it out. With `playerFights teams on`, players can be added the same way. With [`/mobbattle teamByType on`](settings.md), every mob of the same type within `areaRadius` follows the clicked one into (or out of) the team.
@@ -108,6 +122,10 @@ Builds teams and starts a team battle. The last team standing wins. Full details
 **Related settings:** `teams ...`, `teamLook`, `teamByType`, `playerFights teams`, and the per-kind battle settings for `teams`.
 
 ## Summon Wand (`MobBattle_SummonWand`)
+
+![Summon Wand](images/cards/MobBattle_SummonWand_card.png)
+
+▶ Watch: [summon](https://youtu.be/M21iEYmvxqM) · [with a special look](https://youtu.be/Zg61ddWj5_w)
 
 Spawns a saved list of mobs to set up battles quickly. Full details are in [teams-summon-army.md](teams-summon-army.md).
 
@@ -126,6 +144,10 @@ Spawns a saved list of mobs to set up battles quickly. Full details are in [team
 
 ## Army Wand (`MobBattle_ArmyWand`)
 
+![Army Wand](images/cards/MobBattle_ArmyWand_card.png)
+
+▶ [Watch it](https://youtu.be/WdlFfEAAh0w)
+
 Builds your own army of mobs. Full details are in [teams-summon-army.md](teams-summon-army.md).
 
 **Left click a living mob:** it joins your army, with a blue flash and a blue burst ring. Click it again and it leaves, with a red flash.
@@ -142,6 +164,10 @@ Builds your own army of mobs. Full details are in [teams-summon-army.md](teams-s
 - [`/mobbattle armyTint`](settings.md) makes army mobs wear a tint ([`/mobbattle armyTintColor`](settings.md), default blue) for as long as they are in the army.
 
 ## Morph Wand (`MobBattle_MorphWand`)
+
+![Morph Wand](images/cards/MobBattle_MorphWand_card.png)
+
+▶ [Watch it](https://youtu.be/GG9UBmj5-o0)
 
 Gives a mob another mob's model. It keeps its own AI, weapon, attacks and health. It works like the game's frog potion, but has no time limit.
 
@@ -166,6 +192,10 @@ Gives a mob another mob's model. It keeps its own AI, weapon, attacks and health
 
 ## Heal Wand (`MobBattle_HealWand`)
 
+![Heal Wand](images/cards/MobBattle_HealWand_card.png)
+
+▶ [Watch it](https://youtu.be/vmuPqtAUbQk)
+
 **Left click any mob or player:** brings it back to full health.
 
 **Step by step**
@@ -179,6 +209,10 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 - A mob with a health buff is healed to its raised max.
 
 ## Kill Wand (`MobBattle_KillWand`)
+
+![Kill Wand](images/cards/MobBattle_KillWand_card.png)
+
+▶ [Watch it](https://youtu.be/1HrGRisZXxM)
 
 **Left click:** kills the target, whatever its health.
 
@@ -201,6 +235,10 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 - A disintegration is not a kill for battle kill counts.
 
 ## Snap Wand (`MobBattle_SnapWand`)
+
+![Snap Wand](images/cards/MobBattle_SnapWand_card.png)
+
+▶ [Watch it](https://youtu.be/ue_ffUmihbQ)
 
 **Left click:** half of the fighters, picked at random, turn to dust.
 
@@ -228,6 +266,10 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 
 ## Effect Wand (`MobBattle_EffectWand`)
 
+![Effect Wand](images/cards/MobBattle_EffectWand_card.png)
+
+▶ [Watch it](https://youtu.be/-QTM87aRRRY)
+
 ![The Effect Wand jade look in four colors](images/looks-colors.jpg)
 ![The Effect Wand shimmer look in four colors](images/looks-shimmer.jpg)
 
@@ -250,6 +292,10 @@ Any palette color works (`jade:red`, `shimmer:blue`...). `gold` means yellow, an
 
 ## Cleanse Wand (`MobBattle_CleanseWand`)
 
+![Cleanse Wand](images/cards/MobBattle_CleanseWand_card.png)
+
+▶ [Watch it](https://youtu.be/5a5stZEjjEE)
+
 **Left click any mob or player:** removes every effect and every buff, and undoes a morph.
 
 **Step by step**
@@ -264,6 +310,10 @@ Any palette color works (`jade:red`, `shimmer:blue`...). `gold` means yellow, an
 - An army tint comes back within a second, because it lasts as long as the mob is in an army.
 
 ## Buff Wand (`MobBattle_BuffWand`)
+
+![Buff Wand](images/cards/MobBattle_BuffWand_card.png)
+
+▶ [Watch it](https://youtu.be/69zD_VQW_-Q)
 
 **Left click a mob or player:** adds one more buff stack.
 

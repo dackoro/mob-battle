@@ -136,6 +136,8 @@ The other wands have fixed colors:
 ![Skeletons in jade, one per color: blue, red, green and yellow](images/looks-colors.jpg)
 ![Skeletons in shimmer at night, one per color: purple, red, green and yellow](images/looks-shimmer.jpg)
 
+▶ Watch: [the Effect Wand giving looks](https://youtu.be/-QTM87aRRRY) · [summons arriving with a look](https://youtu.be/Zg61ddWj5_w) · [a looked mob dying](https://youtu.be/1HrGRisZXxM)
+
 Two special looks change the whole body of a mob. Both come in every palette color.
 
 | Look | What it looks like | Default color |

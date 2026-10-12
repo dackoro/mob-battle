@@ -8,6 +8,8 @@ Every command here starts with `/mobbattle`. How battles themselves run (targets
 
 ### Team Wand
 
+▶ [Watch it](https://youtu.be/jvpsDgs0lXM)
+
 | Click | Effect |
 |---|---|
 | Left click a mob | Adds it to your current team. Click it again to remove it. With `playerFights teams on` (default), players can be added too. |
@@ -48,6 +50,8 @@ Every command here starts with `/mobbattle`. How battles themselves run (targets
 ## Summons
 
 ### Summon Wand
+
+▶ [Watch it](https://youtu.be/M21iEYmvxqM)
 
 | Click | Effect |
 |---|---|
@@ -97,12 +101,16 @@ None of the exits drop loot. Summons are tracked while the server runs: a summon
 
 ### Jade summons and summons in your army
 
+▶ [Watch it](https://youtu.be/Zg61ddWj5_w)
+
 - `summonJade on|off` (default off): summons come out wearing the jade look, as if the Effect Wand gave it. It is kept the same way (it comes back when another effect ends), glows with `lookGlow`, and they shatter into jade when killed. `summonJadeColor <color>` picks its palette color (default green). See [colors-and-looks.md](colors-and-looks.md).
 - `summonArmy on|off` (default off): summons join your army, as if you added each one with the Army Wand. Summons that spawn into a team (team rule) don't.
 
 ## Armies
 
 ### Army Wand
+
+▶ [Watch it](https://youtu.be/WdlFfEAAh0w)
 
 | Click | Effect |
 |---|---|
@@ -149,6 +157,8 @@ With `morphPlayers on` (default), the Morph Wand works on players like on mobs:
 Only the model changes: the player keeps their own controls, items and health. See [wands.md](wands.md) for the Morph Wand on mobs.
 
 ## Snap Wand
+
+▶ [Watch it](https://youtu.be/ue_ffUmihbQ)
 
 Left click: a share of the fighters (`snapPercent`, default 50%), picked at random, turn to dust, one after another over up to `snapTime` seconds (default 5). Same as `/mobbattle snap` when you click the air.
 

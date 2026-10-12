@@ -1,8 +1,14 @@
 # Dackoro's Mob Battle
 
+![Dackoro's Mob Battle](docs/images/banner.png)
+
 A Hytale mod by **Dackoro**: wands that make mobs fight using their existing AI. Supports vanilla NPCs and modded NPCs with compatible combat behavior; player-only attacks and encounter-specific mechanics may need adaptations.
 
 Hytale **0.7.0** (release and the 0.7 pre-release: `ServerVersion >=0.7.0-pre <0.8.0`).
+
+[![Watch every wand in action (YouTube playlist)](https://img.youtube.com/vi/qorX35UQVe0/maxresdefault.jpg)](https://www.youtube.com/playlist?list=PLbSYS5J690io)
+
+▶ **[Watch every wand in action](https://www.youtube.com/playlist?list=PLbSYS5J690io)** (YouTube playlist, one short clip per wand, battle kind and camera).
 
 ## Features at a glance
 
@@ -10,7 +16,7 @@ Hytale **0.7.0** (release and the 0.7 pre-release: `ServerVersion >=0.7.0-pre <0
 - **Thirteen wands** to start battles, summon mobs, build teams and armies, heal, kill, buff, morph, recolor and inspect mobs.
 - **Players can fight too**, side by side with mobs or against them (never in Creative).
 - **Arenas and timers:** walls that keep fighters in, closing royale zones, time limits with judging by health, damage or kills, scoreboards.
-- **Presentation:** countdowns, big titles, intro and end cameras, battle music, a spectator mode to watch any fighter, duel and watch cards.
+- **Presentation:** countdowns, big titles, intro and end cameras, battle music, a spectator mode to watch any fighter, duel and watch cards. ▶ [Duel cameras](https://youtu.be/eYbRIGjnRyw) · [royale cameras and spectator mode](https://youtu.be/urVVfprhp3o)
 - **Looks:** Jade and Shimmer looks with their own death effects, crowns, buff shimmer, team tints and every color from a 14-color palette.
 - **Settings panel** (`/mobbattle config`) with every setting, presets, resets and undo; settings are saved per world.
 - **Server ready:** permission modes, console events and a public plugin API.
@@ -19,21 +25,61 @@ Hytale **0.7.0** (release and the 0.7 pre-release: `ServerVersion >=0.7.0-pre <0
 
 Get all thirteen with `/mobbattle give` (admin), from the creative inventory, or with `/give <item ID>`. Each wand's tooltip explains what it does. Full details, sounds and quirks: [docs/wands.md](docs/wands.md).
 
-| Item ID | Name | Left click | Right click |
-|---|---|---|---|
-| `MobBattle_Wand` | Battle Wand | Click mob A, then mob B: they duel (crouch + click a mob to fight it yourself). | Clear the selection. |
-| `MobBattle_ChaosWand` | Chaos Wand | Every mob in the area attacks the clicked one. | Battle royale among every mob in the area. |
-| `MobBattle_TeamWand` | Team Wand | Add or remove a mob in the current team. | In the air: next team. On a mob: start the team battle. |
-| `MobBattle_SummonWand` | Summon Wand | Add or remove the mob's type in the summon list. | Summon the whole list around you. |
-| `MobBattle_ArmyWand` | Army Wand | Add or remove a mob in your army, which follows and defends you. | Disband your army. |
-| `MobBattle_MorphWand` | Morph Wand | Give the mob the copied model (it keeps its own AI). | Copy a mob's model (in the air: show it). |
-| `MobBattle_HealWand` | Heal Wand | Back to full health. | — |
-| `MobBattle_KillWand` | Kill Wand | Kill it: it disintegrates, then vanishes. | — |
-| `MobBattle_SnapWand` | Snap Wand | Half of the fighters around turn to dust. | — |
-| `MobBattle_EffectWand` | Effect Wand | Give the selected effect (including the Jade and Shimmer looks). | Next effect in the list. |
-| `MobBattle_CleanseWand` | Cleanse Wand | Remove every effect and buff, and undo a morph. | — |
-| `MobBattle_BuffWand` | Buff Wand | One more buff stack (size, health, damage, defense). | Take the wand's buff off. |
-| `MobBattle_DebugWand` | Debug Wand | Full report on the mob, then follow it for a while. | Stop following. |
+![Battle Wand](docs/images/cards/MobBattle_Wand_card.png)
+
+`MobBattle_Wand` · ▶ Watch: [duel](https://youtu.be/TV-EqNu036Y) · [against a test dummy](https://youtu.be/NU3Tpd9qQdU) · [details](docs/wands.md#battle-wand-mobbattle_wand)
+
+![Chaos Wand](docs/images/cards/MobBattle_ChaosWand_card.png)
+
+`MobBattle_ChaosWand` · ▶ Watch: [everyone vs one](https://youtu.be/VkftCvat9ng) · [battle royale](https://youtu.be/qorX35UQVe0) · [details](docs/wands.md#chaos-wand-mobbattle_chaoswand)
+
+![Team Wand](docs/images/cards/MobBattle_TeamWand_card.png)
+
+`MobBattle_TeamWand` · ▶ [Watch it](https://youtu.be/jvpsDgs0lXM) · [details](docs/wands.md#team-wand-mobbattle_teamwand)
+
+![Summon Wand](docs/images/cards/MobBattle_SummonWand_card.png)
+
+`MobBattle_SummonWand` · ▶ Watch: [summon](https://youtu.be/M21iEYmvxqM) · [with a special look](https://youtu.be/Zg61ddWj5_w) · [details](docs/wands.md#summon-wand-mobbattle_summonwand)
+
+![Army Wand](docs/images/cards/MobBattle_ArmyWand_card.png)
+
+`MobBattle_ArmyWand` · ▶ [Watch it](https://youtu.be/WdlFfEAAh0w) · [details](docs/wands.md#army-wand-mobbattle_armywand)
+
+![Morph Wand](docs/images/cards/MobBattle_MorphWand_card.png)
+
+`MobBattle_MorphWand` · ▶ [Watch it](https://youtu.be/GG9UBmj5-o0) · [details](docs/wands.md#morph-wand-mobbattle_morphwand)
+
+![Heal Wand](docs/images/cards/MobBattle_HealWand_card.png)
+
+`MobBattle_HealWand` · ▶ [Watch it](https://youtu.be/vmuPqtAUbQk) · [details](docs/wands.md#heal-wand-mobbattle_healwand)
+
+![Kill Wand](docs/images/cards/MobBattle_KillWand_card.png)
+
+`MobBattle_KillWand` · ▶ [Watch it](https://youtu.be/1HrGRisZXxM) · [details](docs/wands.md#kill-wand-mobbattle_killwand)
+
+![Snap Wand](docs/images/cards/MobBattle_SnapWand_card.png)
+
+`MobBattle_SnapWand` · ▶ [Watch it](https://youtu.be/ue_ffUmihbQ) · [details](docs/wands.md#snap-wand-mobbattle_snapwand)
+
+![Effect Wand](docs/images/cards/MobBattle_EffectWand_card.png)
+
+`MobBattle_EffectWand` · ▶ [Watch it](https://youtu.be/-QTM87aRRRY) · [details](docs/wands.md#effect-wand-mobbattle_effectwand)
+
+![Cleanse Wand](docs/images/cards/MobBattle_CleanseWand_card.png)
+
+`MobBattle_CleanseWand` · ▶ [Watch it](https://youtu.be/5a5stZEjjEE) · [details](docs/wands.md#cleanse-wand-mobbattle_cleansewand)
+
+![Buff Wand](docs/images/cards/MobBattle_BuffWand_card.png)
+
+`MobBattle_BuffWand` · ▶ [Watch it](https://youtu.be/69zD_VQW_-Q) · [details](docs/wands.md#buff-wand-mobbattle_buffwand)
+
+**Debug Wand** (`MobBattle_DebugWand`, for mod makers): left click writes a full report on the mob, then follows it for a while; right click stops following. [Details](docs/wands.md#debug-wand-mobbattle_debugwand)
+
+### Looks in every color
+
+<p align="center"><img src="docs/images/looks-colors.jpg" alt="Jade look in four colors" width="49%" /> <img src="docs/images/looks-shimmer.jpg" alt="Shimmer look in four colors" width="49%" /></p>
+
+Jade and Shimmer looks, crowns, buff shimmer and team tints in any of the 14 palette colors. See [docs/colors-and-looks.md](docs/colors-and-looks.md).
 
 ## Install
 
@@ -53,7 +99,7 @@ Don't replace the jar while a world is open: Hytale keeps it locked and can't re
 4. `/mobbattle config` opens the settings panel: countdowns, cameras, arenas, timers, colors and more. Nothing applies until **Save changes**.
 5. `/mobbattle help` lists the commands by topic; `/mobbattle stop` ends every battle.
 
-![The settings panel (Summon list tab)](docs/images/panel-summon-list.jpg)
+<p align="center"><img src="docs/images/panel-summon-list.jpg" alt="The settings panel: Summon list tab" width="49%" /> <img src="docs/images/panel-teams.jpg" alt="The settings panel: Teams tab" width="49%" /></p>
 
 ## Commands overview
 
