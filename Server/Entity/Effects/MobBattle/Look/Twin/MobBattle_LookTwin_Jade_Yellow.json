@@ -15,6 +15,10 @@
         "TargetNodeName": "R-Eye"
       }
     ],
-    "FirstPersonParticles": []
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ]
   }
 }

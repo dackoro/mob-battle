@@ -11,6 +11,11 @@
         "TargetNodeName": "Chest",
         "Color": "#8a3dff"
       }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
     ]
   }
 }

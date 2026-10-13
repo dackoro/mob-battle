@@ -19,6 +19,10 @@
         "Color": "#7dffa0"
       }
     ],
-    "FirstPersonParticles": []
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ]
   }
 }

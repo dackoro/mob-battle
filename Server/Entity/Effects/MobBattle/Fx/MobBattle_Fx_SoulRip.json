@@ -11,6 +11,11 @@
         "TargetNodeName": "Chest"
       }
     ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ],
     "ModelVFXId": "MobBattle_Disintegrate"
   },
   "OverlapBehavior": "Overwrite",

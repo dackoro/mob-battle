@@ -6,6 +6,10 @@
   "ApplicationEffects": {
     "ModelVFXId": "MobBattle_Death_Shimmer_Pink",
     "Particles": [],
-    "FirstPersonParticles": []
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ]
   }
 }

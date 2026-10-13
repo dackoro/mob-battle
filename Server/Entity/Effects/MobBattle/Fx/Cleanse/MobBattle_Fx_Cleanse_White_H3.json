@@ -25,6 +25,11 @@
         "SystemId": "MobBattle_Mark_Rune_White",
         "TargetEntityPart": "Entity"
       }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
     ]
   },
   "OverlapBehavior": "Overwrite",

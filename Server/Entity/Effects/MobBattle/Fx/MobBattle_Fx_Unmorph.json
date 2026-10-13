@@ -9,6 +9,11 @@
         "TargetNodeName": "Pelvis"
       }
     ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ],
     "WorldSoundEventId": "SFX_Portal_Neutral_Open"
   },
   "OverlapBehavior": "Overwrite",

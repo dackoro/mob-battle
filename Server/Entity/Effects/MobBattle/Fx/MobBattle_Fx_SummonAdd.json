@@ -15,6 +15,11 @@
         "TargetEntityPart": "Entity"
       }
     ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ],
     "WorldSoundEventId": "SFX_Eye_Void_Attack_Summon"
   },
   "OverlapBehavior": "Overwrite",

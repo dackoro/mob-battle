@@ -11,6 +11,11 @@
         "TargetNodeName": "Pelvis"
       }
     ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ],
     "WorldSoundEventId": "SFX_Deployable_Totem_Heal_Despawn"
   },
   "OverlapBehavior": "Overwrite",

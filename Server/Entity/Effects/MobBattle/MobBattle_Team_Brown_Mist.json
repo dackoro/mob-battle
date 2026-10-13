@@ -10,6 +10,11 @@
           "Z": 0
         }
       }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
     ]
   },
   "Infinite": true,

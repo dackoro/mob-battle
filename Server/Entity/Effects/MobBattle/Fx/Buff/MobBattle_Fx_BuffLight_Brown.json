@@ -10,6 +10,11 @@
           "Y": 1.5
         }
       }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
     ]
   },
   "OverlapBehavior": "Overwrite",

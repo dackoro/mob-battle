@@ -19,6 +19,11 @@
         "TargetEntityPart": "Entity"
       }
     ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ],
     "WorldSoundEventId": "SFX_Skeleton_Mage_Spellbook_Impact"
   },
   "OverlapBehavior": "Overwrite",

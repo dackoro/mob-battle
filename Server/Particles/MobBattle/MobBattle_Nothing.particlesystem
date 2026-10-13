@@ -1,0 +1,9 @@
+{
+  "$Comment": "Shows nothing: the FirstPersonParticles of our effects, so the wearer doesn't see them in first person (others still see Particles). An empty list is not enough, it falls back to Particles.",
+  "LifeSpan": 0.1,
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_Nothing"
+    }
+  ]
+}

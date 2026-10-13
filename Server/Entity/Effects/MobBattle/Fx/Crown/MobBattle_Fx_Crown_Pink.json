@@ -9,7 +9,11 @@
         "TargetNodeName": "Head"
       }
     ],
-    "FirstPersonParticles": []
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ]
   },
   "OverlapBehavior": "Overwrite",
   "Debuff": false

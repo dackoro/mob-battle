@@ -14,6 +14,11 @@
         "SystemId": "MobBattle_Aura_Purple",
         "TargetEntityPart": "Entity"
       }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
     ]
   },
   "OverlapBehavior": "Overwrite",

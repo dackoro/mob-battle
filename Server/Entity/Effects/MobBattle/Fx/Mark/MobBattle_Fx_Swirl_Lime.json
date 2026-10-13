@@ -8,6 +8,11 @@
         "TargetEntityPart": "Entity",
         "TargetNodeName": "Pelvis"
       }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
     ]
   },
   "OverlapBehavior": "Overwrite",
