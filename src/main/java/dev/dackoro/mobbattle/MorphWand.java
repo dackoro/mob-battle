@@ -182,6 +182,9 @@ public final class MorphWand {
         MORPHS.put(entity, copy);
         if (copy.skin() != null) {
             accessor.putComponent(entity, PlayerSkinComponent.getComponentType(), new PlayerSkinComponent(copy.skin()));
+        } else if (skin != null && ORIGINALS.get(entity).skin() == null) {
+            // From a copied player look to a plain model: the copied skin goes, or the client keeps drawing it.
+            dropSkin(entity, accessor);
         }
         putModel(entity, model, copy.skin() != null, accessor);
         modelChanged(entity);
@@ -202,7 +205,7 @@ public final class MorphWand {
             }
         } else if (now != null) {
             // A copied skin on a mob that had none.
-            accessor.removeComponent(entity, PlayerSkinComponent.getComponentType());
+            dropSkin(entity, accessor);
         }
         // A player is rebuilt from their own skin at their size; anything else gets its saved model.
         Model model = original.skin() != null && isPlayer(entity, accessor)
@@ -211,6 +214,21 @@ public final class MorphWand {
         putModel(entity, model, original.skin() != null, accessor);
         modelChanged(entity);
         return true;
+    }
+
+    /**
+     * Removes a copied skin from a mob and tells everyone who sees it. Vanilla only ever sends PlayerSkin updates
+     * (EntityTrackerSystems.EntitySkin, javap), never a removal, so the client kept the old skin half applied and the
+     * cleansed mob came out as a bare player body (user, 2026-10-13). EntityViewer.queueRemove sends the removal.
+     */
+    private static void dropSkin(Ref<EntityStore> entity, ComponentAccessor<EntityStore> accessor) {
+        accessor.removeComponent(entity, PlayerSkinComponent.getComponentType());
+        var visible = accessor.getComponent(entity,
+                com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems.Visible.getComponentType());
+        if (visible == null || visible.visibleTo == null) return;
+        for (var viewer : visible.visibleTo.values()) {
+            viewer.queueRemove(entity, com.hypixel.hytale.protocol.ComponentUpdateType.PlayerSkin);
+        }
     }
 
     /**
