@@ -95,6 +95,10 @@ final class LookLight {
             for (Map.Entry<Ref<EntityStore>, Want> e : wanted.entrySet()) {
                 Want want = e.getValue();
                 if (want == null || want.hex() == null) continue;
+                // `wanted` was built a tick earlier (LookKeeper.lightLater): the mob may be gone since (despawn,
+                // removal after a death look), and getComponent on it throws and aborted the whole pass.
+                Ref<EntityStore> mob = e.getKey();
+                if (!mob.isValid() || mob.getStore() != store) continue;
                 Lit lit = LIT.get(e.getKey());
                 if (lit != null && lit.end != 0) continue; // flashing
                 if (lit == null) {

@@ -89,7 +89,7 @@ final class BattleDebug {
             var from = ChaosWand.positionOf(self, store);
             var to = ChaosWand.positionOf(target, store);
             if (from != null && to != null) distance = String.format(java.util.Locale.ROOT, "%.1f", from.distance(to));
-            if (support != null) attitude = String.valueOf(support.getAttitude(self, target, store));
+            if (support != null) attitude = attitudeOf(support, self, target, store);
             if (combat != null) canDamage = String.valueOf(combat.getCanCauseDamage(self, target, store));
         }
         return " state=" + FightManager.stateOf(self, store)
@@ -143,6 +143,19 @@ final class BattleDebug {
         return b.append(']').toString();
     }
 
+    /**
+     * The role's attitude toward {@code target}, or "n/a": WorldSupport.getAttitude throws a NullPointerException
+     * ("attitudeCache is null") on roles without attitude memory (server log 2026-10-12, /mobbattle debug).
+     */
+    private static String attitudeOf(WorldSupport support, Ref<EntityStore> self, Ref<EntityStore> target,
+                                     Store<EntityStore> store) {
+        try {
+            return String.valueOf(support.getAttitude(self, target, store));
+        } catch (RuntimeException ex) {
+            return "n/a";
+        }
+    }
+
     /** Debug Wand follow: AI state, battle, ordered/locked target and attitude (what changes now and then). */
     static String followFields(Ref<EntityStore> self, Store<EntityStore> store) {
         var battle = BattleManager.battleOf(self);
@@ -153,7 +166,7 @@ final class BattleDebug {
         var target = ordered != null && ordered.isValid() ? ordered : locked;
         String attitude = "?";
         if (target != null && target.isValid() && target.getStore() == store && support != null) {
-            attitude = String.valueOf(support.getAttitude(self, target, store));
+            attitude = attitudeOf(support, self, target, store);
         }
         return "state=" + FightManager.stateOf(self, store)
                 + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
