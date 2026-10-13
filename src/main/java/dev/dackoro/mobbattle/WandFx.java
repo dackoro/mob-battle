@@ -721,6 +721,10 @@ final class WandFx {
         if (target == null || !target.isValid() || PLAYER_KILLS.containsKey(target)) {
             return;
         }
+        // Creative or invulnerable: the damage would be blocked, so no disintegration for a death that never comes.
+        if (PlayerFighters.cantDie(target, buffer)) {
+            return;
+        }
         if (!FxSettings.wandFx || ms <= 0) {
             KillInteraction.killNow(target, null, buffer);
             return;

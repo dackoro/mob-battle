@@ -26,7 +26,8 @@ public class DebugInspectInteraction extends SimpleInstantInteraction {
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
-        if (!Perms.interactionAllowed(context)) return;
+        // Admin only (2026-10-12): each click writes a report file and the whole report to the server log.
+        if (!Perms.interactionAllowed(context, Perms.ADMIN)) return;
         CommandBuffer<EntityStore> buffer = context.getCommandBuffer();
         PlayerRef player = buffer != null ? buffer.getComponent(context.getEntity(), PlayerRef.getComponentType()) : null;
         if (player == null) {

@@ -158,12 +158,12 @@ final class Snap {
     }
 
     /**
-     * A player the wild snap may take in: snapPlayers on, a player who is not in Creative, alive, not the one
-     * snapping, and not already queued. False for anything else.
+     * A player the wild snap may take in: snapPlayers on, a player who can die (not Creative, not invulnerable),
+     * alive, not the one snapping, and not already queued. False for anything else.
      */
     private static boolean snapsPlayer(Ref<EntityStore> r, Ref<EntityStore> snapper, ComponentAccessor<EntityStore> buffer) {
         return FxSettings.snapPlayers && r != snapper && PlayerFighters.isPlayer(r, buffer)
-                && !PlayerFighters.isCreative(r, buffer) && BattleManager.isAlive(r, buffer) && !QUEUE.containsKey(r);
+                && !PlayerFighters.cantDie(r, buffer) && BattleManager.isAlive(r, buffer) && !QUEUE.containsKey(r);
     }
 
     /** FightTickSystem, per NPC: disintegrates it once its turn comes. */
@@ -190,7 +190,7 @@ final class Snap {
                 continue;
             }
             PLAYERS.remove(ref);
-            if (PlayerFighters.isCreative(ref, store)) {
+            if (PlayerFighters.cantDie(ref, store)) {
                 done(e.wave());
                 continue;
             }

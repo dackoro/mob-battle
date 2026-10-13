@@ -54,6 +54,15 @@ public class KillInteraction extends SimpleInstantInteraction {
             }
             return;
         }
+        // A Creative or invulnerable player can't die: no soul rip and no "Killed" for a death that never comes.
+        if (npc == null && PlayerFighters.cantDie(target, buffer)) {
+            WandFx.onTarget(target, WandFx.FAIL, buffer);
+            if (player != null) {
+                player.sendMessage(Message.raw(ChaosWand.nameOf(target, buffer)
+                        + " can't die right now (Creative, invulnerable or just respawned).").color("#ffcc55"));
+            }
+            return;
+        }
         // NPCs get the soul rip first and die after /mobbattle killdelay; anything else dies right away.
         Ref<EntityStore> self = context.getEntity();
         boolean isNpc = npc != null;
@@ -104,7 +113,14 @@ public class KillInteraction extends SimpleInstantInteraction {
             NPCEntity npc = buffer.getComponent(target, NPCEntity.getComponentType());
             if (npc != null && npc.getRole() != null) npc.getRole().setDeathItemsDropped();
         }
-        Damage.Source source = killer != null && killer.isValid() ? new Damage.EntitySource(killer) : Damage.NULL_SOURCE;
+        // With PvP off, vanilla PlayerDamageFilterSystem cancels any damage to a player whose source is a player, so the
+        // Kill Wand never killed one (2026-10-12). The wand is an admin tool gated by killPlayers: on a player it hits
+        // with no source, like a command. Invulnerable and Creative players are skipped before (PlayerFighters.cantDie).
+        boolean playerOnPlayer = killer != null && killer.isValid()
+                && buffer.getComponent(target, PlayerRef.getComponentType()) != null
+                && buffer.getComponent(killer, PlayerRef.getComponentType()) != null;
+        Damage.Source source = killer != null && killer.isValid() && !playerOnPlayer
+                ? new Damage.EntitySource(killer) : Damage.NULL_SOURCE;
         DamageSystems.executeDamage(target, buffer, new Damage(source, cause, amount));
     }
 }

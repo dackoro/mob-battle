@@ -71,7 +71,7 @@ public class MobBattleCommand extends CommandBase {
                 "Heal / Kill / Effect / Cleanse: left click any entity",
                 "  Effect Wand right click: next effect; Kill Wand: soul rip, then death (loot with killLoot on)",
                 "Snap Wand: half of the mobs turn to dust (clicked mob's battle, or every mob within snapRadius, fighting or not)",
-                "Debug Wand: left click a mob: full report (chat, server log, debug/ file), then its target, AI state, health and effects for debugTrack seconds in the same file; right click: stop following",
+                "Debug Wand (admin): left click a mob: full report (chat, server log, debug/ file), then its target, AI state, health and effects for debugTrack seconds in the same file; right click: stop following",
         });
         HELP.put("titles", new String[] {
                 "Titles and cameras (global, or per kind: <option> <duel|allVsOne|royale|teams|all> <value>; <kind> default = follow global)",

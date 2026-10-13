@@ -55,6 +55,24 @@ final class PlayerFighters {
     }
 
     /**
+     * True if damage can't kill this player: Creative or spectating, spawn protection (vanilla PlayerDamageFilterSystem
+     * cancels every hit then), or invulnerable (/entity invulnerable, an invulnerability effect) or intangible. The
+     * Kill and Snap wands skip them instead of playing a death that never comes.
+     */
+    static boolean cantDie(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        if (ref == null || !ref.isValid()) return false;
+        if (isCreative(ref, accessor)) return true;
+        Player p = accessor.getComponent(ref, Player.getComponentType());
+        if (p != null && p.hasSpawnProtection()) return true;
+        if (accessor.getComponent(ref, com.hypixel.hytale.server.core.modules.entity.component.Invulnerable.getComponentType()) != null
+                || accessor.getComponent(ref, com.hypixel.hytale.server.core.modules.entity.component.Intangible.getComponentType()) != null) {
+            return true;
+        }
+        var effects = accessor.getComponent(ref, com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent.getComponentType());
+        return effects != null && effects.isInvulnerable();
+    }
+
+    /**
      * Can {@code target} (a player) fight in a {@code kind} battle? playerFights must be on for it, and they must
      * be alive and not in Creative. Tells {@code asker} why not.
      */
