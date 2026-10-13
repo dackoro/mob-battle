@@ -504,6 +504,9 @@ final class ConfigSchema {
 
         List<Item> buffs = new ArrayList<>();
         buffs.add(note("Percent per source; sources add up on a mob. Streak counts per kill (up to Max kills), Buff Wand per click."));
+        buffs.add(number("buff.size.max", "Size limit", Buffs.MIN_SIZE, Buffs.MAX_SIZE, "% (default " + Buffs.SIZE_SAFE + " = x3)",
+                "Most extra size on one mob or player, all buffs together. Above " + Buffs.SIZE_SAFE + " (x3) is not recommended: "
+                        + "big players don't fit under roofs and their camera ends up in blocks; runes and crowns can sink into big heads."));
         for (Buffs.Source s : Buffs.Source.values()) {
             buffs.add(section(switch (s) {
                 case LONE -> "Lone target (all vs one)";

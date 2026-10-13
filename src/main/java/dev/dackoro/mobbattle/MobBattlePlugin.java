@@ -103,6 +103,7 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new LookLoadSystem());
         getEntityStoreRegistry().registerSystem(new LookDeathSystem());
         getEntityStoreRegistry().registerSystem(new LookGuardSystem());
+        getEntityStoreRegistry().registerSystem(new BuffJump());
         FxSettings.load(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).

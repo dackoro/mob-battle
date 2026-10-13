@@ -995,6 +995,11 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             if (v.equals(saved(f, live))) draft.remove(index);
             else draft.put(index, v);
             notice = null;
+            String warn = "buff.size.max".equals(f.key) ? Buffs.sizeWarning(parseInt(v, 0)) : null;
+            if (warn != null) {
+                notice = "Warning: " + warn;
+                noticeColor = WARN;
+            }
             // A number out of range is shown clamped.
             if (clamped) setInput(ui, sel, f, v);
             previewArea(f, v, live);

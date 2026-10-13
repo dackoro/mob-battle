@@ -5,7 +5,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud;
-import com.hypixel.hytale.server.core.modules.entity.component.EntityScaleComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.DefaultEntityStatTypes;
@@ -151,8 +150,8 @@ final class DuelCard extends CustomUIHud {
     /** The real size (EntityScaleComponent), so a size buff from before a restart still shows. */
     static float scaleOf(Ref<EntityStore> mob, Store<EntityStore> store) {
         if (!mob.isValid()) return 1f;
-        EntityScaleComponent c = store.getComponent(mob, EntityScaleComponent.getComponentType());
-        return c != null && c.getScale() > 0 ? c.getScale() : 1f;
+        float scale = Buffs.sizeScale(mob, store);
+        return scale > 0 ? scale : 1f;
     }
 
     /** Names can be very long: the card is 270 px wide. */

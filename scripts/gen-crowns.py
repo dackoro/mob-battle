@@ -74,7 +74,12 @@ def write(path, data):
         f.write(data if isinstance(data, str) else json.dumps(data, indent=2) + '\n')
 
 
-SIZES = (150, 200, 250, 300)
+# Below 100: size-buffed players, whose model is scaled too (WandFx.particleScale, 2026-10-12).
+SIZES = (30, 40, 50, 60, 70, 80, 90, 150, 200, 250, 300)
+
+# What a player wearing these sees in first person: MobBattle_Nothing (one transparent particle). An empty list falls
+# back to Particles, so the light and crown filled a buffed player's screen (2026-10-12).
+FIRST_PERSON = [{'SystemId': 'MobBattle_Nothing'}]
 
 
 def crown_effect(system, comment, infinite, size=100):
@@ -87,7 +92,7 @@ def crown_effect(system, comment, infinite, size=100):
     if size != 100:
         particle['Scale'] = size / 100
     # Nothing in first person: on a player the crown on the Head node sits in the camera (2026-10-12).
-    fx['ApplicationEffects'] = {'Particles': [particle], 'FirstPersonParticles': []}
+    fx['ApplicationEffects'] = {'Particles': [particle], 'FirstPersonParticles': FIRST_PERSON}
     fx['OverlapBehavior'] = 'Overwrite'
     fx['Debuff'] = False
     return fx
@@ -135,6 +140,7 @@ for color, hexc in PALETTE.items():
                     {'SystemId': 'MobBattle_Mark_Aura_' + color, 'TargetEntityPart': 'Entity'},
                     {'SystemId': 'MobBattle_Mark_Rune_' + color, 'TargetEntityPart': 'Entity'},
                 ],
+                'FirstPersonParticles': FIRST_PERSON,
                 # No sound here: CleanseInteraction plays it on every click (an effect put on again within a moment
                 # did not replay its sound on quick clicks).
             },
@@ -148,6 +154,7 @@ for color, hexc in PALETTE.items():
             'Duration': 1.0,
             'ApplicationEffects': {
                 'Particles': [light_particle],
+                'FirstPersonParticles': FIRST_PERSON,
             },
             'OverlapBehavior': 'Overwrite',
             'Debuff': False,

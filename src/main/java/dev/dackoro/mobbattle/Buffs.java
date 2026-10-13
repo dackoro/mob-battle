@@ -29,7 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *   the Cleanse Wand.</li>
  * </ul>
  * Size is the game's EntityScaleComponent (what the builder tools scale entities with: the model stays, so a morph
- * and particles on it are kept, and the hitbox follows). Health is a StaticModifier (MAX, MULTIPLICATIVE) on max
+ * and particles on it are kept, and the hitbox follows); a player also gets their model's scale, since their camera
+ * follows the model (MorphWand.setPlayerSize). Health is a StaticModifier (MAX, MULTIPLICATIVE) on max
  * health: it raises the max, and only heals with buff &lt;who&gt; heal on (lone: heals the target when picked, even with no
  * lone buff). Damage and defense (BuffDamageSystem): the battle
  * sources count against battle enemies only, the wand against anyone. Buffed mobs except the lone target wear a
@@ -60,7 +61,7 @@ final class Buffs {
     }
 
     enum Stat {
-        SIZE("size", 200), HEALTH("health", 1000), DAMAGE("damage", 1000), DEFENSE("defense", 90);
+        SIZE("size", MAX_SIZE), HEALTH("health", 1000), DAMAGE("damage", 1000), DEFENSE("defense", 90);
 
         final String key;
         /** Highest % for one source (defense: 100 % would make it unkillable). */
@@ -71,10 +72,37 @@ final class Buffs {
             this.max = max;
         }
 
+        /** Highest % on one mob, all sources together: size stops at sizeMax. */
+        int totalMax() {
+            return this == SIZE ? sizeMax : max;
+        }
+
         static Stat of(String word) {
             for (Stat s : values()) if (s.key.equalsIgnoreCase(word)) return s;
             return null;
         }
+    }
+
+    /**
+     * Most extra size on one mob, all sources together (/mobbattle buff sizeMax, key buff.size.max). Default 200 (x3);
+     * above SIZE_SAFE the command and the panel warn (user, 2026-10-12): players don't fit under roofs and their camera
+     * ends up in blocks, and the buff looks (which grow with the square root of the size, WandFx.grown) sink into big heads.
+     */
+    static int sizeMax = 200;
+    static final int SIZE_SAFE = 200;
+    static final int MIN_SIZE = 50;
+    static final int MAX_SIZE = 900;
+
+    /** The warning for a size limit above SIZE_SAFE, else null. */
+    static String sizeWarning(int percent) {
+        if (percent <= SIZE_SAFE) return null;
+        return "Size limit +" + percent + "% (x" + fmt(1 + percent / 100f) + ") is above the recommended +" + SIZE_SAFE
+                + "% (x3): big players don't fit under roofs or in caves, their camera can end up inside blocks, and "
+                + "big mobs' runes and crowns can end up inside their head (the buff looks grow less than the body).";
+    }
+
+    private static String fmt(float v) {
+        return v == Math.round(v) ? String.valueOf(Math.round(v)) : String.format(Locale.ROOT, "%.1f", v);
     }
 
     /** % per source and stat (streak: per kill). 0 = none. */
@@ -135,6 +163,7 @@ final class Buffs {
         PERCENT.get(Source.WAND).putAll(Map.of(Stat.SIZE, 10, Stat.HEALTH, 20, Stat.DAMAGE, 10, Stat.DEFENSE, 5));
         streakMax = 5;
         wandMax = 5;
+        sizeMax = SIZE_SAFE;
         for (Source s : Source.values()) HEAL.put(s, false);
         crown = "off";
     }
@@ -296,6 +325,11 @@ final class Buffs {
     }
 
     private static float scaleOf(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
+        return sizeScale(mob, accessor);
+    }
+
+    /** How much bigger it is drawn: the entity scale (a size buff, the builder tools). */
+    static float sizeScale(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
         EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
         return scale != null ? scale.getScale() : 1f;
     }
@@ -341,6 +375,8 @@ final class Buffs {
             // A size buff left on it goes too (saved with it; otherwise only the builder tools scale entities).
             EntityScaleComponent scale = mob.isValid() ? accessor.getComponent(mob, EntityScaleComponent.getComponentType()) : null;
             if (scale != null && scale.getScale() != 1f) scale.setScale(1f);
+            MorphWand.setPlayerSize(mob, 1f, accessor);
+            BuffJump.npc(mob, 1f, accessor);
             return;
         }
         s.weight.clear();
@@ -376,7 +412,7 @@ final class Buffs {
         for (Map.Entry<Source, Integer> e : s.weight.entrySet()) {
             if (battleSources || e.getKey() == Source.WAND) sum += percent(e.getKey(), st) * e.getValue();
         }
-        return Math.min(st.max, sum);
+        return Math.min(st.totalMax(), sum);
     }
 
     /** Total % of a stat on a mob right now (0 = unbuffed), for DuelCard. Any thread. */
@@ -391,10 +427,13 @@ final class Buffs {
             STATES.remove(mob, s);
             return;
         }
-        // Size: the entity scale (mobs and players), from the one it had before the first buff.
+        // Size: the entity scale (mobs and players), from the one it had before the first buff. A player also gets
+        // their model's scale (MorphWand.setPlayerSize): the client draws a player's body at the entity scale but puts
+        // their camera by the model's scale (user, 2026-10-12: each alone grew only one of them).
         int size = total(s, Stat.SIZE);
         EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
-        float scaleBefore = scale != null ? scale.getScale() : 1f;
+        float scaleBefore = sizeScale(mob, accessor);
+        MorphWand.setPlayerSize(mob, size > 0 ? 1 + size / 100f : 1f, accessor);
         if (size > 0) {
             // Always 1, not the current scale: a size buff saved with the mob before a restart/reload is still on it
             // (our state isn't saved), and taking that scale as the base made it grow again on every new buff
@@ -407,8 +446,9 @@ final class Buffs {
             if (scale != null) scale.setScale(s.baseScale);
             s.baseScale = null;
         }
-        EntityScaleComponent scaleNow = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
-        float scaled = scaleNow != null ? scaleNow.getScale() : 1f;
+        float scaled = sizeScale(mob, accessor);
+        // Mobs jump and climb in step with their size (players: BuffJump on their model change).
+        if (Math.abs(scaled - scaleBefore) > 0.001f) BuffJump.npc(mob, size > 0 ? 1 + size / 100f : 1f, accessor);
         // A new scale rebuilds the mob on the client and drops the particles on it (WandFx.MODEL_SETTLE_MS).
         boolean resized = Math.abs(scaled - scaleBefore) > 0.001f;
         // Health.
@@ -455,8 +495,10 @@ final class Buffs {
         // Crown on streak, champion and wand-buffed mobs (the lone target has its own, /mobbattle crown).
         boolean crowned = !"off".equals(crown) && (s.weight.containsKey(Source.STREAK) || s.weight.containsKey(Source.CHAMPION)
                 || s.weight.containsKey(Source.WAND));
-        // Sized to the mob (attached particles don't grow with the entity scale): CrownBuff_<color>_S200 at x2.
-        String want = crowned ? "CrownBuff_" + crown + WandFx.crownSize(scaled) : null;
+        // Sized to the mob (attached particles don't grow with the entity scale): CrownBuff_<color>_S200 at x2. A
+        // size-buffed player's model is scaled too and their particles grow with it: no extra size for them.
+        float fxScale = WandFx.particleScale(mob, scaled);
+        String want = crowned ? "CrownBuff_" + crown + WandFx.crownSize(fxScale) : null;
         if (s.crownFx != null && !s.crownFx.equals(want)) {
             WandFx.removeFx(mob, s.crownFx, accessor);
             s.crownFx = null;
@@ -466,7 +508,7 @@ final class Buffs {
             if (resized) putAgainLater(mob, want, () -> s.crownFx);
             else WandFx.addFx(mob, want, accessor);
         }
-        applyLook(mob, s, resized, scaled, accessor);
+        applyLook(mob, s, resized, fxScale, accessor);
         // A Jade/Shimmer look of its own (Effect Wand) also loses its ModelVFX in the rebuild: LookKeeper re-sends it.
         if (resized) LookKeeper.resized(mob);
         if (s.weight.isEmpty()) STATES.remove(mob, s);
@@ -565,15 +607,14 @@ final class Buffs {
     static void refreshLook(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
         State s = mob == null ? null : STATES.get(mob);
         if (s == null || !mob.isValid()) return;
-        EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
-        applyLook(mob, s, false, scale != null ? scale.getScale() : 1f, accessor);
+        applyLook(mob, s, false, sizeScale(mob, accessor), accessor);
     }
 
     /** "size +20%, health +40%" for that many Buff Wand stacks (each stat capped at its max). */
     static String describeWand(int stacks) {
         StringBuilder b = new StringBuilder();
         for (Stat st : Stat.values()) {
-            int v = Math.min(st.max, percent(Source.WAND, st) * stacks);
+            int v = Math.min(st.totalMax(), percent(Source.WAND, st) * stacks);
             if (v <= 0) continue;
             if (b.length() > 0) b.append(", ");
             b.append(st.key).append(" +").append(v).append('%');
@@ -680,6 +721,10 @@ final class Buffs {
             wandMax = Math.max(1, Math.min(MAX_WAND, Integer.parseInt(p.getProperty("buff.wand.maxstacks", "5").trim())));
         } catch (NumberFormatException ignored) {
         }
+        try {
+            sizeMax = Math.max(MIN_SIZE, Math.min(MAX_SIZE, Integer.parseInt(p.getProperty("buff.size.max", String.valueOf(SIZE_SAFE)).trim())));
+        } catch (NumberFormatException ignored) {
+        }
         // buff heal (one switch for every source, before buff <who> heal) loads into every source.
         String oldHeal = p.getProperty("buff.heal");
         for (Source s : Source.values()) {
@@ -695,6 +740,7 @@ final class Buffs {
         }
         p.setProperty("buff.streak.maxkills", String.valueOf(streakMax));
         p.setProperty("buff.wand.maxstacks", String.valueOf(wandMax));
+        p.setProperty("buff.size.max", String.valueOf(sizeMax));
         for (Source s : Source.values()) p.setProperty("buff." + s.key + ".heal", String.valueOf(heals(s)));
         p.setProperty("buff.crown", crown);
     }
@@ -718,7 +764,8 @@ final class Buffs {
             if (s == Source.STREAK) b.append(" per kill");
             if (s == Source.WAND) b.append(" per click");
         }
-        return b.append(" | maxKills ").append(streakMax).append(" | wand maxStacks ").append(wandMax)
+        return b.append(" | sizeMax ").append(sizeMax).append('%')
+                .append(" | maxKills ").append(streakMax).append(" | wand maxStacks ").append(wandMax)
                 .append(" | crown ").append(crown.toLowerCase(Locale.ROOT)).toString();
     }
 }

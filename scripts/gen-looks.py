@@ -258,7 +258,9 @@ def eyes(flame, scale=None):
 
 # Buff look sizes (WandFx.lookSize): attached particles don't grow with the entity scale, so a size-buffed mob gets
 # BuffShimmer/BuffRunes_<C>_S200 with runes and eye flames x2 (the runes hid inside a grown Feastmaster's head).
-BUFF_SIZES = (110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 225, 250, 275, 300)  # WandFx.LOOK_SIZES
+# Below 100: size-buffed players, whose model is scaled too (WandFx.particleScale, 2026-10-12).
+BUFF_SIZES = (30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95,
+              110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 225, 250, 275, 300)  # WandFx.LOOK_SIZES
 # Runes = this x the mob's size (user, 2026-10-11, Feastmasters with 0-10 Buff Wand stacks): with only x1.5/x2/x2.5/x3
 # variants, 1-2 stacks (x1.1, x1.2) fell back to the plain runes, hidden in the head, and 3+ jumped to x1.5 sizes.
 BUFF_RUNE_FACTOR = 1.6
@@ -270,13 +272,14 @@ def chest(system, color):
 
 def effect(text, apply, duration=None):
     # FirstPersonParticles: what the wearer sees of these in first person (vanilla Ability_Poison_Imbue_Buff repeats
-    # Particles there). Empty: on a player the eye flames and runes on the Head node filled the screen (2026-10-12).
+    # Particles there). MobBattle_Nothing (one transparent particle): on a player the eye flames and runes on the Head
+    # node filled the screen, and an empty list falls back to Particles (2026-10-12).
     if 'Particles' in apply and 'FirstPersonParticles' not in apply:
         with_fp = {}
         for k, v in apply.items():
             with_fp[k] = v
             if k == 'Particles':
-                with_fp['FirstPersonParticles'] = []
+                with_fp['FirstPersonParticles'] = [{'SystemId': 'MobBattle_Nothing'}]
         apply = with_fp
     body = {'Infinite': True} if duration is None else {'Duration': duration}
     body.update({'OverlapBehavior': 'Overwrite', 'Debuff': False, 'ApplicationEffects': apply})
@@ -297,10 +300,10 @@ def look_effects(name, s, flame, rune_system):
         f = size / 100.0
         sized = eyes(flame, f) + [{'SystemId': rune_system, 'TargetNodeName': 'Head', 'Scale': round(BUFF_RUNE_FACTOR * f, 2)}]
         write(FX_BUFF, 'MobBattle_Fx_BuffShimmer_%s_S%d.json' % (name, size), effect(
-            'BuffShimmer_%s for a mob grown to x%.1f (size buff): runes and eye flames scaled to match.' % (name, f),
+            'BuffShimmer_%s with runes and eye flames x%.2f, for a size buff (WandFx.particleScale).' % (name, f),
             {'ModelVFXId': 'MobBattle_Look_Shimmer_%s' % name, 'Particles': sized}))
         write(FX_BUFF, 'MobBattle_Fx_BuffRunes_%s_S%d.json' % (name, size), effect(
-            'BuffRunes_%s for a mob grown to x%.1f (size buff): runes and eye flames scaled to match.' % (name, f),
+            'BuffRunes_%s with runes and eye flames x%.2f, for a size buff (WandFx.particleScale).' % (name, f),
             {'Particles': sized}))
     write(FX_LOOK, 'MobBattle_Look_Jade_%s.json' % name, effect(
         '%s jade look: the model turns to jade (texture shows), glowing eye flames. Kept by LookKeeper.' % name,

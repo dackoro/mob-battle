@@ -114,6 +114,7 @@ public class MobBattleCommand extends CommandBase {
                 "buff wand size|health|damage|defense|all|off <percent> - Buff Wand, per click (default size 10, health 20, damage 10, defense 5; stacks up to buff wand maxStacks, default 5)",
                 "buff lone|streak|champion|wand heal on|off - that buff also fills the health (lone: heals the target when picked, even with no lone buff); default off: health keeps the same share of the new max",
                 "buff crown gold|<color>|off - crown on streak, champion and Buff Wand mobs (default off: the crown is the everyone-vs-one target's)",
+                "buff sizeMax <50-900> - most extra size on one mob or player, all buffs together (default 200 = x3; more works but is not recommended: big players don't fit under roofs, their camera ends up in blocks). Jumps grow with the size",
                 "fightLaser on|off - laser between fighters at the start (per kind too)",
                 "fightLaserColor <color>|random - laser color (palette; random = a bright one each fight)",
                 "battleIsolation <duel|allVsOne|royale|teams|all> on|off - outside mobs cannot hurt battle mobs",
@@ -458,7 +459,7 @@ public class MobBattleCommand extends CommandBase {
             kids.add(new Sub(st.key, st.key + " %, 0-" + st.max + ("streak".equals(who) ? " per kill" : "wand".equals(who) ? " per click" : ""),
                     words("Percent", "0", "10", "25", "50")));
         }
-        kids.add(new Sub("all", "Every stat to the same % (size stops at 200, defense at 90)", words("Percent", "0", "10", "25", "50")));
+        kids.add(new Sub("all", "Every stat to the same % (defense stops at 90)", words("Percent", "0", "10", "25", "50")));
         kids.add(new Sub("off", "Every stat back to 0"));
         kids.add(new Sub("heal", "lone".equals(who) ? "Heal the target to full when it is picked (default off)"
                 : "This buff also fills the health (default off: health keeps the same share of the new max)",
@@ -477,7 +478,7 @@ public class MobBattleCommand extends CommandBase {
         String[] a = argsAfter(ctx, "buff");
         String usage = "Usage: /mobbattle buff <lone|streak|champion|wand> <size|health|damage|defense|all|off> <percent>, "
                 + "buff streak maxKills <1-" + Buffs.MAX_STREAK + ">, buff wand maxStacks <1-" + Buffs.MAX_WAND + ">, "
-                + "buff <who> heal on|off, buff crown gold|<color>|off";
+                + "buff <who> heal on|off, buff crown gold|<color>|off, buff sizeMax <" + Buffs.MIN_SIZE + "-" + Buffs.MAX_SIZE + ">";
         if (a.length >= 2 && "crown".equalsIgnoreCase(a[0])) {
             String c = Buffs.parseCrown(a[1]);
             if (c == null) {
@@ -485,6 +486,21 @@ public class MobBattleCommand extends CommandBase {
                 return false;
             }
             Buffs.crown = c;
+            return true;
+        }
+        if (a.length >= 2 && "sizemax".equalsIgnoreCase(a[0])) {
+            int v = -1;
+            try {
+                v = Integer.parseInt(a[1].replace("%", ""));
+            } catch (NumberFormatException ignored) {
+            }
+            if (v < Buffs.MIN_SIZE || v > Buffs.MAX_SIZE) {
+                reply(ctx, usage, ERR);
+                return false;
+            }
+            Buffs.sizeMax = v;
+            String warn = Buffs.sizeWarning(v);
+            if (warn != null) reply(ctx, "Warning: " + warn, ERR);
             return true;
         }
         Buffs.Source who = a.length >= 2 ? Buffs.Source.of(a[0]) : null;
@@ -532,7 +548,7 @@ public class MobBattleCommand extends CommandBase {
             reply(ctx, usage, ERR);
             return false;
         }
-        // all: each stat capped at its own maximum (size 200, defense 90).
+        // all: each stat capped at its own maximum (defense 90; the size total stops at sizeMax).
         for (Buffs.Stat st : Buffs.Stat.values()) {
             if (stat == null || st == stat) Buffs.setPercent(who, st, v);
         }
@@ -800,7 +816,9 @@ public class MobBattleCommand extends CommandBase {
                 buffWho("streak", "Per kill in a battle (times its kills, up to maxKills), for that battle"),
                 buffWho("champion", "The winners of a battle, until they die or get the Cleanse Wand"),
                 buffWho("wand", "Buff Wand: per click (stacks up to maxStacks), mobs and players, until they die or get cleansed"),
-                new Sub("crown", "Crown on streak, champion and Buff Wand mobs: gold, a palette color or off (default off)", crownWords())));
+                new Sub("crown", "Crown on streak, champion and Buff Wand mobs: gold, a palette color or off (default off)", crownWords()),
+                new Sub("sizemax", "Most extra size on one mob, all buffs together (" + Buffs.MIN_SIZE + "-" + Buffs.MAX_SIZE
+                        + "%, default " + Buffs.SIZE_SAFE + " = x3; more is not recommended)", words("Percent", "200", "400", "900"))));
         addSubCommand(new Sub("skipcamera", "End your intro or end camera now (same as crouching while it plays)"));
         addSubCommand(new Sub("watch","Spectate a running battle: right click = nearest fighter, left click = previous, mouse turns the camera, Q exits",
                 new Sub("exit", "Stop watching: back to your game mode and position")));
