@@ -21,24 +21,41 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "Chaining",
-          "ChainingAllowance": 1.25,
-          "Next": [
-            {
-              "Type": "MobBattle_Cleanse",
-              "Effects": {
-                "ItemAnimationId": "SwingLeft"
-              },
-              "RunTime": 0.1
+          "Type": "Charging",
+          "AllowIndefiniteHold": true,
+          "DisplayProgress": true,
+          "Effects": {
+            "ItemAnimationId": "CastLeftCharging"
+          },
+          "Next": {
+            "0": {
+              "Type": "Chaining",
+              "ChainingAllowance": 1.25,
+              "Next": [
+                {
+                  "Type": "MobBattle_Cleanse",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                },
+                {
+                  "Type": "MobBattle_Cleanse",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                }
+              ]
             },
-            {
-              "Type": "MobBattle_Cleanse",
+            "1.5": {
+              "Type": "MobBattle_CleanseArea",
               "Effects": {
-                "ItemAnimationId": "SwingLeft"
+                "ItemAnimationId": "CastLeftCharged"
               },
-              "RunTime": 0.1
+              "RunTime": 0.3
             }
-          ]
+          }
         }
       ]
     }

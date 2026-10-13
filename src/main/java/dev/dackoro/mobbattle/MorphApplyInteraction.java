@@ -59,13 +59,13 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         }
         String name = ChaosWand.nameOf(target, buffer);
         MorphWand.Copy now = MorphWand.read(target, buffer);
-        if (now != null && now.modelId().equals(copy.modelId())) {
+        if (copy.sameLook(now)) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            player.sendMessage(Message.raw(name + " already looks like " + copy.modelId() + ".").color("#ffcc55"));
+            player.sendMessage(Message.raw(name + " already looks like " + copy.label() + ".").color("#ffcc55"));
             return;
         }
         if (!MorphWand.apply(target, copy, buffer)) {
-            player.sendMessage(Message.raw("Could not apply model " + copy.modelId() + ".").color("#ffcc55"));
+            player.sendMessage(Message.raw("Could not apply model " + copy.label() + ".").color("#ffcc55"));
             return;
         }
         WandFx.onTarget(target, WandFx.MORPH, buffer);
@@ -76,7 +76,7 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         // The omnitrix transformation sound, played here and not by the effect: a re-applied effect (quick clicks)
         // does not replay its sound.
         WandFx.burst(null, "SFX_MobBattle_OmnitrixTransform", ChaosWand.positionOf(target, buffer), buffer);
-        player.sendMessage(Message.raw(name + " now looks like " + copy.modelId()
+        player.sendMessage(Message.raw(name + " now looks like " + copy.label()
                 + (isPlayer ? ". Cleanse Wand or /mobbattle morph reset to undo."
                 : ". It keeps its own AI and attacks. Cleanse Wand or /mobbattle morph reset to undo.")).color("#7dff8a"));
     }

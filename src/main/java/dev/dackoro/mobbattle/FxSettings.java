@@ -445,6 +445,18 @@ public final class FxSettings {
     public static boolean snapPlayers = true;
     /** Morph Wand: players can be morphed too (/mobbattle morphPlayers). */
     public static boolean morphPlayers = true;
+    /** Morph Wand held left click: every mob in morphBurstRadius takes the copied look (/mobbattle morphBurst). */
+    public static boolean morphBurst = true;
+    /** Morph Wand held right click: the looks in morphBurstRadius are swapped in random pairs (/mobbattle morphShuffle). */
+    public static boolean morphShuffle = true;
+    /** Morph Wand held click: reach in blocks of the burst and the shuffle (/mobbattle morphBurstRadius). */
+    public static final int DEFAULT_MORPH_BURST_RADIUS = 12;
+    public static int morphBurstRadius = DEFAULT_MORPH_BURST_RADIUS;
+    /** Cleanse Wand held left click: every mob and player in cleanseRadius is cleansed (/mobbattle cleanseArea). */
+    public static boolean cleanseArea = true;
+    /** Cleanse Wand held click: reach in blocks (/mobbattle cleanseRadius). */
+    public static final int DEFAULT_CLEANSE_RADIUS = 12;
+    public static int cleanseRadius = DEFAULT_CLEANSE_RADIUS;
 
     /** Who sees the fight cameras: owner (default), nearby or world, like titleScope; never a fighter's own intro. */
     public static String cameraScope = "owner";
@@ -802,6 +814,13 @@ public final class FxSettings {
             teamByType = Boolean.parseBoolean(p.getProperty("team.bytype", String.valueOf(teamByType)));
             snapPlayers = Boolean.parseBoolean(p.getProperty("snap.players", String.valueOf(snapPlayers)));
             morphPlayers = Boolean.parseBoolean(p.getProperty("morph.players", String.valueOf(morphPlayers)));
+            morphBurst = Boolean.parseBoolean(p.getProperty("morph.burst", String.valueOf(morphBurst)));
+            morphShuffle = Boolean.parseBoolean(p.getProperty("morph.shuffle", String.valueOf(morphShuffle)));
+            int mr = intOr(p, "morph.burst.radius", morphBurstRadius);
+            morphBurstRadius = mr <= 0 ? DEFAULT_MORPH_BURST_RADIUS : clampRadius(mr);
+            cleanseArea = Boolean.parseBoolean(p.getProperty("cleanse.area", String.valueOf(cleanseArea)));
+            int cr = intOr(p, "cleanse.area.radius", cleanseRadius);
+            cleanseRadius = cr <= 0 ? DEFAULT_CLEANSE_RADIUS : clampRadius(cr);
             KindFx.load(p);
         }
     }
@@ -912,6 +931,11 @@ public final class FxSettings {
         ActionFx.save(p);
         p.setProperty("snap.players", String.valueOf(snapPlayers));
         p.setProperty("morph.players", String.valueOf(morphPlayers));
+        p.setProperty("morph.burst", String.valueOf(morphBurst));
+        p.setProperty("morph.shuffle", String.valueOf(morphShuffle));
+        p.setProperty("morph.burst.radius", String.valueOf(morphBurstRadius));
+        p.setProperty("cleanse.area", String.valueOf(cleanseArea));
+        p.setProperty("cleanse.area.radius", String.valueOf(cleanseRadius));
         KindFx.save(p);
         return p;
     }
@@ -1037,7 +1061,7 @@ public final class FxSettings {
                         + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonArmy " + onOff(summonArmy) + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
                         + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase(),
-                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", cleanseColor " + cleanseColor.toLowerCase() + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
+                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", morphBurst " + onOff(morphBurst) + ", morphShuffle " + onOff(morphShuffle) + ", morphBurstRadius " + morphBurstRadius + ", cleanseColor " + cleanseColor.toLowerCase() + ", cleanseArea " + onOff(cleanseArea) + ", cleanseRadius " + cleanseRadius + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
                 "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
         };
     }
@@ -1049,7 +1073,7 @@ public final class FxSettings {
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "passivewin", "passivewinignore", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
-            case "debuglog", "debugrecord", "debugtrack", "snapplayers", "morphplayers", "killhitdelay", "cleansecolor", "buffcolor", "bufflight", "heallight" -> 6;
+            case "debuglog", "debugrecord", "debugtrack", "snapplayers", "morphplayers", "morphburst", "morphshuffle", "morphburstradius", "cleansearea", "cleanseradius", "killhitdelay", "cleansecolor", "buffcolor", "bufflight", "heallight" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
                  "summondespawn", "summonlifetime", "summonexit", "summonarmy", "summonjade", "summonjadecolor" -> 4;
             case "teamfx", "teambytype", "armytint", "armytintcolor" -> 5;

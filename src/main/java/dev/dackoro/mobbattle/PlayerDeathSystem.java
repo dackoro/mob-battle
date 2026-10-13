@@ -32,6 +32,9 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
     public void onComponentAdded(Ref<EntityStore> ref, DeathComponent death, Store<EntityStore> store,
                                  CommandBuffer<EntityStore> buffer) {
         Buffs.onPlayerDeath(ref);
+        // The game respawns the same entity and keeps its ModelComponent, so a Morph Wand model would come back with
+        // them. Death ends the morph, as it ends vanilla's morph potion (death clears its effect).
+        MorphWand.restore(ref, buffer);
         if (!BattleManager.isPlayerFighter(ref)) {
             return;
         }

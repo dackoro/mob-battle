@@ -1006,7 +1006,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
 
     /** Radius fields drawn around the player as soon as they change (the draft value, before Save). */
     private static final java.util.Set<String> AREA_PREVIEW = java.util.Set.of("chaos.radius", "battle.arena.size",
-            "battle.shrink.to", "summon.radius", "snap.radius", "chaos.area", "chaos.area.color");
+            "battle.shrink.to", "summon.radius", "snap.radius", "morph.burst.radius", "cleanse.area.radius", "chaos.area", "chaos.area.color");
 
     /**
      * Area radius, arena sizes, Snap reach, summon area, area look and color: the circle is drawn around the player

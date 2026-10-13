@@ -21,48 +21,82 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "Chaining",
-          "ChainingAllowance": 1.25,
-          "Next": [
-            {
-              "Type": "MobBattle_MorphApply",
-              "Effects": {
-                "ItemAnimationId": "SwingLeft"
-              },
-              "RunTime": 0.1
+          "Type": "Charging",
+          "AllowIndefiniteHold": true,
+          "DisplayProgress": true,
+          "Effects": {
+            "ItemAnimationId": "CastSummonCharging"
+          },
+          "Next": {
+            "0": {
+              "Type": "Chaining",
+              "ChainingAllowance": 1.25,
+              "Next": [
+                {
+                  "Type": "MobBattle_MorphApply",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                },
+                {
+                  "Type": "MobBattle_MorphApply",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                }
+              ]
             },
-            {
-              "Type": "MobBattle_MorphApply",
+            "1.5": {
+              "Type": "MobBattle_MorphBurst",
               "Effects": {
-                "ItemAnimationId": "SwingLeft"
+                "ItemAnimationId": "CastSummonCharged"
               },
-              "RunTime": 0.1
+              "RunTime": 0.3
             }
-          ]
+          }
         }
       ]
     },
     "Secondary": {
       "Interactions": [
         {
-          "Type": "Chaining",
-          "ChainingAllowance": 1.25,
-          "Next": [
-            {
-              "Type": "MobBattle_MorphCopy",
-              "Effects": {
-                "ItemAnimationId": "SwingLeft"
-              },
-              "RunTime": 0.1
+          "Type": "Charging",
+          "AllowIndefiniteHold": true,
+          "DisplayProgress": true,
+          "Effects": {
+            "ItemAnimationId": "CastSummonCharging"
+          },
+          "Next": {
+            "0": {
+              "Type": "Chaining",
+              "ChainingAllowance": 1.25,
+              "Next": [
+                {
+                  "Type": "MobBattle_MorphCopy",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                },
+                {
+                  "Type": "MobBattle_MorphCopy",
+                  "Effects": {
+                    "ItemAnimationId": "SwingRight"
+                  },
+                  "RunTime": 0.1
+                }
+              ]
             },
-            {
-              "Type": "MobBattle_MorphCopy",
+            "1.5": {
+              "Type": "MobBattle_MorphShuffle",
               "Effects": {
-                "ItemAnimationId": "SwingRight"
+                "ItemAnimationId": "CastSummonCharged"
               },
-              "RunTime": 0.1
+              "RunTime": 0.3
             }
-          ]
+          }
         }
       ]
     }

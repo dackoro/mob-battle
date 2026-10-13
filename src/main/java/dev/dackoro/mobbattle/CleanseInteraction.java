@@ -31,6 +31,8 @@ public class CleanseInteraction extends SimpleInstantInteraction {
      */
     private static final long LIGHT_LANDS_MS = 400;
 
+    static final String SOUND = "SFX_Deployable_Totem_Heal_Despawn";
+
     /** Every buff and effect goes, except the Cleanse look itself. World thread. */
     static void cleanseNow(com.hypixel.hytale.component.Ref<EntityStore> target, String keepFx,
                            com.hypixel.hytale.component.ComponentAccessor<EntityStore> accessor) {
@@ -49,6 +51,40 @@ public class CleanseInteraction extends SimpleInstantInteraction {
         }
     }
 
+    /**
+     * The light comes down now (look on the mob, sound at it); everything happens when it lands, in
+     * {@link #landLater}. Returns the look's fx name. Any thread with a buffer for the target's world.
+     */
+    static String start(Ref<EntityStore> target, boolean sound, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        String fx = WandFx.cleanse(target, buffer);
+        WandFx.onTarget(target, fx, buffer);
+        // Played here, not by the effect: re-applying the effect on a quick second click didn't replay its sound.
+        // An area cleanse plays it once at the caster instead of once per mob.
+        if (sound) WandFx.burst(null, SOUND, ChaosWand.positionOf(target, buffer), buffer);
+        return fx;
+    }
+
+    /**
+     * When the light lands (LIGHT_LANDS_MS, one task for all of them, on their world thread): effects and buffs go
+     * (size and health back), and the morph is undone. The unmorph swaps the model, which drops the look's leftover
+     * particles on the client, so it comes last, with its own Unmorph burst on the restored model. All targets are in
+     * one world.
+     */
+    static void landLater(java.util.List<Ref<EntityStore>> targets, java.util.List<String> fxs) {
+        if (targets.isEmpty()) return;
+        var store = targets.get(0).getStore();
+        var world = store.getExternalData().getWorld();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            if (store.isShutdown()) return;
+            for (int i = 0; i < targets.size(); i++) {
+                Ref<EntityStore> target = targets.get(i);
+                if (!target.isValid()) continue;
+                cleanseNow(target, fxs.get(i), store);
+                if (MorphWand.restore(target, store)) WandFx.onTarget(target, WandFx.UNMORPH, store);
+            }
+        }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
         if (!Perms.interactionAllowed(context)) return;
@@ -65,20 +101,7 @@ public class CleanseInteraction extends SimpleInstantInteraction {
             player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
             return;
         }
-        // The light comes down now; everything happens when it lands: effects and buffs go (size and health back),
-        // and the morph is undone. The unmorph swaps the model, which drops the look's leftover particles on the
-        // client, so it comes last, with its own Unmorph burst on the restored model.
-        String fx = WandFx.cleanse(target, buffer);
-        WandFx.onTarget(target, fx, buffer);
-        // Played here, not by the effect: re-applying the effect on a quick second click didn't replay its sound.
-        WandFx.burst(null, "SFX_Deployable_Totem_Heal_Despawn", ChaosWand.positionOf(target, buffer), buffer);
-        var store = target.getStore();
-        var world = store.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
-            if (store.isShutdown() || !target.isValid()) return;
-            cleanseNow(target, fx, store);
-            if (MorphWand.restore(target, store)) WandFx.onTarget(target, WandFx.UNMORPH, store);
-        }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        landLater(java.util.List.of(target), java.util.List.of(start(target, true, buffer)));
         player.sendMessage(Message.raw("Removed every effect from " + ChaosWand.nameOf(target, buffer) + ".").color("#7fd3ff"));
     }
 }

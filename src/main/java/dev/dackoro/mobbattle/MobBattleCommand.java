@@ -131,6 +131,8 @@ public class MobBattleCommand extends CommandBase {
                 "mobFx <duel|allVsOne|attackers|royale|all> <color|default|off> - tint, aura and rune on the battle mobs (default = original look; royale purple by default)",
                 "crown gold|<color>|off - everyone vs one: crown with rays of light over the lone target for 20 s (default gold)",
                 "cleanseColor <color> - Cleanse Wand look: light from above, burst, aura and rune (default white)",
+                "cleanseArea on|off - Cleanse Wand: hold left click to cleanse every mob and player around you (default on)",
+                "cleanseRadius <blocks> - reach of the held-click cleanse (default 12)",
                 "healLight <color>|off - Heal Wand: a light comes down from the sky and the heal lands with it (default green; off = at once)",
                 "buffLight buff|<color>|off - Buff Wand: a light comes down from the sky and the buff lands with it (default buff = in buffColor; off = at once)",
                 "buffColor <color> - buff look: the Buff Wand's mark and swirl, and the shimmer (veins, eye flames, runes) of buffed mobs (default purple; taking the buff off is grey)",
@@ -212,6 +214,9 @@ public class MobBattleCommand extends CommandBase {
                 "deathGlow <0-15> - Kill Wand: the disintegrating mob flashes in its color, fading out (default 12, 0 = off)",
                 "killPlayers on|off - the Kill Wand works on players too: they disintegrate, then die normally (default on)",
                 "morphPlayers on|off - the Morph Wand works on players too (default on)",
+                "morphBurst on|off - Morph Wand: hold left click to send a wave that gives every mob around your copied model (default on)",
+                "morphShuffle on|off - Morph Wand: hold right click to send a wave that swaps the models of the mobs around in random pairs (default on)",
+                "morphBurstRadius <blocks> - reach of the held-click waves (default 12)",
                 "debugTrack <seconds> - Debug Wand: how long a left-clicked mob is followed after its report (0-600, default 30, 0 = report only)",
                 "eyeTest [<color>|off] - (experimental, admin) recolors the eyes of the nearest mob (8 blocks) with a texture made at runtime (palette color, default Purple); off puts the original models back",
         });
@@ -840,6 +845,14 @@ public class MobBattleCommand extends CommandBase {
                 words("Snap players", "on", "off")));
         addSubCommand(new Sub("morphplayers", "Morph Wand works on players too (default on)",
                 words("Morph players", "on", "off")));
+        addSubCommand(new Sub("morphburst", "Morph Wand: hold left click, every mob around takes your copied model (default on)",
+                words("Morph burst", "on", "off")));
+        addSubCommand(new Sub("morphshuffle", "Morph Wand: hold right click, the mobs around swap models in random pairs (default on)",
+                words("Morph shuffle", "on", "off")));
+        addSubCommand(new Sub("cleansearea", "Cleanse Wand: hold left click, every mob and player around is cleansed (default on)",
+                words("Cleanse area", "on", "off")));
+        addSubCommand(new Sub("cleanseradius", "Cleanse Wand: reach of the held-click cleanse in blocks (default 12)"));
+        addSubCommand(new Sub("morphburstradius", "Morph Wand: reach of the held-click waves in blocks (default 12)"));
         addSubCommand(new Sub("debug", "Read nearby NPC combat state and log their hits for 10 seconds"));
         addSubCommand(new Sub("duelmode", "Battle Wand: replace duels or accumulate connected fights",
                 words("Duel mode", "exclusive", "accumulate")));
@@ -1846,6 +1859,41 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.morphPlayers = on;
+            }
+            case "morphburst", "morphshuffle" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle " + (key.equals("morphburst") ? "morphBurst" : "morphShuffle") + " on|off", ERR);
+                    return;
+                }
+                if (key.equals("morphburst")) FxSettings.morphBurst = on;
+                else FxSettings.morphShuffle = on;
+            }
+            case "cleansearea" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    reply(ctx, "Usage: /mobbattle cleanseArea on|off", ERR);
+                    return;
+                }
+                FxSettings.cleanseArea = on;
+            }
+            case "cleanseradius" -> {
+                try {
+                    FxSettings.cleanseRadius = FxSettings.clampRadius(Integer.parseInt(val == null ? "" : val));
+                } catch (NumberFormatException e) {
+                    reply(ctx, "Usage: /mobbattle cleanseRadius <" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS
+                            + "> (default " + FxSettings.DEFAULT_CLEANSE_RADIUS + ")", ERR);
+                    return;
+                }
+            }
+            case "morphburstradius" -> {
+                try {
+                    FxSettings.morphBurstRadius = FxSettings.clampRadius(Integer.parseInt(val == null ? "" : val));
+                } catch (NumberFormatException e) {
+                    reply(ctx, "Usage: /mobbattle morphBurstRadius <" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS
+                            + "> (default " + FxSettings.DEFAULT_MORPH_BURST_RADIUS + ")", ERR);
+                    return;
+                }
             }
             default -> {
                 reply(ctx, USAGE, ERR);

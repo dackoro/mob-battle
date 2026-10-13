@@ -312,7 +312,7 @@ final class Presets {
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
                 || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak")
                 || key.equals("battle.unstick") || key.equals("battle.standoff") || key.startsWith("battle.passivewin") || key.equals("battle.duelCard")) return "arenas";
-        if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.equals("effect.id")
+        if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.startsWith("cleanse.") || key.equals("effect.id")
                 || key.equals("wand.debug.track")) return "wands";
         return "rules";
     }
