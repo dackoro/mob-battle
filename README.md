@@ -73,7 +73,7 @@ Get all thirteen with `/mobbattle give` (admin), from the creative inventory, or
 
 `MobBattle_BuffWand` · ▶ [Watch it](https://youtu.be/69zD_VQW_-Q) · [details](docs/wands.md#buff-wand-mobbattle_buffwand)
 
-**Debug Wand** (`MobBattle_DebugWand`, for mod makers): left click writes a full report on the mob, then follows it for a while; right click stops following. [Details](docs/wands.md#debug-wand-mobbattle_debugwand)
+**Debug Wand** (`MobBattle_DebugWand`, for mod makers, admin only): left click writes a full report on the mob, then follows it for a while; right click stops following. [Details](docs/wands.md#debug-wand-mobbattle_debugwand)
 
 ### Looks in every color
 

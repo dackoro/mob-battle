@@ -12,7 +12,7 @@ Each wand's tooltip explains what it does, in English and Spanish.
 
 - `/mobbattle give` gives you one of each wand, placed in your inventory the normal way. If some don't fit, the chat lists the ones you didn't get. It needs the `dackoro.mob_battle.admin` permission. The **Admin** page of the settings panel has the same button.
 - Every wand is also in the creative inventory (Weapons), and you can get one with `/give <item ID>`.
-- In `server` permission mode, using a wand needs `dackoro.mob_battle.use`. Two clicks change shared settings instead, so they need `dackoro.mob_battle.config`: the Effect Wand right click and the Summon Wand left click. See [server-setup.md](server-setup.md).
+- In `server` permission mode, using a wand needs `dackoro.mob_battle.use`. Two clicks change shared settings instead, so they need `dackoro.mob_battle.config`: the Effect Wand right click and the Summon Wand left click. The Debug Wand needs `dackoro.mob_battle.admin` in both modes. See [server-setup.md](server-setup.md).
 
 ## At a glance
 
@@ -175,6 +175,10 @@ Gives a mob another mob's model. It keeps its own AI, weapon, attacks and health
 
 **Left click a mob:** puts the copied model on it, with a green flash, a green burst and the Omnitrix transform sound. With [`/mobbattle morphPlayers on`](settings.md) (the default), players can be morphed too.
 
+**Hold left click (1.5 s, with a charge bar), then let go:** a green shockwave from you gives every mob within [`morphBurstRadius`](settings.md) (default 12 blocks) your copied model. Players in reach are morphed too with `morphPlayers on`, never you. Turn it off with `/mobbattle morphBurst off`, and a held left click then works like a quick one.
+
+**Hold right click (1.5 s), then let go:** the same shockwave, but the mobs in reach **swap models with each other** in random pairs. With an odd number, the last three trade in a ring. Turn it off with `/mobbattle morphShuffle off`.
+
 **Switching to the wand** in your hotbar plays the Omnitrix power-on sound.
 
 **Sounds:** `SFX_MobBattle_OmnitrixOn` (switching to the wand, at you), `SFX_MobBattle_OmnitrixCopy` (at the mob whose model you copy) and `SFX_MobBattle_OmnitrixTransform` (at the mob as it transforms), each with a small random pitch and skipped with `wandFx off`. The transform burst also plays in the world at the mob, since the model swap can drop particles attached to the old model.
@@ -188,6 +192,7 @@ Gives a mob another mob's model. It keeps its own AI, weapon, attacks and health
 - A morph is **saved with the world**, but the original model is only remembered while the server runs. Undo morphs before you leave, or the mob keeps its new look.
 - Applying the model a mob already has does nothing (error flash and a chat message). So does left click with nothing copied yet.
 - The new model's animations may not match the old role's attacks.
+- Quick clicks now fire when you let go of the button, as with the game's staffs, since the wand waits to see whether you are charging.
 - Jade/shimmer looks, buff looks and crowns are put back on after the model swap.
 
 ## Heal Wand (`MobBattle_HealWand`)
@@ -226,7 +231,7 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 
 **Loot:** by default, a mob killed this way drops **nothing**, also when it dies at once (`killDelay 0` or `wandFx off`). [`/mobbattle killLoot on`](settings.md) makes it drop what a normal death would: its drop list plus any items it picked up.
 
-**Players:** with [`/mobbattle killPlayers on`](settings.md) (the default), players turn black and disintegrate too, and then die a normal death after `killDelay`. What they drop follows the world's death rules. With it off, the wand shows its error flash on players and says so in chat.
+**Players:** with [`/mobbattle killPlayers on`](settings.md) (the default), players turn black and disintegrate too, and then die a normal death after `killDelay`. What they drop follows the world's death rules. With it off, the wand shows its error flash on players and says so in chat. It works whether the world has PvP on or off. A player in Creative, invulnerable (`/entity invulnerable`) or under spawn protection right after respawning can't die, so the wand shows its error flash and says so instead of the soul rip.
 
 **Other entities** that have health die at once.
 
@@ -244,7 +249,7 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 
 **Who is affected**
 - **Click a mob that is in a battle:** that battle's fighters, wherever they are.
-- **Click the air, or a mob in no battle:** every mob within [`/mobbattle snapRadius`](settings.md) (default 60) of the clicked mob or of you, fighting or not. This counts at any height, so fliers above and mobs in caves below are included, up to `maxMobs`. A white shockwave on the ground shows how far it reached. Players in reach are taken too with [`/mobbattle snapPlayers on`](settings.md) (the default), but never you and never players in Creative.
+- **Click the air, or a mob in no battle:** every mob within [`/mobbattle snapRadius`](settings.md) (default 60) of the clicked mob or of you, fighting or not. This counts at any height, so fliers above and mobs in caves below are included, up to `maxMobs`. A white shockwave on the ground shows how far it reached. Players in reach are taken too with [`/mobbattle snapPlayers on`](settings.md) (the default), but never you and never players in Creative or invulnerable.
 
 **Step by step**
 1. You slam the ground. The snap fires when the slam lands ([`/mobbattle snapHitDelay`](settings.md), default 310 ms) with the snap sound, even if nobody is picked.
@@ -305,7 +310,10 @@ Any palette color works (`jade:red`, `shimmer:blue`...). `gold` means yellow, an
    - every effect goes, including jade and shimmer looks, team looks, potions and debuffs;
    - a morph is undone, with a green burst and a portal sound as the mob gets its model back.
 
+**Hold left click (1.5 s, with a charge bar), then let go:** a shockwave in the cleanse color goes out from you, and every mob and player within [`cleanseRadius`](settings.md) (default 12 blocks) is cleansed as above, never you. The sound plays once at you. Turn it off with `/mobbattle cleanseArea off`, and a held left click then works like a quick one.
+
 **Gotchas**
+- Quick clicks fire when you let go of the button, as with the game's staffs, since the wand waits to see whether you are charging.
 - It is the way to undo Buff Wand stacks, champion buffs, Effect Wand looks and morphs on a single mob.
 - An army tint comes back within a second, because it lasts as long as the mob is in an army.
 
@@ -324,7 +332,7 @@ Any palette color works (`jade:red`, `shimmer:blue`...). `gold` means yellow, an
 
 With `buffLight off` or `wandFx off`, everything lands at once.
 
-**Per stack**, by default: size +10%, health +20%, damage +10%, defense +5% ([`/mobbattle buff wand`](settings.md)). Stacks go up to [`/mobbattle buff wand maxStacks`](settings.md) (default 5, max 50). Each stat is capped (size 200%, health 1000%, damage 1000%, defense 90%).
+**Per stack**, by default: size +10%, health +20%, damage +10%, defense +5% ([`/mobbattle buff wand`](settings.md)). Stacks go up to [`/mobbattle buff wand maxStacks`](settings.md) (default 5, max 50). Each stat is capped (size at [`buff sizeMax`](settings.md), default 200% = x3; health 1000%, damage 1000%, defense 90%). A bigger mob or player also jumps higher.
 
 **While the buff lasts**, the mob wears the shimmer in `buffColor`: glowing veins, eye flames and runes over its head. A mob with a jade or shimmer look of its own keeps that look and only gets the runes and eye flames. With [`/mobbattle buff crown`](settings.md) (default off), it also wears a crown.
 
@@ -340,7 +348,7 @@ With `buffLight off` or `wandFx off`, everything lands at once.
 
 ## Debug Wand (`MobBattle_DebugWand`)
 
-A read-only tool for checking what a mob is doing.
+A read-only tool for checking what a mob is doing. Admins only (a real `dackoro.mob_battle.admin` grant, in both permission modes), since every click writes a file and the whole report to the server log.
 
 **Left click a mob:** writes a full report about it. The report covers identity and role, model, stats, effects, its battle and side, buffs and its AI state. It goes to three places:
 - a short summary in chat (health, effects, battle, buffs);

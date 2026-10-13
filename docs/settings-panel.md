@@ -48,7 +48,7 @@ Editing a range draws it **around you right away**, before you save: only you se
 
 - **Area radius**, **Area look** and **Area color** (Chaos area tab)
 - **Arena size (duels, teams)** and **Closing arena ends at** (Battles tab)
-- **Snap reach** (Wands tab), **Summon area** (Summon list tab)
+- **Snap reach**, **Wave reach** and **Cleanse wave reach** (Wands tab), **Summon area** (Summon list tab)
 - **Area look** on each battle-kind tab
 
 A value of 0 (auto) has no fixed size, so nothing is drawn.
@@ -208,7 +208,7 @@ Each source has a section: **Lone target (all vs one)**, **Kill streak (per kill
 
 | Field | What it does |
 |---|---|
-| Size | Extra size, % (0 = off, up to 200). |
+| Size | Extra size, % (0 = off, up to 900; all sources together stop at Size limit). |
 | Health | Extra max health, % (up to 1000). |
 | Damage | Extra damage, % (up to 1000). |
 | Defense | Less damage taken, % (up to 90). |
@@ -218,6 +218,7 @@ Extra fields:
 
 | Section | Field | What it does |
 |---|---|---|
+| (top of the tab) | Size limit | Most extra size on one mob or player, all buffs together (50-900 %, default 200 = x3). Above 200 the panel warns: big players don't fit under roofs and their camera ends up in blocks. |
 | Kill streak | Streak max kills | Kills that count at most for the streak buff. |
 | Buff Wand | Buff Wand max stacks | Most Buff Wand clicks on one mob. |
 | | Buff color | Buff Wand mark and swirl, and the shimmer of buffed mobs. |
@@ -243,8 +244,13 @@ Wand feedback and what each wand does. See [wands.md](wands.md).
 | | Dust time | Seconds over which they turn to dust. |
 | | Slam hit delay | Milliseconds from the click to the slam's hit. |
 | | Snap reach | Reach of a snap with no battle running (blocks). Range preview. |
-| | Snap players | Players in reach (not Creative, not you) can turn to dust. |
+| | Snap players | Players in reach (not Creative or invulnerable, not you) can turn to dust. |
 | Morph Wand | Morph players | Players can be morphed too. |
+| | Hold left: morph wave | Hold left click: a wave gives every mob around your copied model (off: a held click works like a quick one). |
+| | Hold right: swap wave | Hold right click: a wave swaps the models of the mobs around in random pairs. |
+| | Wave reach | Reach of both waves (blocks, default 12). Range preview. |
+| Cleanse Wand | Hold left: cleanse wave | Hold left click: a wave cleanses every mob and player around you (off: a held click works like a quick one). |
+| | Cleanse wave reach | Reach of the cleanse wave (blocks, default 12). Range preview. |
 | Debug Wand | Follow time | After the left-click report, the mob's target, AI state, health and effects keep going into the same file (seconds, 0 = report only). |
 | Morph Wand model | Your Morph Wand turns mobs into | Pick a model (searchable, with an icon preview) and press **Use**. It starts on the model your wand holds now. This is yours only and lasts until the server restarts; it is not a saved setting. A right click on a mob with the Morph Wand copies its model instead. |
 

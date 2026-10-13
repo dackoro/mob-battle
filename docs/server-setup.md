@@ -15,7 +15,7 @@ Mob Battle has two permission modes:
 | `open` (default) | Anyone can use the wands and change settings, teams, summon lists and presets. |
 | `server` | Wand use and configuration are checked against permission nodes (below). |
 
-Admin actions **always** need a real `dackoro.mob_battle.admin` grant, in both modes. That includes switching the mode. Switch it from the server console or as an admin:
+Admin actions **always** need a real `dackoro.mob_battle.admin` grant, in both modes (the Debug Wand too). That includes switching the mode. Switch it from the server console or as an admin:
 
 ```text
 /mobbattle permissions server
@@ -42,7 +42,7 @@ Mob Battle registers these defaults with the server, so in `server` mode an ordi
 - Personal exits: `watch exit` and `skipCamera`. Q in Watch mode also works without a node. This way a player can always leave a spectator view or a camera.
 
 **`use` (only checked in `server` mode):**
-- Every wand action, except the two listed under `config` below.
+- Every wand action, except the two listed under `config` below and the Debug Wand (`admin`).
 - `chaos me`, `snap`, `watch`, `debug` (a short combat snapshot of nearby NPCs).
 - `summon` / `summon spawn` / `summon go` (summon the list now).
 - `teams auto|start|join|leave|clear` (your own Team Wand teams).
@@ -64,6 +64,7 @@ Mob Battle registers these defaults with the server, so in `server` mode an ordi
 - `debugLog`, `debugRecord`, `debugDump`.
 - `event duel|royale|focus|list`.
 - `eyeTest` (experimental).
+- The Debug Wand (both clicks).
 - The settings panel's Admin page.
 
 ### Assigning a custom group in `permissions.json`
@@ -139,7 +140,7 @@ These tools help admins investigate a battle that went wrong. Files are written 
 | `/mobbattle debugLog on\|off` | admin | Writes `[debug]` lines to the server log: battle start and rules, wall events, target choices, time-up scores, tie breaks, winners, snaps and rejected duels. Saved setting, default off. |
 | `/mobbattle debugRecord on\|off` | admin | Keeps the last 5 minutes of Mob Battle's log and `[debug]` lines in memory, up to 20,000 lines. Saved setting, default off. |
 | `/mobbattle debugDump` | admin | Writes what the recorder kept to `debug/record_<time>.txt`, with the current settings at the top. The same action is **Save debug record** on the Admin page. Useful when a bug is noticed only after it happened. |
-| Debug Wand (`MobBattle_DebugWand`) | use | Left click a mob for a full report: identity, model, stats, effects, battle, buffs and AI. The report goes to chat (short), the server log and `debug/<role>_<time>.txt`. It then follows the mob for `debugTrack` seconds (default 30, `0` = report only) and adds its changes and every hit to the same file. Right click stops following. |
+| Debug Wand (`MobBattle_DebugWand`) | admin | Left click a mob for a full report: identity, model, stats, effects, battle, buffs and AI. The report goes to chat (short), the server log and `debug/<role>_<time>.txt`. It then follows the mob for `debugTrack` seconds (default 30, `0` = report only) and adds its changes and every hit to the same file. Right click stops following. |
 | `/mobbattle debug` | use | A combat snapshot of the 4 nearest NPCs within 20 blocks, plus a hit log for 10 seconds. |
 
 `debugTrack <seconds>` (0–600) is an ordinary setting and needs `config`.

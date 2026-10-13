@@ -238,7 +238,7 @@ Battles can make fighters bigger and stronger. Three battle sources, all off (0%
 | `streak` | A fighter, once per kill (up to `buff streak maxKills`, default 5) | Until that battle ends |
 | `champion` | The surviving members of the winning side | Until they die or get the Cleanse Wand |
 
-Each source can raise size, max health, damage and defense by a percentage, e.g. `/mobbattle buff lone size 50`, `/mobbattle buff champion all 10`. Sources add up. Size is the entity's scale (mobs and players), so a morph stays. Health raises the max and keeps the same share of health; `buff <who> heal on` fills it to the new max. If the server stops mid-battle, the size and health stay on that mob (the Cleanse Wand resets them). Battle buffs' damage and defense only count against enemies of the battle. All buff settings, the Buff Wand and the buff looks are in [settings.md](settings.md) and [colors-and-looks.md](colors-and-looks.md).
+Each source can raise size, max health, damage and defense by a percentage, e.g. `/mobbattle buff lone size 50`, `/mobbattle buff champion all 10`. Sources add up. Size is the entity's scale (mobs and players), so a morph stays; all sources together stop at `buff sizeMax` (default +200%, x3). Jumps grow with the size: a player's jump force, a mob's jump and climb height. Health raises the max and keeps the same share of health; `buff <who> heal on` fills it to the new max. If the server stops mid-battle, the size and health stay on that mob (the Cleanse Wand resets them). Battle buffs' damage and defense only count against enemies of the battle. All buff settings, the Buff Wand and the buff looks are in [settings.md](settings.md) and [colors-and-looks.md](colors-and-looks.md).
 
 ## Cameras
 

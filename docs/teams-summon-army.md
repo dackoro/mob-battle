@@ -152,7 +152,8 @@ Army mobs follow these rules, most urgent first:
 With `morphPlayers on` (default), the Morph Wand works on players like on mobs:
 
 - Right click a player to copy their model; left click a player to give them the copied model.
-- The Cleanse Wand or `/mobbattle morph reset` gives them their own look back.
+- Copying a player copies their whole look (skin, hair, clothes). A mob given that copy becomes a clone with their look, and a player given it wears that other player's look.
+- The Cleanse Wand or `/mobbattle morph reset` gives them their own look back. Dying does too: they respawn as themselves.
 
 Only the model changes: the player keeps their own controls, items and health. See [wands.md](wands.md) for the Morph Wand on mobs.
 
@@ -165,7 +166,7 @@ Left click: a share of the fighters (`snapPercent`, default 50%), picked at rand
 - **Click a mob in a battle:** only that battle.
 - **Click the air, or a mob in no battle:** every mob within `snapRadius` (default 60) of the clicked mob or of you, fighting or not, at any height (fliers and mobs in caves too), up to `maxMobs`. A white shockwave on the ground shows how far it reached.
 - `snapMode global` (default): the share of everyone. `team`: the share of each side. A fractional count rounds up or down at random.
-- `snapPlayers on|off` (default on): the snap also takes players in reach (never you, never players in Creative). They turn to dust and then die a normal death.
+- `snapPlayers on|off` (default on): the snap also takes players in reach (never you, never players in Creative or invulnerable). They turn to dust and then die a normal death.
 - The dust is the Kill Wand's soul rip: `killDelay` and `killLoot` apply. Mobs with a jade look shatter and mobs with a shimmer look burst into liquid instead.
 - Snapped mobs are not kills for the battle's kill count.
 - The chat says how many will go ("Snap! 45 of 45 within 60 blocks will turn to dust...") and when it's over ("The snap is over: X of Y turned to dust").

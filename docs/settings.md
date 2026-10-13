@@ -112,7 +112,7 @@ Every built-in preset except `default` first puts the presentation settings back
 | `titles` | Countdown, start and winner titles, title style, who sees the titles, battle music and track; per-kind `countdown`, `startTitle`, `winTitle`, `music`. |
 | `arenas` | Arena, timer, at time up, judge by, closing arena (per kind, plus its final radius and time), scoreboard, arena size, timer box, tie break, unstick, stand-off shove, passive win and its "never ends against" list, duel card. |
 | `rules` | Isolation, self defense, friendly fire, players can fight, battle PvP, duel mode, area radius, max mobs, team by type, every buff setting, summon area, random counts, at least one, summons leave, lifetime, how they leave, summons join my army. |
-| `wands` | Effect Wand effect, Kill Wand (soul rip time, cast hit delay, loot, players), Snap Wand (mode, share, time, hit delay, reach, players), morph players, Debug Wand follow time. |
+| `wands` | Effect Wand effect, Kill Wand (soul rip time, cast hit delay, loot, players), Snap Wand (mode, share, time, hit delay, reach, players), Cleanse Wand wave and its reach, Morph Wand (players, held-click waves and their reach), Debug Wand follow time. |
 | `all` | Everything (the same as `preset default`). |
 
 Teams, the summon list and the security settings are never reset. The reset group of each setting is also in the tables below.
@@ -234,7 +234,8 @@ Sources (`<who>`): `lone` (the all vs one target, for that battle), `streak` (pe
 
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
-| Size | `/mobbattle buff <who> size <percent>` | `buff.<who>.size` | 0-200 | 0; wand 10 | rules |
+| Size | `/mobbattle buff <who> size <percent>` | `buff.<who>.size` | 0-900 | 0; wand 10 | rules |
+| Size limit | `/mobbattle buff sizeMax <percent>` | `buff.size.max` | 50-900 | 200 (x3) | rules |
 | Health | `/mobbattle buff <who> health <percent>` | `buff.<who>.health` | 0-1000 | 0; wand 20 | rules |
 | Damage | `/mobbattle buff <who> damage <percent>` | `buff.<who>.damage` | 0-1000 | 0; wand 10 | rules |
 | Defense | `/mobbattle buff <who> defense <percent>` | `buff.<who>.defense` | 0-90 | 0; wand 5 | rules |
@@ -245,7 +246,9 @@ Sources (`<who>`): `lone` (the all vs one target, for that battle), `streak` (pe
 | Buff Wand light | `/mobbattle buffLight buff\|<color>\|off` | `wand.buff.light` | buff (= in the buff color), palette color, off | buff | effects |
 | Buffed mobs' crown | `/mobbattle buff crown gold\|<color>\|off` | `buff.crown` | Gold, palette color, off | off | rules |
 
-Shortcuts: `/mobbattle buff <who> all <percent>` sets the four stats at once (size stops at 200, defense at 90); `/mobbattle buff <who> off` sets them all to 0. `buff lone heal on` heals the all vs one target when it is picked, even with no lone buff.
+Size limit: the most extra size one mob or player can get, all sources together. Above 200 (x3) the command and the panel warn: big players don't fit under roofs or in caves, their camera can end up inside blocks, and runes and crowns can sink into big heads. The buff looks grow less than the body (with the square root of the size: x4 body, x2 runes).
+
+Shortcuts: `/mobbattle buff <who> all <percent>` sets the four stats at once (defense stops at 90, the size total at the size limit); `/mobbattle buff <who> off` sets them all to 0. `buff lone heal on` heals the all vs one target when it is picked, even with no lone buff.
 
 ### Wands
 
@@ -266,6 +269,11 @@ Shortcuts: `/mobbattle buff <who> all <percent>` sets the four stats at once (si
 | Snap reach | `/mobbattle snapRadius <blocks>` | `snap.radius` | 2-430 | 60 | wands |
 | Snap players | `/mobbattle snapPlayers on\|off` | `snap.players` | true, false | on | wands |
 | Morph players | `/mobbattle morphPlayers on\|off` | `morph.players` | true, false | on | wands |
+| Morph wave (hold left click) | `/mobbattle morphBurst on\|off` | `morph.burst` | true, false | on | wands |
+| Cleanse wave (hold left click) | `/mobbattle cleanseArea on\|off` | `cleanse.area` | true, false | on | wands |
+| Cleanse wave reach | `/mobbattle cleanseRadius <blocks>` | `cleanse.area.radius` | 2-430 | 12 | wands |
+| Swap wave (hold right click) | `/mobbattle morphShuffle on\|off` | `morph.shuffle` | true, false | on | wands |
+| Morph wave reach | `/mobbattle morphBurstRadius <blocks>` | `morph.burst.radius` | 2-430 | 12 | wands |
 | Follow time (Debug Wand) | `/mobbattle debugTrack <seconds>` | `wand.debug.track` | 0-600, 0 = report only | 30 | wands |
 
 `killHitDelay` (default 175: the hit at 0.175 s of the Kill Wand's cast animation) and `snapHitDelay` (default 310: frame ~30 of 60 at `Speed` 1.6 in `Server/Item/Animations/MobBattle_SnapWand.json`) line the effect up with the wand's animation; with `wandFx off` they are skipped and the action fires on the click. Raise one if the effect lands before the hit, lower it if after. If you change an animation or its `Speed`, retune with `delay = hit frame / 60 / Speed * 1000`. `snapRadius` is separate from `areaRadius`, so a big battle area does not make the snap reach farther.
