@@ -1154,7 +1154,9 @@ public final class BattleManager {
         if (battle.focusName != null) return side == 1 ? Message.raw(battle.focusName) : I18n.tr("battle.side.attackers");
         if (battle.royale) {
             for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
-                if (e.getValue() == side && isAlive(e.getKey(), buffer)) return Message.raw(ChaosWand.nameOf(e.getKey(), buffer));
+                if (e.getValue() != side || !isAlive(e.getKey(), buffer)) continue;
+                String army = armyName(e.getKey(), buffer);
+                return army != null ? I18n.tr("battle.side.army").param("name", army) : Message.raw(ChaosWand.nameOf(e.getKey(), buffer));
             }
         }
         return I18n.tr("battle.side.team").param("name", battle.name(side));
@@ -1449,7 +1451,7 @@ public final class BattleManager {
                     I18n.tr("battle.sub.attackers.left").param("count", alive));
             color = targetWon ? "#ffd23e" : "#ff6b5e";
         } else if (battle.royale) {
-            main = winTxt(ChaosWand.nameOf(lastAlive, buffer));
+            main = royaleWinTxt(lastAlive, buffer);
             sub = battle.unreachEnded ? Txt.tr("battle.sub.unreach", "Nobody could reach the others: most health left")
                     : battle.passiveEnded ? Txt.tr("battle.sub.rest.cant", "The rest can't fight back")
                     : battle.teamOf.size() == 2 ? Txt.tr("battle.sub.duel.won", "Duel won")
@@ -1649,7 +1651,7 @@ public final class BattleManager {
         if (battle.focusName != null) {
             winMain = best == 1 ? winTxt(battle.focusName) : Txt.tr("battle.win.attackers", "THE ATTACKERS WIN!");
         } else if (battle.royale) {
-            winMain = winTxt(ChaosWand.nameOf(anyMember.get(best), buffer));
+            winMain = royaleWinTxt(anyMember.get(best), buffer);
         } else {
             winMain = teamWinTxt(battle.name(best));
             color = battle.color(best);
@@ -1687,6 +1689,27 @@ public final class BattleManager {
     private static Txt winTxt(String name) {
         name = String.valueOf(name);
         return new Txt(name + " WINS!", I18n.tr("battle.win").param("name", name));
+    }
+
+    /**
+     * Royale winner title: the mob, or its army when it is one (test 2026-10-14: a Chieftain's army won and the title
+     * named one of its goblins). The army is named after the top of its chain: a player, or a leader mob's role.
+     */
+    private static Txt royaleWinTxt(Ref<EntityStore> winner, ComponentAccessor<EntityStore> buffer) {
+        String army = armyName(winner, buffer);
+        if (army == null) return winTxt(ChaosWand.nameOf(winner, buffer));
+        return new Txt(army + "'S ARMY WINS!", I18n.tr("battle.win.army").param("name", army));
+    }
+
+    /** The name of the army {@code member} fights for (its chain's top: a player or a leader mob), or null. */
+    private static String armyName(Ref<EntityStore> member, ComponentAccessor<EntityStore> buffer) {
+        if (member == null || !member.isValid()) return null;
+        java.util.UUID top = Army.topOf(member, Army.keyOf(member, buffer));
+        if (top == null) return null;
+        Ref<EntityStore> leader = Army.entityOf(top);
+        if (leader != null && leader.isValid() && leader.getStore() == member.getStore()) return ChaosWand.nameOf(leader, buffer);
+        PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(top);
+        return p != null ? p.getUsername() : null;
     }
 
     private static Txt teamWinTxt(String name) {
