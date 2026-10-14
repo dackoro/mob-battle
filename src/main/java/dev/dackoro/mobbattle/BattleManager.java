@@ -1698,7 +1698,7 @@ public final class BattleManager {
     private static Txt royaleWinTxt(Ref<EntityStore> winner, ComponentAccessor<EntityStore> buffer) {
         String army = armyName(winner, buffer);
         if (army == null) return winTxt(ChaosWand.nameOf(winner, buffer));
-        return new Txt(army + "'S ARMY WINS!", I18n.tr("battle.win.army").param("name", army));
+        return new Txt(army + "'s ARMY WINS!", I18n.tr("battle.win.army").param("name", army));
     }
 
     /** The name of the army {@code member} fights for (its chain's top: a player or a leader mob), or null. */
