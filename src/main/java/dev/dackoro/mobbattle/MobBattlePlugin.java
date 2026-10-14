@@ -109,6 +109,8 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new SkinRespawnSystem());
         getEntityStoreRegistry().registerSystem(new BuffJump());
         FxSettings.load(getDataDirectory());
+        // Armies saved before the last stop: each mob rejoins as its chunk loads.
+        Army.loadSaved(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
         listenAssetReloads();
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).

@@ -140,7 +140,7 @@ Crouch clicks need you on the ground: while flying in Creative the crouch key fl
 - Army mobs never attack you, and can't be hurt by you or by each other. If a battle royale or chaos battle is started on mobs of the same army, they are enemies in that battle and fight each other.
 - While you hold the Army Wand, each of your army mobs shows a blue ring at its feet (only you see it).
 - Each player has their own army; army mobs of different owners can fight each other.
-- Armies are kept in memory only: they are gone after a server restart. `/mobbattle army clearAll` (admin) disbands every player's army.
+- Armies survive server restarts and chunk unloads: each mob is remembered by its UUID (in `armies.txt`, next to `fx.properties`) and rejoins its army when it loads again. A mob that does not load again within 6 hours of server time is forgotten. `/mobbattle army clearAll` (admin) disbands every army.
 
 ### Orders
 

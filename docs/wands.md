@@ -161,7 +161,7 @@ Builds your own army of mobs. Full details are in [teams-summon-army.md](teams-s
 
 **Gotchas**
 - Joining an army takes the mob out of any battle, duel or team.
-- Armies are kept in memory only, so they are gone after a server restart.
+- Armies survive server restarts and chunk unloads: each mob rejoins its army when it loads again.
 - [`/mobbattle armyTint`](settings.md) makes army mobs wear a tint ([`/mobbattle armyTintColor`](settings.md), default blue) for as long as they are in the army.
 
 ## Morph Wand (`MobBattle_MorphWand`)

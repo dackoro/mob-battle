@@ -170,6 +170,74 @@ final class Army {
     /** An unloaded army mob is forgotten after this long. */
     private static final long AWAY_MS = 6 * 3600_000L;
 
+    /** Army mob -> its entity UUID (for saving the armies: OWNER is keyed by Ref). */
+    private static final Map<Ref<EntityStore>, UUID> MEMBER_ID = new ConcurrentHashMap<>();
+    /** Something changed since the armies were last written to {@link #FILE}. */
+    private static volatile boolean dirty;
+    /**
+     * The armies across server restarts (test 2026-10-14, user: a restart lost every army). One line per mob: its UUID,
+     * its owner key or "-", bossIsLeader, leads, fought. Read into AWAY at startup, so each mob rejoins as it loads.
+     */
+    static final String FILE = "armies.txt";
+
+    private static void remember(Ref<EntityStore> npc, ComponentAccessor<EntityStore> accessor) {
+        var id = accessor.getComponent(npc, com.hypixel.hytale.server.core.entity.UUIDComponent.getComponentType());
+        if (id != null) MEMBER_ID.put(npc, id.getUuid());
+        dirty = true;
+    }
+
+    /** Plugin start: the armies saved last time wait for their mobs to load (as after a chunk unload). */
+    static void loadSaved(java.nio.file.Path dataDir) {
+        if (dataDir == null) return;
+        java.nio.file.Path file = dataDir.resolve(FILE);
+        if (!java.nio.file.Files.isRegularFile(file)) return;
+        long now = System.currentTimeMillis();
+        try {
+            for (String line : java.nio.file.Files.readAllLines(file)) {
+                String[] w = line.trim().split("\\s+");
+                if (w.length < 5 || line.startsWith("#")) continue;
+                try {
+                    AWAY.put(UUID.fromString(w[0]), new Away("-".equals(w[1]) ? null : UUID.fromString(w[1]),
+                            Boolean.parseBoolean(w[2]), Boolean.parseBoolean(w[3]), Boolean.parseBoolean(w[4]), now));
+                } catch (IllegalArgumentException ignored) {
+                    // a broken line: skipped
+                }
+            }
+            if (!AWAY.isEmpty()) MobBattlePlugin.log("Armies: " + AWAY.size() + " mobs saved, they rejoin as they load");
+        } catch (java.io.IOException | RuntimeException e) {
+            MobBattlePlugin.log("Armies: could not read " + file + " (" + e + ")");
+        }
+    }
+
+    /** Writes the armies when they changed (from prune, once a second at most). */
+    private static void saveIfDirty() {
+        if (!dirty) return;
+        dirty = false;
+        java.nio.file.Path dir = FxSettings.dataDirectory();
+        if (dir == null) return;
+        Map<UUID, Away> all = new java.util.HashMap<>(AWAY);
+        long now = System.currentTimeMillis();
+        OWNER.forEach((npc, owner) -> {
+            UUID id = MEMBER_ID.get(npc);
+            if (id == null || !npc.isValid()) return;
+            Away boss = AWAY.get(owner);
+            all.put(id, new Away(owner, LEADERS.containsKey(owner) || boss != null && boss.leads(), leaderKey(npc) != null,
+                    FOUGHT.contains(npc), now));
+        });
+        LEADERS.forEach((key, ref) -> {
+            if (!all.containsKey(key)) all.put(key, new Away(ref.isValid() ? OWNER.get(ref) : null, false, true, false, now));
+        });
+        StringBuilder b = new StringBuilder("# Mob Battle armies: mob owner bossIsLeader leads fought\n");
+        all.forEach((id, a) -> b.append(id).append(' ').append(a.owner() == null ? "-" : a.owner()).append(' ')
+                .append(a.bossIsLeader()).append(' ').append(a.leads()).append(' ').append(a.fought()).append('\n'));
+        try {
+            java.nio.file.Files.createDirectories(dir);
+            java.nio.file.Files.writeString(dir.resolve(FILE), b.toString());
+        } catch (java.io.IOException e) {
+            MobBattlePlugin.log("Armies: could not save (" + e + ")");
+        }
+    }
+
     /** An NPC unloaded with its chunk (BattleUnloadSystem, not a role change): an army mob or leader is remembered. */
     static void unloaded(Ref<EntityStore> ref, com.hypixel.hytale.component.Store<EntityStore> store) {
         if (OWNER.isEmpty() && LEADERS.isEmpty()) return;
@@ -182,6 +250,7 @@ final class Army {
         if (id == null) return;
         AWAY.put(id.getUuid(), new Away(owner, owner != null && LEADERS.containsKey(owner), leads != null,
                 FOUGHT.contains(ref), System.currentTimeMillis()));
+        dirty = true;
     }
 
     /** An NPC loaded again (BattleUnloadSystem, AddReason.LOAD): back in its army, or leading it again. */
@@ -195,11 +264,14 @@ final class Army {
             LEADERS.put(uuid, ref);
             PICKS.replaceAll((k, p) -> uuid.equals(p.owner()) && p.leader() != null ? new Pick(p.owner(), ref, p.name()) : p);
         }
-        // Its leader died meanwhile: it stays free.
-        if (a.owner() != null && (!a.bossIsLeader() || LEADERS.containsKey(a.owner()))) {
+        // Its leader died meanwhile: it stays free. A leader still unloaded (or not loaded yet after a restart) is not
+        // dead: it leads again when it loads.
+        if (a.owner() != null && (!a.bossIsLeader() || LEADERS.containsKey(a.owner()) || AWAY.containsKey(a.owner()))) {
             OWNER.put(ref, a.owner());
+            MEMBER_ID.put(ref, uuid);
             if (a.fought()) FOUGHT.add(ref);
         }
+        dirty = true;
         // Befriended again along its chain on the next follow pass (a reloaded mob has no attitude overrides).
         RENEWED.clear();
     }
@@ -224,6 +296,7 @@ final class Army {
         BattleManager.detach(List.of(npc));
         FightManager.endFightsOf(List.of(npc));
         OWNER.put(npc, owner);
+        remember(npc, buffer);
         // Friendly toward its owner and every owner above it; a leader mob must not attack its own army either.
         befriendChain(npc, buffer);
         // Its own army (if it leads one) now serves a new chain too: follow() renews every army next second.
@@ -286,6 +359,7 @@ final class Army {
         BattleManager.detach(List.of(npc));
         FightManager.endFightsOf(List.of(npc));
         OWNER.put(npc, id);
+        remember(npc, buffer);
         FightManager.befriend(npc, playerEntity, buffer);
         return true;
     }
@@ -316,6 +390,8 @@ final class Army {
         PICKS.clear();
         RENEWED.clear();
         AWAY.clear();
+        MEMBER_ID.clear();
+        dirty = true;
         return n;
     }
 
@@ -334,8 +410,10 @@ final class Army {
      */
     private static void releaseAll(List<Ref<EntityStore>> mobs, Ref<EntityStore> playerEntity) {
         java.util.Set<Ref<EntityStore>> opponents = new java.util.LinkedHashSet<>();
+        dirty = true;
         for (Ref<EntityStore> npc : mobs) {
             OWNER.remove(npc);
+            MEMBER_ID.remove(npc);
             FOUGHT.remove(npc);
             opponents.addAll(FightManager.opponentsOf(npc));
         }
@@ -681,6 +759,8 @@ final class Army {
         LEADERS.replaceAll((k, v) -> v == old ? neu : v);
         PICKS.replaceAll((k, p) -> p.leader() == old ? new Pick(p.owner(), neu, p.name()) : p);
         UUID owner = OWNER.remove(old);
+        UUID id = MEMBER_ID.remove(old);
+        if (id != null && owner != null) MEMBER_ID.put(neu, id);
         if (FOUGHT.remove(old) && owner != null) FOUGHT.add(neu);
         TINTED.remove(old);
         if (owner == null) return;
@@ -699,7 +779,7 @@ final class Army {
         PICKS.values().removeIf(p -> p.leader() != null && !p.leader().isValid() && !RoleChange.pending(p.owner())
                 && !AWAY.containsKey(p.owner()));
         long now = System.currentTimeMillis();
-        AWAY.values().removeIf(a -> now - a.at() > AWAY_MS);
+        if (AWAY.values().removeIf(a -> now - a.at() > AWAY_MS)) dirty = true;
         PICKS.keySet().removeIf(viewer -> com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(viewer) == null);
         RENEWED.values().removeIf(r -> !r.me().isValid());
         // A dead or unloaded leader: its army goes back to its own AI (RoleChange.carry already moved a role swap).
@@ -708,6 +788,7 @@ final class Army {
             if (RoleChange.pending(e.getKey())) continue; // a role change re-adds it under its new Ref in a moment
             if (AWAY.containsKey(e.getKey())) continue;   // unloaded with its chunk: it leads again when it loads
             LEADERS.remove(e.getKey());
+            dirty = true;
             List<Ref<EntityStore>> mobs = members(e.getKey());
             if (!mobs.isEmpty()) {
                 releaseAll(mobs, null);
@@ -715,12 +796,14 @@ final class Army {
             }
         }
         TINTED.keySet().removeIf(npc -> !npc.isValid() || npc.getStore().isShutdown());
-        OWNER.keySet().removeIf(npc -> !npc.isValid() || npc.getStore().isShutdown());
+        if (OWNER.keySet().removeIf(npc -> !npc.isValid() || npc.getStore().isShutdown())) dirty = true;
         FOUGHT.retainAll(OWNER.keySet());
+        MEMBER_ID.keySet().retainAll(OWNER.keySet());
         // A living leader whose army is empty leads nothing any more (add() puts it back when it gets a mob).
-        LEADERS.entrySet().removeIf(e -> e.getValue().isValid() && !OWNER.containsValue(e.getKey())
+        if (LEADERS.entrySet().removeIf(e -> e.getValue().isValid() && !OWNER.containsValue(e.getKey())
                 && PICKS.values().stream().noneMatch(p -> p.leader() == e.getValue())
-                && AWAY.values().stream().noneMatch(a -> e.getKey().equals(a.owner())));
+                && AWAY.values().stream().noneMatch(a -> e.getKey().equals(a.owner())))) dirty = true;
         RENEWED.keySet().retainAll(new java.util.HashSet<>(OWNER.values()));
+        saveIfDirty();
     }
 }
