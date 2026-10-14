@@ -98,6 +98,26 @@ final class Army {
         return key;
     }
 
+    /**
+     * For debug lines: whose army the mob is in ("Dackoro", or a leader mob's role and "#uuid"), plus "leads N" when it
+     * leads one; "none".
+     */
+    static String describe(Ref<EntityStore> npc) {
+        UUID owner = ownerOf(npc);
+        UUID lead = leaderKey(npc);
+        if (owner == null && lead == null) return "none";
+        StringBuilder b = new StringBuilder();
+        if (owner != null) {
+            PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(owner);
+            Ref<EntityStore> l = LEADERS.get(owner);
+            b.append(p != null ? p.getUsername() : l != null && l.isValid() ? "leader#" + owner.toString().substring(0, 4) : owner.toString().substring(0, 8));
+        } else {
+            b.append("-");
+        }
+        if (lead != null) b.append(",leads ").append(members(lead).size());
+        return b.toString();
+    }
+
     /** The army key {@code ref} leads: a player's UUID, a leader mob's, or null. */
     static UUID keyOf(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
         UUID lead = leaderKey(ref);
@@ -590,12 +610,16 @@ final class Army {
     static void drawRings(com.hypixel.hytale.component.Store<EntityStore> store) {
         Map<UUID, Boolean> holds = new java.util.HashMap<>();
         OWNER.forEach((npc, owner) -> {
-            // An owner recruiting for someone else sees only that army (below), not two sets of blue rings.
-            if (!npc.isValid() || npc.getStore() != store || PICKS.containsKey(owner)) return;
-            PlayerRef player = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(owner);
+            if (!npc.isValid() || npc.getStore() != store) return;
+            // The player at the top of its chain sees every mob under them (test 2026-10-14: a leader's goblins in the
+            // player's army had no ring): leaders in gold, the rest in blue.
+            UUID top = topOfKey(owner);
+            // An owner recruiting for someone else sees only that army (below), not two sets of rings.
+            if (top == null || PICKS.containsKey(top)) return;
+            PlayerRef player = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(top);
             if (player == null) return;
-            if (holds.computeIfAbsent(owner, o -> FightFx.holdsItem(player, ARMY_WAND_ID, store))) {
-                FightFx.teamRing(player, npc, RING_COLOR, store);
+            if (holds.computeIfAbsent(top, o -> FightFx.holdsItem(player, ARMY_WAND_ID, store))) {
+                FightFx.teamRing(player, npc, leaderKey(npc) != null ? LEADER_RING_COLOR : RING_COLOR, store);
             }
         });
         // A player recruiting for someone else sees that army instead: its leader in gold, its mobs in blue.

@@ -97,6 +97,7 @@ final class BattleDebug {
                 + " frozen=" + (store.getComponent(self, com.hypixel.hytale.server.core.entity.Frozen.getComponentType()) != null)
                 + " attacking=" + (combat != null && combat.isExecutingAttack())
                 + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
+                + " army=" + Army.describe(self)
                 + " ordered=" + name(ordered, store) + " locked=" + name(locked, store)
                 + " distance=" + distance + " attitude=" + attitude + " vanillaCanDamage=" + canDamage
                 + caeFields(self, store);
@@ -170,6 +171,7 @@ final class BattleDebug {
         }
         return "state=" + FightManager.stateOf(self, store)
                 + " battle=" + (battle == null ? "none" : battle.kind.key + ":" + battle.id.toString().substring(0, 8))
+                + " army=" + Army.describe(self)
                 + " target=" + name(ordered, store) + " locked=" + name(locked, store) + " attitude=" + attitude
                 + caeFollow(self, store);
     }
