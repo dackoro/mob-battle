@@ -434,7 +434,13 @@ final class FightCamera {
         double[] alt = {Double.NaN};
         double[] roof = {Double.NaN};
         Vector3d[] look = {null};
+        // Indoors, each stop's side point (open floor beside the fighter) per stop: {fighter x, z, side x, z, frame}.
+        // Worked out again only when the fighter moved over a block or every SIDE_REFRESH_FRAMES frames (audit
+        // 2026-10-14: up to ~150 column scans a frame per viewer in a roofed arena).
+        double[][] sideCache = new double[stops.size()][];
+        int[] frame = {0};
         List<Shot> shots = List.of(new Shot(usable, (t, acc) -> {
+            frame[0]++;
             // Waypoints from the live positions: start edge, beside each fighter (sides alternate), far edge.
             int n = stops.size() + 2;
             double[] xs = new double[n], zs = new double[n];
@@ -448,13 +454,21 @@ final class FightCamera {
                 at[i] = q != null ? q : center;
                 double side = (i % 2 == 0 ? 1 : -1) * Math.max(DRONE_SIDE, track.size(stops.get(i), acc)[1] + 3);
                 double sx = at[i].x + px * side, sz = at[i].z + pz * side;
-                if (indoor && !droneOpen(sx, sz, level, acc)) {
-                    // A wall or the stands on that side: the other side, else closer in.
-                    double ox = at[i].x - px * side, oz = at[i].z - pz * side;
-                    Vector3d in = droneOpen(ox, oz, level, acc) ? new Vector3d(ox, 0, oz)
-                            : inward(new Vector3d(sx, 0, sz), at[i], level, acc);
-                    sx = in.x;
-                    sz = in.z;
+                double[] kept = sideCache[i];
+                if (indoor && kept != null && frame[0] - kept[4] < SIDE_REFRESH_FRAMES
+                        && Math.hypot(at[i].x - kept[0], at[i].z - kept[1]) <= 1) {
+                    sx = kept[2];
+                    sz = kept[3];
+                } else if (indoor) {
+                    if (!droneOpen(sx, sz, level, acc)) {
+                        // A wall or the stands on that side: the other side, else closer in.
+                        double ox = at[i].x - px * side, oz = at[i].z - pz * side;
+                        Vector3d in = droneOpen(ox, oz, level, acc) ? new Vector3d(ox, 0, oz)
+                                : inward(new Vector3d(sx, 0, sz), at[i], level, acc);
+                        sx = in.x;
+                        sz = in.z;
+                    }
+                    sideCache[i] = new double[] {at[i].x, at[i].z, sx, sz, frame[0]};
                 }
                 xs[i + 1] = sx;
                 zs[i + 1] = sz;
@@ -829,6 +843,8 @@ final class FightCamera {
      */
     private static final double DRONE_LOW = 4;
     private static final double DRONE_SIDE = 4;
+    /** Indoors, a stop's side point is looked for again at least this often (frames of STEP_MS). */
+    private static final int SIDE_REFRESH_FRAMES = 10;
     private static final double DRONE_CLEAR = 2;
     private static final double DRONE_CLIMB = 0.3;
     private static final double DRONE_SINK = 0.06;

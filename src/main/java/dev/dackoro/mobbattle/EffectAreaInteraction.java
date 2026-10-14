@@ -100,12 +100,7 @@ public class EffectAreaInteraction extends SimpleInstantInteraction {
         FightFx.shockwave(center, radius, color, buffer);
         WandFx.burst(null, "SFX_Skeleton_Mage_Spellbook_Impact", center, buffer);
         // Each one gets it as the ring reaches it; immune ones just don't take it.
-        WaveHit.hit(center, radius, hit, buffer, (group, acc) -> {
-            for (Ref<EntityStore> r : group) {
-                EffectControllerComponent effects = acc.getComponent(r, EffectControllerComponent.getComponentType());
-                if (effects != null) EffectGiveInteraction.give(r, chain, effects, acc);
-            }
-        });
+        WaveHit.hit(center, radius, hit, buffer, (group, acc) -> EffectGiveInteraction.giveAll(group, chain, acc));
         return hit;
     }
 }

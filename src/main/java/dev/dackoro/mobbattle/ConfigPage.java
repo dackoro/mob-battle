@@ -1529,10 +1529,25 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private boolean canUndo() {
         Properties before = beforeLastSave;
         if (before == null) return false;
-        if (listsDiffer(before)) return true;
-        Map<Integer, String> diff = diffFrom(before, admin());
-        return !diff.isEmpty() && !diff.equals(draft);
+        // Worked out again only when something it depends on changed (audit 2026-10-14: every panel event of every
+        // player rebuilt the diff of ~260 fields, dropdown option lists included, once a save had happened).
+        boolean admin = admin();
+        Properties live = FxSettings.toProperties();
+        Object[] key = {before, draft.hashCode(), live.hashCode(), admin};
+        if (undoKey != null && undoKey[0] == before && java.util.Arrays.equals(key, undoKey)) return undoCached;
+        boolean result = listsDiffer(before);
+        if (!result) {
+            Map<Integer, String> diff = diffFrom(before, admin);
+            result = !diff.isEmpty() && !diff.equals(draft);
+        }
+        undoKey = key;
+        undoCached = result;
+        return result;
     }
+
+    /** canUndo's last answer and what it was worked out from {beforeLastSave, draft hash, settings hash, admin}. */
+    private Object[] undoKey;
+    private boolean undoCached;
 
     /** An action row whose button asks for a second click (see {@link #confirmed}). */
     private void confirmable(Rows rows, String action, Message label, Supplier<Message> button) {

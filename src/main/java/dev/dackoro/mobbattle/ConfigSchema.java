@@ -221,7 +221,27 @@ final class ConfigSchema {
         return out;
     }
 
+    /** musicTracks() kept until the music assets or the chosen track change (5 fields ask for it on every panel event). */
+    private record MusicCache(int assets, String track, List<Opt> opts) {
+    }
+
+    private static volatile MusicCache musicCache;
+
     private static List<Opt> musicTracks() {
+        int assets;
+        try {
+            assets = MusicContainer.getAssetMap().getAssetMap().size();
+        } catch (RuntimeException e) {
+            assets = -1;
+        }
+        MusicCache c = musicCache;
+        if (c != null && c.assets() == assets && java.util.Objects.equals(c.track(), FxSettings.musicTrack)) return c.opts();
+        List<Opt> opts = buildMusicTracks();
+        musicCache = new MusicCache(assets, FxSettings.musicTrack, opts);
+        return opts;
+    }
+
+    private static List<Opt> buildMusicTracks() {
         Set<String> ids = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         try {
             for (Object k : MusicContainer.getAssetMap().getAssetMap().keySet()) ids.add(String.valueOf(k));

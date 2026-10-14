@@ -60,55 +60,87 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
      */
     static boolean give(Ref<EntityStore> target, java.util.List<EntityEffect> chain, EffectControllerComponent effects,
                         com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
-        EntityEffect effect = chain.get(0);
-        // Re-applying a look: the old one goes first. The very same effect goes back on a moment later.
-        if (LookKeeper.dropLook(target, effect, effects, buffer)) {
-            giveLater(target, chain, effect);
-            return true;
-        }
-        if (!effects.addEffect(target, effect, buffer)) return false;
-        // A Jade or Shimmer look stays visible: LookKeeper re-sends it when the mob loses another effect.
-        LookKeeper.track(target, effect);
-        // A buffed mob wearing the buff's shimmer keeps only its runes and eyes under its new look.
-        if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, buffer);
-        WandFx.onTarget(target, WandFx.EFFECT + "_" + EffectWand.burstColor(effect), buffer);
-        giveRestLater(target, chain, 1, effect);
-        return true;
+        return effects != null && giveAll(java.util.List.of(target), chain, buffer) > 0;
     }
 
-    /** Adds {@code effect} (chain[0]) after LookKeeper.REAPPLY_GAP_MS, then the rest of the chain. */
-    private static void giveLater(Ref<EntityStore> target, java.util.List<EntityEffect> chain, EntityEffect effect) {
-        var store = target.getStore();
+    /**
+     * {@link #give} for a whole group (an Effect Wand wave group): one scheduled task for the looks put back after
+     * REAPPLY_GAP_MS and one per later chain step, for the whole group (audit 2026-10-14: re-applying jade to 200 jade
+     * mobs queued 200 tasks). Returns how many took it.
+     */
+    static int giveAll(java.util.List<Ref<EntityStore>> targets, java.util.List<EntityEffect> chain,
+                       com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        EntityEffect effect = chain.get(0);
+        java.util.List<Ref<EntityStore>> given = new java.util.ArrayList<>(), later = new java.util.ArrayList<>();
+        for (Ref<EntityStore> target : targets) {
+            if (target == null || !target.isValid()) continue;
+            EffectControllerComponent effects = buffer.getComponent(target, EffectControllerComponent.getComponentType());
+            if (effects == null) continue;
+            // Re-applying a look: the old one goes first. The very same effect goes back on a moment later.
+            if (LookKeeper.dropLook(target, effect, effects, buffer)) {
+                later.add(target);
+                continue;
+            }
+            if (!effects.addEffect(target, effect, buffer)) continue;
+            landed(target, effect, buffer, true);
+            given.add(target);
+        }
+        giveRestLater(given, chain, 1, effect);
+        if (!later.isEmpty()) giveLater(later, chain, effect);
+        return given.size() + later.size();
+    }
+
+    /**
+     * An effect went on: a Jade or Shimmer look stays visible (LookKeeper re-sends it when the mob loses another effect),
+     * a buffed mob wearing the buff's shimmer keeps only its runes and eyes under its new look, and the wand's burst.
+     */
+    private static void landed(Ref<EntityStore> target, EntityEffect effect,
+                               com.hypixel.hytale.component.ComponentAccessor<EntityStore> accessor, boolean burst) {
+        LookKeeper.track(target, effect);
+        if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, accessor);
+        if (burst) WandFx.onTarget(target, WandFx.EFFECT + "_" + EffectWand.burstColor(effect), accessor);
+    }
+
+    /** Adds {@code effect} (chain[0]) to every target after LookKeeper.REAPPLY_GAP_MS, then the rest of the chain. */
+    private static void giveLater(java.util.List<Ref<EntityStore>> targets, java.util.List<EntityEffect> chain, EntityEffect effect) {
+        var store = targets.get(0).getStore();
         var world = store.getExternalData().getWorld();
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
-            if (store.isShutdown() || !target.isValid()) return;
-            EffectControllerComponent fx = store.getComponent(target, EffectControllerComponent.getComponentType());
-            if (fx == null || !fx.addEffect(target, effect, store)) return;
-            LookKeeper.track(target, effect);
-            if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, store);
-            WandFx.onTarget(target, WandFx.EFFECT + "_" + EffectWand.burstColor(effect), store);
-            giveRestLater(target, chain, 1, effect);
+            if (store.isShutdown()) return;
+            java.util.List<Ref<EntityStore>> given = new java.util.ArrayList<>();
+            for (Ref<EntityStore> target : targets) {
+                if (!target.isValid() || target.getStore() != store) continue;
+                EffectControllerComponent fx = store.getComponent(target, EffectControllerComponent.getComponentType());
+                if (fx == null || !fx.addEffect(target, effect, store)) continue;
+                landed(target, effect, store, true);
+                given.add(target);
+            }
+            giveRestLater(given, chain, 1, effect);
         }), LookKeeper.REAPPLY_GAP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**
-     * A chain "A>B": gives chain[i] when the previous effect ends (its Duration; 0.5 s for infinite ones). Used to try
-     * multi-step looks (e.g. a death that first turns purple, then bursts), since a mob shows one ModelVFX at a time.
+     * A chain "A>B": gives chain[i] when the previous effect ends (its Duration; 0.5 s for infinite ones), to the whole
+     * group at once. Used to try multi-step looks (e.g. a death that first turns purple, then bursts), since a mob shows
+     * one ModelVFX at a time.
      */
-    private static void giveRestLater(Ref<EntityStore> target, java.util.List<EntityEffect> chain, int i, EntityEffect previous) {
-        if (i >= chain.size() || target == null || !target.isValid()) return;
+    private static void giveRestLater(java.util.List<Ref<EntityStore>> targets, java.util.List<EntityEffect> chain, int i,
+                                      EntityEffect previous) {
+        if (i >= chain.size() || targets.isEmpty()) return;
         float wait = previous.isInfinite() || previous.getDuration() <= 0 ? 0.5f : previous.getDuration();
-        var store = target.getStore();
+        var store = targets.get(0).getStore();
         var world = store.getExternalData().getWorld();
         com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
-            if (store.isShutdown() || !target.isValid()) return;
-            EffectControllerComponent fx = store.getComponent(target, EffectControllerComponent.getComponentType());
+            if (store.isShutdown()) return;
             EntityEffect next = chain.get(i);
-            if (fx != null && fx.addEffect(target, next, store)) {
-                LookKeeper.track(target, next);
-                if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, store);
+            java.util.List<Ref<EntityStore>> still = new java.util.ArrayList<>();
+            for (Ref<EntityStore> target : targets) {
+                if (!target.isValid() || target.getStore() != store) continue;
+                still.add(target);
+                EffectControllerComponent fx = store.getComponent(target, EffectControllerComponent.getComponentType());
+                if (fx != null && fx.addEffect(target, next, store)) landed(target, next, store, false);
             }
-            giveRestLater(target, chain, i + 1, next);
+            giveRestLater(still, chain, i + 1, next);
         }), (long) (wait * 1000), java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 }
