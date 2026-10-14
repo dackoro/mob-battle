@@ -11,7 +11,7 @@ Group {
     Padding: (Top: 6);
 
     Label #Title {
-      Text: "Watching";
+      Text: %server.mobbattle.hud.watching;
       Style: (FontSize: 14, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
               HorizontalAlignment: Center, VerticalAlignment: Center);
     }

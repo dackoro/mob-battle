@@ -103,6 +103,7 @@ public final class FightManager {
     /** Drops state of removed entities and finished fights (BattleManager.maintain, once per second). */
     static void prune() {
         PENDING_STOPS.keySet().removeIf(npc -> !npc.isValid());
+        ChaseSupport.prune();
         STOP_SECONDS.keySet().removeIf(npc -> !PENDING_STOPS.containsKey(npc));
         long now = System.currentTimeMillis();
         PENDING_HEALS.values().removeIf(h -> !h.npc().isValid() || now > h.at() + HEAL_EXPIRE_MS);
@@ -118,6 +119,7 @@ public final class FightManager {
         Double custom = STOP_SECONDS.remove(self);
         double seconds = custom != null ? custom : HOSTILE_SECONDS;
         if (others == null || !BattleManager.isAlive(self, accessor)) return;
+        ChaseSupport.restoreLeash(self, accessor);
         WorldSupport world = WorldSupport.get(self, accessor);
         StateSupport state = StateSupport.get(self, accessor);
         if (world != null) {
@@ -176,6 +178,28 @@ public final class FightManager {
                 && (battle == null ? !isFighting(self, target)
                     : !battle.has(target) || battle.team(target) == battle.team(self))) {
             releaseTarget(self, state, accessor);
+        }
+    }
+
+    /**
+     * Battle isolation from the other side (2026-10-14, test calls: onlookers of one event goblin went for an isolated
+     * duel's fighters with no group call at all; isolation only made the fighters ignore outsiders). An NPC outside
+     * every battle whose LockedTarget fights in an isolated battle lets it go and ignores it OUTSIDER_IGNORE_SECONDS:
+     * its hits were cancelled anyway, now it no longer chases and swings at them. Also catches a group call the role
+     * read before FightTickSystem could drop it. Every tick while a battle runs: one component read.
+     */
+    static void dropFighterTarget(Ref<EntityStore> self, ComponentAccessor<EntityStore> accessor) {
+        MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
+        Ref<EntityStore> target = marked != null ? marked.getMarkedEntityRef(TARGET_SLOT) : null;
+        if (target == null || !target.isValid() || !BattleManager.isManaged(target) || isFighting(self, target)) return;
+        BattleManager.Battle battle = BattleManager.battleOf(target);
+        if (battle == null || !FxSettings.isolated(battle.kind)) return;
+        WorldSupport world = WorldSupport.get(self, accessor);
+        StateSupport state = StateSupport.get(self, accessor);
+        if (world != null) tryOverride(world, target, Attitude.IGNORE, OUTSIDER_IGNORE_SECONDS, combatStateOf(state) != null);
+        releaseTarget(self, state, accessor);
+        if (MobBattlePlugin.debugging()) {
+            MobBattlePlugin.debug("outsider " + ChaosWand.nameOf(self, accessor) + " let go of " + ChaosWand.nameOf(target, accessor) + " (isolated battle)");
         }
     }
 
@@ -597,6 +621,26 @@ public final class FightManager {
         } catch (NullPointerException e) {
             return false;
         }
+    }
+
+    /** How long a mob holding back from a target it can't reach ignores it (renewed every second while it lasts). */
+    static final double HOLD_IGNORE_SECONDS = 2.5;
+
+    /**
+     * Medium: {@code self} stops going for {@code target} for a moment (FightTickSystem.holdsBack): IGNORE toward it
+     * and its LockedTarget cleared if it is that one. The battle keeps the target; the isolation refresh and relock
+     * make it hostile again once it can be reached.
+     */
+    static void holdOff(Ref<EntityStore> self, Ref<EntityStore> target, ComponentAccessor<EntityStore> accessor) {
+        WorldSupport world = WorldSupport.get(self, accessor);
+        if (world != null) tryOverride(world, target, Attitude.IGNORE, HOLD_IGNORE_SECONDS, combatStateOf(StateSupport.get(self, accessor)) != null);
+        MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
+        if (marked != null && marked.getMarkedEntityRef(TARGET_SLOT) == target) marked.setMarkedEntity(TARGET_SLOT, null);
+    }
+
+    /** IGNORE toward {@code other} for {@code seconds}, creating the override memory if needed (SummonCalm). */
+    static void ignore(WorldSupport world, Ref<EntityStore> other, double seconds) {
+        tryOverride(world, other, Attitude.IGNORE, seconds, true);
     }
 
     private static volatile Field overrideMemoryField;

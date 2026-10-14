@@ -38,18 +38,27 @@ public class KillInteraction extends SimpleInstantInteraction {
         if (buffer == null || target == null || !target.isValid()) {
             return;
         }
+        use(context.getEntity(), target, buffer);
+    }
+
+    /**
+     * A Kill Wand click by {@code self} (a player) on {@code target}: the wand and /mobbattle test wand kill go through
+     * here, so tests run the same checks (killPlayers, players who can't die) and the same soul rip.
+     */
+    static void use(Ref<EntityStore> self, Ref<EntityStore> target, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         EntityStatMap stats = buffer.getComponent(target, EntityStatMap.getComponentType());
         if (stats == null) {
             return;
         }
         NPCEntity npc = buffer.getComponent(target, NPCEntity.getComponentType());
-        String name = npc != null ? npc.getRoleName() : "target";
-        PlayerRef player = buffer.getComponent(context.getEntity(), PlayerRef.getComponentType());
+        // A player's name too (it said "Killed target."), as the other wand messages do.
+        String name = npc != null ? npc.getRoleName() : ChaosWand.nameOf(target, buffer);
+        PlayerRef player = buffer.getComponent(self, PlayerRef.getComponentType());
         // Players only with /mobbattle killPlayers on (default off): the wand's error look and a message.
         if (!FxSettings.killPlayers && buffer.getComponent(target, PlayerRef.getComponentType()) != null) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
             if (player != null) {
-                player.sendMessage(Message.raw("The Kill Wand doesn't work on players. Turn it on with /mobbattle killPlayers on")
+                player.sendMessage(I18n.tr("chat.kill.noPlayers")
                         .color("#ffcc55"));
             }
             return;
@@ -58,13 +67,11 @@ public class KillInteraction extends SimpleInstantInteraction {
         if (npc == null && PlayerFighters.cantDie(target, buffer)) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
             if (player != null) {
-                player.sendMessage(Message.raw(ChaosWand.nameOf(target, buffer)
-                        + " can't die right now (Creative, invulnerable or just respawned).").color("#ffcc55"));
+                player.sendMessage(I18n.tr("chat.kill.cantDie").param("name", ChaosWand.nameOf(target, buffer)).color("#ffcc55"));
             }
             return;
         }
         // NPCs get the soul rip first and die after /mobbattle killdelay; anything else dies right away.
-        Ref<EntityStore> self = context.getEntity();
         boolean isNpc = npc != null;
         int hit = FxSettings.wandFx ? FxSettings.killHitDelayMs : 0;
         if (hit <= 0) {
@@ -85,7 +92,7 @@ public class KillInteraction extends SimpleInstantInteraction {
                                String name, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         WandFx.kill(target, killer, npc, buffer);
         if (player != null && player.isValid()) {
-            player.sendMessage(Message.raw("Killed " + name + ".").color("#ff5555"));
+            player.sendMessage(I18n.tr("chat.kill.done").param("name", name).color("#ff5555"));
         }
     }
 

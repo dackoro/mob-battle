@@ -37,9 +37,9 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
         MorphWand.Copy copy = target != null && target.isValid() ? MorphWand.read(target, buffer) : null;
         if (copy == null) {
             MorphWand.Copy current = MorphWand.copyOf(player.getUuid());
-            player.sendMessage(Message.raw(current == null
-                    ? "Right click a mob to copy its model, or use /mobbattle morph <model>."
-                    : "Copied model: " + current.label() + ". Left click a mob to apply it.").color("#ffcc55"));
+            player.sendMessage((current == null
+                    ? I18n.tr("chat.morph.copyHint")
+                    : I18n.tr("chat.morph.copyCurrent").param("model", current.label())).color("#ffcc55"));
             return;
         }
         MorphWand.setCopy(player.getUuid(), copy);
@@ -47,7 +47,7 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
         // The omnitrix "recalibrated" sound, played here and not by the effect: a re-applied effect (quick clicks)
         // does not replay its sound.
         WandFx.burst(null, "SFX_MobBattle_OmnitrixCopy", ChaosWand.positionOf(target, buffer), buffer);
-        player.sendMessage(Message.raw("Copied the model of " + ChaosWand.nameOf(target, buffer) + " (" + copy.label()
-                + "). Left click a mob to give it this look.").color("#7dff8a"));
+        player.sendMessage(I18n.tr("chat.morph.copied").param("name", ChaosWand.nameOf(target, buffer))
+                .param("model", copy.label()).color("#7dff8a"));
     }
 }

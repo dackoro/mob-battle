@@ -47,13 +47,31 @@ public class MorphBurstInteraction extends SimpleInstantInteraction {
             context.getState().state = InteractionState.Failed;
             return;
         }
-        int changed = MorphWand.burst(context.getEntity(), player, shuffle(), buffer);
+        // The held click plays the ground slam: the wave goes when it hits (as the Snap Wand's).
+        var caster = context.getEntity();
+        var store = caster.getStore();
+        boolean shuffle = shuffle();
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> store.getExternalData().getWorld().execute(() -> {
+            if (store.isShutdown() || !caster.isValid()) return;
+            land(player, caster, shuffle, store);
+        }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** When the slam hits: the wave and the morphs, and the chat summary. World thread. */
+    private static void land(PlayerRef player, com.hypixel.hytale.component.Ref<EntityStore> caster, boolean shuffle,
+                             com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        int changed = MorphWand.burst(caster, player, shuffle, buffer);
         if (changed < 0) return;
-        String what = shuffle() ? "swapped looks" : "now look like " + MorphWand.copyOf(player.getUuid()).label();
-        player.sendMessage(Message.raw(changed == 0
-                ? (shuffle() ? "Nobody within " + FxSettings.morphBurstRadius + " blocks to swap looks with."
-                        : "Nobody within " + FxSettings.morphBurstRadius + " blocks to morph.")
-                : changed + (changed == 1 ? " mob " : " mobs ") + what
-                        + ". Cleanse Wand or /mobbattle morph reset to undo.").color(changed == 0 ? "#ffcc55" : "#7dff8a"));
+        Message msg;
+        if (changed == 0) {
+            msg = I18n.tr(shuffle ? "chat.morph.burstNoneSwap" : "chat.morph.burstNoneMorph")
+                    .param("radius", FxSettings.morphBurstRadius);
+        } else if (shuffle) {
+            msg = I18n.tr("chat.morph.burstSwapped").param("count", changed);
+        } else {
+            msg = I18n.tr("chat.morph.burstMorphed").param("count", changed)
+                    .param("model", MorphWand.copyOf(player.getUuid()).label());
+        }
+        player.sendMessage(msg.color(changed == 0 ? "#ffcc55" : "#7dff8a"));
     }
 }

@@ -98,7 +98,7 @@ final class WandFx {
             java.util.stream.Stream.of(HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, EFFECT,
                     COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, UNSELECT_QUIET, BUFF_TAKE, ARMY_ADD, ARMY_REMOVE),
             Teams.PALETTE.keySet().stream().flatMap(c -> java.util.stream.Stream.concat(
-                    java.util.stream.Stream.of(MARK + c, DEATH_JADE + c, DEATH_SHIMMER + c),
+                    java.util.stream.Stream.of(MARK + c, DEATH_JADE + c, DEATH_SHIMMER + c, EFFECT + "_" + c),
                     java.util.Arrays.stream(LIGHT_HEIGHTS).mapToObj(h -> CLEANSE + c + heightSuffix(h)))))
             .toArray(String[]::new);
 
@@ -159,9 +159,11 @@ final class WandFx {
     static void loneCrown(Ref<EntityStore> target, ComponentAccessor<EntityStore> buffer) {
         String sized = crown();
         if (sized == null || target == null || !target.isValid()) return;
-        // A player's model grows with their size buff and the crown with it: the plain crown (particleScale).
+        // A player's model grows with their size buff and the crown with it: sized like the buff crowns (grown / size,
+        // audit 2026-10-14: the plain crown ended up up to 3x bigger than a buff crown on the same player).
+        float f = 1 + (Buffs.enabled(Buffs.Source.LONE) ? Buffs.percent(Buffs.Source.LONE, Buffs.Stat.SIZE) : 0) / 100f;
         String crown = buffer.getComponent(target, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType()) != null
-                ? CROWN + ActionFx.crown : sized;
+                ? CROWN + ActionFx.crown + crownSize(grown(f) / f) : sized;
         boolean grows = Buffs.enabled(Buffs.Source.LONE) && Buffs.percent(Buffs.Source.LONE, Buffs.Stat.SIZE) > 0;
         if (!grows) {
             onTarget(target, crown, buffer);
@@ -243,7 +245,7 @@ final class WandFx {
             // Two tints at once mix (e.g. green + red = a washed-out white): remove every other wand tint
             // first, so only the newest one shows (tintless ones, e.g. Unmorph on top of Cleanse, only restart
             // themselves). The soul rip (pending kill) is never replaced.
-            boolean tinted = !TINTLESS.contains(fx) && !fx.startsWith(SWIRL) && !fx.startsWith("Crown") && !fx.startsWith(BUFF_LIGHT);
+            boolean tinted = !TINTLESS.contains(fx) && !fx.startsWith(EFFECT) && !fx.startsWith(SWIRL) && !fx.startsWith("Crown") && !fx.startsWith(BUFF_LIGHT);
             for (String other : ALL_FX) {
                 if (!tinted && !other.equals(fx)) continue;
                 int index = EntityEffect.getAssetMap().getIndex("MobBattle_Fx_" + other);

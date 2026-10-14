@@ -98,10 +98,10 @@ public class CleanseInteraction extends SimpleInstantInteraction {
         EffectControllerComponent effects = target != null && target.isValid()
                 ? buffer.getComponent(target, EffectControllerComponent.getComponentType()) : null;
         if (effects == null) {
-            player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.look.mob").color("#ffcc55"));
             return;
         }
         landLater(java.util.List.of(target), java.util.List.of(start(target, true, buffer)));
-        player.sendMessage(Message.raw("Removed every effect from " + ChaosWand.nameOf(target, buffer) + ".").color("#7fd3ff"));
+        player.sendMessage(I18n.tr("chat.cleanse.done").param("name", ChaosWand.nameOf(target, buffer)).color("#7fd3ff"));
     }
 }

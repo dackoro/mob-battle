@@ -35,14 +35,14 @@ final class Countdown {
         /** Owner identity only; resolve the current PlayerRef when sending feedback. Null for console events. */
         final UUID owner;
         final BattleManager.Battle.Anchor anchor;
-        final String label;
+        final Label label;
         final Set<Ref<EntityStore>> mobs;
         final Consumer<ComponentAccessor<EntityStore>> start;
         final Consumer<MobBattleApi.EndReason> onEnd;
         volatile boolean cancelled;
 
         Pending(BattleManager.Kind kind, long dueAt, Store<EntityStore> store, UUID owner,
-                BattleManager.Battle.Anchor anchor, String label, Set<Ref<EntityStore>> mobs,
+                BattleManager.Battle.Anchor anchor, Label label, Set<Ref<EntityStore>> mobs,
                 Consumer<ComponentAccessor<EntityStore>> start, Consumer<MobBattleApi.EndReason> onEnd) {
             this.kind = kind;
             this.dueAt = dueAt;
@@ -53,6 +53,16 @@ final class Countdown {
             this.mobs = mobs;
             this.start = start;
             this.onEnd = onEnd;
+        }
+    }
+
+    /**
+     * What a countdown is called: {@code id} is the English text (cancelFor matches its prefix, e.g. "DUEL"),
+     * {@code text} what the players read (a translated Message; {@link #of(String)} = the id as plain text).
+     */
+    record Label(String id, Message text) {
+        static Label of(String id) {
+            return new Label(id, Message.raw(id));
         }
     }
 
@@ -68,34 +78,58 @@ final class Countdown {
     private Countdown() {
     }
 
-    static void run(BattleManager.Kind kind, PlayerRef player, ComponentAccessor<EntityStore> buffer, String label,
+    static void run(BattleManager.Kind kind, PlayerRef player, ComponentAccessor<EntityStore> buffer, Label label,
                     Collection<Ref<EntityStore>> mobs, Consumer<ComponentAccessor<EntityStore>> start) {
         run(kind, player, null, buffer, label, mobs, start, null);
     }
 
-    /** Player countdown that also tells when it is cancelled (never when it starts). */
     static void run(BattleManager.Kind kind, PlayerRef player, ComponentAccessor<EntityStore> buffer, String label,
+                    Collection<Ref<EntityStore>> mobs, Consumer<ComponentAccessor<EntityStore>> start) {
+        run(kind, player, buffer, Label.of(label), mobs, start);
+    }
+
+    /** Player countdown that also tells when it is cancelled (never when it starts). */
+    static void run(BattleManager.Kind kind, PlayerRef player, ComponentAccessor<EntityStore> buffer, Label label,
                     Collection<Ref<EntityStore>> mobs, Consumer<ComponentAccessor<EntityStore>> start,
                     Consumer<MobBattleApi.EndReason> onEnd) {
         run(kind, player, null, buffer, label, mobs, start, onEnd);
     }
 
+    static void run(BattleManager.Kind kind, PlayerRef player, ComponentAccessor<EntityStore> buffer, String label,
+                    Collection<Ref<EntityStore>> mobs, Consumer<ComponentAccessor<EntityStore>> start,
+                    Consumer<MobBattleApi.EndReason> onEnd) {
+        run(kind, player, buffer, Label.of(label), mobs, start, onEnd);
+    }
+
     /** Server-launched event countdown with no retained player owner. */
     static void run(BattleManager.Kind kind, BattleManager.Battle.Anchor anchor,
-                    ComponentAccessor<EntityStore> buffer, String label, Collection<Ref<EntityStore>> mobs,
+                    ComponentAccessor<EntityStore> buffer, Label label, Collection<Ref<EntityStore>> mobs,
                     Consumer<ComponentAccessor<EntityStore>> start) {
         run(kind, null, anchor, buffer, label, mobs, start, null);
     }
 
     static void run(BattleManager.Kind kind, BattleManager.Battle.Anchor anchor,
                     ComponentAccessor<EntityStore> buffer, String label, Collection<Ref<EntityStore>> mobs,
+                    Consumer<ComponentAccessor<EntityStore>> start) {
+        run(kind, anchor, buffer, Label.of(label), mobs, start);
+    }
+
+    static void run(BattleManager.Kind kind, BattleManager.Battle.Anchor anchor,
+                    ComponentAccessor<EntityStore> buffer, Label label, Collection<Ref<EntityStore>> mobs,
                     Consumer<ComponentAccessor<EntityStore>> start,
                     Consumer<MobBattleApi.EndReason> onEnd) {
         run(kind, null, anchor, buffer, label, mobs, start, onEnd);
     }
 
+    static void run(BattleManager.Kind kind, BattleManager.Battle.Anchor anchor,
+                    ComponentAccessor<EntityStore> buffer, String label, Collection<Ref<EntityStore>> mobs,
+                    Consumer<ComponentAccessor<EntityStore>> start,
+                    Consumer<MobBattleApi.EndReason> onEnd) {
+        run(kind, anchor, buffer, Label.of(label), mobs, start, onEnd);
+    }
+
     private static void run(BattleManager.Kind kind, PlayerRef player, BattleManager.Battle.Anchor anchor,
-                            ComponentAccessor<EntityStore> buffer, String label, Collection<Ref<EntityStore>> mobs,
+                            ComponentAccessor<EntityStore> buffer, Label label, Collection<Ref<EntityStore>> mobs,
                             Consumer<ComponentAccessor<EntityStore>> start,
                             Consumer<MobBattleApi.EndReason> onEnd) {
         Set<Ref<EntityStore>> set = ConcurrentHashMap.newKeySet();
@@ -129,10 +163,11 @@ final class Countdown {
             return;
         }
         if (player != null) {
-            player.sendMessage(Message.raw("[" + p.label + "] " + left).color("#ffd23e"));
-            if (TITLE_OWNER.get(p.owner) == p) FightFx.countdownTitle(player, left, p.label);
+            player.sendMessage(I18n.tr("battle.countdown.tick").param("label", p.label.text()).param("left", left)
+                    .color("#ffd23e"));
+            if (TITLE_OWNER.get(p.owner) == p) FightFx.countdownTitle(player, left, p.label.text());
         } else {
-            FightFx.countdownTitle(p.anchor, left, p.label);
+            FightFx.countdownTitle(p.anchor, left, p.label.text());
         }
     }
 
@@ -143,7 +178,7 @@ final class Countdown {
                 finish(old, MobBattleApi.EndReason.REPLACED);
                 PlayerRef player = old.owner != null ? com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(old.owner) : null;
                 if (player != null && player.isValid()) {
-                    player.sendMessage(Message.raw("[" + old.label + "] cancelled: its mobs got a new order.")
+                    player.sendMessage(I18n.tr("battle.countdown.cancelled").param("label", old.label.text())
                             .color("#aaaaaa"));
                 }
             }
@@ -176,7 +211,7 @@ final class Countdown {
     static java.util.Set<Ref<EntityStore>> cancelFor(UUID player, String prefix) {
         java.util.Set<Ref<EntityStore>> mobs = new java.util.HashSet<>();
         for (Pending p : PENDING) {
-            if (!p.cancelled && player.equals(p.owner) && p.label.startsWith(prefix)) {
+            if (!p.cancelled && player.equals(p.owner) && p.label.id().startsWith(prefix)) {
                 finish(p);
                 mobs.addAll(p.mobs);
             }

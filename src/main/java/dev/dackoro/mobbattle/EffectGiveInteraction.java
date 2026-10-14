@@ -39,33 +39,41 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
         EffectControllerComponent effects = target != null && target.isValid()
                 ? buffer.getComponent(target, EffectControllerComponent.getComponentType()) : null;
         if (effects == null) {
-            player.sendMessage(Message.raw("Look at a mob and click it.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.look.mob").color("#ffcc55"));
             return;
         }
         java.util.List<EntityEffect> chain = EffectWand.chain(FxSettings.effect);
         if (chain == null || chain.isEmpty()) {
-            player.sendMessage(Message.raw("Unknown effect " + FxSettings.effect + ". Use /mobbattle wandEffect <id>.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.effect.unknown").param("effect", FxSettings.effect).color("#ffcc55"));
             return;
         }
-        EntityEffect effect = chain.get(0);
         String name = ChaosWand.nameOf(target, buffer);
+        boolean ok = give(target, chain, effects, buffer);
+        player.sendMessage((ok ? I18n.tr("chat.effect.gave").param("effect", FxSettings.effect).param("name", name)
+                : I18n.tr("chat.effect.rejected").param("name", name).param("effect", chain.get(0).getId()))
+                .color(ok ? EffectWand.colorOf(FxSettings.effect) : "#ffcc55"));
+    }
+
+    /**
+     * Gives the chain's first effect to {@code target} (and the rest later, each when the previous ends), with the
+     * look tracking and wand feedback. False if the entity rejected it (immune or not applicable).
+     */
+    static boolean give(Ref<EntityStore> target, java.util.List<EntityEffect> chain, EffectControllerComponent effects,
+                        com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        EntityEffect effect = chain.get(0);
         // Re-applying a look: the old one goes first. The very same effect goes back on a moment later.
         if (LookKeeper.dropLook(target, effect, effects, buffer)) {
             giveLater(target, chain, effect);
-            player.sendMessage(Message.raw("Gave " + FxSettings.effect + " to " + name + ".").color("#b44bff"));
-            return;
+            return true;
         }
-        boolean ok = effects.addEffect(target, effect, buffer);
-        if (ok) {
-            // A Jade or Shimmer look stays visible: LookKeeper re-sends it when the mob loses another effect.
-            LookKeeper.track(target, effect);
-            // A buffed mob wearing the buff's shimmer keeps only its runes and eyes under its new look.
-            if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, buffer);
-            WandFx.onTarget(target, WandFx.EFFECT, buffer);
-            giveRestLater(target, chain, 1, effect);
-        }
-        player.sendMessage(Message.raw(ok ? "Gave " + FxSettings.effect + " to " + name + "."
-                : name + " rejected " + effect.getId() + " (immune or not applicable).").color(ok ? "#b44bff" : "#ffcc55"));
+        if (!effects.addEffect(target, effect, buffer)) return false;
+        // A Jade or Shimmer look stays visible: LookKeeper re-sends it when the mob loses another effect.
+        LookKeeper.track(target, effect);
+        // A buffed mob wearing the buff's shimmer keeps only its runes and eyes under its new look.
+        if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, buffer);
+        WandFx.onTarget(target, WandFx.EFFECT + "_" + EffectWand.burstColor(effect), buffer);
+        giveRestLater(target, chain, 1, effect);
+        return true;
     }
 
     /** Adds {@code effect} (chain[0]) after LookKeeper.REAPPLY_GAP_MS, then the rest of the chain. */
@@ -78,7 +86,7 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
             if (fx == null || !fx.addEffect(target, effect, store)) return;
             LookKeeper.track(target, effect);
             if (LookKeeper.hasOwnLook(target)) Buffs.refreshLook(target, store);
-            WandFx.onTarget(target, WandFx.EFFECT, store);
+            WandFx.onTarget(target, WandFx.EFFECT + "_" + EffectWand.burstColor(effect), store);
             giveRestLater(target, chain, 1, effect);
         }), LookKeeper.REAPPLY_GAP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }

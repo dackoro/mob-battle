@@ -64,11 +64,17 @@ public class ArmyPlayerDamageSystem extends DamageEventSystem {
             return;
         }
         if (buffer.getComponent(attacker, NPCEntity.getComponentType()) != null) {
-            // Its own army mob may hurt a player fighter only when the battle made them enemies.
-            if (Army.isMember(player.getUuid(), attacker) && !BattleManager.areEnemies(attacker, victim)) {
-                damage.setCancelled(true);
+            // Its own army mob (or a mob of a leader serving in its army) may hurt a player fighter only when the
+            // battle made them enemies.
+            if (Army.sameChain(victim, player.getUuid(), attacker, Army.leaderKey(attacker))
+                    && !BattleManager.areEnemies(attacker, victim)) {
+                // armyFriendlyFire: its own army mob's hit lands, without turning anyone against it.
+                if (!FxSettings.armyFriendlyFire) damage.setCancelled(true);
             } else if (!damage.isCancelled()) {
                 Army.order(player.getUuid(), attacker, buffer);
+                // A leader mob hit a player: its army goes for that player too (owner's order).
+                java.util.UUID leads = Army.leaderKey(attacker);
+                if (leads != null) Army.order(leads, victim, buffer);
             }
             return;
         }

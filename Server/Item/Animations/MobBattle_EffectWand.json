@@ -1,14 +1,36 @@
 {
-  "$Comment": "Effect Wand: the wand's usual poses (Parent Wand) plus EffectCast (right click), a copy of the vanilla Wand CastLeft (Cast_Left*.blockyanim) to edit in Blockbench: Common/Characters/Animations/Items/MobBattle/EffectCast/.",
-  "Parent": "Wand",
-  "UseFirstPersonOverrides": false,
-  "Animations": {
-    "EffectCast": {
-      "ThirdPerson": "Characters/Animations/Items/MobBattle/EffectCast/EffectCast.blockyanim",
-      "ThirdPersonMoving": "Characters/Animations/Items/MobBattle/EffectCast/EffectCast_Moving.blockyanim",
-      "FirstPerson": "Characters/Animations/Items/MobBattle/EffectCast/EffectCast_FPS.blockyanim",
-      "ThirdPersonFace": "Characters/Animations/Expressions/Frown.blockyanim",
-      "Speed": 1
-    }
+ "$Comment": "Effect Wand: the wand's usual poses (Parent Wand) plus EffectCast (right click), a copy of the vanilla Wand CastLeft (Cast_Left*.blockyanim) to edit in Blockbench: Common/Characters/Animations/Items/MobBattle/EffectCast/. EffectSlam (right click, 2026-10-13): the Snap Wand's SnapSlam (and the mace Swing_Down_FPS in first person) plus one full turn of the gem head (bone15) around the hit; a player animation can key the held item's own nodes (vanilla bows key Bow-Top-Pulley, flails Chain). EffectSpin (right click): EffectCast plus one full turn of the gem head; EffectSlam is now the held left click's (2026-10-13). EffectCharge (held left while charging, 2026-10-13, user): the vanilla Wand Cast_Left_Charging with the gem spinning 5 turns per loop; EffectSlam carries the spin on, 3 turns slowing down (scratch charge.py).",
+ "Parent": "Wand",
+ "UseFirstPersonOverrides": false,
+ "Animations": {
+  "EffectCast": {
+   "ThirdPerson": "Characters/Animations/Items/MobBattle/EffectCast/EffectCast.blockyanim",
+   "ThirdPersonMoving": "Characters/Animations/Items/MobBattle/EffectCast/EffectCast_Moving.blockyanim",
+   "FirstPerson": "Characters/Animations/Items/MobBattle/EffectCast/EffectCast_FPS.blockyanim",
+   "ThirdPersonFace": "Characters/Animations/Expressions/Frown.blockyanim",
+   "Speed": 1
+  },
+  "EffectCharge": {
+   "ThirdPerson": "Characters/Animations/Items/MobBattle/EffectCharge/EffectCharge.blockyanim",
+   "ThirdPersonMoving": "Characters/Animations/Items/MobBattle/EffectCharge/EffectCharge_Moving.blockyanim",
+   "FirstPerson": "Characters/Animations/Items/MobBattle/EffectCharge/EffectCharge_FPS.blockyanim",
+   "ThirdPersonFace": "Characters/Animations/Expressions/Frown.blockyanim",
+   "Speed": 1,
+   "Looping": true
+  },
+  "EffectSlam": {
+   "ThirdPerson": "Characters/Animations/Items/MobBattle/EffectSlam/EffectSlam.blockyanim",
+   "ThirdPersonMoving": "Characters/Animations/Items/MobBattle/EffectSlam/EffectSlam_Moving.blockyanim",
+   "FirstPerson": "Characters/Animations/Items/MobBattle/EffectSlam/EffectSlam_FPS.blockyanim",
+   "ThirdPersonFace": "Characters/Animations/Expressions/Rage.blockyanim",
+   "Speed": 1.6
+  },
+  "EffectSpin": {
+   "ThirdPerson": "Characters/Animations/Items/MobBattle/EffectSpin/EffectSpin.blockyanim",
+   "ThirdPersonMoving": "Characters/Animations/Items/MobBattle/EffectSpin/EffectSpin_Moving.blockyanim",
+   "FirstPerson": "Characters/Animations/Items/MobBattle/EffectSpin/EffectSpin_FPS.blockyanim",
+   "ThirdPersonFace": "Characters/Animations/Expressions/Frown.blockyanim",
+   "Speed": 1
   }
+ }
 }

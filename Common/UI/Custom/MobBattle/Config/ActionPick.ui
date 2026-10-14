@@ -23,18 +23,38 @@ Group {
 
     $C.@TextField #Name {
       @Anchor = (Width: 170, Right: 8, Top: 6);
-      PlaceholderText: "Name";
+      PlaceholderText: %server.mobbattle.panel.placeholder.name;
       Visible: false;
     }
 
+    // Takes the line's free width; the open list is wider still, so long mob names fit.
     $C.@DropdownBox #Input {
-      Anchor: (Width: 280, Top: 9, Right: 8, Height: 32);
+      @Anchor = (Top: 9, Right: 8, Height: 32);
+      FlexWeight: 1;
       ShowSearchInput: true;
+      Style: DropdownBoxStyle(
+        ...$C.@DefaultDropdownBoxStyle,
+        PanelWidth: 460
+      );
+    }
+
+    // A team's color, right beside the team picker (join a team); hidden otherwise.
+    Group #InputSwatch {
+      Visible: false;
+      Anchor: (Width: 26, Height: 26, Top: 12, Right: 8);
+      Background: #808080;
     }
 
     $C.@TextField #Count {
       @Anchor = (Width: 80, Right: 8, Top: 6);
       Visible: false;
+    }
+
+    // The team's color beside #Extra when it picks a team (add a mob); hidden otherwise.
+    Group #ExtraSwatch {
+      Visible: false;
+      Anchor: (Width: 26, Height: 26, Top: 12, Right: 8);
+      Background: #808080;
     }
 
     $C.@DropdownBox #Extra {

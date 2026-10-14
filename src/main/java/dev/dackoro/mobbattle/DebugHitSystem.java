@@ -19,9 +19,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Set;
 
 /**
- * Debug Wand follow: every hit given or taken by a followed mob, as our filters leave it (after BuffDamageSystem:
- * final amount and whether it is cancelled). Every hit in every world passes here, so it returns at once while
- * nothing is followed.
+ * Debug Wand follow and /mobbattle test duel: every hit given or taken by a followed mob, as our filters leave it
+ * (after BuffDamageSystem: final amount and whether it is cancelled). Every hit in every world passes here, so it
+ * returns at once while nothing is followed.
  */
 public class DebugHitSystem extends DamageEventSystem {
 
@@ -46,10 +46,17 @@ public class DebugHitSystem extends DamageEventSystem {
     @Override
     public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                        CommandBuffer<EntityStore> buffer, Damage damage) {
-        if (!DebugWand.any()) return;
+        boolean wand = DebugWand.any(), test = TestTools.watching();
+        if (!wand && !test) return;
         Ref<EntityStore> victim = chunk.getReferenceTo(index);
         Ref<EntityStore> attacker = damage.getSource() instanceof Damage.EntitySource source ? source.getRef() : null;
         DamageCause cause = DamageCause.getAssetMap().getAsset(damage.getDamageCauseIndex());
-        DebugWand.onHit(attacker, victim, damage.getAmount(), cause != null ? cause.getId() : "?", damage.isCancelled(), buffer);
+        String causeId = cause != null ? cause.getId() : "?";
+        if (wand) DebugWand.onHit(attacker, victim, damage.getAmount(), causeId, damage.isCancelled(), buffer);
+        // test verify isolation: a checked mob takes damage only from its own copy (area attacks of bosses hit the
+        // neighbouring pairs, map-spawned mobs got in; user, 2026-10-13).
+        if (test && TestTools.verifyBlocks(attacker, victim)) damage.setCancelled(true);
+        // /mobbattle test duel: every hit of its two fighters.
+        if (test) TestTools.onHit(attacker, victim, damage.getAmount(), causeId, damage.isCancelled(), buffer);
     }
 }

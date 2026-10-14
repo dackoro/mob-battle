@@ -13,7 +13,7 @@
   "Model": "Items/MobBattle/EffectWand/MobBattle_EffectWand.blockymodel",
   "Texture": "Items/MobBattle/EffectWand/MobBattle_EffectWand_Texture.png",
   "Animation": "Items/MobBattle/EffectWand/idle.blockyanim",
-  "DroppedItemAnimation": "Items/MobBattle/EffectWand/idle.blockyanim",
+  "DroppedItemAnimation": "Items/Animations/Dropped/Dropped_Diagonal_Left.blockyanim",
   "PlayerAnimationsId": "MobBattle_EffectWand",
   "Utility": {
     "Compatible": true
@@ -22,24 +22,41 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "Chaining",
-          "ChainingAllowance": 1.25,
-          "Next": [
-            {
-              "Type": "MobBattle_EffectGive",
-              "Effects": {
-                "ItemAnimationId": "SwingLeft"
-              },
-              "RunTime": 0.1
+          "Type": "Charging",
+          "AllowIndefiniteHold": true,
+          "DisplayProgress": true,
+          "Effects": {
+            "ItemAnimationId": "EffectCharge"
+          },
+          "Next": {
+            "0": {
+              "Type": "Chaining",
+              "ChainingAllowance": 1.25,
+              "Next": [
+                {
+                  "Type": "MobBattle_EffectGive",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                },
+                {
+                  "Type": "MobBattle_EffectGive",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                }
+              ]
             },
-            {
-              "Type": "MobBattle_EffectGive",
+            "1.5": {
+              "Type": "MobBattle_EffectArea",
               "Effects": {
-                "ItemAnimationId": "SwingLeft"
+                "ItemAnimationId": "EffectSlam"
               },
-              "RunTime": 0.1
+              "RunTime": 0.6
             }
-          ]
+          }
         }
       ]
     },
@@ -48,9 +65,17 @@
         {
           "Type": "MobBattle_EffectCycle",
           "Effects": {
-            "ItemAnimationId": "EffectCast"
+            "ItemAnimationId": "EffectSpin"
           },
           "RunTime": 0.4
+        }
+      ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_SkipCamera",
+          "RunTime": 0
         }
       ]
     }
@@ -67,7 +92,6 @@
       0
     ]
   },
-  "DroppedItemAnimation": "Items/Animations/Dropped/Dropped_Diagonal_Left.blockyanim",
   "Tags": {
     "Type": [
       "Tool"

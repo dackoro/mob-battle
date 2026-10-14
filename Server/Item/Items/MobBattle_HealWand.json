@@ -21,24 +21,50 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "Chaining",
-          "ChainingAllowance": 1.25,
-          "Next": [
-            {
-              "Type": "MobBattle_Heal",
-              "Effects": {
-                "ItemAnimationId": "SwingLeft"
-              },
-              "RunTime": 0.1
+          "Type": "Charging",
+          "AllowIndefiniteHold": true,
+          "DisplayProgress": true,
+          "Effects": {
+            "ItemAnimationId": "CastSummonCharging"
+          },
+          "Next": {
+            "0": {
+              "Type": "Chaining",
+              "ChainingAllowance": 1.25,
+              "Next": [
+                {
+                  "Type": "MobBattle_Heal",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                },
+                {
+                  "Type": "MobBattle_Heal",
+                  "Effects": {
+                    "ItemAnimationId": "SwingLeft"
+                  },
+                  "RunTime": 0.1
+                }
+              ]
             },
-            {
-              "Type": "MobBattle_Heal",
+            "1.5": {
+              "Type": "MobBattle_HealArea",
               "Effects": {
-                "ItemAnimationId": "SwingLeft"
+                "ItemPlayerAnimationsId": "MobBattle_SnapWand",
+                "ItemAnimationId": "SnapSlam"
               },
-              "RunTime": 0.1
+              "RunTime": 0.6
             }
-          ]
+          }
+        }
+      ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_SkipCamera",
+          "RunTime": 0
         }
       ]
     }

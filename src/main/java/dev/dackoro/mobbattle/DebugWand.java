@@ -399,7 +399,7 @@ final class DebugWand {
         for (Buffs.Stat st : Buffs.Stat.values()) {
             line(sb, "buff " + st.key, () -> {
                 int pct = Buffs.totalOf(mob, st);
-                return pct > 0 ? "+" + pct + "%" : "none";
+                return pct > 0 ? Buffs.both(st, pct) : "none";
             });
         }
         line(sb, "buff wand stacks", () -> String.valueOf(Buffs.wandStacks(mob)));

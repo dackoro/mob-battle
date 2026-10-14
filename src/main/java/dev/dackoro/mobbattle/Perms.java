@@ -54,7 +54,7 @@ final class Perms {
         }
         String missing = !allowed(player, USE) ? USE : !allowed(player, permission) ? permission : null;
         if (missing == null) return true;
-        player.sendMessage(com.hypixel.hytale.server.core.Message.raw("No permission (needs " + missing + ").")
+        player.sendMessage(I18n.tr("chat.perms.denied").param("perm", missing)
                 .color("#ffcc55"));
         context.getState().state = InteractionState.Failed;
         return false;

@@ -40,7 +40,7 @@ Changing a value does **not** apply it yet:
 
 ### Buttons that act at once
 
-List buttons, the Tools tab, the Admin tab and the Morph Wand **Use** button run the matching `/mobbattle` command as you, with its normal permission checks and chat reply. Your unsaved draft is kept. Buttons that clear or delete something (remove a team, reset teams, clear the summon list, delete a preset, Stop all, Disband armies, Clear all teams, Undo morphs, Reset all) ask for a **second click within 5 seconds** to confirm. Watch, Stop watching, Snap, Chaos me, Debug NPCs, Start, Join and Summon close the panel first so you can see the world.
+List buttons, the Tools tab, the Admin tab and the Morph Wand **Use** button run the matching `/mobbattle` command as you, with its normal permission checks and chat reply. Your unsaved draft is kept. Buttons that clear or delete something (remove a team, reset teams, clear the summon list, delete a preset, Stop all, Disband armies, Clear all teams, Undo morphs, Reset all) ask for a **second click within 5 seconds** to confirm: after the first click the button turns red and reads **Confirm?**. Watch, Stop watching, Snap, Chaos me, Debug NPCs, Start, Join and Summon close the panel first so you can see the world.
 
 ### Range preview
 
@@ -107,8 +107,9 @@ Intro camera before the fight, end camera on the winner, watch mode and the duel
 | | End camera time | How long the end camera films (seconds). Per kind. |
 | Watch & HUD | Auto watch | Camera viewers start watching (spectator camera) as soon as a battle starts. Per kind. |
 | | Duel card | Card with both fighters' stats during 1 vs 1 duels. |
+| | All vs one card | Card with the lone target's stats and the attackers left during an all vs one. |
 
-Crouching skips a running camera. `/mobbattle watch` spectates a running battle (right click = next fighter, left click = previous, Q = exit).
+Crouching (or `/mobbattle skipCamera`) skips a running camera. `/mobbattle watch` spectates a running battle (right click = next fighter, left click = previous, Q or `/mobbattle watch exit` = exit).
 
 ### Battles
 
@@ -120,11 +121,17 @@ What every battle kind shares. Each kind has its own tab for its presentation, r
 | | Unstick stalled fighters | A mob stuck on another level than its target (10 s, fliers 20 s) is moved next to it. |
 | | Stand-off shove | A mob on its target's level that gets no closer, hits nothing and isn't hit for this long is shoved toward it (seconds, 0 = never). |
 | | Win against passive mobs | When only one side can still fight back, it wins after this long without a hit; if nobody can fight, it's a draw. An alert shows bottom left (seconds, 0 = never). |
+| | Never ends against | Roles that keep Win against passive mobs from starting while one is alive (default the test dummies). |
+| | End when nobody fights | A battle where no fighter hurts an enemy for this long ends in a draw (seconds, 0 = never, default 150 = 2.5 min). |
+| | Longest battle | A battle with no winner ends anyway after this long (minutes, default 15). 0 = infinite: only a winner, End when nobody fights, the passive rule or Stop ends it. |
+| Battle waves | Reach as the ring arrives | Snap Wand (without a battle): the dust starts when the ring gets to each mob. Royale and all vs one: each mob's mark comes with the ring (default off). |
+| | Ground only | Only mobs within 3 blocks above or below the wave are snapped or join; fliers and caves stay out (default off). |
 | Arenas & timers | Timer box | Custom (Mob Battle's timer box) or Portal (the game's portal timer). |
 | | Arena size (duels, teams) | Radius of duel and team arenas (blocks; 0 = auto, around the fighters). Range preview. |
 | | Closing arena ends at | Final radius of a closing arena (blocks). Range preview. |
 | | Closing time without timer | How long a closing arena takes when its battle has no timer (seconds). |
-| | Tie break | When the Judge by score is even at time up: Damage, Kills, Random (coin toss) or Draw. If it equals Judge by, the other one of damage/kills is used. |
+| Ties | Winner when even | When the Judge by score is even at time up: Damage, Kills, Random (coin toss) or Draw (default Damage). If it equals Judge by, the other one of damage/kills is used. Per kind. |
+| | Kill table order | Fighters with the same kills: Damage (more damage dealt first, default), Alive (standing fighters first, then damage), First (who got there first) or Shared (they share the place: 1, 2, 2, 4). Then always who got there first. Used by the timer box, the scoreboard, the chat top 3, the end camera and watch mode. Per kind. |
 
 ### Duel, All vs one, Royale, Team battles
 
@@ -160,9 +167,11 @@ One tab per battle kind: **Duel** (Battle Wand), **All vs one** (Chaos Wand left
 | | Players can fight | Duel: crouch + Battle Wand puts you in a duel. All vs one: `/mobbattle chaos me`. Royale: players can be fighters. Teams: `/mobbattle teams join <team>`. |
 | Arena & timer | Arena | On = drawn + wall, Show = only drawn, Wall = invisible wall, Off = none. |
 | | Timer | Fight time limit with a timer box (seconds, 0 = no limit). |
-| | At time up | Draw, Kill (everyone), Continue, Health (best Judge by score wins) or Judge (same, and the losers die). An even score goes to Tie break. |
+| | At time up | Draw, Kill (everyone), Continue, Health (best Judge by score wins) or Judge (same, and the losers die). An even score goes to Winner when even. |
 | | Judge by | What Health/Judge score: Health (% left, fallen = 0%), Damage or Kills (share per fighter, so a bigger side doesn't win for its size), or Mix (the three averaged). |
 | | Closing arena | The arena closes in like a battle royale zone. |
+| Ties | Winner when even | Override of Winner when even (Battles tab). |
+| | Kill table order | (Not on the Duel tab: a duel has no kill table.) Override of Kill table order (Battles tab). |
 | | Scoreboard | A row per side with fighters left and kills. |
 
 See [battles.md](battles.md) for how arenas, timers and judging work.
@@ -175,7 +184,7 @@ The Chaos Wand area (all vs one, royale): look, size, color and height.
 |---|---|
 | Area look | What areas and arenas draw: Border (glow), Disc (on the ground), Disc border (both), Wall, or Off. Range preview. |
 | Area radius | Mobs within this radius join a Chaos Wand battle (blocks). Range preview. |
-| Max mobs | Most mobs one Chaos Wand click affects (more than 60 can lag the server). |
+| Max mobs | Most mobs one Chaos Wand click, Snap or summon affects (default 200, up to 100000; more than 60 shows a warning, since it can lag the server). |
 | Area color | Palette color or Random. Range preview. |
 | Area height | Height of the area pillars and wall (blocks). |
 | Area only while holding the wand | Only its owner sees the area, and only while holding the Chaos Wand. |
@@ -202,26 +211,31 @@ Slam is the Battle Wand's crouch + click in the air.
 
 ### Buffs
 
-Battle buffs (size, health, damage and defense) and the Buff Wand. Percents are per source, and sources add up on a mob. Streak counts per kill (up to Streak max kills), the Buff Wand per click.
+Battle buffs (size, health, damage, defense and speed) and the Buff Wand. Values are per source, and sources add up on a mob. The Buff Wand counts per click, the streak per kill (up to Streak max kills). Clicks and sources add to the mob's base value, they never multiply what it already has: with x2 per click, 10 health becomes 20, then 30, then 40 (not 20, 40, 80). Defense stops at 99% (x100).
 
-Each source has a section: **Lone target (all vs one)**, **Kill streak (per kill)**, **Champion (winners)** and **Buff Wand (per click)**. Each has:
+**Buff values as** (top of the tab): Percent (default: +100 = double) or Multiplier (x2 = double, decimals allowed such as x1.5; defense x2 = takes half the damage). It only changes how the values below are shown and typed; the buffs themselves stay the same, and sources still add up as percent (two x2 sources = x3). Changing it shows every value again in the new unit at once.
+
+Each source has a section, in this order: **Buff Wand (per click)**, **Lone target (all vs one)**, **Kill streak (per kill)** and **Champion (winners)**. Each has:
 
 | Field | What it does |
 |---|---|
-| Size | Extra size, % (0 = off, up to 900; all sources together stop at Size limit). |
-| Health | Extra max health, % (up to 1000). |
-| Damage | Extra damage, % (up to 1000). |
-| Defense | Less damage taken, % (up to 90). |
+| Size | Extra size (0 = off, up to +900 % = x10; all sources together stop at Size limit). |
+| Health | Extra max health (up to +9900 % = x100). |
+| Damage | Extra damage (up to +9900 % = x100). |
+| Defense | Less damage taken (up to 99 % = x100: takes a hundredth; never 100 %, that would be unkillable). |
+| Speed | Extra walking speed (up to +900 % = x10), on top of what a size buff already gives. |
 | Heal when given | Fill the new max health when the buff is given (for the lone target: heal it when it is picked). |
 
 Extra fields:
 
 | Section | Field | What it does |
 |---|---|---|
-| (top of the tab) | Size limit | Most extra size on one mob or player, all buffs together (50-900 %, default 200 = x3). Above 200 the panel warns: big players don't fit under roofs and their camera ends up in blocks. |
+| (top of the tab) | Speed from size / Jump from size | How much a size buff speeds up and raises the jump: off, natural (default; x4 = twice as fast), strong, full (x4 = 4 times as fast). |
+| (top of the tab) | Size limit | Most extra size on one mob or player, all buffs together (50-9900 %, default 200 = x3). Above 200 the panel warns: big players don't fit under roofs and their camera ends up in blocks. |
 | Kill streak | Streak max kills | Kills that count at most for the streak buff. |
 | Buff Wand | Buff Wand max stacks | Most Buff Wand clicks on one mob. |
 | | Buff color | Buff Wand mark and swirl, and the shimmer of buffed mobs. |
+| | Buffed mob look | While the buff lasts: shimmer (veins, eye flames and runes), runes (only eye flames and runes) or off. |
 | | Buff Wand light | Light from the sky that brings the buff: Buff (in the buff color), a color, or off (the buff lands at once). |
 | Crown | Buffed mobs' crown | Crown on streak, champion and Buff Wand mobs: Gold, a palette color or off. |
 
@@ -232,8 +246,16 @@ Wand feedback and what each wand does. See [wands.md](wands.md).
 | Section | Field | What it does |
 |---|---|---|
 | Every wand | Wand effects | Glow, soul rip and sounds on the clicked mob. |
+| Wand waves | Hit as the ring arrives | The held-click waves of the Morph, Cleanse, Effect and Heal wands hit each mob when the visible ring reaches it, not all at once (fliers and caves too, as the ring passes). Default on. |
+| | Ground only | Those waves only hit mobs within 3 blocks above or below the wave, like the game's slams: fliers and caves are spared. Default off. |
 | Heal Wand | Heal Wand light | Light from the sky that brings the heal: a color, or off (heals at once). |
-| Effect Wand | Effect Wand effect | The effect the Effect Wand gives (searchable list; the wand's right click cycles a quick list). |
+| | Hold left: heal wave | Hold left click: a ground slam heals every mob and player around you, you too (off: a held click works like a quick one). |
+| | Heal wave reach | Reach of the heal wave (blocks, default 12). Range preview. |
+| | Heal wave heals you | The heal wave heals you too (default on). |
+| Effect Wand | Effect Wand effect | The effect the Effect Wand gives (searchable list; the wand's right click cycles a quick list). The **Show** row above it filters the list by mod and by group. |
+| | Hold left: effect wave | Hold left click: a wave gives the effect to every mob and player around you (off: a held click works like a quick one). |
+| | Effect wave reach | Reach of the effect wave (blocks, default 12). Range preview. |
+| | Effect wave hits you | The effect wave gives you the effect too (default off). |
 | Kill Wand | Soul rip time | Time before the mob dies (milliseconds, 0 = instant). |
 | | Cast hit delay | Milliseconds from the click to the cast's hit. |
 | | Drop loot | A mob killed by the Kill Wand or Snap drops its normal loot. |
@@ -245,14 +267,17 @@ Wand feedback and what each wand does. See [wands.md](wands.md).
 | | Slam hit delay | Milliseconds from the click to the slam's hit. |
 | | Snap reach | Reach of a snap with no battle running (blocks). Range preview. |
 | | Snap players | Players in reach (not Creative or invulnerable, not you) can turn to dust. |
+| | (note) | The snap's wave options (dust when the ring arrives, ground only) are on the Battles tab, Battle waves. |
 | Morph Wand | Morph players | Players can be morphed too. |
 | | Hold left: morph wave | Hold left click: a wave gives every mob around your copied model (off: a held click works like a quick one). |
 | | Hold right: swap wave | Hold right click: a wave swaps the models of the mobs around in random pairs. |
 | | Wave reach | Reach of both waves (blocks, default 12). Range preview. |
+| | Waves change you | Both waves change your model too (default off). |
 | Cleanse Wand | Hold left: cleanse wave | Hold left click: a wave cleanses every mob and player around you (off: a held click works like a quick one). |
 | | Cleanse wave reach | Reach of the cleanse wave (blocks, default 12). Range preview. |
+| | Cleanse wave cleanses you | The cleanse wave cleanses you too (default off). |
 | Debug Wand | Follow time | After the left-click report, the mob's target, AI state, health and effects keep going into the same file (seconds, 0 = report only). |
-| Morph Wand model | Your Morph Wand turns mobs into | Pick a model (searchable, with an icon preview) and press **Use**. It starts on the model your wand holds now. This is yours only and lasts until the server restarts; it is not a saved setting. A right click on a mob with the Morph Wand copies its model instead. |
+| Morph Wand model | Your Morph Wand turns mobs into | Pick a model (searchable, with an icon preview; the **Show** row above filters it by mod and by group) and press **Use**. It starts on the model your wand holds now. This is yours only and lasts until the server restarts; it is not a saved setting. A right click on a mob with the Morph Wand copies its model instead. |
 
 ### Teams
 
@@ -270,7 +295,7 @@ Team Wand teams. See [teams-summon-army.md](teams-summon-army.md).
 
 ![The Summon list tab: each mob with its icon, count and team, add a mob, summon now](images/panel-summon-list.jpg)
 
-The Summon Wand list. Add, remove and clear apply at once; counts, teams and the settings need Save changes.
+The Summon Wand list. Add, remove and clear apply at once; counts, teams and the settings need Save changes. Each mob row shows its team's color square next to the team (none for no team). A list of more than 7 mobs scrolls in its own box, so Add a mob stays close.
 
 | Section | Field | What it does |
 |---|---|---|
@@ -281,14 +306,15 @@ The Summon Wand list. Add, remove and clear apply at once; counts, teams and the
 | Leaving | Summons leave | Never (they stay), Battle end (the surviving summons of a battle go when it ends) or Timer (each goes Summon lifetime seconds after it spawned). |
 | | Summon lifetime | How long a summon lives with Summons leave = Timer (seconds). |
 | | How they leave | Disintegrate (the Kill Wand's soul rip), Vanish (removed at once) or Shatter (breaks like jade glass). None drop loot. |
-| When they spawn | Summons join my army | Summoned mobs join your army, as if added with the Army Wand (not when they spawn into a team). |
+| When they spawn | Calm until a battle | Off (default): they act as usual. Summons: summons ignore each other until a battle, wand fight or army takes them. All: they also ignore players and other mobs. A hit lets one fight back its attacker only. Only summons made after it is turned on. |
+| | Summons join my army | Summoned mobs join your army, as if added with the Army Wand (not when they spawn into a team). |
 | | Summons in jade | Summons come out wearing the jade look, as if given by the Effect Wand. |
 | | Summon jade color | Color of the summons' jade. |
 
 Below the settings:
 
-- **Mobs in the list:** one row per mob type with its icon, a **count** (a number 0-999 or `random`), a **team** (or No team) and **Remove**.
-- **Add a mob:** pick a mob (searchable, with an icon preview), a count and a team, then **Add**.
+- **Mobs in the list:** one row per entry with its icon, a **count** (a number 0-100000 or `random`), a **team** (or No team) and **Remove**. The same mob can have several entries, one per team (10 archers in red and 10 in green).
+- **Add a mob:** pick a mob (searchable, with an icon preview; the list opens wide so long names fit). The **Show** row above it filters the list: by mod (every mod, Hytale only, or one mod) and by type (Fighters, Defend only, No attack, Avoid: immortal, scenery and test roles), and by group (the first part of the name: Aquatic, Undead...). The group list only offers groups that the chosen mod and type still have. The type is read from each mob's definition, so a mod's unusual mob can land in the wrong one. With every mod shown, mobs from mods are marked ★. Each player's filters are remembered until the server restarts. Then pick a count and a team, then **Add**. The same mob and team as a listed entry changes its count; another team adds an entry. The row starts on your last pick (else the test dummy), so adding the same mob for another team is one click.
 - **Clear list** (confirm) and **Summon** (summons the list around you now).
 
 ### Presets & reset
@@ -296,7 +322,7 @@ Below the settings:
 A preset or reset fills the form: check it, then Save changes (or Discard).
 
 - **Built-in presets:** Default, Fight, Effects, Debug, Cinematic.
-- **Your presets:** a **Load** and **Delete** button for each saved preset.
+- **Your presets:** one row per saved preset: its name (click it to load it into the form) and **Delete** (asks for a second click).
 - **Save the form as a preset:** type a name and press **Save preset**. It saves the form *including unsaved changes*. A preset holds every setting except the team list, the summon list, the permission mode and the debug log/recorder.
 - **Back to defaults (into the form):** Reset effects, Reset cameras, Reset titles, Reset arenas, Reset rules, Reset wands, Reset all.
 
@@ -334,6 +360,8 @@ Only shown to players with `dackoro.mob_battle.admin`, in every permission mode.
 | | End timers | Every running timer ends now by its time-up rule (`/mobbattle skipTimer`). |
 | | Royale event | An ownerless royale around you (area radius, max mobs). |
 | | Save debug record | Writes what the recorder kept to `debug/` in the plugin data folder (`/mobbattle debugDump`). |
+| Measure | Measure | Your speed (blocks/s) and jump height for 10 s, in chat (`/mobbattle measure`). Closes the panel. |
+| Apply to players or mobs | Who / action / value, Apply | A wand action on chosen players or mobs (`/mobbattle apply`, see [server-setup.md](server-setup.md)). Who: me, what you look at, everyone within 12 blocks, every player in this world, or one online player. |
 | Clean up (asks to confirm) | Stop all | Stop every battle, countdown, camera and music. |
 | | Disband armies | Disband every army. |
 | | Clear all teams | Empty every player's teams. |

@@ -38,7 +38,7 @@ final class Presets {
     private static final String[] PRESENTATION_KEYS = {
             "fight.countdown", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
             "camera.end.time", "camera.autowatch", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
-            "laser.enabled", "chaos.area", "fx.runes", "fx.crown", "battle.duelCard"
+            "laser.enabled", "chaos.area", "fx.runes", "fx.crown", "battle.duelCard", "battle.focusCard"
     };
 
     /** Prefixes of presentation keys a built-in preset also puts back first (waves, glow, mob looks). */
@@ -104,6 +104,7 @@ final class Presets {
                 m.put("team.fx", "both");
                 // Everything to read while testing: the duel card and every scoreboard (user, 2026-10-12).
                 m.put("battle.duelCard", "true");
+                m.put("battle.focusCard", "true");
                 for (BattleManager.Kind k : BattleManager.Kind.values()) {
                     m.put("battle.scoreboard." + k.key, "true");
                     // Every arena drawn; the ones that had a wall keep it.
@@ -195,7 +196,8 @@ final class Presets {
                     if (key.startsWith(prefix)) p.setProperty(key, defaults.getProperty(key));
                 }
             }
-            p.keySet().removeIf(k -> KindFx.isOverrideKey(k.toString()));
+            // Presentation overrides only: a per-kind tie rule is a battle rule and stays.
+            p.keySet().removeIf(k -> KindFx.isOverrideKey(k.toString()) && !KindFx.isRuleOverrideKey(k.toString()));
             overlay(lower).forEach(p::setProperty);
         } else {
             Path file = fileOf(name);
@@ -270,7 +272,7 @@ final class Presets {
 
     /** summon.* keys that are settings, not part of the summon list (they go in presets and resets). */
     private static final java.util.Set<String> SUMMON_SETTINGS = java.util.Set.of(
-            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit", "summon.jade", "summon.jade.color", "summon.army",
+            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit", "summon.calm", "summon.jade", "summon.jade.color", "summon.army",
             // The random count range is a setting too (panel "Save changes"), not part of the list.
             "summon.min", "summon.max", "summon.atleastone");
 
@@ -299,20 +301,21 @@ final class Presets {
             return switch (opt) {
                 case "camera", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch" -> "cameras";
                 case "countdown", "starttitle", "wintitle", "music" -> "titles";
+                case "tiebreak", "killtiebreak" -> "arenas";
                 default -> "effects";
             };
         }
         if (key.startsWith("wave.") || key.startsWith("glow.") || key.startsWith("mobfx.") || key.startsWith("fx.")
                 || key.startsWith("chaos.area") || key.equals("chaos.height") || key.startsWith("laser.")
                 || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")
-                || key.equals("wand.buff.light") || key.equals("wand.heal.light") || key.startsWith("summon.jade") || key.startsWith("army.tint")) return "effects";
+                || key.equals("wand.buff.light") || key.equals("wand.buff.look") || key.equals("wand.heal.light") || key.startsWith("summon.jade") || key.startsWith("army.tint")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
         if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
-                || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak")
-                || key.equals("battle.unstick") || key.equals("battle.standoff") || key.startsWith("battle.passivewin") || key.equals("battle.duelCard")) return "arenas";
-        if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.startsWith("cleanse.") || key.equals("effect.id")
+                || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak") || key.equals("battle.killtiebreak")
+                || key.equals("battle.unstick") || key.startsWith("battle.wave.") || key.equals("battle.standoff") || key.equals("battle.below") || key.equals("battle.above") || key.startsWith("battle.passivewin") || key.equals("battle.idleend") || key.equals("battle.maxtime") || key.equals("battle.duelCard") || key.equals("battle.focusCard")) return "arenas";
+        if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.startsWith("cleanse.") || key.equals("effect.id") || key.startsWith("effect.area") || key.startsWith("heal.area") || key.startsWith("wand.wave.")
                 || key.equals("wand.debug.track")) return "wands";
         return "rules";
     }

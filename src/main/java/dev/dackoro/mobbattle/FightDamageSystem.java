@@ -71,15 +71,24 @@ public class FightDamageSystem extends DamageEventSystem {
         }
         java.util.UUID victimOwner = Army.ownerOf(victim);
         var player = buffer.getComponent(attacker, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
-        java.util.UUID attackerOwner = player != null ? player.getUuid() : Army.ownerOf(attacker);
-        // Unless the battle put them on different sides (army summons in a royale): they target each other, so
-        // a cancelled hit left them hitting for nothing and the battle could never end (user, 2026-10-12).
-        if (victimOwner != null && victimOwner.equals(attackerOwner) && !BattleManager.areEnemies(attacker, victim)) {
-            damage.setCancelled(true);
+        // Mob leaders (2026-10-14): the army key a mob leads, if any.
+        java.util.UUID attackerLeads = player == null ? Army.leaderKey(attacker) : null;
+        java.util.UUID victimLeads = Army.leaderKey(victim);
+        // Same army: one chain of command (mates, a leader and its mobs, an owner and every army under it). Unless the
+        // battle put them on different sides (army summons in a royale): they target each other, so a cancelled hit
+        // left them hitting for nothing and the battle could never end (user, 2026-10-12).
+        boolean sameArmy = Army.sameChain(attacker, player != null ? player.getUuid() : attackerLeads, victim, victimLeads);
+        if (sameArmy && !BattleManager.areEnemies(attacker, victim)) {
+            // armyFriendlyFire: the hit lands, but nobody fights back or calls the others (they stay allies).
+            if (!FxSettings.armyFriendlyFire) damage.setCancelled(true);
             return true;
         }
-        if (player != null && !damage.isCancelled()) {
-            Army.order(player.getUuid(), victim, buffer);
+        if (!damage.isCancelled()) {
+            // Owner's order: a player or a leader mob hit it, so their army goes for it.
+            if (player != null) Army.order(player.getUuid(), victim, buffer);
+            else if (attackerLeads != null) Army.order(attackerLeads, victim, buffer);
+            // Bodyguard: a leader mob was hit, so its army goes for the attacker.
+            if (victimLeads != null) Army.order(victimLeads, attacker, buffer);
         }
         if (victimOwner != null && !damage.isCancelled()) {
             Army.defend(victim, attacker, buffer);
@@ -90,9 +99,15 @@ public class FightDamageSystem extends DamageEventSystem {
     @Override
     public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                        CommandBuffer<EntityStore> buffer, Damage damage) {
+        // Medium: a projectile hit tells which roles fight at range (they can reach fliers and fish at the surface).
+        if (damage.getSource() instanceof Damage.ProjectileSource shot) Medium.sawProjectile(shot.getRef(), buffer);
         if (Army.any() && damage.getSource() instanceof Damage.EntitySource armySource && armyHit(armySource.getRef(),
                 chunk.getReferenceTo(index), damage, buffer)) {
             return;
+        }
+        if (SummonCalm.any() && !damage.isCancelled() && damage.getSource() instanceof Damage.EntitySource calmSource) {
+            // A calm summon that is hit may fight back that attacker (/mobbattle summonCalm).
+            SummonCalm.hurt(chunk.getReferenceTo(index), calmSource.getRef(), buffer);
         }
         // Every NPC hit in every world passes here: nothing to do while no battle or wand fight exists.
         if (!BattleManager.hasBattles() && !FightManager.hasFights()

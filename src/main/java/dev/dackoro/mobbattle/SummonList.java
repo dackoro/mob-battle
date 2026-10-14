@@ -26,9 +26,9 @@ public final class SummonList {
 
     public static final String RANDOM = "random";
 
-    /** Role name -> count ("3") or "random". Insertion order is kept for /mobbattle summon list. */
+    /** Entry key (the role, or role#n for more entries of it) -> count ("3") or "random". Insertion order is kept for /mobbattle summon list. */
     public static final Map<String, String> ENTRIES = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
-    /** Role name -> team index (Team Wand colors). Used by summon and /mobbattle teams auto. */
+    /** Entry key -> team index (Team Wand colors). Used by summon and /mobbattle teams auto. */
     public static final Map<String, Integer> TEAMS = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
 
     /*
@@ -42,6 +42,18 @@ public final class SummonList {
         synchronized (ENTRIES) {
             return new LinkedHashMap<>(ENTRIES);
         }
+    }
+
+    /** A list count: "random" or a whole number (clamped to MAX_MOBS_LIMIT by {@link #normalCount}). */
+    static boolean isCount(String s) {
+        return s != null && (RANDOM.equalsIgnoreCase(s.trim()) || s.trim().matches("\\d{1,9}"));
+    }
+
+    /** Lower case "random", or the number clamped to 0..MAX_MOBS_LIMIT (no 999 cap since 2026-10-13, user). */
+    static String normalCount(String s) {
+        String v = s.trim().toLowerCase(java.util.Locale.ROOT);
+        if (RANDOM.equals(v)) return v;
+        return String.valueOf(Math.min(FxSettings.MAX_MOBS_LIMIT, Long.parseLong(v)));
     }
 
     /** Range used by "random" entries. */
@@ -58,34 +70,99 @@ public final class SummonList {
         if (name == null) {
             return null;
         }
+        // A mob already listed first, then the game's own spelling: hasRoleName ignores case, and "zombie" became an
+        // entry of its own next to "Zombie" (user, 2026-10-13), so the counts didn't add up.
+        for (String known : snapshot().keySet()) {
+            if (known.equalsIgnoreCase(name) || roleOf(known).equalsIgnoreCase(name)) {
+                return roleOf(known);
+            }
+        }
         NPCPlugin npc = NPCPlugin.get();
         if (npc.hasRoleName(name)) {
-            return name;
-        }
-        for (String known : snapshot().keySet()) {
-            if (known.equalsIgnoreCase(name)) {
-                return known;
+            for (String role : npc.getRoleTemplateNames(true)) {
+                if (role.equalsIgnoreCase(name)) return role;
             }
+            return name;
         }
         return null;
     }
 
-    /** Adds the role, or removes it if it is already listed. Returns true if it is now in the list. */
-    public static boolean toggle(String role) {
-        if (ENTRIES.remove(role) != null) {
-            TEAMS.remove(role);
-            return false;
+    /*
+     * Entry keys (2026-10-13, user: 10 Skeleton_Archer in red and 10 in green): the first entry of a role is keyed by
+     * the role itself, more entries of the same role (another count or team) by "role#2", "role#3"... ENTRIES and TEAMS
+     * are keyed by entry; spawning uses roleOf(key). Old lists (one entry per role) load unchanged.
+     */
+
+    /** The role of a list entry key ("Skeleton_Archer#2" -> "Skeleton_Archer"). */
+    static String roleOf(String key) {
+        if (key == null) return null;
+        int i = key.lastIndexOf('#');
+        return i > 0 && i < key.length() - 1 && key.substring(i + 1).chars().allMatch(Character::isDigit)
+                ? key.substring(0, i) : key;
+    }
+
+    /** A free entry key for one more entry of {@code role}. */
+    static String newKey(String role) {
+        synchronized (ENTRIES) {
+            if (!ENTRIES.containsKey(role)) return role;
+            for (int n = 2; ; n++) {
+                String key = role + "#" + n;
+                if (!ENTRIES.containsKey(key)) return key;
+            }
         }
+    }
+
+    /** The entry of {@code role} with that team rule (-1 = none), or null. */
+    static String entryOf(String role, int team) {
+        for (String key : snapshot().keySet()) {
+            Integer t = TEAMS.get(key);
+            if (roleOf(key).equalsIgnoreCase(role) && (t == null ? team < 0 : t == team)) return key;
+        }
+        return null;
+    }
+
+    /** A listed entry by its key (any case), else the first entry of that role; null if none. */
+    static String listedKey(String name) {
+        if (name == null) return null;
+        String n = name.trim();
+        Map<String, String> list = snapshot();
+        for (String key : list.keySet()) if (key.equalsIgnoreCase(n)) return key;
+        for (String key : list.keySet()) if (roleOf(key).equalsIgnoreCase(n)) return key;
+        return null;
+    }
+
+    /** The team rules of a role, one per entry with a team, in list order (teams auto). */
+    static List<Integer> teamsOf(String role) {
+        List<Integer> out = new ArrayList<>();
+        for (String key : snapshot().keySet()) {
+            Integer t = TEAMS.get(key);
+            if (t != null && Teams.exists(t) && roleOf(key).equals(role)) out.add(t);
+        }
+        return out;
+    }
+
+    /** Adds the role, or removes every entry of it if it is already listed. Returns true if it is now in the list. */
+    public static boolean toggle(String role) {
+        boolean removed = false;
+        for (String key : snapshot().keySet()) {
+            if (roleOf(key).equals(role)) {
+                ENTRIES.remove(key);
+                TEAMS.remove(key);
+                removed = true;
+            }
+        }
+        if (removed) return false;
         ENTRIES.put(role, "1");
         return true;
     }
 
     public static String describe() {
-        if (ENTRIES.isEmpty()) {
+        Map<String, String> list = snapshot();
+        if (list.isEmpty()) {
             return "Summon list is empty. Add mobs with the Summon Wand or /mobbattle summon add <role> [count|random].";
         }
         StringBuilder sb = new StringBuilder("Summon list: ");
-        ENTRIES.forEach((role, count) -> {
+        list.forEach((role, count) -> {
             sb.append(role).append(" x").append(count);
             Integer team = TEAMS.get(role);
             if (team != null) {
@@ -97,6 +174,25 @@ public final class SummonList {
         sb.append(" | random ").append(randomMin).append("-").append(randomMax)
                 .append(", at least one: ").append(atLeastOne);
         return sb.toString();
+    }
+
+    /** Same as {@link #describe} but translated, for the player's chat. */
+    public static Message describeMessage() {
+        // A snapshot (the list may change meanwhile), and role names, not the internal entry keys ("Skeleton#2").
+        Map<String, String> list = snapshot();
+        if (list.isEmpty()) return I18n.tr("chat.summon.empty");
+        StringBuilder sb = new StringBuilder();
+        list.forEach((role, count) -> {
+            sb.append(roleOf(role)).append(" x").append(count);
+            Integer team = TEAMS.get(role);
+            if (team != null) {
+                sb.append(" (").append(Teams.name(team)).append(")");
+            }
+            sb.append(", ");
+        });
+        sb.setLength(sb.length() - 2);
+        return I18n.tr("chat.summon.list").param("list", sb.toString()).param("min", randomMin)
+                .param("max", randomMax).param("atleast", atLeastOne);
     }
 
     static int countOf(String value) {
@@ -114,8 +210,8 @@ public final class SummonList {
 
     /** Normalize both ends, including reversed, negative or oversized saved ranges. */
     static void setRandomRange(int min, int max) {
-        randomMin = Math.max(0, Math.min(100, Math.min(min, max)));
-        randomMax = Math.max(0, Math.min(100, Math.max(min, max)));
+        randomMin = Math.max(0, Math.min(FxSettings.MAX_MOBS_LIMIT, Math.min(min, max)));
+        randomMax = Math.max(0, Math.min(FxSettings.MAX_MOBS_LIMIT, Math.max(min, max)));
     }
 
     /**
@@ -126,7 +222,7 @@ public final class SummonList {
      */
     public static void spawn(Store<EntityStore> store, Vector3d center, PlayerRef player, Ref<EntityStore> owner) {
         if (ENTRIES.isEmpty()) {
-            player.sendMessage(Message.raw(describe()).color("#ffcc55"));
+            player.sendMessage(describeMessage().color("#ffcc55"));
             return;
         }
         // One copy: the list can change from a command while this runs (see snapshot()). The plan is one role per
@@ -180,7 +276,7 @@ public final class SummonList {
         final EntityEffect look = lookEffect();
         final String rune = runeParticle();
         final java.util.function.DoubleBinaryOperator floor;
-        /** Role -> how many came out, in list order, for the chat summary. */
+        /** Role -> how many came out, in list order, for the chat summary (entries of one role add up). */
         final Map<String, Integer> ok = new LinkedHashMap<>();
         final List<Ref<EntityStore>> toLook = new ArrayList<>();
         final List<Ref<EntityStore>> toArmy = new ArrayList<>();
@@ -221,7 +317,8 @@ public final class SummonList {
             finish();
         }
 
-        private void spawnOne(NPCPlugin npc, ThreadLocalRandom rnd, String role) {
+        private void spawnOne(NPCPlugin npc, ThreadLocalRandom rnd, String key) {
+            String role = roleOf(key);
             double angle = rnd.nextDouble(Math.PI * 2);
             double dist = 1.5 + Math.sqrt(rnd.nextDouble()) * (ring - 1.5);
             double x = center.x + Math.cos(angle) * dist;
@@ -236,13 +333,15 @@ public final class SummonList {
                     return;
                 }
                 SummonDespawn.track(result.first());
-                Integer team = TEAMS.get(role);
+                Integer team = TEAMS.get(key);
                 if (team != null) {
                     // Spawned straight into the player's team draft (Team Wand / teams start).
                     BattleManager.assign(BattleManager.draft(player), result.first(), team);
                 } else if (FxSettings.summonArmy && owner != null) {
                     toArmy.add(result.first());
                 }
+                // Army summons are the player's; the rest may wait calm for a battle (/mobbattle summonCalm).
+                if (team != null || !FxSettings.summonArmy || owner == null) SummonCalm.add(result.first(), store);
                 WandFx.burst(rune, null, pos, store);
                 playSpawnAnimation(result.first(), store);
                 if (look != null) toLook.add(result.first());
@@ -259,9 +358,9 @@ public final class SummonList {
             ok.forEach((role, n) -> summary.append(role).append(" x").append(n).append(", "));
             if (summary.length() > 0) summary.setLength(summary.length() - 2);
             afterSpawn(toLook, look, toArmy, player, owner, store);
-            player.sendMessage(Message.raw("Summoned " + spawned + " mobs: " + summary
-                    + (failed > 0 ? " (" + failed + " failed)" : "")
-                    + (capped ? " — capped by /mobbattle maxMobs (spawn attempts)" : "")).color("#4bff6a"));
+            player.sendMessage(Message.join(I18n.tr("chat.summon.done").param("count", spawned).param("summary", summary.toString()),
+                    failed > 0 ? I18n.tr("chat.summon.failed").param("count", failed) : Message.empty(),
+                    capped ? I18n.tr("chat.summon.capped") : Message.empty()).color("#4bff6a"));
         }
     }
 

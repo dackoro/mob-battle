@@ -35,9 +35,13 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextCard =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextFocusCard =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextPlayers =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextWatch =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextCalm =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextDebugWand =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
@@ -86,6 +90,10 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             nextCard.put(store, now + INTERVAL_MS);
             store.getExternalData().getWorld().execute(() -> DuelCard.tick(store));
         }
+        if (FocusCard.any() && now >= nextFocusCard.getOrDefault(store, 0L)) {
+            nextFocusCard.put(store, now + INTERVAL_MS);
+            store.getExternalData().getWorld().execute(() -> FocusCard.tick(store));
+        }
         if (DebugWand.any() && now >= nextDebugWand.getOrDefault(store, 0L)) {
             nextDebugWand.put(store, now + INTERVAL_MS);
             // Debug Wand tracks (effects and health, 1/s) read components: on the world thread, outside the iteration.
@@ -95,6 +103,11 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             nextWatch.put(store, now + FightFx.TEAM_RING_REFRESH_MS);
             // Camera targets and the watch card outside the system iteration, on the world thread.
             store.getExternalData().getWorld().execute(() -> BattleWatch.tick(store));
+        }
+        if (SummonCalm.any() && now >= nextCalm.getOrDefault(store, 0L)) {
+            nextCalm.put(store, now + SummonCalm.REFRESH_MS);
+            // Attitude overrides and a sphere query per calm summon: on the world thread, outside the iteration.
+            store.getExternalData().getWorld().execute(() -> SummonCalm.tick(store));
         }
         if (Arena.any() && now >= nextArena.getOrDefault(store, 0L)) {
             nextArena.put(store, now + ARENA_MS);

@@ -82,6 +82,9 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(MorphBurstInteraction.TYPE, MorphBurstInteraction.class, MorphBurstInteraction.CODEC)
                 .register(MorphShuffleInteraction.TYPE, MorphShuffleInteraction.class, MorphShuffleInteraction.CODEC)
                 .register(CleanseAreaInteraction.TYPE, CleanseAreaInteraction.class, CleanseAreaInteraction.CODEC)
+                .register(EffectAreaInteraction.TYPE, EffectAreaInteraction.class, EffectAreaInteraction.CODEC)
+                .register(SkipCameraInteraction.TYPE, SkipCameraInteraction.class, SkipCameraInteraction.CODEC)
+                .register(HealAreaInteraction.TYPE, HealAreaInteraction.class, HealAreaInteraction.CODEC)
                 .register(ArmyToggleInteraction.TYPE, ArmyToggleInteraction.class, ArmyToggleInteraction.CODEC)
                 .register(ArmyDisbandInteraction.TYPE, ArmyDisbandInteraction.class, ArmyDisbandInteraction.CODEC)
                 .register(WatchInteraction.Prev.TYPE, WatchInteraction.Prev.class, WatchInteraction.Prev.CODEC)
@@ -103,14 +106,18 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new LookLoadSystem());
         getEntityStoreRegistry().registerSystem(new LookDeathSystem());
         getEntityStoreRegistry().registerSystem(new LookGuardSystem());
+        getEntityStoreRegistry().registerSystem(new SkinRespawnSystem());
         getEntityStoreRegistry().registerSystem(new BuffJump());
         FxSettings.load(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
+        listenAssetReloads();
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent.class,
                 event -> {
                     // Left while watching a battle: back from our saved spectator game mode.
                     BattleWatch.onReady(event.getPlayerRef());
+                    // Came back with a size buff's leftovers (scale and health modifier are saved, our state isn't).
+                    Buffs.onPlayerReady(event.getPlayerRef());
                     var player = event.getPlayer();
                     if (player == null || player.getGameMode() != com.hypixel.hytale.protocol.GameMode.Creative) {
                         return;
@@ -120,10 +127,7 @@ public class MobBattlePlugin extends JavaPlugin {
                             ? entity.getStore().getComponent(entity, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType())
                             : null;
                     if (ref != null && WELCOMED.add(ref.getUuid())) {
-                        ref.sendMessage(com.hypixel.hytale.server.core.Message.raw(
-                                "Dackoro's Mob Battle: /mobbattle help explains the wands and commands. /mobbattle give gets all thirteen wands. "
-                                + "Everything is configurable (effects, cameras, timers, rules, teams, summon list, presets) "
-                                + "in the settings window: /mobbattle config, or with commands.")
+                        ref.sendMessage(I18n.tr("chat.plugin.welcome")
                                 .color("#ffd23e"));
                     }
                 });
@@ -132,13 +136,25 @@ public class MobBattlePlugin extends JavaPlugin {
                 + SelectFighterInteraction.TYPE + ", " + ClearSelectionInteraction.TYPE + ")");
     }
 
+    /** Models or effects (re)loaded or removed: the settings panel's lists of them are built again (PickLists). */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void listenAssetReloads() {
+        getEventRegistry().registerGlobal((Class) com.hypixel.hytale.assetstore.event.LoadedAssetsEvent.class,
+                (java.util.function.Consumer) e -> PickLists.assetsChanged(((com.hypixel.hytale.assetstore.event.LoadedAssetsEvent) e).getAssetClass()));
+        getEventRegistry().registerGlobal((Class) com.hypixel.hytale.assetstore.event.RemovedAssetsEvent.class,
+                (java.util.function.Consumer) e -> PickLists.assetsChanged(((com.hypixel.hytale.assetstore.event.RemovedAssetsEvent) e).getAssetClass()));
+    }
+
     @Override
     protected void shutdown() {
         // Player-side state first (spectator mode, cameras, forced music, HUDs); onReady covers anyone missed.
         BattleWatch.exitAll();
+        MeasureTool.stopAll();
+        TestTools.stopAll();
         FightCamera.stopAll();
         BattleMusic.stopAll();
         DuelCard.clearAll();
+        FocusCard.clearAll();
         MobBattleApi.shutdown();
         super.shutdown();
         WELCOMED.clear();

@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 
 /** Public integration surface for starting and observing ownerless Mob Battle events. */
 public final class MobBattleApi {
-    public static final int API_VERSION = 1;
+    public static final int API_VERSION = 2;
     public enum State { SCHEDULED, RUNNING, ENDED, UNKNOWN }
     public enum Mode { DUEL, ROYALE, FOCUS }
     public enum EndReason { WIN, DRAW, TIMEOUT, STOPPED, REPLACED, UNLOAD, SHUTDOWN, CANCELLED_COUNTDOWN }
@@ -118,7 +118,7 @@ public final class MobBattleApi {
             StartResult refused = registerOrReject(id, worldId, Mode.DUEL);
             if (refused != null) return refused;
             beginIntro(BattleManager.Kind.DUEL, eventAnchor, center, List.of(List.of(first), List.of(second)), store);
-            Countdown.run(BattleManager.Kind.DUEL, eventAnchor, store, "DUEL", fighters, acc -> {
+            Countdown.run(BattleManager.Kind.DUEL, eventAnchor, store, new Countdown.Label("DUEL", I18n.tr("battle.label.duel.plain")), fighters, acc -> {
                 if (!livingNpc(first, acc) || !livingNpc(second, acc)
                         || !PlayerFighters.canStart(first, acc) || !PlayerFighters.canStart(second, acc)) {
                     terminal(id, EndReason.CANCELLED_COUNTDOWN, List.of(), null);
@@ -137,7 +137,7 @@ public final class MobBattleApi {
                 FightManager.provoke(second, first, acc);
                 FightManager.provoke(first, second, acc);
                 Arena.setupAround(battle, acc);
-                FightFx.title(battle, "FIGHT!", nameA + " vs " + nameB);
+                FightFx.title(battle, I18n.tr("battle.fight"), I18n.tr("battle.fight.vs").param("a", nameA).param("b", nameB));
                 running(id);
             }, reason -> terminal(id, reason, List.of(), null));
             return accepted(id, eventAnchor, Mode.DUEL);
@@ -158,14 +158,14 @@ public final class MobBattleApi {
         if (!usable()) return CompletableFuture.completedFuture(reject("Mob Battle is shutting down."));
         Vector3d center = requestedCenter == null ? null : new Vector3d(requestedCenter);
         return submit(world, worldId, Mode.ROYALE, id, (store, anchor) -> {
-            if (!validArea(center, radius, maxMobs)) return reject("Royale requires finite coordinates, radius 1-512, and maxMobs 2-200.");
-            List<Ref<EntityStore>> mobs = ChaosWand.npcsAround(center, radius, maxMobs, store);
+            if (!validArea(center, radius, maxMobs)) return reject("Royale requires finite coordinates, radius 1-" + FxSettings.MAX_RADIUS + ", and maxMobs 2-" + FxSettings.MAX_MOBS_LIMIT + ".");
+            List<Ref<EntityStore>> mobs = ChaosWand.npcsInBand(center, radius, maxMobs, store);
             if (mobs.size() < 2) return reject("Royale requires at least two living NPCs in the selected area.");
             BattleManager.Battle.Anchor eventAnchor = new BattleManager.Battle.Anchor(worldId, center, id);
             StartResult refused = registerOrReject(id, worldId, Mode.ROYALE);
             if (refused != null) return refused;
             beginIntro(BattleManager.Kind.ROYALE, eventAnchor, center, List.of(new ArrayList<>(mobs)), store);
-            Countdown.run(BattleManager.Kind.ROYALE, eventAnchor, store, "BATTLE ROYALE", mobs, acc -> {
+            Countdown.run(BattleManager.Kind.ROYALE, eventAnchor, store, new Countdown.Label("BATTLE ROYALE", I18n.tr("battle.label.royale")), mobs, acc -> {
                 mobs.removeIf(m -> !livingNpc(m, acc) || !PlayerFighters.canStart(m, acc));
                 if (mobs.size() < 2) {
                     terminal(id, EndReason.CANCELLED_COUNTDOWN, List.of(), null);
@@ -182,7 +182,7 @@ public final class MobBattleApi {
                     FightManager.turnAgainst(npc, enemy, acc);
                     FightManager.provoke(npc, enemy, acc);
                 }
-                FightFx.title(battle, "BATTLE ROYALE!", mobs.size() + " NPCs, last one standing wins");
+                FightFx.title(battle, I18n.tr("battle.title.royale"), I18n.tr("battle.sub.royale.npcs").param("count", mobs.size()));
                 running(id);
             }, reason -> terminal(id, reason, List.of(), null));
             return accepted(id, eventAnchor, Mode.ROYALE);
@@ -201,13 +201,13 @@ public final class MobBattleApi {
         UUID id = UUID.randomUUID();
         if (!usable()) return CompletableFuture.completedFuture(reject("Mob Battle is shutting down."));
         return submit(world, worldId, Mode.FOCUS, id, (store, anchor) -> {
-            if (targetId == null || !Double.isFinite(radius) || radius < 1 || radius > 512 || maxMobs < 2 || maxMobs > 200)
-                return reject("Focus requires a target UUID, radius 1-512, and maxMobs 2-200.");
+            if (targetId == null || !Double.isFinite(radius) || radius < 1 || radius > FxSettings.MAX_RADIUS || maxMobs < 2 || maxMobs > FxSettings.MAX_MOBS_LIMIT)
+                return reject("Focus requires a target UUID, radius 1-" + FxSettings.MAX_RADIUS + ", and maxMobs 2-" + FxSettings.MAX_MOBS_LIMIT + ".");
             Ref<EntityStore> target = world.getEntityRef(targetId);
             if (!livingNpc(target, store)) return reject("Focus target must be a living NPC in the selected world.");
             Vector3d center = ChaosWand.positionOf(target, store);
             if (center == null) return reject("Focus target has no current position.");
-            List<Ref<EntityStore>> attackers = ChaosWand.npcsAround(center, radius, maxMobs, store);
+            List<Ref<EntityStore>> attackers = ChaosWand.npcsInBand(center, radius, maxMobs, store);
             attackers.removeIf(m -> m == target);
             if (attackers.isEmpty()) return reject("Focus requires at least one living NPC near its target.");
             String targetName = ChaosWand.nameOf(target, store);
@@ -218,7 +218,7 @@ public final class MobBattleApi {
             if (refused != null) return refused;
             beginIntro(BattleManager.Kind.ALL_VS_ONE, eventAnchor, center,
                     List.of(List.of(target), new ArrayList<>(attackers)), store);
-            Countdown.run(BattleManager.Kind.ALL_VS_ONE, eventAnchor, store, "EVERYONE vs " + targetName, all, acc -> {
+            Countdown.run(BattleManager.Kind.ALL_VS_ONE, eventAnchor, store, new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", targetName)), all, acc -> {
                 attackers.removeIf(m -> !livingNpc(m, acc) || !PlayerFighters.canStart(m, acc));
                 if (!livingNpc(target, acc) || !PlayerFighters.canStart(target, acc) || attackers.isEmpty()) {
                     terminal(id, EndReason.CANCELLED_COUNTDOWN, List.of(), null);
@@ -246,11 +246,29 @@ public final class MobBattleApi {
                 }
                 WandFx.loneCrown(target, acc);
                 Buffs.set(target, Buffs.Source.LONE, 1);
-                FightFx.title(battle, "EVERYONE vs " + targetName, aggressive + " attackers");
+                FightFx.title(battle, I18n.tr("battle.label.everyone").param("name", targetName),
+                        I18n.tr("battle.sub.attackers").param("count", aggressive));
                 running(id);
             }, reason -> terminal(id, reason, List.of(), null));
             return accepted(id, eventAnchor, Mode.FOCUS);
         });
+    }
+
+    /**
+     * Tells battles how mobs of a role move (land, air, water), instead of reading the role's motion controllers.
+     * Swimmers stay in water, walkers that don't breathe under water don't follow targets into deep water, and only
+     * fliers and ranged mobs reach fliers. Call it once, e.g. when your plugin starts. Since API 2.
+     */
+    public void declareMedium(String roleName, boolean walks, boolean flies, boolean swims, boolean breathesUnderwater) {
+        Medium.declare(roleName, walks, flies, swims, breathesUnderwater);
+    }
+
+    /**
+     * Tells battles whether a role attacks from afar (it can then reach fliers and fish at the surface). Without it,
+     * Mob Battle learns this the first time a mob of that role hits something with a projectile. Since API 2.
+     */
+    public void declareRanged(String roleName, boolean ranged) {
+        Medium.declareRanged(roleName, ranged);
     }
 
     public CompletableFuture<Snapshot> stop(UUID eventId) {
@@ -430,7 +448,7 @@ public final class MobBattleApi {
     }
     private static boolean validArea(Vector3d center, double radius, int max) {
         return center != null && Double.isFinite(center.x) && Double.isFinite(center.y) && Double.isFinite(center.z)
-                && Double.isFinite(radius) && radius >= 1 && radius <= 512 && max >= 2 && max <= 200;
+                && Double.isFinite(radius) && radius >= 1 && radius <= FxSettings.MAX_RADIUS && max >= 2 && max <= FxSettings.MAX_MOBS_LIMIT;
     }
     private static void beginIntro(BattleManager.Kind kind, BattleManager.Battle.Anchor anchor, Vector3d center,
                                    List<List<Ref<EntityStore>>> sides, Store<EntityStore> store) {

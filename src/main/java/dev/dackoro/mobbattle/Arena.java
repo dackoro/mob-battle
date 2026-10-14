@@ -58,16 +58,38 @@ final class Arena {
     private static final double TELEPORT_BEYOND = 8.0;
     /** Pushes in a row (one per 250 ms) that didn't bring a fighter in (wedged in rock, a cave pocket): teleport it. */
     private static final int MAX_PUSHES = 8;
+    /** Moved this much toward the center since the last wall pass (WALL_MS): not stuck. */
+    private static final double PROGRESS = 0.2;
+    /** A mob teleported back in lands at this share of the radius. */
+    private static final double TELEPORT_INSIDE = 0.6;
     /** Push toward the center (horizontal and up), like a strong hit's knockback. */
     private static final double PUSH = 7.0;
     private static final double PUSH_UP = 2.5;
+    /** Push at the edge itself, and how much stronger per block outside (up to PUSH). */
+    private static final double PUSH_MIN = 2.5, PUSH_PER_BLOCK = 1.5;
+    /** Upward speed for a blocked mob: about one block of climb. */
+    private static final double STEP_LIFT = 1.6;
 
     private static final class State {
         final BattleManager.Battle battle;
         /** Fighter -> pushes in a row while still outside (world thread only): stuck ones get teleported in. */
         final java.util.Map<Ref<EntityStore>, Integer> pushes = new java.util.HashMap<>();
+        /** Diagnostics (debug only): each mob's height at the last wall pass and what we did to it last. */
+        final java.util.Map<Ref<EntityStore>, double[]> lastPos = new java.util.HashMap<>();
+        final java.util.Map<Ref<EntityStore>, String> lastAction = new java.util.HashMap<>();
+        /** Each mob's distance from the center at the last wall pass: moving in = not stuck, its pushes start over. */
+        final java.util.Map<Ref<EntityStore>, Double> edgeDist = new java.util.HashMap<>();
+        /** Water mobs outside the arena with no water left inside it, and since when (STRANDED_MS, then out). */
+        final java.util.Map<Ref<EntityStore>, Long> stranded = new java.util.HashMap<>();
         /** [debug] "pushed in" lines: fighter -> {last line time, pushes since} (world thread only). */
         final java.util.Map<Ref<EntityStore>, long[]> pushLog = new java.util.HashMap<>();
+        /** Fighters found inside a block on the last wall pass (moved out only when the next pass finds them there too). */
+        final java.util.Set<Ref<EntityStore>> wedged = new java.util.HashSet<>();
+        /**
+         * Fighter -> when to look for a landing spot again after a search found none (wedged or brought back): the
+         * search reads ~10000 blocks, so not every 250 ms pass (audit 2026-10-14).
+         */
+        final java.util.Map<Ref<EntityStore>, Long> noLanding = new java.util.HashMap<>();
         final Store<EntityStore> store;
         final Vector3d center;
         /** Radius at the start; with arenaShrink it closes linearly to endRadius between shrinkFrom and shrinkUntil. */
@@ -162,7 +184,8 @@ final class Arena {
             if (!s.wall) return false;
             double r = s.radius(System.currentTimeMillis()) + OUTSIDE_MARGIN;
             double dx = pos.x - s.center.x, dz = pos.z - s.center.z;
-            return dx * dx + dz * dz > r * r;
+            double dy = pos.y - s.center.y;
+            return dx * dx + dz * dz > r * r || beyondBand(dy < 0 ? dy + OUTSIDE_MARGIN : dy - OUTSIDE_MARGIN);
         }
         return false;
     }
@@ -234,14 +257,14 @@ final class Arena {
         if (seconds <= 0) return;
         int needed = (int) Math.ceil(radius * 2 / CHASE_BLOCKS_PER_SECOND / 10.0) * 10;
         if (seconds >= needed) return;
-        String warning = "The " + battle.kind.key + " timer ("
-                + MobBattleCommand.formatDuration(seconds) + ") is short for an arena of radius " + Math.round(radius)
-                + ": fighters far apart may not meet before time is up. Try /mobbattle timer " + battle.kind.key + " "
-                + MobBattleCommand.formatDuration(needed) + (shrink ? "" : ", /mobbattle arenaShrink " + battle.kind.key + " on")
-                + " or a smaller area.";
         PlayerRef owner = battle.owner();
         if (owner != null && owner.isValid()) {
-            owner.sendMessage(com.hypixel.hytale.server.core.Message.raw(warning).color("#ffcc55"));
+            owner.sendMessage(I18n.tr(shrink ? "battle.warn.short.timer" : "battle.warn.short.timer.shrink")
+                    .param("kind", battle.kind.key)
+                    .param("time", MobBattleCommand.formatDuration(seconds))
+                    .param("radius", Math.round(radius))
+                    .param("needed", MobBattleCommand.formatDuration(needed))
+                    .color("#ffcc55"));
         }
     }
 
@@ -324,29 +347,94 @@ final class Arena {
             if (!npc.isValid() || !BattleManager.isAlive(npc, store)) continue;
             Vector3d p = ChaosWand.positionOf(npc, store);
             if (p == null) continue;
+            if (MobBattlePlugin.debugging()) watchFall(s, npc, p, store);
             double dx = p.x - s.center.x, dz = p.z - s.center.z;
             double d = Math.sqrt(dx * dx + dz * dz);
+            // Inside a block (2026-10-14, cave diagnostics: every deer that sank through the floor was first wedged
+            // into the rock, and from there the game let it fall): out at once, wherever it is.
+            // Two passes in a row and a body taller than a block (audit 2026-10-14: a chicken under a slab or a mob
+            // walking through a door has a solid block at feet + 1 without being stuck).
+            boolean wedged = !Unstick.flyingNow(npc, store) && !Medium.waterOnly(Medium.of(npc, store))
+                    && tallerThanABlock(npc, store) && embedded(p, store);
+            if (!wedged) s.wedged.remove(npc);
+            if (wedged && s.wedged.add(npc)) wedged = false;
+            if (wedged && !searchDue(s, npc)) wedged = false;
+            if (wedged) {
+                s.wedged.remove(npc);
+                FightFx.Spot spot = Medium.spotFor(Medium.of(npc, store));
+                Vector3d to = landing(s, d < 0.01 ? 1 : dx / d, d < 0.01 ? 0 : dz / d, Math.max(d + 1, 3), p.y, s.center.y, spot, store);
+                // Nowhere roomy near it (a cave): the arena's center, where the battle started on solid ground.
+                if (to == null) to = centerSpot(s, spot, store);
+                if (to == null) s.noLanding.put(npc, System.currentTimeMillis() + NO_LANDING_RETRY_MS);
+                if (to != null) {
+                    s.pushes.remove(npc);
+                    s.edgeDist.remove(npc);
+                    if (MobBattlePlugin.debugging()) s.lastAction.put(npc, String.format(java.util.Locale.ROOT, "unwedged %.1f %.1f %.1f -> %.1f %.1f %.1f",
+                            p.x, p.y, p.z, to.x, to.y, to.z));
+                    store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
+                            com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
+                                    new com.hypixel.hytale.math.vector.Rotation3f(0f, 0f, 0f)));
+                    MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store)
+                            + " was inside a block, moved out");
+                    continue;
+                }
+            }
+            // Fallen to another cave level, or up a cliff, inside the circle (2026-10-14, cave test: animals ran down
+            // a shaft to a lava level far below): out of the fight, so back at the arena's height. Not fliers or
+            // water mobs (a lake can be deep).
+            double dy = p.y - s.center.y;
+            if (beyondBand(dy) && !Unstick.flyingNow(npc, store) && !Medium.waterOnly(Medium.of(npc, store))) {
+                bringBack(s, npc, d < 0.01 ? 1 : dx / d, d < 0.01 ? 0 : dz / d, radius, p, store,
+                        Math.round(Math.abs(dy)) + " blocks " + (dy < 0 ? "below" : "above") + " the arena");
+                continue;
+            }
             if (d <= radius - EDGE_MARGIN || d < 0.01) {
                 s.pushes.remove(npc);
+                s.stranded.remove(npc);
+                s.edgeDist.remove(npc);
                 continue;
             }
             double ox = dx / d, oz = dz / d;   // outward
+            // Medium (2026-10-14, user): a water mob's lake is its zone. It is only moved into water inside the
+            // arena; with none there it stays where it is, never pushed onto land (the others can't reach it either,
+            // so passiveWin ends the battle on health). A walker that drowns is only moved onto dry land.
+            Medium.Can can = Medium.of(npc, store);
+            boolean fish = Medium.waterOnly(can);
+            FightFx.Spot spot = Medium.spotFor(can);
             // Still outside the edge after MAX_PUSHES pushes: the knockback can't move it (e.g. the closing wall
             // passed a mob wedged in rock). An edge mob just inside the margin is never counted.
-            int pushed = d > radius ? s.pushes.merge(npc, 1, Integer::sum) : 0;
+            // Only pushes that got it nowhere count (2026-10-14, user: with a closing arena the wall kept pushing a wolf
+            // that was walking in with it, it hit MAX_PUSHES, was teleported 3 blocks inside, met the wall again: a
+            // ping-pong). Moving in since the last pass starts the count over.
+            Double before = s.edgeDist.put(npc, d);
+            int pushed;
+            if (d <= radius) pushed = 0;
+            else if (before != null && d < before - PROGRESS) {
+                s.pushes.remove(npc);
+                pushed = 0;
+            } else pushed = s.pushes.merge(npc, 1, Integer::sum);
             if (d > radius + TELEPORT_BEYOND || pushed > MAX_PUSHES) {
                 s.pushes.remove(npc);
-                double r = Math.max(1, radius - 3);
-                double x = s.center.x + ox * r, z = s.center.z + oz * r;
-                // A spot to stand on at about its own height (a cave mob stays low, a mountain one high), else at
-                // the arena's height; none (e.g. solid rock there): only pushed this time.
-                double y = FightFx.standableY(x, z, p.y, STAND_RANGE, store);
-                if (!Double.isFinite(y)) y = FightFx.standableY(x, z, s.center.y, STAND_RANGE, store);
-                if (!Double.isFinite(y)) {
-                    push(npc, ox, oz, store);
+                s.edgeDist.remove(npc);
+                // Well inside (60 % of the radius), so the closing wall does not reach it again right away. A spot to
+                // stand on at about its own height (a cave mob stays low, a mountain one high), else at the arena's
+                // height; an escapee (far out) comes back at the arena's height first (2026-10-14, cave test: an
+                // antelope that fell 13 blocks out could land on the cave level below). None: only pushed this time.
+                boolean escaped = d > radius + TELEPORT_BEYOND;
+                double first = escaped ? s.center.y : p.y, second = escaped ? p.y : s.center.y;
+                Vector3d to = landing(s, ox, oz, radius, first, second, spot, store);
+                if (to == null && !fish) to = centerSpot(s, spot, store); // a narrow corridor: no roomy spot anywhere
+                if (to == null) {
+                    if (!fish) {
+                        push(npc, ox, oz, d - (radius - EDGE_MARGIN), pushed > 1, store);
+                    } else if (strandedOut(s, npc, store)) {
+                        continue;
+                    }
                     continue;
                 }
-                Vector3d to = new Vector3d(x, y, z);
+                s.stranded.remove(npc);
+                if (MobBattlePlugin.debugging()) s.lastAction.put(npc, String.format(java.util.Locale.ROOT, "arena teleport %.1f %.1f %.1f -> %.1f %.1f %.1f",
+                        p.x, p.y, p.z, to.x, to.y, to.z));
                 store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
                         com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
                                 new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) Math.atan2(ox, oz), 0f)));
@@ -355,7 +443,7 @@ final class Arena {
                         + Math.round(d - radius) + " blocks outside, teleported back in");
                 continue;
             }
-            if (MobBattlePlugin.debugging()) {
+            if (MobBattlePlugin.debugging() && !fish) {
                 // Several pushes a second per mob filled the log (~130 lines a minute): one line per mob every
                 // PUSH_LOG_MS, with how many pushes it got since.
                 long now = System.currentTimeMillis();
@@ -369,8 +457,157 @@ final class Arena {
                     pl[1] = 0;
                 }
             }
-            push(npc, ox, oz, store);
+            if (!fish && !wallAhead(p, -ox, -oz, store)) {
+                push(npc, ox, oz, d - (radius - EDGE_MARGIN), pushed > 1, store);
+                if (MobBattlePlugin.debugging()) s.lastAction.put(npc, String.format(java.util.Locale.ROOT, "push at %.1f %.1f %.1f (blocked %s)",
+                        p.x, p.y, p.z, pushed > 1));
+            }
         }
+    }
+
+    /**
+     * The mob's body is in a solid block (sunk below the floor, pushed into a wall). Only the block above its feet: the
+     * feet block itself is solid on stairs and slabs, where a mob stands half way up it.
+     */
+    private static boolean embedded(Vector3d p, Store<EntityStore> store) {
+        int bx = (int) Math.floor(p.x), by = (int) Math.floor(p.y + 0.05), bz = (int) Math.floor(p.z);
+        return FightFx.solidAt(bx, by + 1, bz, store);
+    }
+
+    /** How long a mob waits before another landing search after one found nothing. */
+    private static final long NO_LANDING_RETRY_MS = 2000;
+
+    /** False while {@code npc}'s last landing search found nothing, for NO_LANDING_RETRY_MS. */
+    private static boolean searchDue(State s, Ref<EntityStore> npc) {
+        Long at = s.noLanding.get(npc);
+        if (at == null) return true;
+        if (System.currentTimeMillis() < at) return false;
+        s.noLanding.remove(npc);
+        return true;
+    }
+
+    /** Hitbox taller than 1.1 blocks: a smaller mob fits under a block at feet + 1 without being stuck in it. */
+    private static boolean tallerThanABlock(Ref<EntityStore> npc, Store<EntityStore> store) {
+        var box = store.getComponent(npc, com.hypixel.hytale.server.core.modules.entity.component.BoundingBox.getComponentType());
+        return box == null || box.getBoundingBox() == null || box.getBoundingBox().max.y - box.getBoundingBox().min.y > 1.1;
+    }
+
+    /**
+     * Rock right where a push would send it (one block ahead, at its body): a knockback into it wedges the mob into
+     * the block (cave diagnostics 2026-10-14), so no push; the pushes count as no progress and the teleport takes over.
+     * A step (only the feet block solid, room above) is fine: the blocked lift hops it.
+     */
+    private static boolean wallAhead(Vector3d p, double dirX, double dirZ, Store<EntityStore> store) {
+        int ax = (int) Math.floor(p.x + dirX * 0.9), az = (int) Math.floor(p.z + dirZ * 0.9), by = (int) Math.floor(p.y + 0.05);
+        return FightFx.solidAt(ax, by + 1, az, store) || FightFx.solidAt(ax, by + 2, az, store) && FightFx.solidAt(ax, by, az, store);
+    }
+
+    /**
+     * Diagnostics (debugLog, 2026-10-14: deer sank through solid cave floor): a fighter that dropped more than 3 blocks
+     * since the last wall pass (250 ms) is logged with where it was, whether that spot had solid ground under it, and
+     * the last thing the arena did to it.
+     */
+    private static void watchFall(State s, Ref<EntityStore> npc, Vector3d p, Store<EntityStore> store) {
+        double[] before = s.lastPos.put(npc, new double[] {p.x, p.y, p.z});
+        if (before == null || before[1] - p.y <= 3 || Unstick.flyingNow(npc, store)) return;
+        int bx = (int) Math.floor(before[0]), by = (int) Math.floor(before[1]), bz = (int) Math.floor(before[2]);
+        boolean ground = FightFx.solidAt(bx, by - 1, bz, store);
+        boolean inside = FightFx.solidAt(bx, by, bz, store) || FightFx.solidAt(bx, by + 1, bz, store);
+        MobBattlePlugin.debug(String.format(java.util.Locale.ROOT, "arena #%s: %s DROPPED %.1f blocks: %.1f %.1f %.1f -> %.1f %.1f %.1f, solid under the old spot %s, inside a block there %s, last: %s",
+                s.battle.id.toString().substring(0, 8), ChaosWand.nameOf(npc, store), before[1] - p.y, before[0], before[1], before[2],
+                p.x, p.y, p.z, ground, inside, s.lastAction.getOrDefault(npc, "nothing")));
+    }
+
+    /**
+     * How long a water mob may wait outside the arena once no water is left inside it (2026-10-14, user: a zombie
+     * can't leave the arena to get at it either, so hiding in a lake out there must not win the battle).
+     */
+    private static final long STRANDED_MS = 10_000;
+
+    /** A water mob found no water inside the arena: true once STRANDED_MS went by and it was taken out (soul rip). */
+    private static boolean strandedOut(State s, Ref<EntityStore> npc, Store<EntityStore> store) {
+        long now = System.currentTimeMillis();
+        long since = s.stranded.computeIfAbsent(npc, k -> now);
+        if (now - since < STRANDED_MS || WandFx.isDying(npc)) return false;
+        s.stranded.remove(npc);
+        WandFx.kill(npc, null, true, store);
+        MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store)
+                + " stayed outside with no water left inside for " + STRANDED_MS / 1000 + " s: out");
+        return true;
+    }
+
+    /**
+     * arenaVertical (default 0 = no limit): a fighter farther above or below the arena's center height is brought back
+     * (cave shafts, cliffs). Separate from battleBelow/Above, which only choose who joins (user, 2026-10-14).
+     */
+    private static boolean beyondBand(double dy) {
+        return FxSettings.arenaVertical > 0 && Math.abs(dy) > FxSettings.arenaVertical;
+    }
+
+    /** Teleports {@code npc} back inside at the arena's height, along its direction from the center (vertical escape). */
+    private static void bringBack(State s, Ref<EntityStore> npc, double ox, double oz, double radius, Vector3d p,
+                                  Store<EntityStore> store, String why) {
+        if (!searchDue(s, npc)) return;
+        FightFx.Spot spot = Medium.spotFor(Medium.of(npc, store));
+        Vector3d to = landing(s, ox, oz, radius, s.center.y, s.center.y, spot, store);
+        if (to == null) {
+            s.noLanding.put(npc, System.currentTimeMillis() + NO_LANDING_RETRY_MS);
+            return;
+        }
+        s.pushes.remove(npc);
+        s.edgeDist.remove(npc);
+        if (MobBattlePlugin.debugging()) s.lastAction.put(npc, String.format(java.util.Locale.ROOT, "bring back %.1f %.1f %.1f -> %.1f %.1f %.1f",
+                p.x, p.y, p.z, to.x, to.y, to.z));
+        store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
+                com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
+                        new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) Math.atan2(ox, oz), 0f)));
+        WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
+        MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store) + " was "
+                + why + ", teleported back in");
+    }
+
+    /** Directions tried around the mob's own (radians) and shares of the radius, for a landing spot with room. */
+    private static final double[] LANDING_TURNS = {0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, Math.PI};
+    private static final double[] LANDING_SHARES = {TELEPORT_INSIDE, 0.35, 0.8};
+
+    /**
+     * Where a mob teleported back in lands: a standable spot (by medium) near height {@code first}, else
+     * {@code second}, with room around it (FightFx.roomy), along its own direction first, then turning; null if none.
+     */
+    private static Vector3d landing(State s, double ox, double oz, double radius, double first, double second,
+                                    FightFx.Spot spot, Store<EntityStore> store) {
+        double base = Math.atan2(oz, ox);
+        for (double share : LANDING_SHARES) {
+            double r = Math.max(1, radius * share);
+            for (double turn : LANDING_TURNS) {
+                double a = base + turn, x = s.center.x + Math.cos(a) * r, z = s.center.z + Math.sin(a) * r;
+                double y = FightFx.standableY(x, z, first, STAND_RANGE, spot, store);
+                if (!Double.isFinite(y) || !landingHeight(s, y)) y = FightFx.standableY(x, z, second, STAND_RANGE, spot, store);
+                // Within the arena's height band (2026-10-14, cave: the nearest standable spot was the surface 23 blocks
+                // up, so the vertical limit sent it back every second), and with room around it: a tight spot is
+                // often a pocket inside the rock, where the mob seemed to sink through the floor (recording).
+                if (!Double.isFinite(y) || !landingHeight(s, y)) continue;
+                if (spot == FightFx.Spot.WATER || FightFx.roomy(x, y, z, store)) return new Vector3d(x, y, z);
+            }
+        }
+        // Nowhere with room: it stays and the wall keeps pushing.
+        return null;
+    }
+
+    /** The arena's center on its ground (where the battle started), for a mob with nowhere roomier to go; null if none. */
+    private static Vector3d centerSpot(State s, FightFx.Spot spot, Store<EntityStore> store) {
+        double cy = FightFx.standableY(s.center.x, s.center.z, s.center.y, STAND_RANGE, spot, store);
+        return Double.isFinite(cy) ? new Vector3d(s.center.x, cy, s.center.z) : null;
+    }
+
+    /** A landing height well inside the vertical limit, so a teleported mob is not brought back again at once. */
+    private static boolean landingHeight(State s, double y) {
+        double dy = y - s.center.y;
+        // Inside the band with 2 blocks to spare; with no limit set, within the old 20-block band anyway.
+        // Within the vertical limit with 2 blocks to spare; without one, 20 blocks anyway (the nearest standable spot of
+        // a cave can be the surface far above).
+        double band = FxSettings.arenaVertical > 0 ? FxSettings.arenaVertical : 20;
+        return Math.abs(dy) <= band - 2;
     }
 
     /** At most one [debug] "pushed in" line per mob this often. */
@@ -380,9 +617,17 @@ final class Arena {
     private static final int STAND_RANGE = 24;
 
     /** Knockback toward the center (the game's own, as "/knockback apply" sets it). */
-    private static void push(Ref<EntityStore> npc, double ox, double oz, Store<EntityStore> store) {
+    private static void push(Ref<EntityStore> npc, double ox, double oz, double over, boolean blocked, Store<EntityStore> store) {
+        // Gentle at the edge, harder the farther out it is (2026-10-14, user: the fixed push was too rough). One that
+        // the last push did not move (a step of the colosseum stands) gets the full lift, to hop up instead of being
+        // teleported after MAX_PUSHES (test 2026-10-14: 9 teleports on the stands).
+        double strength = Math.max(PUSH_MIN, Math.min(PUSH, PUSH_MIN + PUSH_PER_BLOCK * over));
+        // Blocked: just enough lift for one step and a gentle push, not the full strength (an antelope stuck at a cave
+        // ledge was flung across the cave once it came free, recording 2026-10-14).
+        if (blocked) strength = PUSH_MIN;
+        double up = blocked ? STEP_LIFT : PUSH_UP * strength / PUSH;
         KnockbackComponent kb = store.ensureAndGetComponent(npc, KnockbackComponent.getComponentType());
-        kb.setVelocity(new Vector3d(-ox * PUSH, PUSH_UP, -oz * PUSH));
+        kb.setVelocity(new Vector3d(-ox * strength, up, -oz * strength));
         kb.setVelocityType(ChangeVelocityType.Set);
         kb.setVelocityConfig(null);
         kb.setDuration(0f);
@@ -400,15 +645,22 @@ final class Arena {
             }
             return;
         }
-        String sub = subtitle(s.battle, store);
+        java.util.List<com.hypixel.hytale.server.core.Message> sub = subtitle(s.battle, store);
         for (UUID id : s.viewers) {
             PlayerRef p = Universe.get().getPlayer(id);
             if (p != null && p.isValid()) TimerHud.show(p, store, s.titleKey, sub, left);
         }
     }
 
-    /** Who is fighting, for the custom timer box: "A vs B", "vs X: 5 attackers", "6 left". */
-    private static String subtitle(BattleManager.Battle battle, ComponentAccessor<EntityStore> buffer) {
+    /** Characters that fit a line of the timer box (12 px bold uppercase in its 218 px wide body). */
+    private static final int LINE_CHARS = 28;
+
+    /**
+     * Who is fighting, for the custom timer box, one Message per line (at most TimerHud.MAX_LINES): "A vs B",
+     * "5 attackers vs X", "6 fighters left" + the top killer. A line that would not fit by its names goes on two.
+     */
+    private static java.util.List<com.hypixel.hytale.server.core.Message> subtitle(BattleManager.Battle battle,
+                                                                                    ComponentAccessor<EntityStore> buffer) {
         // Counted, not collected: this runs every second for battles of hundreds of mobs.
         int alive = 0;
         Ref<EntityStore> first = null, second = null;
@@ -419,22 +671,53 @@ final class Arena {
             alive++;
         }
         if (battle.kind == BattleManager.Kind.DUEL && alive == 2) {
-            return pretty(ChaosWand.nameOf(first, buffer)) + " vs " + pretty(ChaosWand.nameOf(second, buffer));
+            String a = pretty(ChaosWand.nameOf(first, buffer));
+            String b = pretty(ChaosWand.nameOf(second, buffer));
+            if (a.length() + b.length() + 4 <= LINE_CHARS) {
+                return java.util.List.of(I18n.tr("hud.timer.vs").param("a", a).param("b", b));
+            }
+            return java.util.List.of(com.hypixel.hytale.server.core.Message.raw(a), I18n.tr("hud.timer.vs.line").param("b", b));
         }
         if (battle.kind == BattleManager.Kind.ALL_VS_ONE && battle.focusName != null) {
             int n = Math.max(0, alive - 1);
-            return n + (n == 1 ? " attacker" : " attackers") + " vs " + pretty(battle.focusName);
+            String name = pretty(battle.focusName);
+            if (name.length() + 14 <= LINE_CHARS) {
+                return java.util.List.of(I18n.tr("hud.timer.attackers.vs").param("count", n).param("name", name));
+            }
+            return java.util.List.of(I18n.tr("hud.timer.attackers").param("count", n),
+                    I18n.tr("hud.timer.vs.line").param("b", name));
         }
         if (battle.kind == BattleManager.Kind.TEAMS && buffer instanceof Store<EntityStore> st) {
-            // Compact: alive per team, "RED 5 · BLUE 3" (the scoreboard has the full rows).
-            java.util.List<String> parts = new java.util.ArrayList<>();
-            Scoreboard.sides(battle, st).forEach((team, c) -> parts.add(battle.name(team) + " " + c[0]));
-            return String.join(" · ", parts);
+            // Compact: alive per team, "RED 5 · BLUE 3" (the scoreboard has the full rows), on as many lines as
+            // the names need.
+            java.util.List<com.hypixel.hytale.server.core.Message> lines = new java.util.ArrayList<>();
+            java.util.List<com.hypixel.hytale.server.core.Message> row = new java.util.ArrayList<>();
+            int[] used = {0};
+            Scoreboard.sides(battle, st).forEach((team, c) -> {
+                String part = battle.name(team) + " " + c[0];
+                if (!row.isEmpty() && used[0] + 3 + part.length() > LINE_CHARS) {
+                    lines.add(com.hypixel.hytale.server.core.Message.join(row.toArray(new com.hypixel.hytale.server.core.Message[0])));
+                    row.clear();
+                    used[0] = 0;
+                }
+                if (!row.isEmpty()) {
+                    row.add(com.hypixel.hytale.server.core.Message.raw(" · "));
+                    used[0] += 3;
+                }
+                row.add(com.hypixel.hytale.server.core.Message.raw(part));
+                used[0] += part.length();
+            });
+            if (!row.isEmpty()) lines.add(com.hypixel.hytale.server.core.Message.join(row.toArray(new com.hypixel.hytale.server.core.Message[0])));
+            return lines;
         }
         // Only the leader: one short line however many fight (hundreds of mobs would not fit).
         BattleManager.Kills leader = battle.topKiller();
-        String top = leader != null ? " | top: " + pretty(leader.name()) + " " + leader.count() : "";
-        return alive + " fighters left" + top;
+        int tied = leader != null && battle.sharedPlaces() ? battle.tiedAtTop() : 1;
+        com.hypixel.hytale.server.core.Message count = I18n.tr("hud.timer.fighters").param("count", alive);
+        if (leader == null) return java.util.List.of(count);
+        return java.util.List.of(count, tied > 1
+                ? I18n.tr("hud.timer.top.tied").param("tied", tied).param("n", leader.count())
+                : I18n.tr("hud.timer.top").param("name", pretty(leader.name())).param("n", leader.count()));
     }
 
     /** Role ids read better in the box without underscores: "Test_Dummy" -> "Test Dummy". */

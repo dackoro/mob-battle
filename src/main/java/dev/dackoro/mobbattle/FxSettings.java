@@ -49,7 +49,9 @@ public final class FxSettings {
     /** Chaos Wand area radius in blocks (/mobbattle arearadius). */
     public static int radius = 60;
     public static final int MIN_RADIUS = 2;
-    public static final int MAX_RADIUS = 430;
+    public static final int MAX_RADIUS = 2048;
+    /** Above this radius (areaRadius, snapRadius, wave radii) the panel and command warn: past view distance mobs are not loaded. */
+    public static final int RADIUS_WARN = 128;
 
     /**
      * What an area or arena draws (/mobbattle areaStyle): border (only the border glow), disc (a disc on the ground),
@@ -149,13 +151,39 @@ public final class FxSettings {
      * (no closer, no hit given or taken, out of reach) before it is shoved toward it. 0 = never. Default 15.
      */
     public static int standoffSeconds = 15;
-    static final int MAX_STANDOFF_SECONDS = 120;
+    static final int MAX_STANDOFF_SECONDS = 3600;
     /**
      * /mobbattle passiveWin: once only one side (or none) can still fight back, seconds without a hit before that
      * side wins (none: a draw), with an alert bottom left (BattleManager.passiveEnd). 0 = off. Default 15.
      */
     public static int passiveWinSeconds = 15;
-    static final int MAX_PASSIVE_WIN_SECONDS = 120;
+    /**
+     * How far below / above the center a royale or all vs one takes mobs, and how far the arena wall lets them go
+     * before bringing them back (2026-10-14, user: a surface battle pulled in mobs from a deep cave; keep shallow caves
+     * and fliers, optional). Blocks, 0 = no limit (the whole sphere, as before). Defaults 50 below (user: wide, but not a deep magma cave), 40 above.
+     */
+    public static int battleBelow = 50, battleAbove = 40;
+    /**
+     * How far above or below the arena's center height a fighter may go before the arena wall brings it back (cave
+     * shafts, cliffs; fliers never). Separate from battleBelow/Above, which only choose who joins (user, 2026-10-14).
+     * Blocks, 0 = no limit (default).
+     */
+    public static int arenaVertical = 0;
+    static final int MAX_BATTLE_DEPTH = 512;
+    static final int MAX_PASSIVE_WIN_SECONDS = 3600;
+    /**
+     * /mobbattle idleEnd (2026-10-13, user): a battle where no fighter hurts an enemy for this long ends in a draw
+     * (a royale of defensive animals stood still for its whole 3 min timer). 0 = off.
+     */
+    public static int idleEndSeconds = 150;
+    static final int MAX_IDLE_END_SECONDS = 3600;
+    /**
+     * /mobbattle battleMaxTime (2026-10-13, user: an infinite battle option): minutes after which a battle with no winner
+     * ends anyway (was a fixed 15 min, BattleManager.MAX_MILLIS). 0 = never (infinite). A longer arena timer still
+     * pushes it past the timer's end (Arena.setup).
+     */
+    public static int battleMaxMinutes = 15;
+    static final int MAX_BATTLE_MINUTES = 10080;
     /**
      * /mobbattle passiveWinIgnore: role ids (comma separated, a trailing * matches any ending, case-insensitive) that
      * never let passiveWin start while one is alive in the battle, e.g. an immortal training dummy a modder tests a mob
@@ -189,6 +217,8 @@ public final class FxSettings {
     }
     /** Read-only 1 vs 1 duel card with both fighters' stats, from the countdown to the end (/mobbattle duelCard). Default: off. */
     public static boolean duelCard = false;
+    /** All vs one card: the lone target's stats and the attackers (/mobbattle focusCard). Default: off. */
+    public static boolean focusCard = false;
 
     public static boolean shrinks(BattleManager.Kind kind) {
         return kind != null && SHRINK.getOrDefault(kind, false);
@@ -208,6 +238,8 @@ public final class FxSettings {
     static final int MAX_DEBUG_TRACK_SECONDS = 600;
     /** timeUp health/judge when even on health: "damage" (default), "random" or "draw" (/mobbattle tieBreak). */
     public static String tieBreak = "damage";
+    /** Kill table ties (/mobbattle killTieBreak, KindFx): damage (default), alive, first or shared. */
+    public static String killTieBreak = "damage";
     /** Snap Wand and /mobbattle snap: "global" (half of everyone, default) or "team" (half of each side). */
     public static String snapMode = "global";
     /** Cleanse Wand look, a palette color (/mobbattle cleanseColor). */
@@ -222,6 +254,21 @@ public final class FxSettings {
      * the buff lands with the light (BuffGiveInteraction), off = at once.
      */
     public static String buffLight = "buff";
+    /**
+     * Lasting look of a wand-, streak- or champion-buffed mob (/mobbattle buffLook, 2026-10-13, user: a Buff Wand
+     * without the shimmer): "shimmer" (veins, eye flames and runes, default), "runes" (only eye flames and runes, the
+     * skin stays as it is) or "off" (no lasting look; the click's mark, swirl and light are wandFx/buffLight).
+     */
+    public static String buffLook = "shimmer";
+    static final java.util.List<String> BUFF_LOOKS = java.util.List.of("shimmer", "runes", "off");
+
+    /** Canonical buffLook value, or null if it is not one. */
+    static String parseBuffLook(String value) {
+        if (value == null) return null;
+        String v = value.trim().toLowerCase(java.util.Locale.ROOT);
+        if (v.equals("none") || v.equals("false")) v = "off";
+        return BUFF_LOOKS.contains(v) ? v : null;
+    }
 
     /** The Buff Wand light's palette color now, or null when it is off. */
     static String buffLightColor() {
@@ -259,7 +306,7 @@ public final class FxSettings {
     public static int snapPercent = 50;
     /** Snap: seconds over which they turn to dust, 1-30 (/mobbattle snapTime). */
     public static int snapSeconds = 5;
-    public static final int MAX_SNAP_SECONDS = 30;
+    public static final int MAX_SNAP_SECONDS = 600;
     /** Snap Wand: ms from the click to the slam's hit, when sound, shockwave and targets fire (/mobbattle snapHitDelay). */
     public static final int DEFAULT_SNAP_HIT_DELAY_MS = 310;
     public static final int MAX_SNAP_HIT_DELAY_MS = 2000;
@@ -270,8 +317,9 @@ public final class FxSettings {
     /** Timer box: "custom" (TimerHud, default) or "portal" (the game's portal box) (/mobbattle timerStyle). */
     public static String timerStyle = "custom";
     public static final int MIN_ARENA = 8;
-    public static final int MAX_ARENA = 128;
-    public static final int MAX_TIMER = 3600;
+    public static final int MAX_ARENA = 1024;
+    public static final int ARENA_WARN = 128;
+    public static final int MAX_TIMER = 86400;
 
     public static Arena.Mode arenaMode(BattleManager.Kind kind) {
         return kind == null ? Arena.Mode.OFF : ARENA.getOrDefault(kind, Arena.Mode.OFF);
@@ -291,8 +339,9 @@ public final class FxSettings {
      */
     public static String tieBreak(BattleManager.Kind kind) {
         String by = judgeBy(kind);
-        if (tieBreak.equals(by)) return by.equals("damage") ? "kills" : "damage";
-        return tieBreak;
+        String rule = KindFx.get(kind, KindFx.Opt.TIE_BREAK);
+        if (rule.equals(by)) return by.equals("damage") ? "kills" : "damage";
+        return rule;
     }
 
     /** A judgeBy value as stored (lowercase), or null. */
@@ -389,11 +438,13 @@ public final class FxSettings {
     /** Height in blocks of the pillars (/mobbattle areaheight). */
     public static int pillarHeight = 30;
     public static final int MIN_HEIGHT = 3;
-    public static final int MAX_HEIGHT = 128;
+    public static final int MAX_HEIGHT = 512;
+    public static final int HEIGHT_WARN = 64;
 
     /** Summon area radius in blocks (/mobbattle summonradius); 0 = auto, grows with how many mobs. */
     public static int summonRadius = 0;
-    public static final int MAX_SUMMON_RADIUS = 64;
+    public static final int MAX_SUMMON_RADIUS = 512;
+    public static final int SUMMON_RADIUS_WARN = 64;
 
     /** Summoned mobs leave on their own: never (default, they stay), battleEnd (the surviving summons of a battle go when it ends) or timer (summonLifetime after spawn) (/mobbattle summonDespawn). Global, not per kind: summons spawn outside battles. */
     public static String summonDespawn = SummonDespawn.NEVER;
@@ -407,14 +458,28 @@ public final class FxSettings {
     public static String summonJadeColor = EffectWand.JADE_COLOR;
     /** Army mobs wear a tint for as long as they are in the army (/mobbattle armyTint). Default off. */
     public static boolean armyTint = false;
+    /**
+     * Hits inside one army (mates, a leader and its mobs) do their damage instead of being cancelled, and nobody fights
+     * back or calls the others: they stay allies (/mobbattle armyFriendlyFire, key army.friendlyfire, 2026-10-14,
+     * user). Default off.
+     */
+    public static boolean armyFriendlyFire = false;
     /** Color of the army tint (/mobbattle armyTintColor), a palette color. Default blue (the Army Wand color). */
     public static String armyTintColor = "Blue";
     /** How a summon leaves: disintegrate (the Kill Wand's soul rip, no loot), vanish (removed at once) or shatter (jade glass) (/mobbattle summonExit). */
     public static String summonExit = SummonDespawn.DISINTEGRATE;
+    /** Summons wait calm until a battle, wand fight, army or hit (/mobbattle summonCalm): off (default), summons (they ignore each other) or all (players and other mobs too). */
+    public static String summonCalm = SummonCalm.OFF;
 
-    /** Max mobs one Chaos Wand click affects (/mobbattle maxmobs). Mostly limited by the game's own AI cost. */
+    /** Max mobs one Chaos Wand click, Snap or summon affects (/mobbattle maxmobs). Mostly limited by the game's own AI cost. */
     public static int maxMobs = 200;
-    public static final int MAX_MOBS_LIMIT = 200;
+    /**
+     * Highest maxMobs (and summon list count) allowed: no real cap on purpose (user, 2026-10-13: "5000 if I want,
+     * my PC is my problem"); above {@link #MAX_MOBS_WARN} the command and the panel only warn.
+     */
+    public static final int MAX_MOBS_LIMIT = 100000;
+    /** Above this maxMobs the server may lag: a warning, never a cap. */
+    public static final int MAX_MOBS_WARN = 60;
 
     /** Team look: both, tint, mist or off (/mobbattle teamlook). */
     public static String teamFx = "tint";
@@ -457,6 +522,33 @@ public final class FxSettings {
     /** Cleanse Wand held click: reach in blocks (/mobbattle cleanseRadius). */
     public static final int DEFAULT_CLEANSE_RADIUS = 12;
     public static int cleanseRadius = DEFAULT_CLEANSE_RADIUS;
+    /** Effect Wand held left click: every mob and player in effectRadius gets the effect (/mobbattle effectArea). */
+    public static boolean effectArea = true;
+    /** Effect Wand held click: reach in blocks (/mobbattle effectRadius). */
+    public static final int DEFAULT_EFFECT_RADIUS = 12;
+    public static int effectRadius = DEFAULT_EFFECT_RADIUS;
+    /** Heal Wand held left click: every mob and player in healRadius, the caster too, is healed (/mobbattle healArea). */
+    public static boolean healArea = true;
+    /**
+     * Held-click waves: whether the caster is in their own wave (2026-10-13, user: "not heal me", "always cleanse me").
+     * Heal on by default (it always healed the caster), the others off (they never touched the caster). Keys
+     * heal.area.self, cleanse.area.self, effect.area.self, morph.burst.self (/mobbattle healAreaSelf ...).
+     */
+    public static boolean healAreaSelf = true;
+    public static boolean cleanseAreaSelf = false;
+    public static boolean effectAreaSelf = false;
+    public static boolean morphBurstSelf = false;
+    /** Heal Wand held click: reach in blocks (/mobbattle healRadius). */
+    public static final int DEFAULT_HEAL_RADIUS = 12;
+    public static int healRadius = DEFAULT_HEAL_RADIUS;
+    /** Wand waves (Morph, Cleanse, Effect, Heal): each target is hit when the ring reaches it (/mobbattle waveTravel). */
+    public static boolean waveTravel = true;
+    /** Wand waves: only targets near the ground of the wave, as vanilla slams (/mobbattle waveGroundOnly). */
+    public static boolean waveGroundOnly = false;
+    /** Snap, royale and all-vs-one waves: each target is hit when the ring reaches it (/mobbattle battleWaveTravel). */
+    public static boolean battleWaveTravel = false;
+    /** Snap, royale and all-vs-one waves: only targets near the ground (/mobbattle battleWaveGroundOnly). */
+    public static boolean battleWaveGroundOnly = false;
 
     /** Who sees the fight cameras: owner (default), nearby or world, like titleScope; never a fighter's own intro. */
     public static String cameraScope = "owner";
@@ -598,6 +690,8 @@ public final class FxSettings {
         BattleMusic.stopSilenced();
         if (!Unstick.active()) Unstick.clear();
         if (!duelCard) DuelCard.clearAll();
+        if (!focusCard) FocusCard.clearAll();
+        Buffs.refreshLookAll();
     }
 
     /** The plugin data directory (where fx.properties lives), or null before load. */
@@ -648,11 +742,14 @@ public final class FxSettings {
             summonLifetime = SummonDespawn.clampLifetime(intOr(p, "summon.lifetime", summonLifetime));
             String exit = SummonDespawn.parseExit(p.getProperty("summon.exit"));
             if (exit != null) summonExit = exit;
+            String calm = SummonCalm.parseMode(p.getProperty("summon.calm"));
+            if (calm != null) summonCalm = calm;
             summonJade = Boolean.parseBoolean(p.getProperty("summon.jade", String.valueOf(summonJade)));
             summonArmy = Boolean.parseBoolean(p.getProperty("summon.army", String.valueOf(summonArmy)));
             String jadeColor = SummonList.parseJadeColor(p.getProperty("summon.jade.color"));
             if (jadeColor != null) summonJadeColor = jadeColor;
             armyTint = Boolean.parseBoolean(p.getProperty("army.tint", String.valueOf(armyTint)));
+            armyFriendlyFire = Boolean.parseBoolean(p.getProperty("army.friendlyfire", String.valueOf(armyFriendlyFire)));
             String tintColor = SummonList.parseJadeColor(p.getProperty("army.tint.color"));
             if (tintColor != null) armyTintColor = tintColor;
             effect = p.getProperty("effect.id", effect);
@@ -672,6 +769,8 @@ public final class FxSettings {
             }
             String light = parseBuffLight(p.getProperty("wand.buff.light", buffLight));
             if (light != null) buffLight = light;
+            String buffLookValue = parseBuffLook(p.getProperty("wand.buff.look", buffLook));
+            if (buffLookValue != null) buffLook = buffLookValue;
             String healL = parseHealLight(p.getProperty("wand.heal.light", healLight));
             if (healL != null) healLight = healL;
             areaStyle = loadAreaStyle(p.getProperty("chaos.area"), currentAreaStyles(p), areaStyle);
@@ -746,15 +845,22 @@ public final class FxSettings {
             } catch (NumberFormatException ignored) {
                 // keep the default
             }
+            // One key each (audit 2026-10-14: a bad value in one of them skipped the others).
+            battleBelow = Math.max(0, Math.min(MAX_BATTLE_DEPTH, intOr(p, "battle.below", battleBelow)));
+            battleAbove = Math.max(0, Math.min(MAX_BATTLE_DEPTH, intOr(p, "battle.above", battleAbove)));
+            arenaVertical = Math.max(0, Math.min(MAX_BATTLE_DEPTH, intOr(p, "battle.arena.vertical", arenaVertical)));
+            passiveWinSeconds = Math.max(0, Math.min(MAX_PASSIVE_WIN_SECONDS, intOr(p, "battle.passivewin", passiveWinSeconds)));
+            battleMaxMinutes = Math.max(0, Math.min(MAX_BATTLE_MINUTES, intOr(p, "battle.maxtime", battleMaxMinutes)));
             try {
-                passiveWinSeconds = Math.max(0, Math.min(MAX_PASSIVE_WIN_SECONDS,
-                        Integer.parseInt(p.getProperty("battle.passivewin", String.valueOf(passiveWinSeconds)))));
+                idleEndSeconds = Math.max(0, Math.min(MAX_IDLE_END_SECONDS,
+                        Integer.parseInt(p.getProperty("battle.idleend", String.valueOf(idleEndSeconds)))));
             } catch (NumberFormatException ignored) {
                 // keep the default
             }
             String ignore = parsePassiveWinIgnore(p.getProperty("battle.passivewin.ignore", passiveWinIgnore));
             if (ignore != null) passiveWinIgnore = ignore;
             duelCard = Boolean.parseBoolean(p.getProperty("battle.duelCard", String.valueOf(duelCard)));
+            focusCard = Boolean.parseBoolean(p.getProperty("battle.focusCard", String.valueOf(focusCard)));
             // Each key on its own: a bad value keeps that kind's current setting, the other keys still load.
             for (BattleManager.Kind k : BattleManager.Kind.values()) {
                 try {
@@ -787,6 +893,8 @@ public final class FxSettings {
             timerStyle = "portal".equalsIgnoreCase(style) ? "portal" : "custom";
             String tb = p.getProperty("battle.tiebreak", tieBreak).toLowerCase(java.util.Locale.ROOT);
             tieBreak = tb.equals("random") || tb.equals("draw") || tb.equals("kills") ? tb : "damage";
+            String ktb = KindFx.parse(KindFx.Opt.KILL_TIE_BREAK, p.getProperty("battle.killtiebreak", killTieBreak));
+            killTieBreak = ktb != null ? ktb : "damage";
             snapMode = "team".equalsIgnoreCase(p.getProperty("snap.mode", snapMode)) ? "team" : "global";
             snapPercent = Math.max(1, Math.min(100, intOr(p, "snap.percent", snapPercent)));
             snapSeconds = Math.max(1, Math.min(MAX_SNAP_SECONDS, intOr(p, "snap.time", snapSeconds)));
@@ -821,6 +929,20 @@ public final class FxSettings {
             cleanseArea = Boolean.parseBoolean(p.getProperty("cleanse.area", String.valueOf(cleanseArea)));
             int cr = intOr(p, "cleanse.area.radius", cleanseRadius);
             cleanseRadius = cr <= 0 ? DEFAULT_CLEANSE_RADIUS : clampRadius(cr);
+            effectArea = Boolean.parseBoolean(p.getProperty("effect.area", String.valueOf(effectArea)));
+            int er = intOr(p, "effect.area.radius", effectRadius);
+            effectRadius = er <= 0 ? DEFAULT_EFFECT_RADIUS : clampRadius(er);
+            healArea = Boolean.parseBoolean(p.getProperty("heal.area", String.valueOf(healArea)));
+            healAreaSelf = Boolean.parseBoolean(p.getProperty("heal.area.self", String.valueOf(healAreaSelf)));
+            cleanseAreaSelf = Boolean.parseBoolean(p.getProperty("cleanse.area.self", String.valueOf(cleanseAreaSelf)));
+            effectAreaSelf = Boolean.parseBoolean(p.getProperty("effect.area.self", String.valueOf(effectAreaSelf)));
+            morphBurstSelf = Boolean.parseBoolean(p.getProperty("morph.burst.self", String.valueOf(morphBurstSelf)));
+            int hr = intOr(p, "heal.area.radius", healRadius);
+            healRadius = hr <= 0 ? DEFAULT_HEAL_RADIUS : clampRadius(hr);
+            waveTravel = Boolean.parseBoolean(p.getProperty("wand.wave.travel", String.valueOf(waveTravel)));
+            waveGroundOnly = Boolean.parseBoolean(p.getProperty("wand.wave.groundonly", String.valueOf(waveGroundOnly)));
+            battleWaveTravel = Boolean.parseBoolean(p.getProperty("battle.wave.travel", String.valueOf(battleWaveTravel)));
+            battleWaveGroundOnly = Boolean.parseBoolean(p.getProperty("battle.wave.groundonly", String.valueOf(battleWaveGroundOnly)));
             KindFx.load(p);
         }
     }
@@ -887,17 +1009,25 @@ public final class FxSettings {
         p.setProperty("battle.unstick", String.valueOf(unstick));
         p.setProperty("battle.standoff", String.valueOf(standoffSeconds));
         p.setProperty("battle.passivewin", String.valueOf(passiveWinSeconds));
+        p.setProperty("battle.below", String.valueOf(battleBelow));
+        p.setProperty("battle.above", String.valueOf(battleAbove));
+        p.setProperty("battle.arena.vertical", String.valueOf(arenaVertical));
         p.setProperty("battle.passivewin.ignore", passiveWinIgnore);
+        p.setProperty("battle.idleend", String.valueOf(idleEndSeconds));
+        p.setProperty("battle.maxtime", String.valueOf(battleMaxMinutes));
         p.setProperty("battle.duelCard", String.valueOf(duelCard));
+        p.setProperty("battle.focusCard", String.valueOf(focusCard));
         p.setProperty("battle.shrink.time", String.valueOf(shrinkSeconds));
         p.setProperty("battle.timer.style", timerStyle);
         p.setProperty("battle.tiebreak", tieBreak);
+        p.setProperty("battle.killtiebreak", killTieBreak);
         p.setProperty("snap.mode", snapMode);
         p.setProperty("snap.percent", String.valueOf(snapPercent));
         Buffs.save(p);
         p.setProperty("wand.cleanse.color", cleanseColor);
         p.setProperty("wand.buff.color", buffColor);
         p.setProperty("wand.buff.light", buffLight);
+        p.setProperty("wand.buff.look", buffLook);
         p.setProperty("wand.heal.light", healLight);
         p.setProperty("snap.time", String.valueOf(snapSeconds));
         p.setProperty("snap.hitdelay", String.valueOf(snapHitDelayMs));
@@ -912,10 +1042,12 @@ public final class FxSettings {
         p.setProperty("summon.despawn", summonDespawn);
         p.setProperty("summon.lifetime", String.valueOf(summonLifetime));
         p.setProperty("summon.exit", summonExit);
+        p.setProperty("summon.calm", summonCalm);
         p.setProperty("summon.jade", String.valueOf(summonJade));
         p.setProperty("summon.army", String.valueOf(summonArmy));
         p.setProperty("summon.jade.color", summonJadeColor);
         p.setProperty("army.tint", String.valueOf(armyTint));
+        p.setProperty("army.friendlyfire", String.valueOf(armyFriendlyFire));
         p.setProperty("army.tint.color", armyTintColor);
         p.setProperty("chaos.height", String.valueOf(pillarHeight));
         p.setProperty("camera.style", cameraStyle);
@@ -935,7 +1067,19 @@ public final class FxSettings {
         p.setProperty("morph.shuffle", String.valueOf(morphShuffle));
         p.setProperty("morph.burst.radius", String.valueOf(morphBurstRadius));
         p.setProperty("cleanse.area", String.valueOf(cleanseArea));
+        p.setProperty("heal.area.self", String.valueOf(healAreaSelf));
+        p.setProperty("cleanse.area.self", String.valueOf(cleanseAreaSelf));
+        p.setProperty("effect.area.self", String.valueOf(effectAreaSelf));
+        p.setProperty("morph.burst.self", String.valueOf(morphBurstSelf));
         p.setProperty("cleanse.area.radius", String.valueOf(cleanseRadius));
+        p.setProperty("effect.area", String.valueOf(effectArea));
+        p.setProperty("effect.area.radius", String.valueOf(effectRadius));
+        p.setProperty("heal.area", String.valueOf(healArea));
+        p.setProperty("heal.area.radius", String.valueOf(healRadius));
+        p.setProperty("wand.wave.travel", String.valueOf(waveTravel));
+        p.setProperty("wand.wave.groundonly", String.valueOf(waveGroundOnly));
+        p.setProperty("battle.wave.travel", String.valueOf(battleWaveTravel));
+        p.setProperty("battle.wave.groundonly", String.valueOf(battleWaveGroundOnly));
         KindFx.save(p);
         return p;
     }
@@ -1051,17 +1195,17 @@ public final class FxSettings {
                         + " | timeUp " + kinds(TIME_UP, v -> v.name().toLowerCase(java.util.Locale.ROOT))
                         + " | judgeBy " + kinds(JUDGE_BY, v -> v)
                         + " | arenaShrink " + rules(SHRINK) + " to " + shrinkTo + ", over " + MobBattleCommand.formatDuration(shrinkSeconds)
-                        + " with no timer | scoreboard " + rules(SCOREBOARD) + " | unstick " + onOff(unstick) + ", standoffTime " + (standoffSeconds > 0 ? standoffSeconds + " s" : "off") + ", passiveWin " + (passiveWinSeconds > 0 ? passiveWinSeconds + " s" : "off") + " (ignore " + (passiveWinIgnore.isEmpty() ? "none" : passiveWinIgnore) + ")"
-                        + " | duelCard " + onOff(duelCard)
-                        + " | arenaSize " + (arenaSize > 0 ? arenaSize : "auto") + ", timerStyle " + timerStyle + ", tieBreak " + tieBreak + ", snapMode " + snapMode
+                        + " with no timer | scoreboard " + rules(SCOREBOARD) + " | unstick " + onOff(unstick) + ", standoffTime " + (standoffSeconds > 0 ? standoffSeconds + " s" : "off") + ", battleBelow " + (battleBelow > 0 ? battleBelow : "off") + ", battleAbove " + (battleAbove > 0 ? battleAbove : "off") + ", arenaVertical " + (arenaVertical > 0 ? arenaVertical : "off") + ", passiveWin " + (passiveWinSeconds > 0 ? passiveWinSeconds + " s" : "off") + " (ignore " + (passiveWinIgnore.isEmpty() ? "none" : passiveWinIgnore) + "), idleEnd " + (idleEndSeconds > 0 ? idleEndSeconds + " s" : "off") + ", battleMaxTime " + (battleMaxMinutes > 0 ? battleMaxMinutes + " min" : "off (infinite)")
+                        + " | duelCard " + onOff(duelCard) + ", focusCard " + onOff(focusCard)
+                        + " | arenaSize " + (arenaSize > 0 ? arenaSize : "auto") + ", timerStyle " + timerStyle + ", tieBreak " + tieBreak + ", killTieBreak " + killTieBreak + ", snapMode " + snapMode
                         + ", snapPercent " + snapPercent + "%, snapTime " + snapSeconds + " s, snapHitDelay " + snapHitDelayMs + " ms, snapRadius " + snapRadius,
                 "Chaos area: areaStyle " + areaStyle + ", areaColor " + areaColor.toLowerCase() + ", areaRadius " + radius
                         + ", areaHeight " + pillarHeight + ", areaOnlyWand " + onOff(areaOnlyWand) + ", maxMobs " + maxMobs
                         + ", summonRadius " + (summonRadius > 0 ? summonRadius : "auto") + ", summonDespawn " + summonDespawn
-                        + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonArmy " + onOff(summonArmy) + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
+                        + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonCalm " + summonCalm + ", summonArmy " + onOff(summonArmy) + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
-                        + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase(),
-                "Wands: wandEffect " + effect + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", morphBurst " + onOff(morphBurst) + ", morphShuffle " + onOff(morphShuffle) + ", morphBurstRadius " + morphBurstRadius + ", cleanseColor " + cleanseColor.toLowerCase() + ", cleanseArea " + onOff(cleanseArea) + ", cleanseRadius " + cleanseRadius + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
+                        + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase() + ", armyFriendlyFire " + onOff(armyFriendlyFire),
+                "Wands: wandEffect " + effect + ", effectArea " + onOff(effectArea) + ", effectRadius " + effectRadius + ", healArea " + onOff(healArea) + ", healAreaSelf " + onOff(healAreaSelf) + ", effectAreaSelf " + onOff(effectAreaSelf) + ", cleanseAreaSelf " + onOff(cleanseAreaSelf) + ", morphBurstSelf " + onOff(morphBurstSelf) + ", healRadius " + healRadius + ", waveTravel " + onOff(waveTravel) + ", waveGroundOnly " + onOff(waveGroundOnly) + ", battleWaveTravel " + onOff(battleWaveTravel) + ", battleWaveGroundOnly " + onOff(battleWaveGroundOnly) + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", morphBurst " + onOff(morphBurst) + ", morphShuffle " + onOff(morphShuffle) + ", morphBurstRadius " + morphBurstRadius + ", cleanseColor " + cleanseColor.toLowerCase() + ", cleanseArea " + onOff(cleanseArea) + ", cleanseRadius " + cleanseRadius + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", buffLook " + buffLook + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
                 "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
         };
     }
@@ -1072,11 +1216,11 @@ public final class FxSettings {
             case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
-            case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "passivewin", "passivewinignore", "duelcard", "timerstyle", "tiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
-            case "debuglog", "debugrecord", "debugtrack", "snapplayers", "morphplayers", "morphburst", "morphshuffle", "morphburstradius", "cleansearea", "cleanseradius", "killhitdelay", "cleansecolor", "buffcolor", "bufflight", "heallight" -> 6;
+            case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "battlebelow", "battleabove", "arenavertical", "passivewin", "passivewinignore", "idleend", "battlemaxtime", "duelcard", "focuscard", "timerstyle", "tiebreak", "killtiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
+            case "debuglog", "debugrecord", "debugtrack", "bufflook", "snapplayers", "morphplayers", "morphburst", "morphshuffle", "morphburstradius", "cleansearea", "cleanseradius", "healareaself", "cleanseareaself", "effectareaself", "morphburstself", "effectarea", "effectradius", "healarea", "healradius", "wavetravel", "wavegroundonly", "battlewavetravel", "battlewavegroundonly", "killhitdelay", "cleansecolor", "buffcolor", "bufflight", "heallight" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
-                 "summondespawn", "summonlifetime", "summonexit", "summonarmy", "summonjade", "summonjadecolor" -> 4;
-            case "teamfx", "teambytype", "armytint", "armytintcolor" -> 5;
+                 "summondespawn", "summonlifetime", "summonexit", "summoncalm", "summonarmy", "summonjade", "summonjadecolor" -> 4;
+            case "teamfx", "teambytype", "armytint", "armytintcolor", "armyfriendlyfire" -> 5;
             case "permissions" -> 7;
             default -> 6;
         };

@@ -12,7 +12,7 @@ Group {
     Padding: (Top: 6);
 
     Label #Title {
-      Text: "Duel";
+      Text: %server.mobbattle.hud.duel;
       Style: (FontSize: 14, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
               HorizontalAlignment: Center, VerticalAlignment: Center);
     }
@@ -31,7 +31,7 @@ Group {
     Label #DefenseA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
     Label #SizeA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
 
-    Label #Vs { Anchor: (Height: 26); Text: "VS"; Style: (FontSize: 14, TextColor: #96a9be, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center); }
+    Label #Vs { Anchor: (Height: 26); Text: %server.mobbattle.hud.vs; Style: (FontSize: 14, TextColor: #96a9be, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center); }
 
     Label #NameB { Anchor: (Height: 22); Text: ""; Style: (FontSize: 15, RenderBold: true, RenderUppercase: true); }
     Label #TagB { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }

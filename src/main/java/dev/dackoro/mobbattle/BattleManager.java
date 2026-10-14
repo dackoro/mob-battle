@@ -37,8 +37,11 @@ public final class BattleManager {
     public static final String[] TEAM_NAMES = new String[Teams.MAX];
     public static final String[] TEAM_COLORS = new String[Teams.MAX];
 
-    /** Safety: a battle stops after this long even if nobody wins. */
-    private static final long MAX_MILLIS = 15 * 60 * 1000;
+    /** Safety: a battle stops after battleMaxTime minutes even if nobody wins; 0 = never (infinite battle). */
+    static long deadline() {
+        int min = FxSettings.battleMaxMinutes;
+        return min <= 0 ? Long.MAX_VALUE : System.currentTimeMillis() + min * 60_000L;
+    }
 
     /** Battle type; its key names it in /mobbattle friendlyfire and battleisolation. */
     public enum Kind {
@@ -51,8 +54,12 @@ public final class BattleManager {
         }
     }
 
-    /** One fighter's kills in a battle: name and side as they were when it scored. */
-    record Kills(String name, int team, int count) {
+    /**
+     * One fighter's kills in a battle: name and side as they were when it scored, and when it reached this count
+     * ({@code at}, ms): the last tie break of {@link Battle#ranking} (user, 2026-10-13: two fighters on 5 kills were
+     * listed in map order).
+     */
+    record Kills(String name, int team, int count, long at) {
     }
 
     public static final class Battle {
@@ -103,16 +110,26 @@ public final class BattleManager {
         final Map<Ref<EntityStore>, Boolean> canFight = new ConcurrentHashMap<>();
         /** All vs one: attackers hit by a fellow attacker, put back on the lone target next tick (FightTickSystem). */
         final Set<Ref<EntityStore>> refocus = ConcurrentHashMap.newKeySet();
+        /** FocusCard: the lone target (kept after it falls and leaves teamOf) and the most attackers seen at once. */
+        volatile Ref<EntityStore> cardLone;
+        volatile int cardPeak;
         /** passiveWin: when only one side (or none) could still fight back, or its last hit since; 0 = not now. */
         volatile long passiveSince;
         /** passiveWin: ended by it (end titles say so). */
         volatile boolean passiveEnded;
+        /** passiveWin ended it with nobody able to reach the others (Medium): won on health. */
+        volatile boolean unreachEnded;
+        /** idleEnd: the battle's start or its last hit between enemies; ended by it. */
+        volatile long lastHit = System.currentTimeMillis();
+        volatile boolean idleEnded;
+        /** When the battle began: only flock mates spawned after it join a side (joinOwnersSide). */
+        final long startedAt = System.currentTimeMillis();
         /** Players shown the passiveWin alert (PassiveAlert), to take it off again. */
         final Set<UUID> alertViewers = ConcurrentHashMap.newKeySet();
         /** (flock, member) pairs refreshed once per second, so pets can join without scanning every member. */
         volatile List<Ref<EntityStore>[]> flocks = List.of();
-        /** Safety deadline; an arena timer longer than MAX_MILLIS pushes it past its own end (Arena.setup). */
-        volatile long expiresAt = System.currentTimeMillis() + MAX_MILLIS;
+        /** Safety deadline; an arena timer longer than battleMaxTime pushes it past its own end (Arena.setup). */
+        volatile long expiresAt = deadline();
         /** Next winner check; only touched by the battle's own world thread. */
         long nextCheck;
         volatile boolean over;
@@ -129,6 +146,8 @@ public final class BattleManager {
         volatile boolean killAll;
         /** Damage each side dealt to its enemies (FightDamageSystem), for the tieBreak damage rule. */
         final Map<Integer, Double> damageBy = new ConcurrentHashMap<>();
+        /** Damage each fighter dealt to its enemies, for killTieBreak damage/alive. */
+        final Map<Ref<EntityStore>, Double> damageOf = new ConcurrentHashMap<>();
         /** Kills per fighter (KillTracker), with its name and side kept for after it dies or leaves. */
         final Map<Ref<EntityStore>, Kills> kills = new ConcurrentHashMap<>();
         /** Who scored the latest kill (endCamera lasthit: the final blow). */
@@ -139,22 +158,58 @@ public final class BattleManager {
         /** A kill by {@code killer} (side {@code team}) in this battle. */
         void recordKill(Ref<EntityStore> killer, String name, int team) {
             lastKiller = killer;
-            kills.compute(killer, (k, old) -> new Kills(name, team, old == null ? 1 : old.count() + 1));
+            long now = System.currentTimeMillis();
+            kills.compute(killer, (k, old) -> new Kills(name, team, old == null ? 1 : old.count() + 1, now));
             killsBy.merge(team, 1, Integer::sum);
         }
 
-        /** The fighters with the most kills, most first (ties in no particular order). */
-        List<Kills> topKillers(int n) {
-            List<Kills> all = new ArrayList<>(kills.values());
-            all.sort((x, y) -> Integer.compare(y.count(), x.count()));
-            return all.subList(0, Math.min(n, all.size()));
+        /**
+         * Kill table order (killTieBreak of this kind, user 2026-10-13): most kills; even = more damage dealt (damage),
+         * standing fighters first then damage (alive), or nothing more (first, shared); last, who reached it first.
+         */
+        java.util.Comparator<Map.Entry<Ref<EntityStore>, Kills>> ranking() {
+            String mode = KindFx.killTieBreak(kind);
+            java.util.Comparator<Map.Entry<Ref<EntityStore>, Kills>> c =
+                    (x, y) -> Integer.compare(y.getValue().count(), x.getValue().count());
+            // Damage and standing frozen for this sort (audit 2026-10-14): the world thread changes them while /mobbattle
+            // stop sorts on the command thread, and a comparator whose values move can throw mid-sort.
+            if ("alive".equals(mode)) {
+                java.util.Set<Ref<EntityStore>> standing = new java.util.HashSet<>();
+                for (Ref<EntityStore> r : kills.keySet()) if (has(r)) standing.add(r);
+                c = c.thenComparingInt(e -> standing.contains(e.getKey()) ? 0 : 1);
+            }
+            if ("alive".equals(mode) || "damage".equals(mode)) {
+                Map<Ref<EntityStore>, Double> dealt = new java.util.HashMap<>(damageOf);
+                c = c.thenComparingDouble(e -> -dealt.getOrDefault(e.getKey(), 0.0));
+            }
+            return c.thenComparingLong(e -> e.getValue().at());
         }
 
-        /** The fighter with the most kills, or null; one pass, no copy (the timer box asks every second). */
+        /** killTieBreak shared: the same kills share a place (1, 2, 2, 4). */
+        boolean sharedPlaces() {
+            return "shared".equals(KindFx.killTieBreak(kind));
+        }
+
+        /** The fighters with the most kills, in {@link #ranking} order. */
+        List<Kills> topKillers(int n) {
+            return kills.entrySet().stream().sorted(ranking()).limit(n).map(Map.Entry::getValue).toList();
+        }
+
+        /** The first of {@link #ranking}, or null; one pass, no copy (the timer box asks every second). */
         Kills topKiller() {
-            Kills best = null;
-            for (Kills k : kills.values()) if (best == null || k.count() > best.count()) best = k;
-            return best;
+            java.util.Comparator<Map.Entry<Ref<EntityStore>, Kills>> order = ranking();
+            Map.Entry<Ref<EntityStore>, Kills> best = null;
+            for (Map.Entry<Ref<EntityStore>, Kills> e : kills.entrySet()) if (best == null || order.compare(e, best) < 0) best = e;
+            return best != null ? best.getValue() : null;
+        }
+
+        /** How many fighters share the top kill count (the timer box says "2 tied" with killTieBreak shared). */
+        int tiedAtTop() {
+            Kills top = topKiller();
+            if (top == null) return 0;
+            int n = 0;
+            for (Kills k : kills.values()) if (k.count() == top.count()) n++;
+            return n;
         }
         /** timeUp judge: the side that won on health (healed, spared); -1 = nobody is spared. */
         volatile int survivorTeam = -1;
@@ -335,12 +390,17 @@ public final class BattleManager {
     static void maintain() {
         // Retired mobs stay managed on purpose (joinOwnersSide must not pull them back into a battle).
         MANAGED.removeIf(npc -> !npc.isValid());
+        long spawnCutoff = System.currentTimeMillis() - SPAWN_MEMORY_MS;
+        SPAWNED_AT.entrySet().removeIf(e -> !e.getKey().isValid() || e.getValue() < spawnCutoff || BATTLES.isEmpty());
         RoleChange.prune();
+        Medium.prune();
         WandFx.prune();
         Snap.prune();
         Army.prune();
         Buffs.prune();
         SummonDespawn.maintain();
+        SummonCalm.prune();
+        SkinRespawnSystem.prune();
         BattleMusic.maintain();
         for (Battle battle : BATTLES) {
             // World unloaded (e.g. a closed instance): its tick will never run checkWinner again. A live world
@@ -490,20 +550,31 @@ public final class BattleManager {
     private BattleManager() {
     }
 
+    /** Places of a ranked kill list: 1, 2, 3... or, shared, the same kills the same place (1, 2, 2, 4). */
+    static int[] places(List<Kills> ranked, boolean shared) {
+        int[] out = new int[ranked.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = shared && i > 0 && ranked.get(i).count() == ranked.get(i - 1).count() ? out[i - 1] : i + 1;
+        }
+        return out;
+    }
+
     /** At the end: the top 3 killers in chat, to the owner and the player fighters (one line, any battle size). */
     private static void killSummary(Battle battle) {
         if (battle.kills.isEmpty()) return;
-        StringBuilder line = new StringBuilder("Most kills: ");
-        int place = 1;
-        for (Kills k : battle.topKillers(3)) {
-            if (place > 1) line.append(", ");
-            line.append(place++).append(". ").append(k.name().replace('_', ' ')).append(" (").append(k.count()).append(')');
+        StringBuilder line = new StringBuilder();
+        List<Kills> top = battle.topKillers(3);
+        int[] places = places(top, battle.sharedPlaces());
+        for (int i = 0; i < top.size(); i++) {
+            Kills k = top.get(i);
+            if (i > 0) line.append(", ");
+            line.append(places[i]).append(". ").append(k.name().replace('_', ' ')).append(" (").append(k.count()).append(')');
         }
-        Message msg = Message.raw(line.toString()).color("#ffd23e");
+        Message msg = I18n.tr("battle.killsummary").param("list", line.toString()).color("#ffd23e");
         for (PlayerRef p : FightFx.titleViewers(battle)) {
             if (p.isValid()) p.sendMessage(msg);
         }
-        MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " kills by side " + battle.killsBy + " | " + line);
+        MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " kills by side " + battle.killsBy + " | Most kills: " + line);
     }
 
     /** Ends every running battle (duels, Chaos and team battles) with no winner. Returns how many. */
@@ -568,6 +639,8 @@ public final class BattleManager {
             b.refocus.remove(old);
             Kills k = b.kills.remove(old);
             if (k != null) b.kills.put(neu, k);
+            Double dealt = b.damageOf.remove(old);
+            if (dealt != null) b.damageOf.put(neu, dealt);
             if (b.lastKiller == old) b.lastKiller = neu;
             managed = false;
         }
@@ -644,13 +717,33 @@ public final class BattleManager {
         }
     }
 
+    /** NPCs spawned while a battle runs (LookLoadSystem, AddReason.SPAWN) and when; pruned in maintain. */
+    private static final Map<Ref<EntityStore>, Long> SPAWNED_AT = new ConcurrentHashMap<>();
+    /** How long a spawn is remembered: a pet joins its owner's side within a few seconds of appearing. */
+    private static final long SPAWN_MEMORY_MS = 60_000;
+
+    /** An NPC was just spawned (not loaded): remembered only while some battle runs. */
+    static void noteSpawn(Ref<EntityStore> npc) {
+        if (!BATTLES.isEmpty()) SPAWNED_AT.put(npc, System.currentTimeMillis());
+    }
+
     /**
      * If {@code npc} shares a flock with a battle member (a pet or summon spawned by it), adds it to
      * that member's side. Returns the battle it joined, or null.
      */
+    /** Spawned while a battle runs (FightTickSystem asks first, so wild NPCs get no timer entry for joinOwnersSide). */
+    static boolean recentlySpawned(Ref<EntityStore> npc) {
+        return !SPAWNED_AT.isEmpty() && SPAWNED_AT.containsKey(npc);
+    }
+
     public static Battle joinOwnersSide(Ref<EntityStore> npc, ComponentAccessor<EntityStore> buffer) {
         // A previously assigned/retired mob must never silently rejoin its old flock's battle.
         if (isManaged(npc) || !isAlive(npc, buffer)) return null;
+        // Only something spawned during a battle (a Trork Hunter's wolf, a Broodmother's young): pack animals join the
+        // flock of any of their kind nearby, so onlooking hyenas, cave rexes, scarak lice and feran civilians were
+        // pulled into a duel next to them (test calls, 2026-10-14).
+        Long spawned = SPAWNED_AT.get(npc);
+        if (spawned == null) return null;
         Ref<EntityStore> flock = com.hypixel.hytale.server.flock.FlockPlugin.getFlockReference(npc, buffer);
         if (flock == null || !flock.isValid()) {
             return null;
@@ -664,6 +757,7 @@ public final class BattleManager {
                 if (member == npc || !b.has(member)) {
                     continue;
                 }
+                if (spawned < b.startedAt) continue;
                 if (other == flock || (other.isValid() && other.getStore() == flock.getStore()
                         && other.getIndex() == flock.getIndex())) {
                     b.add(npc, b.team(member));
@@ -858,8 +952,11 @@ public final class BattleManager {
      */
     static final long CHASE_GIVE_UP_MS = 8000;
 
-    /** Target tiers, best first: an enemy that fights back, a passive one, one it can't reach right now. */
-    private static final int FIGHTER = 0, PASSIVE = 1, OUT_OF_REACH = 2;
+    /**
+     * Target tiers, best first: an enemy that fights back, a passive one, the same two in another medium it can still
+     * reach (a fish at the surface for an archer, 2026-10-14), one it can't reach right now.
+     */
+    private static final int FIGHTER = 0, PASSIVE = 1, OTHER_MEDIUM = 2, OUT_OF_REACH = 4;
 
     /**
      * How good {@code other} is as a target for {@code self}: out of reach when {@code self} can't fly and
@@ -867,10 +964,34 @@ public final class BattleManager {
      * passive mob (a royale skeleton went for a frog 36 blocks away with another skeleton 8 blocks from it, and stood
      * "confused" once the frog hopped out of sight; user, 2026-10-12). Players count as fighters.
      */
-    private static int reach(Battle battle, boolean selfFlies, Ref<EntityStore> other, ComponentAccessor<EntityStore> buffer) {
-        if (!selfFlies && Unstick.flyingNow(other, buffer)) return OUT_OF_REACH;
+    private static int reach(Battle battle, Medium.Can self, Ref<EntityStore> other, ComponentAccessor<EntityStore> buffer) {
+        Medium.Where there = Medium.where(other, buffer);
+        // Flying while it can't fly or shoot, under deep water while it drowns, on land for a fish (Medium).
+        if (!Medium.reaches(self, there)) return OUT_OF_REACH;
         if (Arena.outside(battle, ChaosWand.positionOf(other, buffer))) return OUT_OF_REACH;
-        return fights(battle, other, buffer) ? FIGHTER : PASSIVE;
+        int tier = fights(battle, other, buffer) ? FIGHTER : PASSIVE;
+        return Medium.same(self, there) ? tier : tier + OTHER_MEDIUM;
+    }
+
+    /**
+     * True if {@code self} can reach some living enemy that fights back, where it is now (passiveWin). A passive one
+     * does not count: a piranha that could reach only a wild fish won a royale against a wolf it could not reach
+     * (test 2026-10-14).
+     */
+    static boolean reachesAnyEnemy(Battle battle, Ref<EntityStore> self, ComponentAccessor<EntityStore> buffer) {
+        Medium.Can can = Medium.of(self, buffer);
+        int myTeam = battle.team(self);
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            Ref<EntityStore> other = e.getKey();
+            if (other == self || e.getValue() == myTeam || !isAlive(other, buffer) || !fights(battle, other, buffer)) continue;
+            if (Medium.reaches(can, Medium.where(other, buffer))) return true;
+        }
+        return false;
+    }
+
+    /** True if {@code self} can reach {@code other} where it is now. */
+    static boolean canReach(Ref<EntityStore> self, Ref<EntityStore> other, ComponentAccessor<EntityStore> buffer) {
+        return Medium.reaches(Medium.of(self, buffer), Medium.where(other, buffer));
     }
 
     /** Whether a member can attack at all (FightManager.canAttack, asked once per battle); players always can. */
@@ -878,7 +999,11 @@ public final class BattleManager {
         if (isPlayerFighter(member)) return true;
         Boolean f = battle.canFight.get(member);
         if (f == null) {
-            f = FightManager.canAttack(member, buffer);
+            // Cows, deer and other prey have an attitude memory and a combat state, so canAttack says yes, yet they
+            // never attack (test verify); a royale of them never reached passiveWin (test 2026-10-14).
+            com.hypixel.hytale.server.npc.entities.NPCEntity npc = buffer.getComponent(member,
+                    com.hypixel.hytale.server.npc.entities.NPCEntity.getComponentType());
+            f = (npc == null || !PickLists.observedNoAttack(npc.getRoleName())) && FightManager.canAttack(member, buffer);
             battle.canFight.put(member, f);
         }
         return f;
@@ -894,8 +1019,15 @@ public final class BattleManager {
     private static Integer passiveEnd(Battle battle, Set<Integer> aliveTeams, ComponentAccessor<EntityStore> buffer) {
         int seconds = FxSettings.passiveWinSeconds;
         Set<Integer> fighting = new HashSet<>();
+        // Sides with a fighter that can reach some enemy where it is now (Medium: a fish and a wolf on land can't).
+        Set<Integer> reaching = new HashSet<>();
         boolean dummy = false;
         if (seconds > 0 && aliveTeams.size() >= 2) {
+            // One pass: the living fighters, and the sides standing in each medium (Where) - so each fighter's "can it
+            // reach a fighting enemy" is a few lookups, not a scan of every member (audit 2026-10-14: 500 fish vs 500
+            // walkers was ~250000 checks a second).
+            List<Ref<EntityStore>> fighters = new ArrayList<>();
+            Map<Medium.Where, Set<Integer>> sidesAt = new java.util.EnumMap<>(Medium.Where.class);
             for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
                 if (!isAlive(e.getKey(), buffer)) continue;
                 // passiveWinIgnore (a training dummy): while one is alive the battle never ends this way.
@@ -903,27 +1035,54 @@ public final class BattleManager {
                     dummy = true;
                     break;
                 }
-                if (!fighting.contains(e.getValue()) && fights(battle, e.getKey(), buffer)) fighting.add(e.getValue());
+                if (!fights(battle, e.getKey(), buffer)) continue;
+                fighting.add(e.getValue());
+                fighters.add(e.getKey());
+                sidesAt.computeIfAbsent(Medium.where(e.getKey(), buffer), k -> new HashSet<>()).add(e.getValue());
+            }
+            if (!dummy && fighting.size() > 1) {
+                for (Ref<EntityStore> f : fighters) {
+                    int team = battle.team(f);
+                    if (reaching.contains(team)) continue;
+                    Medium.Can can = Medium.of(f, buffer);
+                    for (Map.Entry<Medium.Where, Set<Integer>> at : sidesAt.entrySet()) {
+                        Set<Integer> there = at.getValue();
+                        if ((there.size() > 1 || !there.contains(team)) && Medium.reaches(can, at.getKey())) {
+                            reaching.add(team);
+                            break;
+                        }
+                    }
+                    if (reaching.size() > 1) break; // the battle goes on, nothing more to know
+                }
             }
         }
-        if (seconds <= 0 || aliveTeams.size() < 2 || fighting.size() > 1 || dummy) {
+        // Two or more sides that fight and reach each other: the battle goes on.
+        if (seconds <= 0 || aliveTeams.size() < 2 || fighting.size() > 1 && reaching.size() > 1 || dummy) {
             stopPassiveAlert(battle);
             return null;
         }
         long now = System.currentTimeMillis();
         if (battle.passiveSince == 0) battle.passiveSince = now;
         long left = seconds * 1000L - (now - battle.passiveSince);
-        int side = fighting.isEmpty() ? -1 : fighting.iterator().next();
+        // Nobody reaches anybody but several sides could fight: the side with the most health left wins (2026-10-14).
+        // One side that fights (the rest passive): it wins, as before. Several that fight but only one reaches a
+        // fighting enemy: that one. None reaches: the side with the most health left among those that fight.
+        boolean unreach = fighting.size() > 1 && reaching.isEmpty();
+        int side = fighting.size() <= 1 ? (fighting.isEmpty() ? -1 : fighting.iterator().next())
+                : unreach ? healthiestSide(battle, fighting, buffer) : reaching.iterator().next();
         if (left <= 0) {
             stopPassiveAlert(battle);
             battle.passiveEnded = true;
+            battle.unreachEnded = unreach;
             return side;
         }
         if (!battle.silent && battle.store != null) {
-            String who = side < 0 ? null : sideName(battle, side, buffer);
-            String title = side < 0 ? "Nobody left can fight" : "Only passive mobs left";
-            String text = side < 0 ? "Draw unless someone lands a hit."
-                    : who + " wins unless the rest get hit.";
+            Message who = side < 0 ? null : sideName(battle, side, buffer);
+            // Several sides fight but only one reaches the others (a bat over zombies): not "only passive mobs".
+            Message title = I18n.tr(unreach ? "battle.passive.title.unreach" : fighting.size() > 1 ? "battle.passive.title.oneway"
+                    : side < 0 ? "battle.passive.title.nobody" : "battle.passive.title.only");
+            Message text = side < 0 ? I18n.tr("battle.passive.text.draw")
+                    : I18n.tr("battle.passive.text.wins").param("who", who);
             int secs = (int) Math.ceil(left / 1000.0);
             for (PlayerRef viewer : FightFx.titleViewers(battle)) {
                 if (!viewer.isValid()) continue;
@@ -932,6 +1091,44 @@ public final class BattleManager {
             }
         }
         return null;
+    }
+
+    /** The living side with the highest average health (percent of each member's max, the fallen at 0); -1 if none. */
+    private static int healthiestSide(Battle battle, Set<Integer> aliveTeams, ComponentAccessor<EntityStore> buffer) {
+        Map<Integer, double[]> sides = new java.util.HashMap<>();
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            if (!aliveTeams.contains(e.getValue())) continue;
+            double[] v = sides.computeIfAbsent(e.getValue(), k -> new double[2]);
+            v[0] += healthFraction(e.getKey(), buffer);
+            v[1]++;
+        }
+        int best = -1;
+        double bestScore = -1;
+        for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
+            double score = e.getValue()[1] > 0 ? e.getValue()[0] / e.getValue()[1] : 0;
+            if (score > bestScore) {
+                bestScore = score;
+                best = e.getKey();
+            }
+        }
+        return best;
+    }
+
+    /**
+     * /mobbattle idleEnd (checkWinner, once a second): no enemy hit for idleEnd seconds since the start or the last
+     * hit = a draw (2026-10-13: a royale of defensive animals that never start a fight stood still for its whole
+     * timer). passiveWin, when it applies, is shorter and says who wins; this one catches mobs that could fight but
+     * don't. A passiveWinIgnore dummy alive keeps the battle going, as for passiveWin.
+     */
+    private static boolean idleEnd(Battle battle, ComponentAccessor<EntityStore> buffer) {
+        int seconds = FxSettings.idleEndSeconds;
+        if (seconds <= 0 || System.currentTimeMillis() - battle.lastHit < seconds * 1000L) return false;
+        for (Ref<EntityStore> member : battle.teamOf.keySet()) {
+            if (isAlive(member, buffer) && ignored(battle, member, buffer)) return false;
+        }
+        battle.idleEnded = true;
+        MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": no enemy hit for " + seconds + " s, draw (idleEnd)");
+        return true;
     }
 
     /** passiveWinIgnore: a member whose role is on the list (asked through the role name, NPCs only). */
@@ -943,14 +1140,14 @@ public final class BattleManager {
     }
 
     /** Name of a side for the passiveWin alert: the mob in a royale, "<name> team", the lone target or "The attackers". */
-    private static String sideName(Battle battle, int side, ComponentAccessor<EntityStore> buffer) {
-        if (battle.focusName != null) return side == 1 ? battle.focusName : "The attackers";
+    private static Message sideName(Battle battle, int side, ComponentAccessor<EntityStore> buffer) {
+        if (battle.focusName != null) return side == 1 ? Message.raw(battle.focusName) : I18n.tr("battle.side.attackers");
         if (battle.royale) {
             for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
-                if (e.getValue() == side && isAlive(e.getKey(), buffer)) return ChaosWand.nameOf(e.getKey(), buffer);
+                if (e.getValue() == side && isAlive(e.getKey(), buffer)) return Message.raw(ChaosWand.nameOf(e.getKey(), buffer));
             }
         }
-        return battle.name(side) + " team";
+        return I18n.tr("battle.side.team").param("name", battle.name(side));
     }
 
     private static void stopPassiveAlert(Battle battle) {
@@ -963,14 +1160,14 @@ public final class BattleManager {
                                               ComponentAccessor<EntityStore> buffer) {
         Vector3d me = ChaosWand.positionOf(self, buffer);
         int myTeam = battle.team(self);
-        boolean flies = Unstick.canFly(self, buffer);
+        Medium.Can can = Medium.of(self, buffer);
         Ref<EntityStore> best = null;
         int bestTier = Integer.MAX_VALUE;
         double bestDist = Double.MAX_VALUE;
         for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
             Ref<EntityStore> other = e.getKey();
             if (other == self || other == skip || e.getValue() == myTeam || !isAlive(other, buffer)) continue;
-            int tier = reach(battle, flies, other, buffer);
+            int tier = reach(battle, can, other, buffer);
             if (tier > bestTier) continue;
             double d = me == null ? Double.MAX_VALUE - 1 : ChaosWand.distSq(me, other, buffer);
             if (tier < bestTier || d < bestDist) {
@@ -979,6 +1176,54 @@ public final class BattleManager {
                 best = other;
             }
         }
+        return best;
+    }
+
+    /** A target farther than this may be swapped for a fighter right beside the mob ({@link #nearerEnemy}). */
+    private static final double SWITCH_FROM = 8;
+    /** "Right beside": an enemy fighter this close. */
+    private static final double BESIDE = 4;
+    /** nearerEnemy runs for each mob once every this many seconds. */
+    private static final long NEAR_EVERY = 3;
+
+    /**
+     * An enemy fighter within {@link #BESIDE} while {@code self} still walks to a target farther than
+     * {@link #SWITCH_FROM}; null if none, or if {@code self} hit its target in the last SELF_DEFENSE_MS. In a royale of
+     * 500 Kweebecs mobs walked past enemies right beside them to the one picked at the start (user, 2026-10-13).
+     * Duels and all-vs-one attackers have no other enemy. One cheap distance pass per mob and second, only when far.
+     */
+    private static Ref<EntityStore> nearerEnemy(Battle battle, Ref<EntityStore> self, Ref<EntityStore> target, long now,
+                                                ComponentAccessor<EntityStore> buffer) {
+        // Only royale and teams have other enemies to pick; an all-vs-one of 1000 would scan 1000 x 1000 a second.
+        if (!battle.royale && !battle.isTeams()) return null;
+        // Each mob looks every NEAR_EVERY seconds, staggered by its index: a 1000-mob royale is ~330 scans a second.
+        if (Math.floorMod(self.getIndex() + now / 1000, NEAR_EVERY) != 0) return null;
+        Long hit = battle.hitTarget.get(self);
+        if (hit != null && now - hit < SELF_DEFENSE_MS) return null;
+        Vector3d me = ChaosWand.positionOf(self, buffer);
+        if (me == null || ChaosWand.distSq(me, target, buffer) <= SWITCH_FROM * SWITCH_FROM) return null;
+        int myTeam = battle.team(self);
+        Ref<EntityStore> best = null;
+        double bestDist = BESIDE * BESIDE;
+        // Only what stands within BESIDE (audit 2026-10-14: a scan of every fighter was ~8 million reads a second in a
+        // 5000-mob royale). The sphere list is thread-local: copied, since reach() below reads more of the world.
+        List<Ref<EntityStore>> near = new ArrayList<>(com.hypixel.hytale.server.core.util.TargetUtil
+                .getAllEntitiesInSphere(me, BESIDE, buffer));
+        Medium.Can can = null;
+        for (Ref<EntityStore> other : near) {
+            if (other == null || other == self || other == target || !other.isValid()) continue;
+            Integer team = battle.teamOf.get(other);
+            if (team == null || team == myTeam) continue;
+            double d = ChaosWand.distSq(me, other, buffer);
+            if (d >= bestDist || !isAlive(other, buffer)) continue;
+            if (can == null) can = Medium.of(self, buffer);
+            if (reach(battle, can, other, buffer) != FIGHTER) continue;
+            best = other;
+            bestDist = d;
+        }
+        if (best != null && MobBattlePlugin.debugging()) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8)
+                + ": " + ChaosWand.nameOf(self, buffer) + " leaves " + ChaosWand.nameOf(target, buffer) + " (far) for "
+                + ChaosWand.nameOf(best, buffer) + " beside it");
         return best;
     }
 
@@ -991,10 +1236,20 @@ public final class BattleManager {
             Long from = battle.chaseFrom.putIfAbsent(self, now);
             boolean giveUp = from != null && now - from >= CHASE_GIVE_UP_MS;
             // Out of reach now (flown off, past the wall): any enemy it can reach goes first, without waiting.
-            boolean outOfReach = !giveUp && reach(battle, Unstick.canFly(self, buffer), target, buffer) == OUT_OF_REACH;
-            if (!giveUp && !outOfReach) return target;
+            boolean outOfReach = !giveUp && reach(battle, Medium.of(self, buffer), target, buffer) == OUT_OF_REACH;
+            if (!giveUp && !outOfReach) {
+                Ref<EntityStore> beside = nearerEnemy(battle, self, target, now, buffer);
+                if (beside == null) return target;
+                battle.targets.put(self, beside);
+                battle.chaseFrom.put(self, now);
+                battle.turnedAt.put(self, now); // a stray hit from farther away can't pull it off at once
+                changed[0] = true;
+                return beside;
+            }
             Ref<EntityStore> other = bestEnemy(battle, self, target, buffer);
-            if (outOfReach && other != null && reach(battle, Unstick.canFly(self, buffer), other, buffer) == OUT_OF_REACH) {
+            // Never swap for one it can't reach: after the chase limit a wolf left a wolf for a piranha out at sea,
+            // dropped it a second later as out of reach, and so on (test 2026-10-14).
+            if (other != null && reach(battle, Medium.of(self, buffer), other, buffer) == OUT_OF_REACH) {
                 other = null;
             }
             if (giveUp) battle.chaseFrom.put(self, now);
@@ -1050,12 +1305,13 @@ public final class BattleManager {
         // trorks switched every couple of seconds and hit nobody (user, 2026-10-12).
         Long hit = battle.hitTarget.get(self);
         if (hit != null && t - hit < SELF_DEFENSE_MS && now != null && battle.has(now) && isAlive(now, buffer)) return false;
-        if (now != null && Unstick.flyingNow(by, buffer) && !Unstick.canFly(self, buffer)) {
+        // An attacker it can't get at (a flier, a fish under water) is answered only when it comes close.
+        if (now != null && !canReach(self, by, buffer)) {
             Vector3d me = ChaosWand.positionOf(self, buffer);
             double d = me == null ? Double.MAX_VALUE : Math.sqrt(ChaosWand.distSq(me, by, buffer));
             if (d > SELF_DEFENSE_FLIER_REACH) {
                 if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
-                        + ChaosWand.nameOf(self, buffer) + " ignores a hit from " + ChaosWand.nameOf(by, buffer) + " (flying, "
+                        + ChaosWand.nameOf(self, buffer) + " ignores a hit from " + ChaosWand.nameOf(by, buffer) + " (" + Medium.where(by, buffer).name().toLowerCase(java.util.Locale.ROOT) + ", "
                         + String.format(java.util.Locale.ROOT, "%.1f", d) + " blocks away, out of reach)");
                 return false;
             }
@@ -1083,7 +1339,7 @@ public final class BattleManager {
             finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.UNLOAD, -1);
             MobBattlePlugin.log("Battle cancelled: fighters were unloaded");
             if (!battle.silent && battle.owner != null && battle.owner.isValid()) {
-                battle.owner.sendMessage(Message.raw("Battle cancelled: some fighters were unloaded (too far from every player). No winner.").color("#aaaaaa"));
+                battle.owner.sendMessage(I18n.tr("battle.cancelled.unloaded").color("#aaaaaa"));
             }
             return;
         }
@@ -1102,6 +1358,7 @@ public final class BattleManager {
         BattleOutcome outcome = BattleOutcome.resolve(aliveTeams.size(), expired);
         if (outcome == BattleOutcome.ONGOING) {
             Integer forced = passiveEnd(battle, aliveTeams, buffer);
+            if (forced == null && idleEnd(battle, buffer)) forced = -1;
             if (forced == null) return;
             if (forced < 0) {
                 outcome = BattleOutcome.EMPTY;
@@ -1136,7 +1393,7 @@ public final class BattleManager {
             battle.eventWinners = winnerUuids(battle, battle.eventWinnerSide, buffer);
         }
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " over: " + outcome + ", sides alive " + aliveTeams
-                + ", fighters alive " + alive + ", damage by side " + battle.damageBy + (expired ? " (15 min limit)" : ""));
+                + ", fighters alive " + alive + ", damage by side " + battle.damageBy + (expired ? " (battleMaxTime)" : ""));
         Set<Ref<EntityStore>> keepLook = new HashSet<>();
         if (outcome == BattleOutcome.WIN && battle.isTeams()) {
             int side = aliveTeams.iterator().next();
@@ -1158,29 +1415,41 @@ public final class BattleManager {
             return;
         }
 
-        String main;
-        String sub;
+        Txt main;
+        Txt sub;
         String color;
         if (outcome == BattleOutcome.EMPTY || outcome == BattleOutcome.TIMEOUT) {
-            main = "DRAW!";
-            sub = outcome == BattleOutcome.TIMEOUT ? "Time is up"
-                    : battle.passiveEnded ? "Nobody left can fight" : "Nobody is left standing";
+            main = Txt.tr("battle.draw", "DRAW!");
+            if (outcome == BattleOutcome.TIMEOUT) sub = Txt.tr("battle.sub.timeup", "Time is up");
+            else if (battle.idleEnded) {
+                String time = MobBattleCommand.formatDuration(FxSettings.idleEndSeconds);
+                sub = new Txt("Nobody fought for " + time, I18n.tr("battle.sub.nobody.fought").param("time", time));
+            } else if (battle.passiveEnded) sub = Txt.tr("battle.sub.nobody.can", "Nobody left can fight");
+            else sub = Txt.tr("battle.sub.nobody.standing", "Nobody is left standing");
             color = "#aaaaaa";
         } else if (battle.focusName != null) {
             boolean targetWon = aliveTeams.contains(1);
-            main = targetWon ? battle.focusName + " WINS!" : battle.focusName + " IS DEFEATED!";
-            sub = battle.passiveEnded ? (targetWon ? "The attackers can't fight" : "Couldn't fight back")
-                    : targetWon ? "Survived everyone" : alive + " attackers left standing";
+            main = targetWon ? winTxt(battle.focusName)
+                    : new Txt(battle.focusName + " IS DEFEATED!", I18n.tr("battle.defeated").param("name", battle.focusName));
+            if (battle.passiveEnded) {
+                sub = targetWon ? Txt.tr("battle.sub.attackers.cant", "The attackers can't fight")
+                        : Txt.tr("battle.sub.cant.back", "Couldn't fight back");
+            } else if (targetWon) sub = Txt.tr("battle.sub.survived", "Survived everyone");
+            else sub = new Txt(alive + " attackers left standing",
+                    I18n.tr("battle.sub.attackers.left").param("count", alive));
             color = targetWon ? "#ffd23e" : "#ff6b5e";
         } else if (battle.royale) {
-            main = ChaosWand.nameOf(lastAlive, buffer) + " WINS!";
-            sub = battle.passiveEnded ? "The rest can't fight back"
-                    : battle.teamOf.size() == 2 ? "Duel won" : "Last one standing";
+            main = winTxt(ChaosWand.nameOf(lastAlive, buffer));
+            sub = battle.unreachEnded ? Txt.tr("battle.sub.unreach", "Nobody could reach the others: most health left")
+                    : battle.passiveEnded ? Txt.tr("battle.sub.rest.cant", "The rest can't fight back")
+                    : battle.teamOf.size() == 2 ? Txt.tr("battle.sub.duel.won", "Duel won")
+                    : Txt.tr("battle.sub.last.standing", "Last one standing");
             color = "#ffd23e";
         } else {
             int team = aliveTeams.iterator().next();
-            main = battle.name(team) + " TEAM WINS!";
-            sub = battle.passiveEnded ? "The rest can't fight back" : alive + " left standing";
+            main = teamWinTxt(battle.name(team));
+            sub = battle.passiveEnded ? Txt.tr("battle.sub.rest.cant", "The rest can't fight back")
+                    : new Txt(alive + " left standing", I18n.tr("battle.sub.left.standing").param("count", alive));
             color = battle.color(team);
         }
         // endCamera winner / lasthit: film that fighter, and say its kill count.
@@ -1191,15 +1460,18 @@ public final class BattleManager {
             if (focus != null) {
                 Kills k = battle.kills.get(focus);
                 int n = k != null ? k.count() : 0;
-                sub += " | " + ("lasthit".equals(endMode) ? "Final blow: " : "") + ChaosWand.nameOf(focus, buffer).replace('_', ' ')
-                        + ", " + n + (n == 1 ? " kill" : " kills");
+                String who = ChaosWand.nameOf(focus, buffer).replace('_', ' ');
+                boolean lasthit = "lasthit".equals(endMode);
+                sub = new Txt(sub.en() + " | " + (lasthit ? "Final blow: " : "") + who + ", " + n + (n == 1 ? " kill" : " kills"),
+                        Message.join(sub.msg(), Message.raw(" | "),
+                                I18n.tr(lasthit ? "battle.sub.lasthit" : "battle.sub.kills").param("name", who).param("n", n)));
             }
         }
-        MobBattlePlugin.log("Battle over: " + main + " (" + sub + ")");
+        MobBattlePlugin.log("Battle over: " + main.en() + " (" + sub.en() + ")");
         for (PlayerRef viewer : messageViewers(battle)) {
-            if (viewer.isValid()) viewer.sendMessage(Message.raw(main + " " + sub).color(color));
+            if (viewer.isValid()) viewer.sendMessage(Message.join(main.msg(), Message.raw(" "), sub.msg()).color(color));
         }
-        FightFx.winnerTitle(battle, main, sub);
+        FightFx.winnerTitle(battle, main.msg(), sub.msg());
         if (focus != null) FightCamera.ending(battle, focus, buffer);
     }
 
@@ -1215,18 +1487,18 @@ public final class BattleManager {
         if (aliveTeams.size() != 1) return null;
         if (battle.royale) return lastAlive;
         int team = aliveTeams.iterator().next();
-        Ref<EntityStore> best = null;
-        int bestKills = -1;
+        // The first of the kill table among that side's standing fighters; nobody scored = any standing one.
+        Ref<EntityStore> any = null;
         for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
-            if (e.getValue() != team || !isAlive(e.getKey(), buffer)) continue;
-            Kills k = battle.kills.get(e.getKey());
-            int n = k != null ? k.count() : 0;
-            if (n > bestKills) {
-                best = e.getKey();
-                bestKills = n;
+            if (e.getValue() == team && isAlive(e.getKey(), buffer)) {
+                any = e.getKey();
+                break;
             }
         }
-        return best;
+        return battle.kills.entrySet().stream().sorted(battle.ranking())
+                .map(Map.Entry::getKey)
+                .filter(r -> battle.team(r) == team && isAlive(r, buffer))
+                .findFirst().orElse(any);
     }
 
     /** The arena timer reached 0 (Arena.tick): draw, kill everyone, keep fighting, or the healthiest side wins. */
@@ -1235,18 +1507,18 @@ public final class BattleManager {
         switch (rule) {
             case CONTINUE -> {
                 battle.silent = true;
-                announce(battle, "TIME'S UP!", "The fight goes on", "#aaaaaa");
+                announce(battle, Txt.tr("battle.timesup", "TIME'S UP!"), Txt.tr("battle.sub.goes.on", "The fight goes on"), "#aaaaaa");
             }
             case KILL -> {
                 battle.silent = true;
                 battle.killAll = true;
                 battle.eventEndReason = MobBattleApi.EndReason.TIMEOUT;
                 battle.eventWinnerSide = -1;
-                announce(battle, "TIME'S UP!", "Nobody survives", "#ff6b5e");
+                announce(battle, Txt.tr("battle.timesup", "TIME'S UP!"), Txt.tr("battle.sub.nobody.survives", "Nobody survives"), "#ff6b5e");
             }
             case DRAW -> {
                 finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.TIMEOUT, -1);
-                announce(battle, "DRAW!", "Time is up", "#aaaaaa");
+                announce(battle, Txt.tr("battle.draw", "DRAW!"), Txt.tr("battle.sub.timeup", "Time is up"), "#aaaaaa");
             }
             case HEALTH -> healthWinner(battle, false, buffer);
             case JUDGE -> healthWinner(battle, true, buffer);
@@ -1320,7 +1592,7 @@ public final class BattleManager {
             MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + " time up (" + (judge ? "judge" : "health")
                     + ", judgeBy " + by + "):" + sb);
         }
-        String tie = null;
+        Txt tie = null;
         if (best >= 0 && bestScore > 0 && bestScore - second < TIE) {
             // Even on health: /mobbattle tieBreak damage (who dealt more), random, or draw.
             java.util.List<Integer> tied = new java.util.ArrayList<>();
@@ -1330,13 +1602,15 @@ public final class BattleManager {
             best = breakTie(battle, tied);
             String rule = FxSettings.tieBreak(battle.kind);
             MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": tie between sides " + tied + ", tieBreak "
-                    + rule + (rule.equals(FxSettings.tieBreak) ? "" : " (" + FxSettings.tieBreak + " = judgeBy)") + " -> " + (best < 0 ? "draw" : "side " + best));
-            tie = best < 0 ? null : "damage".equals(rule) ? "more damage dealt"
-                    : "kills".equals(rule) ? "more kills" : "a coin toss";
+                    + rule + (rule.equals(KindFx.get(battle.kind, KindFx.Opt.TIE_BREAK)) ? "" : " (" + KindFx.get(battle.kind, KindFx.Opt.TIE_BREAK) + " = judgeBy)") + " -> " + (best < 0 ? "draw" : "side " + best));
+            tie = best < 0 ? null : "damage".equals(rule) ? Txt.tr("battle.tie.damage", "more damage dealt")
+                    : "kills".equals(rule) ? Txt.tr("battle.tie.kills", "more kills") : Txt.tr("battle.tie.coin", "a coin toss");
         }
         if (best < 0 || bestScore <= 0) {
             finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.TIMEOUT, -1);
-            announce(battle, "DRAW!", "Time is up, even on " + judgeWord(by), "#aaaaaa");
+            announce(battle, Txt.tr("battle.draw", "DRAW!"),
+                    new Txt("Time is up, even on " + judgeWord(by),
+                            I18n.tr("battle.sub.time.even").param("what", judgeMessage(by))), "#aaaaaa");
             return;
         }
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": side " + best + " wins"
@@ -1360,24 +1634,61 @@ public final class BattleManager {
             battle.eventWinners = winnerUuids(battle, best, buffer);
             finish(battle, battle.snapshot(), Set.of(), MobBattleApi.EndReason.TIMEOUT, best);
         }
-        String winner;
+        Txt winMain;
         String color = "#ffd23e";
         if (battle.focusName != null) {
-            winner = best == 1 ? battle.focusName : "THE ATTACKERS";
+            winMain = best == 1 ? winTxt(battle.focusName) : Txt.tr("battle.win.attackers", "THE ATTACKERS WIN!");
         } else if (battle.royale) {
-            winner = ChaosWand.nameOf(anyMember.get(best), buffer);
+            winMain = winTxt(ChaosWand.nameOf(anyMember.get(best), buffer));
         } else {
-            winner = battle.name(best) + " TEAM";
+            winMain = teamWinTxt(battle.name(best));
             color = battle.color(best);
         }
-        String why = tie != null ? "even on " + judgeWord(by) + " (" + Math.round(bestScore * 100) + "%), won by " + tie
-                : Math.round(bestScore * 100) + "% " + switch (by) {
-                    case "damage" -> "of the damage";
-                    case "kills" -> "of the kills";
-                    case "mix" -> "score";
-                    default -> "health left";
-                } + " vs " + Math.round(Math.max(0, second) * 100) + "%";
-        announce(battle, winner + " WINS!", (judge ? "Time is up: the losers fall. " : "Time is up: ") + why, color);
+        long pct = Math.round(bestScore * 100);
+        long otherPct = Math.round(Math.max(0, second) * 100);
+        Txt why;
+        if (tie != null) {
+            why = new Txt("even on " + judgeWord(by) + " (" + pct + "%), won by " + tie.en(),
+                    I18n.tr("battle.why.tie").param("what", judgeMessage(by)).param("pct", pct).param("by", tie.msg()));
+        } else {
+            String en = pct + "% " + switch (by) {
+                case "damage" -> "of the damage";
+                case "kills" -> "of the kills";
+                case "mix" -> "score";
+                default -> "health left";
+            } + " vs " + otherPct + "%";
+            why = new Txt(en, I18n.tr("battle.why." + switch (by) {
+                case "damage", "kills", "mix" -> by;
+                default -> "health";
+            }).param("pct", pct).param("other", otherPct));
+        }
+        announce(battle, winMain, new Txt((judge ? "Time is up: the losers fall. " : "Time is up: ") + why.en(),
+                I18n.tr(judge ? "battle.timeup.judge" : "battle.timeup.why").param("why", why.msg())), color);
+    }
+
+    /** A line of battle text: English for the server log, the translated Message for the players. */
+    record Txt(String en, Message msg) {
+        static Txt tr(String key, String en) {
+            return new Txt(en, I18n.tr(key));
+        }
+    }
+
+    /** "NAME WINS!" with a name that can be anything (mob, lone target). */
+    private static Txt winTxt(String name) {
+        name = String.valueOf(name);
+        return new Txt(name + " WINS!", I18n.tr("battle.win").param("name", name));
+    }
+
+    private static Txt teamWinTxt(String name) {
+        return new Txt(name + " TEAM WINS!", I18n.tr("battle.win.team").param("name", name));
+    }
+
+    private static Message judgeMessage(String by) {
+        return I18n.tr("battle.judge." + switch (by) {
+            case "damage", "kills" -> by;
+            case "mix" -> "score";
+            default -> "health";
+        });
     }
 
     private static String judgeWord(String by) {
@@ -1469,6 +1780,7 @@ public final class BattleManager {
         int team = b.team(attacker);
         if (team != b.team(victim)) {
             b.damageBy.merge(team, (double) amount, Double::sum);
+            b.damageOf.merge(attacker, (double) amount, Double::sum);
             // selfDefense: a mob hit by an enemy that isn't its target turns on it (FightTickSystem, next tick).
             if (b.targets.get(victim) != attacker && FxSettings.selfDefense(b.kind) && !isPlayerFighter(victim)) {
                 b.hitBy.put(victim, attacker);
@@ -1479,6 +1791,7 @@ public final class BattleManager {
             if (b.targets.get(attacker) == victim) b.hitTarget.put(attacker, System.currentTimeMillis());
             // passiveWin: a hit on the mobs that can't fight back starts its time again.
             if (b.passiveSince != 0) b.passiveSince = System.currentTimeMillis();
+            b.lastHit = System.currentTimeMillis();
         }
     }
 
@@ -1491,12 +1804,12 @@ public final class BattleManager {
         return Math.max(0, Math.min(1, health.get() / health.getMax()));
     }
 
-    private static void announce(Battle battle, String main, String sub, String color) {
-        MobBattlePlugin.log("Battle: " + main + " (" + sub + ")");
+    private static void announce(Battle battle, Txt main, Txt sub, String color) {
+        MobBattlePlugin.log("Battle: " + main.en() + " (" + sub.en() + ")");
         for (PlayerRef viewer : messageViewers(battle)) {
-            if (viewer.isValid()) viewer.sendMessage(Message.raw(main + " " + sub).color(color));
+            if (viewer.isValid()) viewer.sendMessage(Message.join(main.msg(), Message.raw(" "), sub.msg()).color(color));
         }
-        FightFx.winnerTitle(battle, main, sub);
+        FightFx.winnerTitle(battle, main.msg(), sub.msg());
     }
 
     /** Chat results stay owner-only for wand battles; ownerless events report to their configured spectators. */

@@ -18,6 +18,10 @@ Group {
     $C.@DropdownBox #Input {
       Anchor: (Width: 300, Top: 4, Height: 32);
       ShowSearchInput: true;
+      Style: DropdownBoxStyle(
+        ...$C.@DefaultDropdownBoxStyle,
+        PanelWidth: 460
+      );
     }
 
     Label #Hint {

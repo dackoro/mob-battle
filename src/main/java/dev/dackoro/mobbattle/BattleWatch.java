@@ -98,15 +98,15 @@ final class BattleWatch extends CustomUIHud {
     /** /mobbattle watch (world thread): the player's own battle in this world, else the nearest one. */
     static void start(PlayerRef player, Ref<EntityStore> me, Store<EntityStore> store) {
         if (WATCHING.containsKey(player.getUuid())) {
-            player.sendMessage(Message.raw("You are already watching. Q or /mobbattle watch exit to leave.").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.already").color(WARN));
             return;
         }
         if (BattleManager.isPlayerFighter(me)) {
-            player.sendMessage(Message.raw("You are fighting in a battle: you can't watch it.").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.fighting").color(WARN));
             return;
         }
         if (Spectating.isSpectating(me, store)) {
-            player.sendMessage(Message.raw("You are already spectating (/spectate exit first).").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.spectating").color(WARN));
             return;
         }
         TransformComponent t = store.getComponent(me, TransformComponent.getComponentType());
@@ -127,7 +127,7 @@ final class BattleWatch extends CustomUIHud {
             }
         }
         if (battle == null) {
-            player.sendMessage(Message.raw("No battle to watch in this world.").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.none").color(WARN));
             return;
         }
         watch(player, me, store, battle, at, t);
@@ -158,7 +158,7 @@ final class BattleWatch extends CustomUIHud {
                               Vector3d at, TransformComponent t) {
         Ref<EntityStore> target = firstTarget(battle, at, store);
         if (target == null) {
-            player.sendMessage(Message.raw("No battle to watch in this world.").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.none").color(WARN));
             return;
         }
         HeadRotation head = store.getComponent(me, HeadRotation.getComponentType());
@@ -166,10 +166,10 @@ final class BattleWatch extends CustomUIHud {
         // An intro still playing (cameraTime longer than the countdown) or an orbit gives way to the watch camera.
         FightCamera.cancel(player);
         if (!GameModeTypes.enter(me, store, GAME_MODE)) {
-            player.sendMessage(Message.raw("Can't start watching right now.").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.cant.start").color(WARN));
             return;
         }
-        store.putComponent(me, Spectating.getComponentType(), new Spectating(target));
+        switchTo(me, target, store);
         WATCHING.put(player.getUuid(), new Watch(battle, store, at, look));
         // Cutting that camera gives the player their normal camera back a moment later (and an orbit glides back
         // first), after the spectator camera was attached: the client was left flying free while the server still
@@ -180,8 +180,7 @@ final class BattleWatch extends CustomUIHud {
         reattachLater(player, store, REATTACH_LATE_MS);
         reattachLater(player, store, REATTACH_LAST_MS);
         MobBattlePlugin.debug("watch: " + player.getUsername() + " watches battle #" + battle.id.toString().substring(0, 8));
-        player.sendMessage(Message.raw("Watching the battle: right click = nearest fighter, left click = back to the previous one, "
-                + "mouse = turn the camera, Q = exit (or /mobbattle watch exit).").color("#ffd23e"));
+        player.sendMessage(I18n.tr("battle.watch.help").color("#ffd23e"));
     }
 
     /**
@@ -192,7 +191,7 @@ final class BattleWatch extends CustomUIHud {
     static void cycle(PlayerRef player, Ref<EntityStore> me, ComponentAccessor<EntityStore> acc, int dir) {
         Watch w = WATCHING.get(player.getUuid());
         if (w == null) {
-            player.sendMessage(Message.raw("Not watching a battle. Q leaves the spectator mode.").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.not").color(WARN));
             return;
         }
         Spectating sp = acc.getComponent(me, Spectating.getComponentType());
@@ -206,7 +205,7 @@ final class BattleWatch extends CustomUIHud {
                 }
             }
             if (next == null) {
-                player.sendMessage(Message.raw("No earlier fighter to go back to: right click for the nearest one.").color("#aaaaaa"));
+                player.sendMessage(I18n.tr("battle.watch.noearlier").color("#aaaaaa"));
                 return;
             }
         } else {
@@ -231,7 +230,7 @@ final class BattleWatch extends CustomUIHud {
         }
         if (current != null) w.seen.add(current);
         w.seen.add(next);
-        acc.putComponent(me, Spectating.getComponentType(), new Spectating(next));
+        switchTo(me, next, acc);
     }
 
     /** After a cut camera's glide back (FightCamera.cut: 0.3 s sequence, then the camera reset). */
@@ -261,29 +260,65 @@ final class BattleWatch extends CustomUIHud {
         }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
-    private static java.lang.reflect.Method applyFollowCamera;
-    private static boolean applyFollowCameraMissing;
+    /**
+     * Watches {@code target}: the vanilla Spectating component (its OnSpectatingChange sends a follow camera 4 blocks
+     * back, whatever the target's size), then our sized follow camera a tick later, which replaces it.
+     */
+    private static void switchTo(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        acc.putComponent(me, Spectating.getComponentType(), new Spectating(target));
+        var store = me.getStore();
+        store.getExternalData().getWorld().execute(() -> {
+            if (store.isShutdown() || !me.isValid() || !target.isValid()) return;
+            Spectating sp = store.getComponent(me, Spectating.getComponentType());
+            if (sp != null && sp.getTargetRef() == target) followCamera(me, target, store);
+        });
+    }
 
-    /** Vanilla SpectatorSystems.OnSpectatingChange.applyFollowCamera(me, target, accessor) (world thread). */
-    private static void followCamera(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
-        if (applyFollowCamera == null && !applyFollowCameraMissing) {
-            try {
-                java.lang.reflect.Method m = Class.forName(
-                        "com.hypixel.hytale.server.core.modules.entity.spectator.SpectatorSystems$OnSpectatingChange")
-                        .getDeclaredMethod("applyFollowCamera", Ref.class, Ref.class, ComponentAccessor.class);
-                m.setAccessible(true);
-                applyFollowCamera = m;
-            } catch (ReflectiveOperationException | RuntimeException e) {
-                applyFollowCameraMissing = true;
-                MobBattlePlugin.log("Watch: can't re-attach the spectator camera (" + e + ")");
-            }
+    /**
+     * The follow camera on {@code target}, as vanilla SpectatorSystems.OnSpectatingChange.applyFollowCamera (javap,
+     * 0.7.0: attached third person at the eyes, raycast distance, the watcher's own rotation, raised to 1 block for
+     * tiny eyes) but sized: vanilla keeps 4 blocks for anything, so a giant boss filled the screen with the camera
+     * inside it (user, 2026-10-13). Distance = its half width + 1.1 x its hitbox height (a size buff grows the
+     * hitbox), at least 4. Also used to re-attach after an intro reset. World thread.
+     */
+    static void followCamera(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        PlayerRef player = acc.getComponent(me, PlayerRef.getComponentType());
+        var net = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId.getComponentType());
+        if (player == null || net == null) return;
+        var transform = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
+        if (transform != null) {
+            acc.putComponent(me, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
+                    com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createForPlayer(transform.getPosition(), transform.getRotation()));
         }
-        if (applyFollowCamera == null) return;
-        try {
-            applyFollowCamera.invoke(null, me, target, acc);
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            MobBattlePlugin.log("Watch: re-attaching the spectator camera failed: " + e);
+        var s = new com.hypixel.hytale.protocol.ServerCameraSettings();
+        s.attachedToType = com.hypixel.hytale.protocol.AttachedToType.EntityId;
+        s.attachedToEntityId = net.getId();
+        s.followAttachedEntity = true;
+        s.eyeOffset = true;
+        s.isFirstPerson = false;
+        float eye = com.hypixel.hytale.server.core.modules.entity.component.ModelComponent.getEyeHeight(target, acc);
+        if (eye < 1) s.positionOffset = new com.hypixel.hytale.protocol.Position(0, 1 - eye, 0);
+        s.positionDistanceOffsetType = com.hypixel.hytale.protocol.PositionDistanceOffsetType.DistanceOffsetRaycast;
+        s.distance = (float) followDistance(target, acc);
+        s.rotationType = com.hypixel.hytale.protocol.RotationType.Custom;
+        s.applyLookType = com.hypixel.hytale.protocol.ApplyLookType.Rotation;
+        var mine = acc.getComponent(me, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
+        if (mine != null) {
+            var r = mine.getRotation();
+            s.rotation = new com.hypixel.hytale.protocol.Direction(r.yaw(), r.pitch(), r.roll());
         }
+        player.getPacketHandler().writeNoCache(new com.hypixel.hytale.protocol.packets.camera.SetServerCamera(
+                com.hypixel.hytale.protocol.ClientCameraView.Custom, true, s));
+    }
+
+    /** Follow distance for {@code target}: 4 blocks for a normal mob, its half width + 1.1 x its height when bigger (max 60). */
+    static double followDistance(Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        var bb = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.component.BoundingBox.getComponentType());
+        if (bb == null || bb.getBoundingBox() == null) return 4;
+        var box = bb.getBoundingBox();
+        double h = box.max.y - box.min.y;
+        double w = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2;
+        return Math.min(60, Math.max(4, w + h * 1.1));
     }
 
     /** How many fighters left click can go back through. */
@@ -295,11 +330,11 @@ final class BattleWatch extends CustomUIHud {
         hide(player, acc);
         var mode = GameModeTypes.getCurrentType(me, acc);
         if (mode == null || !mode.isSpectator()) {
-            if (w == null) player.sendMessage(Message.raw("You are not watching a battle.").color(WARN));
+            if (w == null) player.sendMessage(I18n.tr("battle.watch.notwatching").color(WARN));
             return;
         }
         if (!GameModeTypes.exit(me, acc)) {
-            player.sendMessage(Message.raw("Can't stop watching right now.").color(WARN));
+            player.sendMessage(I18n.tr("battle.watch.cant.stop").color(WARN));
             return;
         }
         acc.tryRemoveComponent(me, Spectating.getComponentType());
@@ -307,7 +342,7 @@ final class BattleWatch extends CustomUIHud {
         if (w != null && w.store == me.getStore()) {
             acc.putComponent(me, Teleport.getComponentType(), Teleport.createForPlayer(w.home, w.homeLook));
         }
-        player.sendMessage(Message.raw("Stopped watching.").color("#aaaaaa"));
+        player.sendMessage(I18n.tr("battle.watch.stopped").color("#aaaaaa"));
     }
 
     /** /mobbattle stop: everyone stops watching (each on their world thread). */
@@ -351,7 +386,7 @@ final class BattleWatch extends CustomUIHud {
             if (ref == null || !ref.isValid() || ref.getStore() != victim.getStore()) continue;
             Spectating sp = acc.getComponent(ref, Spectating.getComponentType());
             if (sp != null && sp.getTargetRef() == victim) {
-                acc.putComponent(ref, Spectating.getComponentType(), new Spectating(killer));
+                switchTo(ref, killer, acc);
             }
         }
     }
@@ -400,7 +435,7 @@ final class BattleWatch extends CustomUIHud {
                     w.endsAt = now + END_MS;
                     Ref<EntityStore> winner = winner(w.battle, store);
                     if (winner != null && winner != target) {
-                        store.putComponent(me, Spectating.getComponentType(), new Spectating(winner));
+                        switchTo(me, winner, store);
                         target = winner;
                     }
                 } else if (now >= w.endsAt) {
@@ -410,7 +445,7 @@ final class BattleWatch extends CustomUIHud {
             } else if (target == null || !target.isValid() || !w.battle.has(target) || !BattleManager.isAlive(target, store)) {
                 Ref<EntityStore> next = replacement(w.battle, target, me, store);
                 if (next != null) {
-                    store.putComponent(me, Spectating.getComponentType(), new Spectating(next));
+                    switchTo(me, next, store);
                     target = next;
                 }
             }
@@ -454,16 +489,9 @@ final class BattleWatch extends CustomUIHud {
     }
 
     private static Ref<EntityStore> topKillerAlive(BattleManager.Battle b, ComponentAccessor<EntityStore> acc) {
-        Ref<EntityStore> best = null;
-        int most = 0;
-        for (Map.Entry<Ref<EntityStore>, BattleManager.Kills> k : b.kills.entrySet()) {
-            Ref<EntityStore> r = k.getKey();
-            if (k.getValue().count() > most && b.has(r) && BattleManager.isAlive(r, acc)) {
-                most = k.getValue().count();
-                best = r;
-            }
-        }
-        return best;
+        // The kill table's order (killTieBreak), first one still standing.
+        return b.kills.entrySet().stream().sorted(b.ranking()).map(Map.Entry::getKey)
+                .filter(r -> b.has(r) && BattleManager.isAlive(r, acc)).findFirst().orElse(null);
     }
 
     private static Ref<EntityStore> nearestAlive(BattleManager.Battle b, org.joml.Vector3dc at, Ref<EntityStore> skip,
@@ -525,7 +553,7 @@ final class BattleWatch extends CustomUIHud {
         UICommandBuilder ui = new UICommandBuilder();
         ui.set("#Title.TextSpans", Message.translation("server.mobbattle.timer." + b.kind.key));
         int left = aliveSorted(b, store).size();
-        line(ui, "#Left", b.over ? "Battle over" : left + (left == 1 ? " fighter left" : " fighters left"), "#c8d4e0");
+        line(ui, "#Left", b.over ? I18n.tr("hud.battleover") : I18n.tr("hud.fighters.left").param("count", left), "#c8d4e0");
         if (mob == null || !mob.isValid()) {
             line(ui, "#Name", "?", "#888888");
             for (String id : new String[] {"#Side", "#Health", "#Attack", "#Defense", "#Size", "#Kills"}) line(ui, id, "", "#888888");
@@ -539,14 +567,13 @@ final class BattleWatch extends CustomUIHud {
                 b.isTeams() ? b.color(team) : up ? "#ffd23e" : "#888888");
         line(ui, "#Side", sideText(b, team), b.isTeams() ? b.color(team) : "#96a9be");
         line(ui, "#Health", DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
-        line(ui, "#Attack", "Attack  " + DuelCard.stat(mob, Buffs.Stat.DAMAGE), DuelCard.color(mob, Buffs.Stat.DAMAGE));
-        line(ui, "#Defense", "Defense  " + DuelCard.stat(mob, Buffs.Stat.DEFENSE), DuelCard.color(mob, Buffs.Stat.DEFENSE));
+        line(ui, "#Attack", I18n.tr("hud.attack").param("v", DuelCard.stat(mob, Buffs.Stat.DAMAGE)), DuelCard.color(mob, Buffs.Stat.DAMAGE));
+        line(ui, "#Defense", I18n.tr("hud.defense").param("v", DuelCard.stat(mob, Buffs.Stat.DEFENSE)), DuelCard.color(mob, Buffs.Stat.DEFENSE));
         float scale = DuelCard.scaleOf(mob, store);
         boolean scaled = Math.abs(scale - 1f) > 0.01f;
-        line(ui, "#Size", "Size  " + (scaled ? "x" + String.format(java.util.Locale.ROOT, "%.2f", scale) : "base"),
-                scaled ? "#7dff8a" : "#c8d4e0");
+        line(ui, "#Size", I18n.tr("hud.size").param("v", DuelCard.sizeValue(scale)), scaled ? "#7dff8a" : "#c8d4e0");
         BattleManager.Kills k = b.kills.get(mob);
-        line(ui, "#Kills", "Kills  " + (k != null ? k.count() : 0), k != null ? "#ffd23e" : "#c8d4e0");
+        line(ui, "#Kills", I18n.tr("hud.kills").param("n", k != null ? k.count() : 0), k != null ? "#ffd23e" : "#c8d4e0");
         hud.update(false, ui);
     }
 
@@ -577,30 +604,33 @@ final class BattleWatch extends CustomUIHud {
             String name = mob.isValid() ? ChaosWand.nameOf(mob, store) : null;
             line(ui, "#Name" + side, DuelCard.shorten(name == null ? "?" : name.replace('_', ' ')),
                     up ? (on ? "#ffd23e" : "#e8eef5") : "#888888");
-            line(ui, "#Tag" + side, on ? "Watching" : "", "#ffd23e");
+            line(ui, "#Tag" + side, on ? I18n.tr("hud.watching.tag") : Message.empty(), "#ffd23e");
             line(ui, "#Health" + side, DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
-            line(ui, "#Attack" + side, "Attack  " + DuelCard.stat(mob, Buffs.Stat.DAMAGE), DuelCard.color(mob, Buffs.Stat.DAMAGE));
-            line(ui, "#Defense" + side, "Defense  " + DuelCard.stat(mob, Buffs.Stat.DEFENSE), DuelCard.color(mob, Buffs.Stat.DEFENSE));
+            line(ui, "#Attack" + side, I18n.tr("hud.attack").param("v", DuelCard.stat(mob, Buffs.Stat.DAMAGE)), DuelCard.color(mob, Buffs.Stat.DAMAGE));
+            line(ui, "#Defense" + side, I18n.tr("hud.defense").param("v", DuelCard.stat(mob, Buffs.Stat.DEFENSE)), DuelCard.color(mob, Buffs.Stat.DEFENSE));
             float scale = DuelCard.scaleOf(mob, store);
             boolean scaled = Math.abs(scale - 1f) > 0.01f;
-            line(ui, "#Size" + side, "Size  " + (scaled ? "x" + String.format(java.util.Locale.ROOT, "%.2f", scale) : "base"),
-                    scaled ? "#7dff8a" : "#c8d4e0");
+            line(ui, "#Size" + side, I18n.tr("hud.size").param("v", DuelCard.sizeValue(scale)), scaled ? "#7dff8a" : "#c8d4e0");
         }
-        line(ui, "#Left", b.over ? "Battle over" : "", "#c8d4e0");
+        line(ui, "#Left", b.over ? I18n.tr("hud.battleover") : Message.empty(), "#c8d4e0");
         hud.update(false, ui);
     }
 
-    private static String sideText(BattleManager.Battle b, int team) {
+    private static Message sideText(BattleManager.Battle b, int team) {
         return switch (b.kind) {
-            case TEAMS -> "Team " + b.name(team);
-            case ALL_VS_ONE -> team == 1 ? "The lone target" : "Attacker";
-            case ROYALE -> "Every one for themselves";
-            case DUEL -> "Duelist";
+            case TEAMS -> I18n.tr("hud.side.team").param("name", b.name(team));
+            case ALL_VS_ONE -> I18n.tr(team == 1 ? "hud.side.lone" : "hud.side.attacker");
+            case ROYALE -> I18n.tr("hud.side.royale");
+            case DUEL -> I18n.tr("hud.side.duelist");
         };
     }
 
     private static void line(UICommandBuilder b, String id, String text, String color) {
         b.set(id + ".TextSpans", Message.raw(text).color(color));
+    }
+
+    private static void line(UICommandBuilder b, String id, Message text, String color) {
+        b.set(id + ".TextSpans", text.color(color));
     }
 
     private static void hide(PlayerRef player, ComponentAccessor<EntityStore> acc) {

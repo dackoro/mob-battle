@@ -42,7 +42,7 @@ final class Snap {
     private static final long FIRST_MS = 300;
 
     /** One snap: who did it and how many of its chosen are still waiting. */
-    private record Wave(UUID player, int chosen, int total, AtomicInteger left, String area) {
+    private record Wave(UUID player, int chosen, int total, AtomicInteger left, Message area) {
     }
 
     private record Entry(long due, Wave wave) {
@@ -75,6 +75,9 @@ final class Snap {
                     ComponentAccessor<EntityStore> buffer) {
         Map<String, List<Ref<EntityStore>>> sides = new LinkedHashMap<>();
         int reach = radius();
+        // Where the ring starts (a snap on the air or a wild mob; null for a battle snap) and how far it goes.
+        Vector3d waveCenter = null;
+        double waveReach = reach;
         BattleManager.Battle clicked = target != null ? BattleManager.battleOf(target) : null;
         if (clicked != null) {
             // A mob in a battle: that battle, wherever its fighters are.
@@ -89,6 +92,8 @@ final class Snap {
             Vector3d center = target != null ? ChaosWand.positionOf(target, buffer)
                     : playerEntity != null ? ChaosWand.positionOf(playerEntity, buffer) : null;
             if (center == null) return 0;
+            waveCenter = center;
+            waveReach = reach;
             ActionFx.shockwave(ActionFx.Action.SNAP, center, reach, buffer);
             ActionFx.glowRing(ActionFx.Action.SNAP, center, reach, buffer);
             // A set: the same ref can come from the mob search, the player search and the clicked target.
@@ -102,7 +107,8 @@ final class Snap {
             if (target != null && (!PlayerFighters.isPlayer(target, buffer) || snapsPlayer(target, playerEntity, buffer))) {
                 around.add(target);
             }
-            for (Ref<EntityStore> m : around) {
+            Set<Ref<EntityStore>> kept = new LinkedHashSet<>(WaveHit.filter(center, new ArrayList<>(around), FxSettings.battleWaveGroundOnly, buffer));
+            for (Ref<EntityStore> m : kept) {
                 if (!BattleManager.isAlive(m, buffer) || QUEUE.containsKey(m)) continue;
                 BattleManager.Battle b = BattleManager.battleOf(m);
                 sides.computeIfAbsent(b != null ? b.id + ":" + b.team(m) : "wild", k -> new ArrayList<>()).add(m);
@@ -131,7 +137,7 @@ final class Snap {
                 + FxSettings.snapSeconds + " s, radius " + reach + "): " + chosen + " of " + total + " from "
                 + sides.size() + " sides");
         // Where it reached: the clicked battle's fighters, or a radius around the clicked mob / the player.
-        String area = clicked != null ? "in that battle" : "within " + reach + " blocks";
+        Message area = clicked != null ? I18n.tr("chat.snap.area.battle") : I18n.tr("chat.snap.area.radius").param("blocks", reach);
         // The snap itself always sounds, even when nobody is in reach or nobody was picked (a small radius often
         // finds few mobs, and picks half of them at random).
         if (playerEntity != null) {
@@ -142,16 +148,22 @@ final class Snap {
             long now = System.currentTimeMillis();
             long spread = Math.max(1, FxSettings.snapSeconds * 1000L - FIRST_MS);
             for (Ref<EntityStore> m : picked) {
-                QUEUE.put(m, new Entry(now + FIRST_MS + rnd.nextLong(spread), wave));
+                // battleWaveTravel: its dust starts once the ring got to it (a battle snap has no ring: no wait).
+                long arrive = 0;
+                if (FxSettings.battleWaveTravel && waveCenter != null) {
+                    Vector3d p = ChaosWand.positionOf(m, buffer);
+                    if (p != null) arrive = FightFx.waveReachMs(Math.hypot(p.x - waveCenter.x, p.z - waveCenter.z), waveReach);
+                }
+                QUEUE.put(m, new Entry(now + arrive + FIRST_MS + rnd.nextLong(spread), wave));
                 if (PlayerFighters.isPlayer(m, buffer)) PLAYERS.add(m);
             }
         }
         if (player != null) {
-            player.sendMessage(Message.raw(total == 0 ? "Nobody to snap: no mobs " + (FxSettings.snapPlayers ? "or players " : "") + area + "."
-                    : chosen == 0 ? "Snap! Nobody was picked (" + FxSettings.snapPercent + "% of " + total
-                    + " " + area + ")."
-                    : "Snap! " + chosen + " of " + total + " " + area + " will turn to dust"
-                    + (byTeam ? " (of each side)" : "") + " within " + FxSettings.snapSeconds + " s...")
+            player.sendMessage((total == 0 ? I18n.tr(FxSettings.snapPlayers ? "chat.snap.nobody.players" : "chat.snap.nobody").param("area", area)
+                    : chosen == 0 ? I18n.tr("chat.snap.nonepicked").param("percent", FxSettings.snapPercent)
+                    .param("total", total).param("area", area)
+                    : I18n.tr(byTeam ? "chat.snap.started.team" : "chat.snap.started").param("chosen", chosen)
+                    .param("total", total).param("area", area).param("seconds", FxSettings.snapSeconds))
                     .color(total == 0 ? "#ffcc55" : "#c8b6ff"));
         }
         return chosen;
@@ -224,8 +236,8 @@ final class Snap {
         if (wave.left().decrementAndGet() != 0 || wave.player() == null) return;
         PlayerRef p = Universe.get().getPlayer(wave.player());
         if (p != null && p.isValid()) {
-            p.sendMessage(Message.raw("The snap is over: " + wave.chosen() + " of " + wave.total()
-                    + " " + wave.area() + " turned to dust, " + (wave.total() - wave.chosen()) + " remain.")
+            p.sendMessage(I18n.tr("chat.snap.over").param("chosen", wave.chosen()).param("total", wave.total())
+                    .param("area", wave.area()).param("remain", wave.total() - wave.chosen())
                     .color("#c8b6ff"));
         }
         MobBattlePlugin.debug("snap over: " + wave.chosen() + " of " + wave.total());

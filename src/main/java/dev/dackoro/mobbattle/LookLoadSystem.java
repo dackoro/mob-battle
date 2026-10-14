@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
@@ -24,7 +25,17 @@ public class LookLoadSystem extends com.hypixel.hytale.component.system.RefSyste
 
     @Override
     public void onEntityAdded(Ref<EntityStore> ref, AddReason reason, Store<EntityStore> store, CommandBuffer<EntityStore> buffer) {
+        if (reason == AddReason.SPAWN) {
+            // Pets and summons that appear mid-battle may join their owner's side (BattleManager.joinOwnersSide).
+            BattleManager.noteSpawn(ref);
+            return;
+        }
         if (reason != AddReason.LOAD) return;
+        // A mob saved wearing a copied player look comes back as a bare player body: its own model back.
+        ModelComponent model = store.getComponent(ref, ModelComponent.getComponentType());
+        if (model != null && model.getModel() != null && MorphWand.PLAYER_MODEL.equals(model.getModel().getModelAssetId())) {
+            store.getExternalData().getWorld().execute(() -> MorphWand.fixBald(ref, store));
+        }
         EffectControllerComponent effects = store.getComponent(ref, EffectControllerComponent.getComponentType());
         if (!LookKeeper.hasLookEffect(effects)) return;
         // Components change outside the system callback, on the world thread.

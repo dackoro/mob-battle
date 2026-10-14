@@ -22,13 +22,13 @@ Each wand's tooltip explains what it does, in English and Spanish.
 | `MobBattle_ChaosWand` | Chaos Wand | Epic | Everyone vs one: every mob around attacks the clicked one | Battle royale around the mob you aim at, or around you | Yes, with `playerFights allVsOne` / `royale` |
 | `MobBattle_TeamWand` | Team Wand | Rare | Add or remove a mob in the current team | In the air: next team. On a mob: start the team battle | Yes, with `playerFights teams` |
 | `MobBattle_SummonWand` | Summon Wand | Uncommon | Add or remove the mob's type in the summon list | Summon the whole list around you | No |
-| `MobBattle_ArmyWand` | Army Wand | Rare | Add or remove a mob in your army | Disband your army | No |
-| `MobBattle_MorphWand` | Morph Wand | Uncommon | Give the mob the copied model | Copy a model (in the air: show the copied one) | Yes, with `morphPlayers` |
-| `MobBattle_HealWand` | Heal Wand | Uncommon | Back to full health | None | Yes |
+| `MobBattle_ArmyWand` | Army Wand | Rare | Add or remove a mob in your army (crouch: recruit for a mob leader or another player) | Disband that army | No |
+| `MobBattle_MorphWand` | Morph Wand | Uncommon | Give the mob the copied model (hold: every mob around) | Copy a model or a player's look (in the air: show the copied one; hold: the mobs around swap looks) | Yes, with `morphPlayers` |
+| `MobBattle_HealWand` | Heal Wand | Uncommon | Back to full health (hold: everyone around you) | None | Yes |
 | `MobBattle_KillWand` | Kill Wand | Epic | Kill it (soul rip, then removal) | None | Yes, with `killPlayers` |
 | `MobBattle_SnapWand` | Snap Wand | Legendary | Half of the fighters turn to dust | None | Yes, with `snapPlayers` |
-| `MobBattle_EffectWand` | Effect Wand | Legendary | Give the selected effect | Next effect in the list | Yes |
-| `MobBattle_CleanseWand` | Cleanse Wand | Common | Remove every effect and buff, undo a morph | None | Yes |
+| `MobBattle_EffectWand` | Effect Wand | Legendary | Give the selected effect (hold: everyone around you) | Next effect in the list | Yes |
+| `MobBattle_CleanseWand` | Cleanse Wand | Common | Remove every effect and buff, undo a morph (hold: everyone around you) | None | Yes |
 | `MobBattle_BuffWand` | Buff Wand | Epic | One more buff stack | Take the wand's buff off | Yes |
 | `MobBattle_DebugWand` | Debug Wand | Common | Full report on the mob, then follow it | Stop following | Meant for mobs |
 
@@ -42,6 +42,7 @@ The `playerFights`, `morphPlayers`, `killPlayers` and `snapPlayers` settings are
 - **Errors** show as a short red flash with a fizzle and an error sound on the mob, plus a chat message. Examples: the Battle Wand on two mobs that can't fight, the Morph Wand with no copied model, or the Buff Wand at its max.
 - **One wand tint at a time:** a new wand tint replaces the previous one on that mob, so two colors never mix into a washed-out white. Effects without a tint (Effect Wand, unmorph) play on top. The Kill Wand soul rip and team looks are never replaced.
 - **Clicking the same mob again** restarts its effect from the beginning instead of just extending it.
+- **Held-click waves** (Morph, Cleanse, Effect and Heal): hold the click 1.5 s and let go. You slam the ground and a ring grows from you. With [`waveTravel on`](settings.md) (the default) each mob is hit **when the ring reaches it**, not all at once; fliers above and mobs in caves below are still hit as the ring passes. [`waveGroundOnly on`](settings.md) only hits mobs within 3 blocks above or below the wave, as the game's own slams do. Everything is decided at the slam: a Morph swap reads everyone's model first, so each mob still gets the model it was paired with, even if its partner already changed.
 
 ---
 
@@ -113,7 +114,7 @@ Builds teams and starts a team battle. The last team standing wins. Full details
 
 **Left click a mob:** adds it to your current team, with a swirl in the team color and the team look. Click it again to take it out. With `playerFights teams on`, players can be added the same way. With [`/mobbattle teamByType on`](settings.md), every mob of the same type within `areaRadius` follows the clicked one into (or out of) the team.
 
-**Right click in the air:** switches to the next team. **Right click a mob:** starts the battle. It needs at least 2 teams with living members.
+**Right click** spins the color wheel in the middle of the wand one full turn. **Right click in the air:** switches to the next team. **Right click a mob:** starts the battle. It needs at least 2 teams with living members.
 
 **While you hold the wand**, each team's mobs show a ring in the team color at their feet. Only you can see these rings.
 
@@ -138,7 +139,7 @@ Spawns a saved list of mobs to set up battles quickly. Full details are in [team
 
 **Gotchas**
 - Mobs with a team rule ([`/mobbattle summon team`](settings.md)) spawn already in their team.
-- [`/mobbattle summonJade`](settings.md) makes summons come out wearing the jade look. [`/mobbattle summonArmy`](settings.md) puts them in your army. [`/mobbattle summonDespawn`](settings.md) / `summonLifetime` / `summonExit` make them leave by themselves.
+- [`/mobbattle summonJade`](settings.md) makes summons come out wearing the jade look. [`/mobbattle summonCalm`](settings.md) keeps them from fighting until a battle starts. [`/mobbattle summonArmy`](settings.md) puts them in your army. [`/mobbattle summonDespawn`](settings.md) / `summonLifetime` / `summonExit` make them leave by themselves.
 
 **Related settings:** `summon ...`, `summonRadius`, `maxMobs`, `wave summon`, `borderColor summon`, `summonJade`, `summonJadeColor`, `summonArmy`, `summonDespawn`, `summonLifetime`, `summonExit`.
 
@@ -175,9 +176,9 @@ Gives a mob another mob's model. It keeps its own AI, weapon, attacks and health
 
 **Left click a mob:** puts the copied model on it, with a green flash, a green burst and the Omnitrix transform sound. With [`/mobbattle morphPlayers on`](settings.md) (the default), players can be morphed too.
 
-**Hold left click (1.5 s, with a charge bar), then let go:** a green shockwave from you gives every mob within [`morphBurstRadius`](settings.md) (default 12 blocks) your copied model. Players in reach are morphed too with `morphPlayers on`, never you. Turn it off with `/mobbattle morphBurst off`, and a held left click then works like a quick one.
+**Hold left click (1.5 s, with a charge bar), then let go:** you slam the ground (the Snap Wand's slam), and when it hits a green shockwave from you gives every mob within [`morphBurstRadius`](settings.md) (default 12 blocks) your copied model. Players in reach are morphed too with `morphPlayers on`; you only with `/mobbattle morphBurstSelf on` (both waves). Turn it off with `/mobbattle morphBurst off`, and a held left click then works like a quick one.
 
-**Hold right click (1.5 s), then let go:** the same shockwave, but the mobs in reach **swap models with each other** in random pairs. With an odd number, the last three trade in a ring. Turn it off with `/mobbattle morphShuffle off`.
+**Hold right click (1.5 s), then let go:** the same slam and shockwave, but the mobs in reach **swap models with each other** in random pairs. With an odd number, the last three trade in a ring. Turn it off with `/mobbattle morphShuffle off`.
 
 **Switching to the wand** in your hotbar plays the Omnitrix power-on sound.
 
@@ -208,6 +209,8 @@ Gives a mob another mob's model. It keeps its own AI, weapon, attacks and health
 2. When the light lands, about 0.4 s later, the target is healed to 100%. It gets a green glow and burst, the Healing Totem fireflies and the healing sound.
 
 With `healLight off` or `wandFx off` there is no light, and the heal lands at once.
+
+**Hold left click (1.5 s, with a charge bar), then let go:** you slam the ground (the Snap Wand's slam). When it hits, a shockwave in the heal light color goes out, and every mob and player within [`healRadius`](settings.md) (default 12 blocks), **you included**, is healed as above, each with its own light (`/mobbattle healAreaSelf off` leaves you out). Turn it off with `/mobbattle healArea off`, and a held left click then works like a quick one. Quick clicks fire when you let go of the button.
 
 **Gotchas**
 - It only restores health. Effects, buffs and morphs stay.
@@ -278,9 +281,11 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 ![The Effect Wand jade look in four colors](images/looks-colors.jpg)
 ![The Effect Wand shimmer look in four colors](images/looks-shimmer.jpg)
 
-**Left click any mob or player:** gives it the selected effect (default `Burn`), with a purple burst. The chat says if the target rejected it (immune, or the effect doesn't apply).
+**Left click any mob or player:** gives it the selected effect (default `Burn`), with a burst in the effect's color (the same color as its chat line and wave). The chat says if the target rejected it (immune, or the effect doesn't apply).
 
-**Right click:** switches to the next effect in the quick list: `Burn`, `Poison_T2`, `Freeze`, `Slow`, `Stun`, `Root`, `Vulnerable`, `Ability_Enrage_Buff`, `Potion_Health_Regen`, `Immune`, `jade`, `shimmer`.
+**Right click:** casts (the gem head spins one full turn) and switches to the next effect in the quick list: `Burn`, `Poison_T2`, `Freeze`, `Slow`, `Stun`, `Root`, `Vulnerable`, `Ability_Enrage_Buff`, `Potion_Health_Regen`, `Immune`, `jade`, `shimmer`. The chat line comes in the effect's own color: a jade or shimmer look in its palette color, any other effect (other mods' too) in the tint it paints the mob with, light grey if it has none.
+
+**Hold left click (1.5 s, with a charge bar), then let go:** you slam the ground (while you charge, the gem head spins fast; it keeps spinning into the slam and slows down), and when it hits a shockwave in the effect's color goes out from you, and every mob and player within [`effectRadius`](settings.md) (default 12 blocks) gets the effect as with a click; you only with `/mobbattle effectAreaSelf on`. Turn it off with `/mobbattle effectArea off`, and a held left click then works like a quick one. Quick left clicks fire when you let go of the button.
 
 **Any other effect:** [`/mobbattle wandEffect <id>`](settings.md) accepts any loaded effect ID, including other mods' (for example `Potion_Morph_Frog`). It also accepts:
 - A chain `A>B>C`: each effect is given when the previous one ends (0.5 s after an infinite one).
@@ -310,7 +315,7 @@ Any palette color works (`jade:red`, `shimmer:blue`...). `gold` means yellow, an
    - every effect goes, including jade and shimmer looks, team looks, potions and debuffs;
    - a morph is undone, with a green burst and a portal sound as the mob gets its model back.
 
-**Hold left click (1.5 s, with a charge bar), then let go:** a shockwave in the cleanse color goes out from you, and every mob and player within [`cleanseRadius`](settings.md) (default 12 blocks) is cleansed as above, never you. The sound plays once at you. Turn it off with `/mobbattle cleanseArea off`, and a held left click then works like a quick one.
+**Hold left click (1.5 s, with a charge bar), then let go:** a shockwave in the cleanse color goes out from you, and every mob and player within [`cleanseRadius`](settings.md) (default 12 blocks) is cleansed as above; you only with `/mobbattle cleanseAreaSelf on`. The sound plays once at you. Turn it off with `/mobbattle cleanseArea off`, and a held left click then works like a quick one.
 
 **Gotchas**
 - Quick clicks fire when you let go of the button, as with the game's staffs, since the wand waits to see whether you are charging.
@@ -332,9 +337,9 @@ Any palette color works (`jade:red`, `shimmer:blue`...). `gold` means yellow, an
 
 With `buffLight off` or `wandFx off`, everything lands at once.
 
-**Per stack**, by default: size +10%, health +20%, damage +10%, defense +5% ([`/mobbattle buff wand`](settings.md)). Stacks go up to [`/mobbattle buff wand maxStacks`](settings.md) (default 5, max 50). Each stat is capped (size at [`buff sizeMax`](settings.md), default 200% = x3; health 1000%, damage 1000%, defense 90%). A bigger mob or player also jumps higher.
+**Per stack**, by default: size +10%, health +20%, damage +10%, defense +5% ([`/mobbattle buff wand`](settings.md)). Stacks go up to [`/mobbattle buff wand maxStacks`](settings.md) (default 5, max 50). Each stat is capped (size at [`buff sizeMax`](settings.md), default 200% = x3; health and damage 9900% = x100, defense 99%). A bigger mob or player also jumps higher.
 
-**While the buff lasts**, the mob wears the shimmer in `buffColor`: glowing veins, eye flames and runes over its head. A mob with a jade or shimmer look of its own keeps that look and only gets the runes and eye flames. With [`/mobbattle buff crown`](settings.md) (default off), it also wears a crown.
+**While the buff lasts**, the mob wears the shimmer in `buffColor`: glowing veins, eye flames and runes over its head. A mob with a jade or shimmer look of its own keeps that look and only gets the runes and eye flames. [`/mobbattle buffLook`](settings.md) changes this for every buffed mob: `runes` = only the runes and eye flames, `off` = no lasting look (the click's swirl, light and mark still play; turn those off with `buffLight off` or `wandFx off`). With [`/mobbattle buff crown`](settings.md) (default off), it also wears a crown.
 
 **Right click:** takes the wand's buff off, including stacks still coming down. The mob flashes grey with a grey swirl and a purple liquid splash, and it shrinks back. Buffs from battles (streak, champion, lone) stay.
 

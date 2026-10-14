@@ -27,7 +27,7 @@ final class ServerEvents {
     private static final String OK = "#ffd23e";
     private static final String ERROR = "#ff6b5e";
     private static final int MIN_RADIUS = 1;
-    private static final int MAX_RADIUS = 512;
+    private static final int MAX_RADIUS = FxSettings.MAX_RADIUS;
     private static final int LIST_DEFAULT_RADIUS = 32;
     private static final int LIST_MAX_RADIUS = 128;
     private static final int LIST_ROWS = 20;
@@ -37,7 +37,7 @@ final class ServerEvents {
     /** args[0] is "event"; the permission check and dispatch remain in MobBattleCommand. */
     static void handle(CommandContext ctx, String[] args) {
         if (args == null || args.length < 2) {
-            reply(ctx, "Usage: /mobbattle event <duel|royale|focus|list> ...", ERROR);
+            reply(ctx, I18n.tr("chat.event.usage"), ERROR);
             return;
         }
         switch (args[1].toLowerCase(Locale.ROOT)) {
@@ -45,18 +45,18 @@ final class ServerEvents {
             case "royale" -> royale(ctx, args);
             case "focus" -> focus(ctx, args);
             case "list" -> list(ctx, args);
-            default -> reply(ctx, "Usage: /mobbattle event <duel|royale|focus|list> ...", ERROR);
+            default -> reply(ctx, I18n.tr("chat.event.usage"), ERROR);
         }
     }
 
     private static void duel(CommandContext ctx, String[] args) {
         if (args.length < 4 || args.length > 5) {
-            reply(ctx, "Usage: /mobbattle event duel <uuidA> <uuidB> [world]", ERROR);
+            reply(ctx, I18n.tr("chat.event.usage.duel"), ERROR);
             return;
         }
         UUID a = parseUuid(args[2]), b = parseUuid(args[3]);
         if (a == null || b == null || a.equals(b)) {
-            reply(ctx, "Duel needs two different, valid entity UUIDs.", ERROR);
+            reply(ctx, I18n.tr("chat.event.duel.invalid"), ERROR);
             return;
         }
         World world = resolveWorld(ctx, args.length == 5 ? args[4] : null);
@@ -66,12 +66,12 @@ final class ServerEvents {
 
     private static void royale(CommandContext ctx, String[] args) {
         if (args.length < 6 || args.length > 8) {
-            reply(ctx, "Usage: /mobbattle event royale <x> <y> <z> <radio> [maxMobs] [world]", ERROR);
+            reply(ctx, I18n.tr("chat.event.usage.royale"), ERROR);
             return;
         }
         Double x = finite(args[2]), y = finite(args[3]), z = finite(args[4]), radiusValue = finite(args[5]);
         if (x == null || y == null || z == null || radiusValue == null || radiusValue < MIN_RADIUS || radiusValue > MAX_RADIUS) {
-            reply(ctx, "Coordinates must be finite and radio must be 1-512.", ERROR);
+            reply(ctx, I18n.tr("chat.event.royale.coords"), ERROR);
             return;
         }
         int maxMobs = FxSettings.maxMobs;
@@ -83,14 +83,14 @@ final class ServerEvents {
         } else if (args.length == 8) {
             Integer n = integer(args[6]);
             if (n == null) {
-                reply(ctx, "maxMobs must be an integer from 2 to " + FxSettings.MAX_MOBS_LIMIT + ".", ERROR);
+                reply(ctx, I18n.tr("chat.event.maxmobs.int").param("limit", FxSettings.MAX_MOBS_LIMIT), ERROR);
                 return;
             }
             maxMobs = n;
             worldName = args[7];
         }
         if (maxMobs < 2 || maxMobs > FxSettings.MAX_MOBS_LIMIT) {
-            reply(ctx, "maxMobs must be 2-" + FxSettings.MAX_MOBS_LIMIT + ".", ERROR);
+            reply(ctx, I18n.tr("chat.event.maxmobs.range").param("limit", FxSettings.MAX_MOBS_LIMIT), ERROR);
             return;
         }
         World world = resolveWorld(ctx, worldName);
@@ -102,12 +102,12 @@ final class ServerEvents {
 
     private static void focus(CommandContext ctx, String[] args) {
         if (args.length < 3 || args.length > 4) {
-            reply(ctx, "Usage: /mobbattle event focus <uuid> [world]", ERROR);
+            reply(ctx, I18n.tr("chat.event.usage.focus"), ERROR);
             return;
         }
         UUID targetId = parseUuid(args[2]);
         if (targetId == null) {
-            reply(ctx, "Focus needs a valid NPC UUID.", ERROR);
+            reply(ctx, I18n.tr("chat.event.focus.invalid"), ERROR);
             return;
         }
         World world = resolveWorld(ctx, args.length == 4 ? args[3] : null);
@@ -117,18 +117,18 @@ final class ServerEvents {
 
     private static void list(CommandContext ctx, String[] args) {
         if (!ctx.isPlayer()) {
-            reply(ctx, "Usage (player only): /mobbattle event list [radio]", ERROR);
+            reply(ctx, I18n.tr("chat.event.usage.list.player"), ERROR);
             return;
         }
         if (args.length > 3) {
-            reply(ctx, "Usage: /mobbattle event list [radio]", ERROR);
+            reply(ctx, I18n.tr("chat.event.usage.list"), ERROR);
             return;
         }
         double radius = LIST_DEFAULT_RADIUS;
         if (args.length == 3) {
             Double n = finite(args[2]);
             if (n == null || n < 1 || n > LIST_MAX_RADIUS) {
-                reply(ctx, "List radius must be 1-" + LIST_MAX_RADIUS + " blocks.", ERROR);
+                reply(ctx, I18n.tr("chat.event.list.radius").param("max", LIST_MAX_RADIUS), ERROR);
                 return;
             }
             radius = n;
@@ -136,7 +136,7 @@ final class ServerEvents {
         final double scanRadius = radius;
         Ref<EntityStore> playerRef = ctx.senderAsPlayerRef();
         if (playerRef == null || !playerRef.isValid()) {
-            reply(ctx, "Player entity is no longer available.", ERROR);
+            reply(ctx, I18n.tr("chat.event.list.noplayer"), ERROR);
             return;
         }
         Store<EntityStore> store = playerRef.getStore();
@@ -145,23 +145,23 @@ final class ServerEvents {
             if (store.isShutdown() || !playerRef.isValid()) return;
             Vector3d center = ChaosWand.positionOf(playerRef, store);
             if (center == null) {
-                reply(ctx, "Could not read your current position.", ERROR);
+                reply(ctx, I18n.tr("chat.event.list.nopos"), ERROR);
                 return;
             }
             List<Ref<EntityStore>> mobs = ChaosWand.npcsAround(center, scanRadius, FxSettings.MAX_MOBS_LIMIT, store);
             if (mobs.isEmpty()) {
-                reply(ctx, "No living NPCs within " + scanRadius + " blocks.", ERROR);
+                reply(ctx, I18n.tr("chat.event.list.none").param("radius", scanRadius), ERROR);
                 return;
             }
             int count = Math.min(LIST_ROWS, mobs.size());
-            reply(ctx, "Living NPCs within " + scanRadius + " blocks (" + mobs.size() + "): ", OK);
+            reply(ctx, I18n.tr("chat.event.list.header").param("radius", scanRadius).param("count", mobs.size()), OK);
             for (int i = 0; i < count; i++) {
                 Ref<EntityStore> mob = mobs.get(i);
                 UUIDComponent uuid = store.getComponent(mob, UUIDComponent.getComponentType());
                 String name = ChaosWand.nameOf(mob, store);
                 reply(ctx, "  " + (uuid != null ? uuid.getUuid() : "UUID unavailable") + "  " + name, "#c8e6ff");
             }
-            if (mobs.size() > count) reply(ctx, "  ... and " + (mobs.size() - count) + " more.", "#aaaaaa");
+            if (mobs.size() > count) reply(ctx, I18n.tr("chat.event.list.more").param("count", mobs.size() - count), "#aaaaaa");
         });
     }
 
@@ -170,7 +170,7 @@ final class ServerEvents {
         if (requested != null && !requested.isBlank()) {
             UUID id = parseUuid(requested);
             world = id != null ? Universe.get().getWorld(id) : Universe.get().getWorld(requested);
-            if (world == null) reply(ctx, "World not found: " + requested, ERROR);
+            if (world == null) reply(ctx, I18n.tr("chat.event.world.notfound").param("name", requested), ERROR);
             return world;
         }
         if (ctx.isPlayer()) {
@@ -179,7 +179,7 @@ final class ServerEvents {
         } else {
             world = Universe.get().getDefaultWorld();
         }
-        if (world == null) reply(ctx, "No current/default world. Pass a world name or UUID.", ERROR);
+        if (world == null) reply(ctx, I18n.tr("chat.event.world.none"), ERROR);
         return world;
     }
 
@@ -213,7 +213,7 @@ final class ServerEvents {
                               Function<MobBattleApi, CompletableFuture<MobBattleApi.StartResult>> request) {
         MobBattleApi api = MobBattlePlugin.getApi();
         if (api == null) {
-            reply(ctx, label + " cancelled: Mob Battle is shutting down.", ERROR);
+            reply(ctx, I18n.tr("chat.event.cancelled.shutdown").param("label", labelText(label)), ERROR);
             return;
         }
         try {
@@ -221,20 +221,28 @@ final class ServerEvents {
                 if (failure != null) {
                     MobBattlePlugin.log("Server event " + label.toLowerCase(Locale.ROOT) + " request failed: "
                             + failure.getClass().getSimpleName());
-                    reply(ctx, label + " cancelled: the event request failed.", ERROR);
+                    reply(ctx, I18n.tr("chat.event.cancelled.failed").param("label", labelText(label)), ERROR);
                 } else if (result == null) {
-                    reply(ctx, label + " cancelled: the event request returned no result.", ERROR);
+                    reply(ctx, I18n.tr("chat.event.cancelled.noresult").param("label", labelText(label)), ERROR);
                 } else if (result.accepted()) {
-                    reply(ctx, label + " queued. Event ID: " + result.snapshot().eventId(), OK);
+                    reply(ctx, I18n.tr("chat.event.queued").param("label", labelText(label)).param("id", String.valueOf(result.snapshot().eventId())), OK);
                 } else {
-                    reply(ctx, label + " cancelled: " + result.error(), ERROR);
+                    reply(ctx, I18n.tr("chat.event.cancelled.error").param("label", labelText(label)).param("error", String.valueOf(result.error())), ERROR);
                 }
             });
         } catch (Throwable failure) {
             MobBattlePlugin.log("Server event " + label.toLowerCase(Locale.ROOT) + " request failed: "
                     + failure.getClass().getSimpleName());
-            reply(ctx, label + " cancelled: the event request failed.", ERROR);
+            reply(ctx, I18n.tr("chat.event.cancelled.failed").param("label", labelText(label)), ERROR);
         }
+    }
+
+    private static Message labelText(String label) {
+        return I18n.tr("chat.event.label." + label.toLowerCase(Locale.ROOT));
+    }
+
+    private static void reply(CommandContext ctx, Message text, String color) {
+        if (ctx != null) ctx.sendMessage(text.color(color));
     }
 
     private static void reply(CommandContext ctx, String text, String color) {

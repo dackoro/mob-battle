@@ -57,9 +57,20 @@ public class PlayerBattleDamageSystem extends DamageEventSystem {
         return PlayerRef.getComponentType();
     }
 
+    /**
+     * EventSystem.shouldProcessEvent skips cancelled events by default, and the hits battlePvp lets through are exactly
+     * the ones the world's PvP rule cancelled: without this the system never saw them (2026-10-14, player test: two
+     * players in a duel with battlePvp on could not hurt each other).
+     */
+    @Override
+    protected boolean shouldProcessEvent(Damage damage) {
+        return true;
+    }
+
     @Override
     public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                        CommandBuffer<EntityStore> buffer, Damage damage) {
+        if (damage.getSource() instanceof Damage.ProjectileSource shot) Medium.sawProjectile(shot.getRef(), buffer);
         if (!BattleManager.hasPlayerFighters() || !(damage.getSource() instanceof Damage.EntitySource source)) {
             return;
         }
@@ -73,6 +84,10 @@ public class PlayerBattleDamageSystem extends DamageEventSystem {
             return; // still waiting in a team draft, or not an entity hit: normal rules
         }
         boolean attackerIsPlayer = buffer.getComponent(attacker, PlayerRef.getComponentType()) != null;
+        if (attackerIsPlayer && MobBattlePlugin.debugging()) {
+            MobBattlePlugin.debug("pvp hit " + ChaosWand.nameOf(attacker, buffer) + " -> " + ChaosWand.nameOf(victim, buffer)
+                    + " " + damage.getAmount() + " arrives cancelled " + damage.isCancelled() + ", same battle " + (BattleManager.battleOf(attacker) == battle));
+        }
         if (BattleManager.battleOf(attacker) == battle) {
             if (battle.team(attacker) == battle.team(victim)) {
                 if (!FxSettings.friendlyFire(battle.kind)) damage.setCancelled(true);
@@ -88,6 +103,10 @@ public class PlayerBattleDamageSystem extends DamageEventSystem {
             }
             if (!damage.isCancelled()) {
                 BattleManager.recordDamage(attacker, victim, damage.getAmount());
+            } else if (attackerIsPlayer && MobBattlePlugin.debugging()) {
+                // Why an enemy player's hit stays blocked (2026-10-14, player tests: battlePvp on, still no damage).
+                MobBattlePlugin.debug("pvp hit " + ChaosWand.nameOf(attacker, buffer) + " -> " + ChaosWand.nameOf(victim, buffer)
+                        + " blocked: " + blockReasons(index, chunk, store) + ", battlePvp " + FxSettings.battlePvp);
             }
             return;
         }
@@ -95,6 +114,20 @@ public class PlayerBattleDamageSystem extends DamageEventSystem {
                 && buffer.getComponent(attacker, NPCEntity.getComponentType()) != null) {
             damage.setCancelled(true);
         }
+    }
+
+    /** The vanilla reasons a player can't be hurt right now, for the debug line above. */
+    private static String blockReasons(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store) {
+        var world = store.getExternalData().getWorld();
+        var archetype = chunk.getArchetype();
+        Player player = chunk.getComponent(index, Player.getComponentType());
+        EffectControllerComponent effects = chunk.getComponent(index, EffectControllerComponent.getComponentType());
+        return "worldPvp " + world.getWorldConfig().isPvpEnabled()
+                + ", invulnerable " + archetype.contains(Invulnerable.getComponentType())
+                + ", intangible " + archetype.contains(Intangible.getComponentType())
+                + ", spawnProtection " + (player != null && player.hasSpawnProtection())
+                + ", effectInvulnerable " + (effects != null && effects.isInvulnerable())
+                + ", incomingDisabled " + world.getGameplayConfig().getCombatConfig().isPlayerIncomingDamageDisabled();
     }
 
     /**

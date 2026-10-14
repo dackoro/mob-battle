@@ -61,7 +61,9 @@ final class Buffs {
     }
 
     enum Stat {
-        SIZE("size", MAX_SIZE), HEALTH("health", 1000), DAMAGE("damage", 1000), DEFENSE("defense", 90);
+        // 2026-10-13, user: higher caps (health/damage x100, defense 99% = takes 1/100; 100% would be unkillable)
+        // and speed as its own stat, on top of the speed a size buff already gives.
+        SIZE("size", MAX_SIZE), HEALTH("health", 99900), DAMAGE("damage", 99900), DEFENSE("defense", 99), SPEED("speed", 4900);
 
         final String key;
         /** Highest % for one source (defense: 100 % would make it unkillable). */
@@ -89,27 +91,191 @@ final class Buffs {
      * ends up in blocks, and the buff looks (which grow with the square root of the size, WandFx.grown) sink into big heads.
      */
     static int sizeMax = 200;
+
+    /**
+     * How much a size buff speeds up and raises the jump (2026-10-13, user: x4 at twice the speed looked slow, its
+     * steps four times longer): off, natural (default: speed x sqrt(size), jump height x size; calibrated in game),
+     * strong, full (speed x size: the steps match the ground, but very fast). Keys buff.size.speed / buff.size.jump.
+     */
+    static final java.util.List<String> SIZE_EFFECTS = java.util.List.of("off", "natural", "strong", "full");
+    static String sizeSpeed = "natural";
+    static String sizeJump = "natural";
+
+    /** Walking speed = base x size^this. */
+    static double speedExponent() {
+        return switch (sizeSpeed) {
+            case "off" -> 0;
+            case "strong" -> 0.75;
+            case "full" -> 1;
+            default -> 0.5;
+        };
+    }
+
+    /** A player's jump force = default x size^this (0.55: the jump height grows with the size, measured in game). */
+    static double jumpExponent() {
+        return switch (sizeJump) {
+            case "off" -> 0;
+            case "strong" -> 0.7;
+            case "full" -> 0.85;
+            default -> 0.55;
+        };
+    }
+
+    /** A mob's jump height = base x size^this (the same steps as the players' force: height ~ force squared). */
+    static double mobJumpExponent() {
+        return switch (sizeJump) {
+            case "off" -> 0;
+            case "strong" -> 1.4;
+            case "full" -> 1.7;
+            default -> 1;
+        };
+    }
+
+    /** off|natural|strong|full, any case; null if none. */
+    static String parseSizeEffect(String v) {
+        if (v == null) return null;
+        String s = v.trim().toLowerCase(Locale.ROOT);
+        return SIZE_EFFECTS.contains(s) ? s : null;
+    }
+
+    /** After a sizeSpeed/sizeJump change: every buffed mob and player moves by the new rule now. */
+    static void refreshMovementAll() {
+        // One task per world, not one per buffed mob (audit 2026-10-14: every panel save queued one per mob).
+        forEachWorld(STATES.keySet(), (store, mobs) -> {
+            for (Ref<EntityStore> mob : mobs) {
+                if (!mob.isValid()) continue;
+                // The buff's size factor, as apply() passes it (not the entity scale, which may be a saved one).
+                BuffJump.npc(mob, 1 + totalOf(mob, Stat.SIZE) / 100f, 1 + totalOf(mob, Stat.SPEED) / 100f, store);
+                BuffJump.player(mob, store);
+            }
+        });
+    }
+
+    /** Runs {@code task} once per world on its thread with that world's mobs of {@code mobs}. */
+    private static void forEachWorld(java.util.Collection<Ref<EntityStore>> mobs,
+                                     java.util.function.BiConsumer<Store<EntityStore>, java.util.List<Ref<EntityStore>>> task) {
+        Map<Store<EntityStore>, java.util.List<Ref<EntityStore>>> byStore = new java.util.HashMap<>();
+        for (Ref<EntityStore> mob : mobs) {
+            if (mob.isValid()) byStore.computeIfAbsent(mob.getStore(), k -> new java.util.ArrayList<>()).add(mob);
+        }
+        byStore.forEach((store, list) -> {
+            if (store.isShutdown()) return;
+            store.getExternalData().getWorld().execute(() -> {
+                if (!store.isShutdown()) task.accept(store, list);
+            });
+        });
+    }
     static final int SIZE_SAFE = 200;
     static final int MIN_SIZE = 50;
-    static final int MAX_SIZE = 900;
+    static final int MAX_SIZE = 9900;
 
     /** The warning for a size limit above SIZE_SAFE, else null. */
     static String sizeWarning(int percent) {
         if (percent <= SIZE_SAFE) return null;
-        return "Size limit +" + percent + "% (x" + fmt(1 + percent / 100f) + ") is above the recommended +" + SIZE_SAFE
-                + "% (x3): big players don't fit under roofs or in caves, their camera can end up inside blocks, and "
+        return "Size limit " + both(Stat.SIZE, percent) + " is above the recommended " + both(Stat.SIZE, SIZE_SAFE)
+                + ": big players don't fit under roofs or in caves, their camera can end up inside blocks, and "
                 + "big mobs' runes and crowns can end up inside their head (the buff looks grow less than the body).";
     }
 
-    private static String fmt(float v) {
-        return v == Math.round(v) ? String.valueOf(Math.round(v)) : String.format(Locale.ROOT, "%.1f", v);
+    /** Same warning as {@link #sizeWarning} for the player's chat, translated (null when there is none). */
+    static com.hypixel.hytale.server.core.Message sizeWarningMessage(int percent) {
+        if (percent <= SIZE_SAFE) return null;
+        return I18n.tr("chat.buffs.sizewarn").param("limit", both(Stat.SIZE, percent))
+                .param("safe", both(Stat.SIZE, SIZE_SAFE));
+    }
+
+    /**
+     * How buff values are shown and typed (/mobbattle buff unit, key buff.unit, 2026-10-13, user): percent (default,
+     * +100 % = double) or multiplier (x2 = double, decimals allowed; defense x2 = half the damage taken). Stored as
+     * percent either way, so switching never changes a buff. Sources and stacks still add up as percent: two x2
+     * sources = +200 % = x3, five Buff Wand clicks of x1.1 = x1.5.
+     */
+    static boolean multiplier = false;
+    static final String UNIT_PERCENT = "percent";
+    static final String UNIT_MULTIPLIER = "multiplier";
+
+    static String unit() {
+        return multiplier ? UNIT_MULTIPLIER : UNIT_PERCENT;
+    }
+
+    /** "percent"/"%" or "multiplier"/"x" -> true for multiplier; null if neither. */
+    static Boolean parseUnit(String v) {
+        if (v == null) return null;
+        String s = v.trim().toLowerCase(Locale.ROOT);
+        if (s.equals(UNIT_PERCENT) || s.equals("%")) return false;
+        if (s.equals(UNIT_MULTIPLIER) || s.equals("x")) return true;
+        return null;
+    }
+
+    /** The multiplier of a percent: 1 + p/100; defense 1/(1 - p/100) (x2 = takes half the damage). */
+    static double toMultiplier(Stat st, int percent) {
+        return st == Stat.DEFENSE ? 1 / (1 - Math.min(99, percent) / 100.0) : 1 + percent / 100.0;
+    }
+
+    /** The percent of a multiplier (x1 or less = 0). */
+    static int fromMultiplier(Stat st, double m) {
+        if (!(m > 1)) return 0;
+        return (int) Math.min(Integer.MAX_VALUE, Math.round(st == Stat.DEFENSE ? 100 * (1 - 1 / m) : (m - 1) * 100));
+    }
+
+    /** "x2", "x1.5", "x3.03". */
+    static String multText(double m) {
+        double r = Math.round(m * 100) / 100.0;
+        return "x" + (r == Math.rint(r) ? String.valueOf((long) r) : String.valueOf(r).replaceAll("0+$", ""));
+    }
+
+    /**
+     * For chat: the value in the current unit, the other one in brackets: "x2 (+100%)" or "+100% (x2)" (user,
+     * 2026-10-13: in multiplier mode the chat still spoke percent).
+     */
+    static String both(Stat st, int percent) {
+        String pct = "+" + percent + "%", mult = multText(toMultiplier(st, percent));
+        return multiplier ? mult + " (" + pct + ")" : pct + " (" + mult + ")";
+    }
+
+    /** Short, for a HUD: "+100%" or "x2" in the current unit. */
+    static String brief(Stat st, int percent) {
+        return multiplier ? multText(toMultiplier(st, percent)) : "+" + percent + "%";
+    }
+
+    /** A value in the current unit: "50%" or "x1.5". */
+    static String show(Stat st, int percent) {
+        return multiplier ? multText(toMultiplier(st, percent)) : percent + "%";
+    }
+
+    /**
+     * A typed value as percent: "x2"/"2x" is always a multiplier, "50%" always percent, a plain number follows the
+     * unit. -1 if not a number.
+     */
+    static int parseValue(Stat st, String raw) {
+        if (raw == null) return -1;
+        String s = raw.trim().toLowerCase(Locale.ROOT);
+        boolean mult = multiplier;
+        if (s.startsWith("x") || s.endsWith("x")) {
+            mult = true;
+            s = s.startsWith("x") ? s.substring(1) : s.substring(0, s.length() - 1);
+        } else if (s.endsWith("%")) {
+            mult = false;
+            s = s.substring(0, s.length() - 1);
+        }
+        try {
+            double d = Double.parseDouble(s.trim());
+            if (!Double.isFinite(d) || d < 0) return -1;
+            // Below x1 would shrink or weaken, which buffs don't do: refused instead of silently turned into "off"
+            // (audit 2026-10-14). x0 and x1 still mean none.
+            if (mult && d > 0 && d < 1) return -1;
+            // Huge values ("x1e9") stay huge instead of wrapping around int: the callers' range checks reject them.
+            return mult ? fromMultiplier(st, d) : (int) Math.min(Integer.MAX_VALUE, Math.round(d));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     /** % per source and stat (streak: per kill). 0 = none. */
     private static final Map<Source, EnumMap<Stat, Integer>> PERCENT = new EnumMap<>(Source.class);
     /** Streak: kills that count at most. */
     static int streakMax = 5;
-    static final int MAX_STREAK = 50;
+    static final int MAX_STREAK = 1000;
     /**
      * Crown on streak, champion and wand-buffed mobs: Gold, a palette color, or off (default: the crown belongs to
      * the everyone-vs-one target, user 2026-10-10).
@@ -117,7 +283,7 @@ final class Buffs {
     static String crown = "off";
     /** Buff Wand: clicks that stack at most. */
     static int wandMax = 5;
-    static final int MAX_WAND = 50;
+    static final int MAX_WAND = 1000;
     /** Per source: a new buff (lone: being picked) fills the health to its max (on) or leaves it (off, default). */
     private static final EnumMap<Source, Boolean> HEAL = new EnumMap<>(Source.class);
 
@@ -128,6 +294,11 @@ final class Buffs {
     /** One buffed mob: its sources (weight = 1, or the kills of a streak) and what was changed, to undo it. */
     private static final class State {
         final EnumMap<Source, Integer> weight = new EnumMap<>(Source.class);
+        /**
+         * Direct amounts set by /mobbattle apply (size/health/damage/defense <value>), on top of the sources, against
+         * anyone (as the Buff Wand's). No shimmer or crown: an admin's resize of a player shouldn't look like a buff.
+         */
+        final EnumMap<Stat, Integer> direct = new EnumMap<>(Stat.class);
         /** EntityScaleComponent scale before the size buff (null: not scaled by us). */
         Float baseScale;
         boolean health;
@@ -138,6 +309,13 @@ final class Buffs {
          * look of its own (a jade summon keeps its jade). scripts/gen-looks.py.
          */
         String lookFx;
+        /** Speed total last applied to its movement (BuffJump), so a change is pushed once. */
+        int speed;
+        /**
+         * Size factor last applied to its movement (BuffJump). Compared instead of the entity scale (audit 2026-10-14: a
+         * size saved with the mob across a restart is already on it, so a new buff of that size never reached BuffJump).
+         */
+        float moveSize = 1f;
         /** lookFx is the shimmer waiting for the wand's short effects to end (addLookLater), not on the mob yet. */
         volatile boolean lookPending;
     }
@@ -164,6 +342,9 @@ final class Buffs {
         streakMax = 5;
         wandMax = 5;
         sizeMax = SIZE_SAFE;
+        multiplier = false;
+        sizeSpeed = "natural";
+        sizeJump = "natural";
         for (Source s : Source.values()) HEAL.put(s, false);
         crown = "off";
     }
@@ -345,6 +526,25 @@ final class Buffs {
     static void onPlayerDeath(Ref<EntityStore> player) {
         if (player == null || !STATES.containsKey(player)) return;
         for (Source s : Source.values()) set(player, s, 0);
+        for (Stat st : Stat.values()) setDirect(player, st, 0);
+    }
+
+    /**
+     * PlayerReadyEvent: a player who left while buffed comes back as a new entity with no buff state, but the game
+     * saved their entity scale and health modifier, while vanilla rebuilds their model at 1 (so body, camera and
+     * jump disagreed; user, 2026-10-13). Their leftovers go, as on death. ❓ Untested in game.
+     */
+    static void onPlayerReady(Ref<EntityStore> player) {
+        if (player == null || !player.isValid() || STATES.containsKey(player)) return;
+        Store<EntityStore> store = player.getStore();
+        store.getExternalData().getWorld().execute(() -> {
+            if (!player.isValid() || STATES.containsKey(player)) return;
+            EntityScaleComponent scale = store.getComponent(player, EntityScaleComponent.getComponentType());
+            EntityStatMap stats = store.getComponent(player, EntityStatMap.getComponentType());
+            EntityStatValue health = stats != null ? stats.get(DefaultEntityStatTypes.getHealth()) : null;
+            boolean modifier = health != null && health.getModifiers() != null && health.getModifiers().containsKey(MODIFIER_KEY);
+            if (modifier || scale != null && scale.getScale() != 1f) clearNow(player, store);
+        });
     }
 
     /** End of a battle: the lone and streak buffs of its mobs go; champions stay. */
@@ -376,10 +576,11 @@ final class Buffs {
             EntityScaleComponent scale = mob.isValid() ? accessor.getComponent(mob, EntityScaleComponent.getComponentType()) : null;
             if (scale != null && scale.getScale() != 1f) scale.setScale(1f);
             MorphWand.setPlayerSize(mob, 1f, accessor);
-            BuffJump.npc(mob, 1f, accessor);
+            BuffJump.npc(mob, 1f, 1f, accessor);
             return;
         }
         s.weight.clear();
+        s.direct.clear();
         apply(mob, s, false, accessor);
     }
 
@@ -393,6 +594,7 @@ final class Buffs {
             n++;
             run(mob, store -> {
                 s.weight.clear();
+                s.direct.clear();
                 apply(mob, s, false, store);
             });
         }
@@ -408,11 +610,11 @@ final class Buffs {
 
     /** Same; battleSources false = only the Buff Wand's (a hit between mobs that aren't battle enemies). */
     private static int total(State s, Stat st, boolean battleSources) {
-        int sum = 0;
+        long sum = s.direct.getOrDefault(st, 0);
         for (Map.Entry<Source, Integer> e : s.weight.entrySet()) {
-            if (battleSources || e.getKey() == Source.WAND) sum += percent(e.getKey(), st) * e.getValue();
+            if (battleSources || e.getKey() == Source.WAND) sum += (long) percent(e.getKey(), st) * e.getValue();
         }
-        return Math.min(st.totalMax(), sum);
+        return (int) Math.min(st.totalMax(), sum);
     }
 
     /** Total % of a stat on a mob right now (0 = unbuffed), for DuelCard. Any thread. */
@@ -447,8 +649,22 @@ final class Buffs {
             s.baseScale = null;
         }
         float scaled = sizeScale(mob, accessor);
-        // Mobs jump and climb in step with their size (players: BuffJump on their model change).
-        if (Math.abs(scaled - scaleBefore) > 0.001f) BuffJump.npc(mob, size > 0 ? 1 + size / 100f : 1f, accessor);
+        // Mobs jump, climb and run in step with their size and speed (players: BuffJump on their model change, and
+        // here when only the speed changed).
+        // A player growing past x2: their reach doesn't grow (per item, measured from the eye; validated by the server,
+        // docs/general/hallazgos.md 2026-10-13), so mobs at their feet can't be hit. Told once per crossing.
+        if (scaled > REACH_WARN_SCALE && scaleBefore <= REACH_WARN_SCALE) {
+            com.hypixel.hytale.server.core.universe.PlayerRef pr = accessor.getComponent(mob, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
+            if (pr != null) pr.sendMessage(I18n.tr("chat.buffs.reach").color("#ffcc55"));
+        }
+        int speed = total(s, Stat.SPEED);
+        float factor = size > 0 ? 1 + size / 100f : 1f;
+        if (Math.abs(factor - s.moveSize) > 0.001f || speed != s.speed) {
+            BuffJump.npc(mob, factor, 1 + speed / 100f, accessor);
+            if (speed != s.speed) BuffJump.player(mob, accessor);
+            s.speed = speed;
+            s.moveSize = factor;
+        }
         // A new scale rebuilds the mob on the client and drops the particles on it (WandFx.MODEL_SETTLE_MS).
         boolean resized = Math.abs(scaled - scaleBefore) > 0.001f;
         // Health.
@@ -511,8 +727,29 @@ final class Buffs {
         applyLook(mob, s, resized, fxScale, accessor);
         // A Jade/Shimmer look of its own (Effect Wand) also loses its ModelVFX in the rebuild: LookKeeper re-sends it.
         if (resized) LookKeeper.resized(mob);
-        if (s.weight.isEmpty()) STATES.remove(mob, s);
+        if (s.weight.isEmpty() && s.direct.isEmpty()) STATES.remove(mob, s);
     }
+
+    /**
+     * /mobbattle apply ... size|health|damage|defense|speed &lt;value&gt;: a direct amount (percent; 0 = none) on that mob or
+     * player, kept until Cleanse, unbuff, death or a restart. Its world thread.
+     */
+    static void setDirect(Ref<EntityStore> mob, Stat st, int percent) {
+        if (mob == null || !mob.isValid()) return;
+        run(mob, store -> {
+            State s = STATES.get(mob);
+            if (percent <= 0) {
+                if (s == null || s.direct.remove(st) == null) return;
+            } else {
+                if (s == null) STATES.put(mob, s = new State());
+                s.direct.put(st, Math.min(st.totalMax(), percent));
+            }
+            apply(mob, s, false, store);
+        });
+    }
+
+    /** A player bigger than this is told their reach doesn't grow. */
+    private static final float REACH_WARN_SCALE = 2.01f;
 
     private static final String BUFF_SHIMMER = "BuffShimmer_";
     private static final String BUFF_RUNES = "BuffRunes_";
@@ -525,9 +762,11 @@ final class Buffs {
      */
     private static void applyLook(Ref<EntityStore> mob, State s, boolean resized, float scaled,
                                   ComponentAccessor<EntityStore> accessor) {
-        boolean looks = s.weight.containsKey(Source.STREAK) || s.weight.containsKey(Source.CHAMPION)
-                || s.weight.containsKey(Source.WAND);
-        String look = looks ? (LookKeeper.hasOwnLook(mob) ? BUFF_RUNES : BUFF_SHIMMER) + FxSettings.buffColor
+        // buffLook off: no lasting look; runes: only the eye flames and runes, never the shimmer veins.
+        boolean looks = !"off".equals(FxSettings.buffLook) && (s.weight.containsKey(Source.STREAK)
+                || s.weight.containsKey(Source.CHAMPION) || s.weight.containsKey(Source.WAND));
+        boolean runesOnly = "runes".equals(FxSettings.buffLook) || LookKeeper.hasOwnLook(mob);
+        String look = looks ? (runesOnly ? BUFF_RUNES : BUFF_SHIMMER) + FxSettings.buffColor
                 + WandFx.lookSize(scaled) : null;
         if (s.lookFx != null && !s.lookFx.equals(look)) {
             LookKeeper.untrackBuff(mob);
@@ -607,17 +846,31 @@ final class Buffs {
     static void refreshLook(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
         State s = mob == null ? null : STATES.get(mob);
         if (s == null || !mob.isValid()) return;
-        applyLook(mob, s, false, sizeScale(mob, accessor), accessor);
+        // Sized as apply() and refreshLookAll() do (audit 2026-10-14: the raw scale made a x3 player's runes huge again).
+        applyLook(mob, s, false, WandFx.particleScale(mob, sizeScale(mob, accessor)), accessor);
     }
 
-    /** "size +20%, health +40%" for that many Buff Wand stacks (each stat capped at its max). */
+    /**
+     * buffLook or buffColor changed (command, panel save, preset, reload): every buffed mob gets its look again, each
+     * on its world thread. A look that didn't change is left alone (applyLook compares the effect id).
+     */
+    static void refreshLookAll() {
+        forEachWorld(STATES.keySet(), (store, mobs) -> {
+            for (Ref<EntityStore> mob : mobs) {
+                State s = STATES.get(mob);
+                if (s != null && mob.isValid()) applyLook(mob, s, false, WandFx.particleScale(mob, sizeScale(mob, store)), store);
+            }
+        });
+    }
+
+    /** "size +20% (x1.2), health +40% (x1.4)" for that many Buff Wand stacks (each stat capped at its max). */
     static String describeWand(int stacks) {
         StringBuilder b = new StringBuilder();
         for (Stat st : Stat.values()) {
             int v = Math.min(st.totalMax(), percent(Source.WAND, st) * stacks);
             if (v <= 0) continue;
             if (b.length() > 0) b.append(", ");
-            b.append(st.key).append(" +").append(v).append('%');
+            b.append(st.key).append(' ').append(both(st, v));
         }
         return b.toString();
     }
@@ -637,7 +890,8 @@ final class Buffs {
      */
     static float scale(Ref<EntityStore> attacker, Ref<EntityStore> victim, float amount, boolean enemies) {
         if (STATES.isEmpty()) return amount;
-        State a = attacker != null ? STATES.get(attacker) : null;
+        // Damage it does to itself (its own burn or fall, an effect it carries) is not raised by its own damage buff.
+        State a = attacker != null && !attacker.equals(victim) ? STATES.get(attacker) : null;
         if (a != null) amount *= 1 + total(a, Stat.DAMAGE, enemies) / 100f;
         State v = STATES.get(victim);
         if (v != null) amount *= 1 - total(v, Stat.DEFENSE, enemies) / 100f;
@@ -682,7 +936,15 @@ final class Buffs {
         if (PRE_LONE.remove(old)) PRE_LONE.add(neu);
         Falling f = FALLING.remove(old);
         if (f != null) FALLING.put(neu, f);
-        if (s != null) modelChanged(neu);
+        if (s != null) {
+            modelChanged(neu);
+            // The new role has fresh motion controllers: its size and speed buffs go on them again.
+            float factor = 1 + total(s, Stat.SIZE) / 100f, speed = 1 + total(s, Stat.SPEED) / 100f;
+            s.moveSize = factor;
+            run(neu, store -> {
+                if (neu.isValid()) BuffJump.npc(neu, factor, speed, store);
+            });
+        }
     }
 
     /** BattleManager.maintain: drops dead or unloaded mobs. */
@@ -732,6 +994,13 @@ final class Buffs {
         }
         String c = parseCrown(p.getProperty("buff.crown"));
         if (c != null) crown = c;
+        Boolean u = parseUnit(p.getProperty("buff.unit"));
+        if (u != null) multiplier = u;
+        String sp = parseSizeEffect(p.getProperty("buff.size.speed"));
+        if (sp != null) sizeSpeed = sp;
+        String sj = parseSizeEffect(p.getProperty("buff.size.jump"));
+        if (sj != null) sizeJump = sj;
+        if (!STATES.isEmpty()) refreshMovementAll();
     }
 
     static void save(Properties p) {
@@ -743,6 +1012,9 @@ final class Buffs {
         p.setProperty("buff.size.max", String.valueOf(sizeMax));
         for (Source s : Source.values()) p.setProperty("buff." + s.key + ".heal", String.valueOf(heals(s)));
         p.setProperty("buff.crown", crown);
+        p.setProperty("buff.unit", unit());
+        p.setProperty("buff.size.speed", sizeSpeed);
+        p.setProperty("buff.size.jump", sizeJump);
     }
 
     /** "lone size 10% health 50% | streak off | champion off | maxKills 5 | crown gold". */
@@ -759,12 +1031,13 @@ final class Buffs {
             if (heals(s)) b.append(" heal on");
             for (Stat st : Stat.values()) {
                 int v = percent(s, st);
-                if (v > 0) b.append(' ').append(st.key).append(' ').append(v).append('%');
+                if (v > 0) b.append(' ').append(st.key).append(' ').append(both(st, v));
             }
             if (s == Source.STREAK) b.append(" per kill");
             if (s == Source.WAND) b.append(" per click");
         }
-        return b.append(" | sizeMax ").append(sizeMax).append('%')
+        return b.append(" | sizeMax ").append(both(Stat.SIZE, sizeMax)).append(" | sizeSpeed ").append(sizeSpeed)
+                .append(" | sizeJump ").append(sizeJump).append(" | unit ").append(unit())
                 .append(" | maxKills ").append(streakMax).append(" | wand maxStacks ").append(wandMax)
                 .append(" | crown ").append(crown.toLowerCase(Locale.ROOT)).toString();
     }

@@ -55,8 +55,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             // when clicking the air.
             Ref<EntityStore> mob = isLivingNpc(target, buffer) ? target : FightManager.getSelection(player.getUuid());
             if (!isLivingNpc(mob, buffer) || mob.getStore() != context.getEntity().getStore()) {
-                player.sendMessage(Message.raw("Crouch and click a mob to fight it yourself (or select one, then crouch "
-                        + "and click the air).").color(COLOR_WARN));
+                player.sendMessage(I18n.tr("chat.duel.crouchHint").color(COLOR_WARN));
                 return;
             }
             FightManager.clear(player.getUuid());
@@ -67,7 +66,8 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             BattleManager.markPlayer(me, player.getUuid());
             String duelFx = ActionFx.mobFx(ActionFx.Role.DUEL);
             if (duelFx != null) WandFx.onTarget(mob, duelFx, buffer);
-            Countdown.run(BattleManager.Kind.DUEL, player, buffer, "DUEL: " + nameOf(mob, buffer) + " vs you", java.util.List.of(mob, me),
+            Countdown.run(BattleManager.Kind.DUEL, player, buffer, new Countdown.Label("DUEL: " + nameOf(mob, buffer) + " vs you",
+                    I18n.tr("battle.label.duel.you").param("name", nameOf(mob, buffer))), java.util.List.of(mob, me),
                     acc -> duel(player, me, mob, me, acc));
             // Clicking the air (the selected mob vs you): the Snap Wand's ground slam, only as a look.
             if (target != mob) slam(me, buffer);
@@ -81,7 +81,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         }
         if (!targetIsPlayer && !isLivingNpc(target, buffer)) {
             // Clicking the air: not Failed, so the wand still plays its swing.
-            player.sendMessage(Message.raw("Look at a living mob and click it.").color(COLOR_WARN));
+            player.sendMessage(I18n.tr("chat.look.livingMob").color(COLOR_WARN));
             return;
         }
 
@@ -95,7 +95,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         if (first == null) {
             FightManager.select(player.getUuid(), target);
             WandFx.onTarget(target, WandFx.CHARM, buffer);
-            player.sendMessage(Message.raw("Selected: " + targetName + ". Now click its opponent.").color(COLOR_INFO));
+            player.sendMessage(I18n.tr("chat.duel.selected").param("name", targetName).color(COLOR_INFO));
             return;
         }
         if (first == target) {
@@ -103,7 +103,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             FightManager.clear(player.getUuid());
             // The grey tint and burst ring, as the right click's clear.
             WandFx.onTarget(target, WandFx.UNSELECT, buffer);
-            player.sendMessage(Message.raw("Deselected: " + targetName + ".").color(COLOR_INFO));
+            player.sendMessage(I18n.tr("chat.duel.deselected").param("name", targetName).color(COLOR_INFO));
             return;
         }
 
@@ -116,8 +116,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             MobBattlePlugin.debug("duel rejected: neither " + nameOf(picked, buffer) + " nor " + targetName + " can attack");
             WandFx.onTarget(picked, WandFx.FAIL, buffer);
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            player.sendMessage(Message.raw("Neither " + nameOf(picked, buffer) + " nor " + targetName
-                    + " can attack. No fight.").color(COLOR_WARN));
+            player.sendMessage(I18n.tr("chat.duel.neitherCanAttack").param("a", nameOf(picked, buffer)).param("b", targetName).color(COLOR_WARN));
             return;
         }
         if (PlayerFighters.isPlayer(picked, buffer)) BattleManager.markPlayer(picked, player.getUuid());
@@ -129,7 +128,8 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
             WandFx.onTarget(target, duelFx, buffer);
         }
         FightCamera.intro(BattleManager.Kind.DUEL, player, null, java.util.List.of(java.util.List.of(picked), java.util.List.of(target)), buffer);
-        Countdown.run(BattleManager.Kind.DUEL, player, buffer, "DUEL: " + nameOf(picked, buffer) + " vs " + targetName, java.util.List.of(picked, target),
+        Countdown.run(BattleManager.Kind.DUEL, player, buffer, new Countdown.Label("DUEL: " + nameOf(picked, buffer) + " vs " + targetName,
+                I18n.tr("battle.label.duel").param("a", nameOf(picked, buffer)).param("b", targetName)), java.util.List.of(picked, target),
                 acc -> duel(player, playerEntity, picked, target, acc));
     }
 
@@ -161,7 +161,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
                      ComponentAccessor<EntityStore> buffer) {
         if (!BattleManager.isAlive(first, buffer) || !BattleManager.isAlive(target, buffer)
                 || !PlayerFighters.canStart(first, buffer) || !PlayerFighters.canStart(target, buffer)) {
-            player.sendMessage(Message.raw("Duel cancelled: a fighter is gone.").color(COLOR_WARN));
+            player.sendMessage(I18n.tr("chat.duel.fighterGone").color(COLOR_WARN));
             return;
         }
         String firstName = ChaosWand.nameOf(first, buffer);
@@ -173,8 +173,7 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         // A player fighter always can attack (a passive mob still gets hunted).
         boolean withPlayer = BattleManager.isPlayerFighter(first) || BattleManager.isPlayerFighter(target);
         if (!withPlayer && a != FightManager.Result.AGGRESSIVE && b != FightManager.Result.AGGRESSIVE) {
-            player.sendMessage(Message.raw("Neither " + firstName + " nor " + targetName
-                    + " can attack. No fight.").color(COLOR_WARN));
+            player.sendMessage(I18n.tr("chat.duel.neitherCanAttack").param("a", firstName).param("b", targetName).color(COLOR_WARN));
             return;
         }
         // Also a 2-mob "royale", so the winner gets a title when the other one dies.
@@ -189,13 +188,13 @@ public class SelectFighterInteraction extends SimpleInstantInteraction {
         MobBattlePlugin.log("Fight " + firstName + " (" + a + ", state " + FightManager.stateOf(first, buffer) + ") vs "
                 + targetName + " (" + b + ", state " + FightManager.stateOf(target, buffer) + ")");
 
-        player.sendMessage(Message.raw("FIGHT! " + firstName + " vs " + targetName).color(COLOR_FIGHT));
+        player.sendMessage(I18n.tr("chat.duel.fight").param("a", firstName).param("b", targetName).color(COLOR_FIGHT));
         FightFx.showFightStart(player, playerEntity, firstName, targetName, first, target, buffer);
         if (a == FightManager.Result.PASSIVE) {
-            player.sendMessage(Message.raw(firstName + " is passive: it will only run.").color(COLOR_WARN));
+            player.sendMessage(I18n.tr("chat.duel.passive").param("name", firstName).color(COLOR_WARN));
         }
         if (b == FightManager.Result.PASSIVE) {
-            player.sendMessage(Message.raw(targetName + " is passive: it will only run.").color(COLOR_WARN));
+            player.sendMessage(I18n.tr("chat.duel.passive").param("name", targetName).color(COLOR_WARN));
         }
     }
 

@@ -28,7 +28,7 @@ public class HealInteraction extends SimpleInstantInteraction {
             .build();
 
     /** The light reaching the mob, as CleanseInteraction.LIGHT_LANDS_MS (same MobBattle_Light_&lt;Color&gt; rays). */
-    private static final long LIGHT_LANDS_MS = 400;
+    static final long LIGHT_LANDS_MS = 400;
 
     @Override
     protected void firstRun(@Nonnull InteractionType type, @Nonnull InteractionContext context, @Nonnull CooldownHandler cooldownHandler) {
@@ -59,12 +59,14 @@ public class HealInteraction extends SimpleInstantInteraction {
             }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
         if (player != null) {
-            player.sendMessage(Message.raw("Healed " + name + " to full health.").color("#55ff77"));
+            player.sendMessage(I18n.tr("chat.heal.done").param("name", name).color("#55ff77"));
         }
     }
 
     /** Full health and the heal look (burst, totem fireflies and sound, green tint). World thread. */
-    private static void healNow(Ref<EntityStore> target, ComponentAccessor<EntityStore> accessor) {
+    static void healNow(Ref<EntityStore> target, ComponentAccessor<EntityStore> accessor) {
+        // Dead or dying by the time the light lands (a delayed wave group): no heal for a corpse.
+        if (target == null || !BattleManager.isAlive(target, accessor)) return;
         EntityStatMap stats = accessor.getComponent(target, EntityStatMap.getComponentType());
         if (stats == null) return;
         stats.maximizeStatValue(DefaultEntityStatTypes.getHealth());

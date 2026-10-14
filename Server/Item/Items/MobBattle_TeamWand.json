@@ -13,7 +13,7 @@
   "Model": "Items/MobBattle/TeamWand/MobBattle_TeamWand.blockymodel",
   "Texture": "Items/MobBattle/TeamWand/MobBattle_TeamWand_Texture.png",
   "Animation": "Items/MobBattle/TeamWand/idle.blockyanim",
-  "PlayerAnimationsId": "Staff",
+  "PlayerAnimationsId": "MobBattle_TeamWand",
   "Utility": {
     "Compatible": true
   },
@@ -53,18 +53,26 @@
             {
               "Type": "MobBattle_TeamAction",
               "Effects": {
-                "ItemAnimationId": "SwingLeft"
+                "ItemAnimationId": "TeamSpinLeft"
               },
               "RunTime": 0.35
             },
             {
               "Type": "MobBattle_TeamAction",
               "Effects": {
-                "ItemAnimationId": "SwingRight"
+                "ItemAnimationId": "TeamSpinRight"
               },
               "RunTime": 0.35
             }
           ]
+        }
+      ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_SkipCamera",
+          "RunTime": 0
         }
       ]
     }

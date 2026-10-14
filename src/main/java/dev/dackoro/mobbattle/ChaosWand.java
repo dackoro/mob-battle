@@ -37,6 +37,7 @@ public final class ChaosWand {
     }
 
     static Vector3d positionOf(Ref<EntityStore> ref, ComponentAccessor<EntityStore> buffer) {
+        if (ref == null || !ref.isValid()) return null; // a removed Ref throws on getComponent
         TransformComponent t = buffer.getComponent(ref, TransformComponent.getComponentType());
         return t != null ? new Vector3d(t.getPosition()) : null;
     }
@@ -72,6 +73,19 @@ public final class ChaosWand {
 
     static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, boolean column, int maxMobs,
                                              ComponentAccessor<EntityStore> buffer) {
+        return npcsAround(center, radius, column, maxMobs, false, buffer);
+    }
+
+    /**
+     * Royale and all vs one: within the battle height band ({@link #inBand}) too, filtered before the maxMobs cap (audit
+     * 2026-10-14: mobs outside the band took cap places, so fewer joined and the left-out count was wrong).
+     */
+    static List<Ref<EntityStore>> npcsInBand(Vector3d center, double radius, int maxMobs, ComponentAccessor<EntityStore> buffer) {
+        return npcsAround(center, radius, false, maxMobs, true, buffer);
+    }
+
+    private static List<Ref<EntityStore>> npcsAround(Vector3d center, double radius, boolean column, int maxMobs,
+                                                     boolean band, ComponentAccessor<EntityStore> buffer) {
         // getAllEntitiesInSphere returns a thread-local list: copy it right away.
         // Distance once per NPC, not once per sort comparison (n log n component reads and copies).
         List<Near> near = new ArrayList<>();
@@ -81,7 +95,8 @@ public final class ChaosWand {
                 : TargetUtil.getAllEntitiesInSphere(center, radius, buffer);
         for (Ref<EntityStore> r : found) {
             if (r != null && r.isValid() && buffer.getComponent(r, NPCEntity.getComponentType()) != null
-                    && BattleManager.isAlive(r, buffer) && (!column || horizontal(center, r, buffer) <= radius)) {
+                    && BattleManager.isAlive(r, buffer) && (!column || horizontal(center, r, buffer) <= radius)
+                    && (!band || inBand(center, r, buffer))) {
                 near.add(new Near(r, distSq(center, r, buffer)));
             }
         }
@@ -93,6 +108,17 @@ public final class ChaosWand {
             out.add(near.get(i).ref());
         }
         return out;
+    }
+
+    /**
+     * battleBelow / battleAbove (2026-10-14, user): a royale or all vs one takes mobs only this far below / above its
+     * center (0 = no limit), so a surface battle leaves a deep cave's mobs alone. True if {@code r} is inside the band.
+     */
+    static boolean inBand(Vector3d center, Ref<EntityStore> r, ComponentAccessor<EntityStore> buffer) {
+        Vector3d p = positionOf(r, buffer);
+        if (p == null || center == null) return true;
+        double dy = p.y - center.y;
+        return !(FxSettings.battleBelow > 0 && dy < -FxSettings.battleBelow) && !(FxSettings.battleAbove > 0 && dy > FxSettings.battleAbove);
     }
 
     private static double horizontal(Vector3d center, Ref<EntityStore> r, ComponentAccessor<EntityStore> buffer) {
@@ -107,16 +133,20 @@ public final class ChaosWand {
     static void warnLeftOut(PlayerRef player) {
         int left = LEFT_OUT.get();
         if (left > 0) {
-            player.sendMessage(Message.raw(left + " mobs were left out: the limit is " + FxSettings.maxMobs
-                    + " (/mobbattle maxMobs <2-" + FxSettings.MAX_MOBS_LIMIT + ">).").color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.leftout").param("count", left).param("max", FxSettings.maxMobs)
+                    .param("limit", FxSettings.MAX_MOBS_LIMIT).color(WARN));
         }
     }
 
     private record Near(Ref<EntityStore> ref, double distSq) {
     }
 
-    /** Squared distance without copying the position; MAX_VALUE if it has no transform. */
+    /**
+     * Squared distance without copying the position; MAX_VALUE if it has no transform or is gone. A removed Ref throws
+     * on getComponent ("Invalid entity reference!"), which crashed the world (nearerEnemy, 2026-10-13).
+     */
     static double distSq(Vector3d c, Ref<EntityStore> r, ComponentAccessor<EntityStore> buffer) {
+        if (r == null || !r.isValid()) return Double.MAX_VALUE;
         TransformComponent t = buffer.getComponent(r, TransformComponent.getComponentType());
         return t == null ? Double.MAX_VALUE : t.getPosition().distanceSquared(c);
     }
@@ -136,13 +166,14 @@ public final class ChaosWand {
         if (center == null) {
             return;
         }
-        List<Ref<EntityStore>> around = npcsAround(center, buffer);
+        List<Ref<EntityStore>> around = npcsInBand(center, FxSettings.radius, FxSettings.maxMobs, buffer);
         around.removeIf(r -> r == target);
+        // battleWaveGroundOnly: only the mobs near the ground of the wave join (fliers and caves stay out).
+        if (FxSettings.battleWaveGroundOnly) around.retainAll(new java.util.HashSet<>(WaveHit.filter(center, around, true, buffer)));
         String targetName = nameOf(target, buffer);
         if (around.isEmpty()) {
             // Only the cast animation and this message: no area, no effects.
-            player.sendMessage(Message.raw("No mobs within " + FxSettings.radius + " blocks of " + targetName
-                    + ". Use /mobbattle areaRadius <blocks>.").color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.nomobs").param("radius", FxSettings.radius).param("name", targetName).color(WARN));
             return;
         }
         BattleManager.Kind kind = BattleManager.Kind.ALL_VS_ONE;
@@ -157,13 +188,17 @@ public final class ChaosWand {
             String lone = ActionFx.mobFx(ActionFx.Role.LONE);
             String rage = ActionFx.mobFx(ActionFx.Role.ATTACKERS);
             if (lone != null) WandFx.onTarget(target, lone, KindFx.countdown(kind), buffer);
-            for (Ref<EntityStore> npc : around) {
-                if (rage != null) WandFx.onTarget(npc, rage, KindFx.countdown(kind), buffer);
+            // battleWaveTravel: each attacker's mark comes as the ring reaches it.
+            if (rage != null) {
+                int seconds = KindFx.countdown(kind);
+                WaveHit.hit(center, FxSettings.radius, new ArrayList<>(around), FxSettings.battleWaveTravel, buffer, (group, acc) -> {
+                    for (Ref<EntityStore> npc : group) WandFx.onTarget(npc, rage, seconds, acc);
+                });
             }
         }
         FightFx.summonRune(kind, center, buffer);
         FightCamera.intro(kind, player, center, List.of(List.of(target), new ArrayList<>(around)), buffer);
-        Countdown.run(kind, player, buffer, "EVERYONE vs " + targetName, withTarget(around, target),
+        Countdown.run(kind, player, buffer, new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", targetName)), withTarget(around, target),
                 acc -> focusNow(player, playerEntity, target, targetName, around, center, acc),
                 reason -> Buffs.cancelPreLone(target));
         // The lone buff from the countdown on (after Countdown.run: a replaced countdown of this target cancels
@@ -177,7 +212,7 @@ public final class ChaosWand {
         around.removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
         if (!BattleManager.isAlive(target, buffer) || !PlayerFighters.canStart(target, buffer) || around.isEmpty()) {
             Buffs.cancelPreLone(target);
-            player.sendMessage(Message.raw("EVERYONE vs " + targetName + " cancelled: the mobs are gone.").color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.focuscancelled").param("name", targetName).color(WARN));
             return;
         }
 
@@ -213,21 +248,23 @@ public final class ChaosWand {
             FightManager.turnAgainst(target, firstAttacker, buffer);
         }
         MobBattlePlugin.log("Chaos focus on " + targetName + ": " + around.size() + " mobs, " + attackers + " aggressive");
-        player.sendMessage(Message.raw("EVERYONE vs " + targetName + "! " + attackers + " of " + around.size()
-                + " mobs attack (radius " + FxSettings.radius + ").").color(FIGHT));
-        FightFx.title(BattleManager.Kind.ALL_VS_ONE, player, "EVERYONE vs " + targetName, attackers + " attackers");
+        player.sendMessage(I18n.tr("chat.chaos.focusstart").param("name", targetName).param("attackers", attackers)
+                .param("total", around.size()).param("radius", FxSettings.radius).color(FIGHT));
+        FightFx.title(BattleManager.Kind.ALL_VS_ONE, player, I18n.tr("battle.label.everyone").param("name", targetName),
+                I18n.tr("battle.sub.attackers").param("count", attackers));
     }
 
     /** Free-for-all: every NPC around {@code center} gets a random opponent. */
     static void brawl(PlayerRef player, Ref<EntityStore> playerEntity, Vector3d center,
                       ComponentAccessor<EntityStore> buffer) {
-        List<Ref<EntityStore>> around = npcsAround(center, buffer);
+        List<Ref<EntityStore>> around = npcsInBand(center, FxSettings.radius, FxSettings.maxMobs, buffer);
         // /mobbattle playerFights royale: the players in the area fight too (not in Creative).
         around.addAll(PlayerFighters.playersAround(player, center, FxSettings.radius, buffer));
+        // battleWaveGroundOnly: only the mobs near the ground of the wave join (fliers and caves stay out).
+        if (FxSettings.battleWaveGroundOnly) around.retainAll(new java.util.HashSet<>(WaveHit.filter(center, around, true, buffer)));
         if (around.size() < 2) {
             // Only the cast animation and this message: no area, no effects.
-            player.sendMessage(Message.raw("A free-for-all needs at least 2 mobs within " + FxSettings.radius
-                    + " blocks. Use /mobbattle areaRadius <blocks>.").color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.brawlneeds").param("radius", FxSettings.radius).color(WARN));
             return;
         }
         BattleManager.Kind kind = BattleManager.Kind.ROYALE;
@@ -241,18 +278,27 @@ public final class ChaosWand {
             if (store.isShutdown()) return;
             ActionFx.shockwave(ActionFx.Action.ROYALE, center, FxSettings.radius, store);
             WandFx.burst(null, WandFx.SNAP_SOUND, center, store);
+            // battleWaveTravel: each fighter's mark comes as the ring reaches it.
+            String mark = KindFx.runes(kind) && FxSettings.battleWaveTravel ? ActionFx.mobFx(ActionFx.Role.ROYALE) : null;
+            if (mark != null) {
+                int seconds = KindFx.countdown(kind);
+                WaveHit.hit(center, FxSettings.radius, new ArrayList<>(around), true, store, (group, acc) -> {
+                    for (Ref<EntityStore> npc : group) if (npc.isValid()) WandFx.onTarget(npc, mark, seconds, acc);
+                });
+            }
         }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
         warnLeftOut(player);
         if (KindFx.runes(kind)) {
             // /mobbattle mobFx royale (default purple).
             String brawl = ActionFx.mobFx(ActionFx.Role.ROYALE);
+            // With battleWaveTravel the marks come with the ring instead (above).
             for (Ref<EntityStore> npc : around) {
-                if (brawl != null) WandFx.onTarget(npc, brawl, KindFx.countdown(kind), buffer);
+                if (brawl != null && !FxSettings.battleWaveTravel) WandFx.onTarget(npc, brawl, KindFx.countdown(kind), buffer);
             }
         }
         FightFx.summonRune(kind, center, buffer);
         FightCamera.intro(kind, player, center, List.of(new ArrayList<>(around)), buffer);
-        Countdown.run(kind, player, buffer, "BATTLE ROYALE", around, acc -> brawlNow(player, playerEntity, around, center, acc));
+        Countdown.run(kind, player, buffer, new Countdown.Label("BATTLE ROYALE", I18n.tr("battle.label.royale")), around, acc -> brawlNow(player, playerEntity, around, center, acc));
     }
 
     /** How many of the closest opponents a royale fighter picks its first one from. */
@@ -276,7 +322,7 @@ public final class ChaosWand {
                                  Vector3d center, ComponentAccessor<EntityStore> buffer) {
         around.removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
         if (around.size() < 2) {
-            player.sendMessage(Message.raw("BATTLE ROYALE cancelled: fewer than 2 mobs left.").color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.royalecancelled").color(WARN));
             return;
         }
 
@@ -319,8 +365,9 @@ public final class ChaosWand {
             sb.setLength(sb.length() - 1);
             MobBattlePlugin.debug(sb.toString());
         }
-        player.sendMessage(Message.raw("BATTLE ROYALE! " + aggressive + " of " + around.size()
-                + " mobs fight until one is left (radius " + FxSettings.radius + ").").color(FIGHT));
-        FightFx.title(BattleManager.Kind.ROYALE, player, "BATTLE ROYALE!", around.size() + " mobs, last one standing wins");
+        player.sendMessage(I18n.tr("chat.chaos.royalestart").param("aggressive", aggressive).param("total", around.size())
+                .param("radius", FxSettings.radius).color(FIGHT));
+        FightFx.title(BattleManager.Kind.ROYALE, player, I18n.tr("battle.title.royale"),
+                I18n.tr("battle.sub.royale.mobs").param("count", around.size()));
     }
 }

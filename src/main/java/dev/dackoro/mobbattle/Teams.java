@@ -184,6 +184,17 @@ public final class Teams {
         return 0;
     }
 
+    /** Same as {@link #describe} but translated, for the player's chat. */
+    public static com.hypixel.hytale.server.core.Message describeMessage() {
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < MAX; i++) {
+            if (exists(i)) {
+                parts.add(name(i) + " " + color(i));
+            }
+        }
+        return I18n.tr("chat.teams.list").param("count", count()).param("max", MAX).param("list", String.join(", ", parts));
+    }
+
     public static String describe() {
         StringBuilder sb = new StringBuilder("Teams (" + count() + "/" + MAX + "): ");
         List<String> parts = new ArrayList<>();

@@ -53,12 +53,21 @@ final class Scoreboard extends CustomUIHud {
         return !SHOWN.isEmpty() || BattleManager.hasBattles();
     }
 
+    /**
+     * A 1v1 duel with the duel card, or an all vs one with the focus card: the card takes the board's place on the right
+     * and says the same and more, so the board is not shown (user, 2026-10-13).
+     */
+    private static boolean cardShown(BattleManager.Battle b) {
+        return (b.kind == BattleManager.Kind.DUEL && FxSettings.duelCard && b.teamOf.size() <= 2)
+                || (b.kind == BattleManager.Kind.ALL_VS_ONE && FxSettings.focusCard);
+    }
+
     /** Once per second per world (BattleLifecycleSystem, world thread). */
     static void tick(Store<EntityStore> store) {
         if (store.isShutdown()) return;
         Map<UUID, BattleManager.Battle> want = new HashMap<>();
         for (BattleManager.Battle b : BattleManager.battles()) {
-            if (b.over || b.store != store || !FxSettings.scoreboard(b.kind)) continue;
+            if (b.over || b.store != store || !FxSettings.scoreboard(b.kind) || cardShown(b)) continue;
             for (PlayerRef p : FightFx.titleViewers(b)) {
                 if (p.isValid()) want.put(p.getUuid(), b);
             }
@@ -101,7 +110,7 @@ final class Scoreboard extends CustomUIHud {
         return ref != null && ref.isValid() && ref.getStore() == store;
     }
 
-    private record Row(String text, String color) {
+    private record Row(Message text, String color) {
     }
 
     private static void show(PlayerRef player, Store<EntityStore> store, BattleManager.Battle battle) {
@@ -116,13 +125,13 @@ final class Scoreboard extends CustomUIHud {
         }
         List<Row> rows = rows(battle, store);
         UICommandBuilder b = new UICommandBuilder();
-        b.set("#Title.Text", title(battle));
+        b.set("#Title.TextSpans", title(battle));
         for (int i = 0; i < ROWS; i++) {
             boolean on = i < rows.size();
             b.set("#Row" + i + ".Visible", on);
             // A colored Message goes in TextSpans (as vanilla pages do): .Text only takes a plain string, and a
             // Message there makes the client drop the connection ("Failed to apply CustomUI HUD commands").
-            if (on) b.set("#Text" + i + ".TextSpans", Message.raw(rows.get(i).text()).color(rows.get(i).color()));
+            if (on) b.set("#Text" + i + ".TextSpans", rows.get(i).text().color(rows.get(i).color()));
         }
         hud.update(false, b);
     }
@@ -136,13 +145,8 @@ final class Scoreboard extends CustomUIHud {
         }
     }
 
-    private static String title(BattleManager.Battle battle) {
-        return switch (battle.kind) {
-            case DUEL -> "Duel";
-            case ALL_VS_ONE -> "Everyone vs one";
-            case ROYALE -> "Battle royale";
-            case TEAMS -> "Teams";
-        };
+    private static Message title(BattleManager.Battle battle) {
+        return I18n.tr("hud.score.title." + battle.kind.key);
     }
 
     /** The rows of a battle (at most ROWS). Counted, not collected: battles can hold hundreds of mobs. */
@@ -154,8 +158,9 @@ final class Scoreboard extends CustomUIHud {
                 for (Map.Entry<Integer, int[]> e : sides.entrySet()) {
                     int team = e.getKey();
                     int kills = battle.killsBy.getOrDefault(team, 0);
-                    out.add(new Row(battle.name(team) + "  " + e.getValue()[0] + "/" + e.getValue()[1]
-                            + "  ·  " + kills + (kills == 1 ? " kill" : " kills"), battle.color(team)));
+                    out.add(new Row(I18n.tr("hud.score.team").param("name", battle.name(team))
+                            .param("alive", e.getValue()[0]).param("total", e.getValue()[1]).param("kills", kills),
+                            battle.color(team)));
                 }
             }
             case ALL_VS_ONE -> {
@@ -165,26 +170,30 @@ final class Scoreboard extends CustomUIHud {
                     if (e.getValue() == 1) target = e.getKey();
                 }
                 int[] one = sides.getOrDefault(1, new int[2]);
-                String hp = one[0] > 0 && target != null ? "  " + health(target, store) + "%" : "  down";
-                out.add(new Row(pretty(battle.focusName) + hp, "#ffd23e"));
+                out.add(new Row(one[0] > 0 && target != null
+                        ? I18n.tr("hud.score.hp").param("name", pretty(battle.focusName)).param("pct", health(target, store))
+                        : I18n.tr("hud.score.down").param("name", pretty(battle.focusName)), "#ffd23e"));
                 int[] crowd = sides.getOrDefault(0, new int[2]);
-                out.add(new Row("Attackers  " + crowd[0] + "/" + crowd[1], "#ff6b5e"));
+                out.add(new Row(I18n.tr("hud.score.attackers").param("alive", crowd[0]).param("total", crowd[1]), "#ff6b5e"));
             }
             case ROYALE -> {
                 int alive = 0;
                 for (Ref<EntityStore> m : battle.members()) if (BattleManager.isAlive(m, store)) alive++;
-                out.add(new Row(alive + "/" + battle.teamOf.size() + " left", "#ffffff"));
-                int place = 1;
-                for (BattleManager.Kills k : battle.topKillers(ROWS - 1)) {
-                    out.add(new Row(place++ + ". " + pretty(k.name()) + "  " + k.count()
-                            + (k.count() == 1 ? " kill" : " kills"), place == 2 ? "#ffd23e" : "#c8e6ff"));
+                out.add(new Row(I18n.tr("hud.score.left").param("alive", alive).param("total", battle.teamOf.size()), "#ffffff"));
+                java.util.List<BattleManager.Kills> top = battle.topKillers(ROWS - 1);
+                int[] places = BattleManager.places(top, battle.sharedPlaces());
+                for (int i = 0; i < top.size(); i++) {
+                    BattleManager.Kills k = top.get(i);
+                    out.add(new Row(I18n.tr("hud.score.place").param("place", places[i]).param("name", pretty(k.name()))
+                            .param("kills", k.count()), places[i] == 1 ? "#ffd23e" : "#c8e6ff"));
                 }
             }
             case DUEL -> {
                 for (Ref<EntityStore> m : battle.members()) {
                     boolean up = BattleManager.isAlive(m, store);
-                    out.add(new Row(pretty(ChaosWand.nameOf(m, store)) + "  " + (up ? health(m, store) + "%" : "down"),
-                            up ? "#ffffff" : "#888888"));
+                    String who = pretty(ChaosWand.nameOf(m, store));
+                    out.add(new Row(up ? I18n.tr("hud.score.hp").param("name", who).param("pct", health(m, store))
+                            : I18n.tr("hud.score.down").param("name", who), up ? "#ffffff" : "#888888"));
                     if (out.size() >= 2) break;
                 }
             }

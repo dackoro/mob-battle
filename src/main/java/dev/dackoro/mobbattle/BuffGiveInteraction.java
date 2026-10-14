@@ -39,12 +39,12 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
         }
         Ref<EntityStore> target = context.getTargetEntity();
         if (target == null || !target.isValid() || buffer.getComponent(target, EntityStatMap.getComponentType()) == null) {
-            player.sendMessage(Message.raw("Look at a mob or player and click it.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.look.mobOrPlayer").color("#ffcc55"));
             return;
         }
         String name = ChaosWand.nameOf(target, buffer);
         if (!Buffs.enabled(Buffs.Source.WAND)) {
-            player.sendMessage(Message.raw("The Buff Wand is off: set it with /mobbattle buff wand <stat> <percent>").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.buff.off").color("#ffcc55"));
             WandFx.onTarget(target, WandFx.FAIL, buffer);
             return;
         }
@@ -53,8 +53,8 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
         if (before >= Buffs.wandMax) {
             // Already at the top: the error look and a message, no buff look (nothing changed).
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            player.sendMessage(Message.raw(name + " is already at the max: " + before + "/" + Buffs.wandMax + " stacks ("
-                    + Buffs.describeWand(before) + "). Raise it with /mobbattle buff wand maxStacks <n>").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.buff.atMax").param("name", name).param("stacks", before)
+                    .param("max", Buffs.wandMax).param("desc", Buffs.describeWand(before)).color("#ffcc55"));
             return;
         }
         // buffLight: a light comes down from the sky (as the Cleanse Wand's) and the buff lands with it: the mark
@@ -72,8 +72,8 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
             stacks = Buffs.addWandStackLater(target, LIGHT_LANDS_MS,
                     store -> WandFx.onTarget(target, WandFx.MARK + FxSettings.buffColor, store));
         }
-        String msg = "Buffed " + name + ": " + stacks + "/" + Buffs.wandMax + " stacks (" + Buffs.describeWand(stacks) + ")"
-                + (stacks == Buffs.wandMax ? ". Max reached." : ".");
-        player.sendMessage(Message.raw(msg).color("#ffd23e"));
+        player.sendMessage(I18n.tr(stacks == Buffs.wandMax ? "chat.buff.givenMax" : "chat.buff.given")
+                .param("name", name).param("stacks", stacks).param("max", Buffs.wandMax)
+                .param("desc", Buffs.describeWand(stacks)).color("#ffd23e"));
     }
 }

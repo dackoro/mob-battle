@@ -24,3 +24,4 @@ out/
 art-source/
 # Local deploy paths (see deploy.local.example.json)
 deploy.local.json
+__pycache__/

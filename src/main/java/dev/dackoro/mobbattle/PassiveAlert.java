@@ -2,6 +2,7 @@ package dev.dackoro.mobbattle;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
@@ -31,7 +32,7 @@ final class PassiveAlert extends CustomUIHud {
     }
 
     /** Shows or refreshes the alert for {@code player} (world thread of {@code store}). */
-    static void show(PlayerRef player, Store<EntityStore> store, String title, String text, int secondsLeft) {
+    static void show(PlayerRef player, Store<EntityStore> store, Message title, Message text, int secondsLeft) {
         Ref<EntityStore> ref = player.getReference();
         if (ref == null || !ref.isValid() || ref.getStore() != store) return;
         Player p = store.getComponent(ref, Player.getComponentType());
@@ -44,8 +45,8 @@ final class PassiveAlert extends CustomUIHud {
         }
         UICommandBuilder b = new UICommandBuilder();
         b.set("#Title.Text", title);
-        b.set("#Text.Text", text);
-        b.set("#Time.Text", secondsLeft + " s");
+        b.set("#Text.TextSpans", text);
+        b.set("#Time.Text", I18n.tr("hud.seconds").param("n", secondsLeft));
         hud.update(false, b);
     }
 

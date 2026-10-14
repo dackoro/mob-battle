@@ -51,7 +51,7 @@ public class TeamSelectInteraction extends SimpleInstantInteraction {
             BattleManager.markPlayer(target, player.getUuid());
         } else if (target == null || !target.isValid() || buffer.getComponent(target, NPCEntity.getComponentType()) == null
                 || !BattleManager.isAlive(target, buffer)) {
-            player.sendMessage(Message.raw("Look at a living mob and click it to add it to a team.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.team.look").color("#ffcc55"));
             return;
         }
         BattleManager.Draft draft = BattleManager.draft(player);
@@ -62,17 +62,22 @@ public class TeamSelectInteraction extends SimpleInstantInteraction {
         int more = role != null ? followSameType(draft, target, role, team, buffer) : 0;
         if (team < 0) {
             TeamFx.clear(target);
-            String tail = more > 0 ? " (and " + more + " more " + role + ")" : "";
-            player.sendMessage(Message.raw(name + " removed from the "
-                    + Teams.name(draft.currentTeam()) + " team" + tail + ".").color("#aaaaaa"));
+            player.sendMessage((more > 0
+                    ? I18n.tr("chat.team.removedMore").param("name", name).param("team", Teams.name(draft.currentTeam()))
+                            .param("more", more).param("role", role)
+                    : I18n.tr("chat.team.removed").param("name", name).param("team", Teams.name(draft.currentTeam())))
+                    .color("#aaaaaa"));
             return;
         }
         TeamFx.show(target, team);
         // The swirl in the team color (no tint: the team look stays).
         WandFx.swirl(target, Teams.color(team), buffer);
-        String extra = more > 0 ? ", +" + more + " more " + role : "";
-        player.sendMessage(Message.raw(name + " joins the " + Teams.name(team) + " team ("
-                + draft.teams().get(team).size() + " mobs" + extra + ").").color(Teams.color(team)));
+        int size = draft.teams().get(team).size();
+        player.sendMessage((more > 0
+                ? I18n.tr("chat.team.joinsMore").param("name", name).param("team", Teams.name(team))
+                        .param("count", size).param("more", more).param("role", role)
+                : I18n.tr("chat.team.joins").param("name", name).param("team", Teams.name(team)).param("count", size))
+                .color(Teams.color(team)));
         FightFx.teamRing(player, target, Teams.color(team), buffer);
     }
 

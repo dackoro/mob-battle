@@ -59,7 +59,8 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         boolean kills = WandFx.hasPendingKills();
         boolean countdowns = Countdown.hasPending();
         boolean snaps = Snap.any();
-        if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !snaps && !FightManager.hasFights()) {
+        boolean homes = ChaseSupport.anyHome();
+        if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !snaps && !homes && !FightManager.hasFights()) {
             // Nothing running anywhere: drop the timers, their Refs would keep unloaded worlds reachable.
             if (!timers.isEmpty()) timers.clear();
             return;
@@ -77,6 +78,11 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         // Every battle and draft member is managed: wild NPCs skip the battle lookups entirely.
         boolean managed = BattleManager.isManaged(self);
         BattleManager.Battle battle = managed && battles ? BattleManager.battleOf(self) : null;
+        // An onlooker of the same group (an Outlander next to an Outlander duel) must not answer the fighters' calls.
+        if (battles && !managed) {
+            dropCallsAboutFighters(self, buffer);
+            FightManager.dropFighterTarget(self, buffer);
+        }
         if (managed && due(self, now, ISOLATION_INTERVAL_MS, t -> t.isolation, (t, v) -> t.isolation = v)) {
             Timers t = timers.get(self);
             long version = BattleManager.membership();
@@ -87,7 +93,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             }
             FightManager.refreshBattleIsolation(self, battle, buffer, full);
         }
-        if (battles && !managed && BattleManager.hasFlocks() && !FightManager.isFighter(self)
+        if (battles && !managed && BattleManager.hasFlocks() && BattleManager.recentlySpawned(self) && !FightManager.isFighter(self)
                 && due(self, now, CHECK_INTERVAL_MS, t -> t.join, (t, v) -> t.join = v)) {
             // Pets/summons spawned mid-battle (e.g. the Trork Hunter's wolf) join their owner's side.
             battle = BattleManager.joinOwnersSide(self, buffer);
@@ -98,6 +104,11 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         }
 
         if (battle != null) {
+            if (FxSettings.isolated(battle.kind)) dropOutsideBeacons(battle, self, buffer);
+            // Every tick, not once a second: pack animals join a flock again right away (wolves in a royale were back
+            // in one flock each second and never hurt each other, test 2026-10-14). Two component reads.
+            Ref<EntityStore> current = battle.targets.get(self);
+            if (current != null) leaveSharedFlock(self, current, buffer);
             if (!battle.refocus.isEmpty() && battle.refocus.remove(self)) {
                 // All vs one: a fellow attacker hit it; back on the lone target at once (and it ignores that ally).
                 Ref<EntityStore> target = battle.targets.get(self);
@@ -108,14 +119,97 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             }
             return;
         }
-        if (!FightManager.isFighter(self) || !due(self, now, CHECK_INTERVAL_MS, t -> t.check, (t, v) -> t.check = v)) {
+        if (!FightManager.isFighter(self)) {
+            // Its wand fight (army) is over: home goes back to where it was (Army.follow then moves it to the owner).
+            // Managed mobs too (audit 2026-10-14): a mob stays managed after its battle, and an army fight it had later
+            // left its HOME entry for good, which kept this system busy on every NPC.
+            if (homes && ChaseSupport.hasHome(self)) ChaseSupport.restoreLeash(self, buffer);
+            return;
+        }
+        if (!due(self, now, CHECK_INTERVAL_MS, t -> t.check, (t, v) -> t.check = v)) {
             return;
         }
         Ref<EntityStore> enemy = FightManager.enemyOf(self);
         if (enemy != null) {
             relock(self, enemy, buffer);
+            // Army fights too: no soft leash back mid-fight, and a far enemy is still walked to (ChaseSupport).
+            if (BattleManager.isAlive(enemy, buffer)) ChaseSupport.keep(self, enemy, buffer);
         }
     }
+
+    /**
+     * Battle isolation for group calls (audit 2026-10-13, user: Outlanders in test duels went for other pairs). Trork
+     * and Outlander roles shout "TrorkEnemySighted" (Kweebecs "Kweebec_All_Danger") to every NPC of their group in 30
+     * blocks, and the call SETS the receiver's LockedTarget to the caller's target, whatever the attitudes say. Every
+     * tick, a battle member drops calls whose target is not one of its own enemies in this battle; calls about a real
+     * enemy are kept (teamwork). Read through BeaconSupport (the NPC's message slots, pollMessage = consume).
+     */
+    private static void dropOutsideBeacons(BattleManager.Battle battle, Ref<EntityStore> self, CommandBuffer<EntityStore> buffer) {
+        var beacons = buffer.getComponent(self, com.hypixel.hytale.server.npc.components.messaging.BeaconSupport.getComponentType());
+        var slots = beacons != null ? beacons.getMessageSlots() : null;
+        if (slots == null) return;
+        int team = battle.team(self);
+        for (int i = 0; i < slots.length; i++) {
+            if (!beacons.isMessageQueued(i)) continue;
+            Ref<EntityStore> about = beacons.peekMessage(i);
+            // Only calls pointing at someone: target-less ones are signals of boss phases and encounters.
+            if (about == null) continue;
+            boolean enemy = about.isValid() && battle.has(about) && battle.team(about) != team;
+            if (!enemy) {
+                beacons.pollMessage(i);
+                TestTools.callDropped(self);
+            }
+        }
+    }
+
+    /**
+     * The other half of {@link #dropOutsideBeacons}: an NPC outside every battle drops a group call whose target fights
+     * in an isolated battle (user, 2026-10-13: nearby Outlanders kept joining an Outlander duel). Runs only while a
+     * battle exists; one component read and a few message slots per NPC.
+     */
+    private static void dropCallsAboutFighters(Ref<EntityStore> self, CommandBuffer<EntityStore> buffer) {
+        var beacons = buffer.getComponent(self, com.hypixel.hytale.server.npc.components.messaging.BeaconSupport.getComponentType());
+        var slots = beacons != null ? beacons.getMessageSlots() : null;
+        if (slots == null) return;
+        for (int i = 0; i < slots.length; i++) {
+            if (!beacons.isMessageQueued(i)) continue;
+            Ref<EntityStore> about = beacons.peekMessage(i);
+            if (about == null || !BattleManager.isManaged(about)) continue;
+            BattleManager.Battle b = BattleManager.battleOf(about);
+            if (b != null && FxSettings.isolated(b.kind)) {
+                beacons.pollMessage(i);
+                TestTools.callDropped(self);
+            }
+        }
+    }
+
+    /**
+     * Two enemies in one flock can't hurt each other: vanilla CombatSupport.getCanCauseDamage is false between flock
+     * members (disableDamageFlock), the damage filter cancels melee (FightDamageSystem un-cancels it) and ranged
+     * attackers never even aim (PositionCache skips targets they can't damage). Battles split flocks at the start, but
+     * mobs spawned together join one again later: two Outlander Stalkers in a royale never shot each other (test,
+     * 2026-10-13). Like vanilla FlockLeave, both leave the flock, checked once a second against the current target.
+     */
+    private static void leaveSharedFlock(Ref<EntityStore> self, Ref<EntityStore> target, CommandBuffer<EntityStore> buffer) {
+        if (!target.isValid() || target.getStore() != self.getStore()) return;
+        Ref<EntityStore> mine = com.hypixel.hytale.server.flock.FlockPlugin.getFlockReference(self, buffer);
+        if (mine == null) return;
+        Ref<EntityStore> theirs = com.hypixel.hytale.server.flock.FlockPlugin.getFlockReference(target, buffer);
+        if (theirs == null || (mine != theirs && !(mine.isValid() && theirs.isValid() && mine.getIndex() == theirs.getIndex()))) return;
+        var flock = com.hypixel.hytale.server.flock.FlockMembership.getComponentType();
+        buffer.tryRemoveComponent(self, flock);
+        buffer.tryRemoveComponent(target, flock);
+        long now = System.currentTimeMillis();
+        if (MobBattlePlugin.debugging() && now - lastFlockLog > FLOCK_LOG_MS) {
+            lastFlockLog = now;
+            MobBattlePlugin.debug("battle: " + ChaosWand.nameOf(self, buffer) + " and its target " + ChaosWand.nameOf(target, buffer)
+                    + " shared a flock (no damage between them): both left it");
+        }
+    }
+
+    /** The flock line above at most this often (it now runs every tick). */
+    private static final long FLOCK_LOG_MS = 5000;
+    private static volatile long lastFlockLog;
 
     private void pruneTimers(long now) {
         if (now - lastPrune < PRUNE_INTERVAL_MS) {
@@ -168,6 +262,9 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         if (target == null) {
             return;
         }
+        if (holdsBack(self, target, buffer)) {
+            return;
+        }
         if (changed[0]) {
             // Previous target died: go for the next one. In a royale the old target stays an enemy, so it is not
             // ignored for 30 s: after a few switches a mob ignored most of the arena and stood confused (user, 2026-10-12).
@@ -176,6 +273,25 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         } else {
             relock(self, target, buffer);
         }
+        // Leash point here, and back on the chase when the target is out of its sight or it gave up (ChaseSupport).
+        ChaseSupport.keep(self, target, buffer);
+    }
+
+    /**
+     * Medium (2026-10-14): a walker that would drown does not follow a target into deep water (Zombie, wolf, Trork and
+     * golem sank 66 blocks and drowned in the test), and a water-only mob does not try to reach one on land. It lets
+     * go and ignores it a moment, checked again every second; passiveWin ends the battle if nobody can reach anybody.
+     * A flier out of reach is still followed from below, as before.
+     */
+    private static boolean holdsBack(Ref<EntityStore> self, Ref<EntityStore> target, CommandBuffer<EntityStore> buffer) {
+        Medium.Can can = Medium.of(self, buffer);
+        if (!Medium.drowns(can) && !Medium.waterOnly(can)) return false;
+        Medium.Where there = Medium.where(target, buffer);
+        if (Medium.reaches(can, there)) return false;
+        boolean wet = there == Medium.Where.SURFACE || there == Medium.Where.UNDER;
+        if (Medium.drowns(can) ? !wet : there != Medium.Where.GROUND) return false;
+        FightManager.holdOff(self, target, buffer);
+        return true;
     }
 
     /** Team color ring under this NPC (or player fighter, from PlayerFighters.tick), only for the player who owns the draft/battle and holds the Team Wand. */

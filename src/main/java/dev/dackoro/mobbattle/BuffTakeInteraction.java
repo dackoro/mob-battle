@@ -36,7 +36,7 @@ public class BuffTakeInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> target = context.getTargetEntity();
         // Stacks still coming down with the light count: they are cancelled, else they would land after this.
         if (target == null || !target.isValid() || Buffs.wandStacksSoon(target) == 0) {
-            player.sendMessage(Message.raw("Look at a mob or player with a Buff Wand buff and right click it.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.buff.takeLook").color("#ffcc55"));
             return;
         }
         Buffs.cancelFalling(target);
@@ -47,6 +47,6 @@ public class BuffTakeInteraction extends SimpleInstantInteraction {
         // After the size goes back (Buffs.set, queued): the new scale rebuilds the mob and would drop particles.
         WandFx.swirlLater(target, "Gray");
         WandFx.buffTakeLater(target);
-        player.sendMessage(Message.raw("Took the buff off " + ChaosWand.nameOf(target, buffer) + ".").color("#7fd3ff"));
+        player.sendMessage(I18n.tr("chat.buff.taken").param("name", ChaosWand.nameOf(target, buffer)).color("#7fd3ff"));
     }
 }

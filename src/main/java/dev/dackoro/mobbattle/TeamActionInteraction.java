@@ -50,8 +50,8 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
 
         if (!onNpc) {
             int team = BattleManager.nextTeam(draft);
-            player.sendMessage(Message.raw("Now adding mobs to the " + Teams.name(team) + " team ("
-                    + draft.teams().get(team).size() + " mobs). Right click a mob to start the battle.")
+            player.sendMessage(I18n.tr("chat.team.adding").param("team", Teams.name(team))
+                    .param("count", draft.teams().get(team).size())
                     .color(Teams.color(team)));
             return;
         }
@@ -72,12 +72,11 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
             }
         }
         if (teams.size() < 2) {
-            player.sendMessage(Message.raw("You need at least 2 teams with mobs. Left click mobs to add them, "
-                    + "right click in the air to switch team.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.team.need2").color("#ffcc55"));
             return;
         }
         FightCamera.intro(BattleManager.Kind.TEAMS, player, null, teams, buffer);
-        Countdown.run(BattleManager.Kind.TEAMS, player, buffer, "TEAM BATTLE", teams.stream().flatMap(List::stream).toList(), acc -> startNow(player, playerEntity, teams, colors, acc));
+        Countdown.run(BattleManager.Kind.TEAMS, player, buffer, new Countdown.Label("TEAM BATTLE", I18n.tr("battle.label.teams")), teams.stream().flatMap(List::stream).toList(), acc -> startNow(player, playerEntity, teams, colors, acc));
     }
 
     private static void startNow(PlayerRef player, Ref<EntityStore> playerEntity, List<List<Ref<EntityStore>>> teams,
@@ -91,7 +90,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
             }
         }
         if (teams.size() < 2) {
-            player.sendMessage(Message.raw("TEAM BATTLE cancelled: fewer than 2 teams have mobs left.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.team.cancelled").color("#ffcc55"));
             return;
         }
 
@@ -124,7 +123,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                 .map(t -> battle.name(t) + " (" + byColor.get(t).size() + ")")
                 .collect(Collectors.joining(" vs "));
         MobBattlePlugin.log("Team battle: " + versus + ", " + aggressive + " aggressive");
-        player.sendMessage(Message.raw("TEAM BATTLE! " + versus + ". Last team standing wins.").color("#ff6b5e"));
-        FightFx.title(BattleManager.Kind.TEAMS, player, "TEAM BATTLE!", versus);
+        player.sendMessage(I18n.tr("chat.team.start").param("versus", versus).color("#ff6b5e"));
+        FightFx.title(BattleManager.Kind.TEAMS, player, I18n.tr("battle.title.teams"), Message.raw(versus));
     }
 }

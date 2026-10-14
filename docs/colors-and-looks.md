@@ -94,6 +94,7 @@ The Heal, Buff and Cleanse Wands bring a light down from the sky onto the target
 |---|---|---|
 | [`healLight`](settings.md) | palette color or `off` (green) | The Heal Wand's light. `off`: no light, the heal lands at once. |
 | [`buffColor`](settings.md) | palette color (purple) | The Buff Wand's swirl and mark, and the shimmer that buffed mobs wear. The swirl also plays when a champion buff is given. Taking a buff off is always grey. |
+| [`buffLook`](settings.md) | `shimmer`, `runes` or `off` (`shimmer`) | What a buffed mob wears while the buff lasts: the shimmer (veins, eye flames, runes), only the eye flames and runes, or nothing. |
 | [`buffLight`](settings.md) | `buff`, palette color or `off` (`buff`) | The Buff Wand's light. `buff` uses `buffColor`. `off`: no light, the stack lands at once. |
 | [`cleanseColor`](settings.md) | palette color (white) | The whole Cleanse Wand look: the light, burst, aura and rune at its feet. |
 

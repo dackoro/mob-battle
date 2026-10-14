@@ -13,13 +13,16 @@ Hytale **0.7.0** (release and the 0.7 pre-release: `ServerVersion >=0.7.0-pre <0
 ## Features at a glance
 
 - **Four battle kinds:** duels, everyone vs one, battle royale and team battles, all driven by the mobs' own AI.
-- **Thirteen wands** to start battles, summon mobs, build teams and armies, heal, kill, buff, morph, recolor and inspect mobs.
+- **Thirteen wands** to start battles, summon mobs, build teams and armies, heal, kill, buff, morph, recolor and inspect mobs. Hold the click on the Heal, Cleanse, Effect and Morph wands to slam the ground and hit everyone around you.
+- **Land, air and water:** fish stay in the water, walkers don't drown chasing them, and only fliers and ranged mobs go for targets up in the air.
 - **Players can fight too**, side by side with mobs or against them (never in Creative).
+- **Armies:** recruit mobs for yourself, for another player or for a leader mob.
+- **Random battles:** `summon fill` picks mobs that fight, of similar strength, in balanced teams if you like.
 - **Arenas and timers:** walls that keep fighters in, closing royale zones, time limits with judging by health, damage or kills, scoreboards.
-- **Presentation:** countdowns, big titles, intro and end cameras, battle music, a spectator mode to watch any fighter, duel and watch cards. ▶ [Duel cameras](https://youtu.be/eYbRIGjnRyw) · [royale cameras and spectator mode](https://youtu.be/urVVfprhp3o)
+- **Presentation:** countdowns, big titles, intro and end cameras, battle music, a spectator mode to watch any fighter, duel, all vs one and watch cards. ▶ [Duel cameras](https://youtu.be/eYbRIGjnRyw) · [royale cameras and spectator mode](https://youtu.be/urVVfprhp3o)
 - **Looks:** Jade and Shimmer looks with their own death effects, crowns, buff shimmer, team tints and every color from a 14-color palette.
-- **Settings panel** (`/mobbattle config`) with every setting, presets, resets and undo; settings are saved per world.
-- **Server ready:** permission modes, console events and a public plugin API.
+- **Settings panel** (`/mobbattle config`) with every setting, presets, resets and undo; settings are saved per world. English and Spanish.
+- **Server ready:** permission modes, console events, test tools and a public plugin API.
 
 ## Wands
 
@@ -111,17 +114,21 @@ Everything is under `/mobbattle`. Settings are saved per world in `fx.properties
 | `preset ...`, `reset <group>` | Built-in and saved presets; put one group of settings back to default. |
 | `countdown`, `startTitle`, `winTitle`, `titleStyle`, `titleScope`, `music` | Countdown, titles and battle music (global or per kind). |
 | `camera`, `cameraStyle`, `cameraTime`, `cameraShots`, `cameraScope`, `endCamera`, `endCameraTime`, `autoWatch`, `skipCamera` | Intro and end cameras. |
-| `watch [exit]`, `duelCard` | Spectate a running battle; the duel stats card. |
+| `watch [exit]`, `duelCard`, `focusCard` | Spectate a running battle; the duel and all vs one stats cards. |
 | `battleIsolation`, `selfDefense`, `friendlyFire`, `playerFights`, `battlePvp`, `duelMode`, `chaos me` | Battle rules per kind, players in battles. |
-| `arena`, `arenaSize`, `arenaShrink`, `timer`, `timeUp`, `judgeBy`, `tieBreak`, `scoreboard`, `timerStyle`, `unstick`, `standoffTime`, `passiveWin` | Arenas, timers, judging and stuck or passive fighters. |
+| `arena`, `arenaSize`, `arenaShrink`, `arenaVertical`, `timer`, `timeUp`, `judgeBy`, `tieBreak`, `killTieBreak`, `scoreboard`, `timerStyle` | Arenas, timers, judging and kill table order. |
+| `unstick`, `standoffTime`, `passiveWin`, `idleEnd`, `battleMaxTime`, `battleBelow`, `battleAbove` | Stuck or passive fighters, when a battle ends on its own, how far up and down a battle takes mobs. |
 | `areaRadius`, `areaStyle`, `areaColor`, `areaHeight`, `areaOnlyWand`, `maxMobs`, `fightLaser` | The Chaos Wand area and the fighter laser. |
 | `teams ...`, `teamByType`, `teamLook` | Team list, Team Wand teams and team looks. |
-| `summon ...`, `summonRadius`, `summonDespawn`, `summonJade`, `summonArmy`, `army clearAll`, `armyTint` | The summon list, summons leaving, armies. |
-| `buff ...`, `buffColor`, `buffLight` | Battle buffs and the Buff Wand. |
+| `summon ...` (incl. `summon fill`), `summonRadius`, `summonDespawn`, `summonCalm`, `summonJade`, `summonArmy` | The summon list, random battles, calm summons, summons leaving. |
+| `army clearAll`, `armyTint`, `armyFriendlyFire` | Armies. |
+| `buff ...`, `buffColor`, `buffLight`, `buffLook` | Battle buffs and the Buff Wand (size limit, speed and jump from size, percent or multiplier values). |
 | `wandFx`, `wandEffect`, `killDelay`, `killLoot`, `killPlayers`, `snap`, `snapRadius`, `morph ...`, `morphPlayers`, `healLight`, `cleanseColor` | Wand settings. |
+| `healArea`, `cleanseArea`, `effectArea`, `morphBurst`, `morphShuffle` (+ `...Radius`, `...Self`), `waveTravel`, `waveGroundOnly`, `battleWaveTravel`, `battleWaveGroundOnly` | Held-click waves and how waves travel. |
 | `wave`, `borderColor`, `mobFx`, `crown`, `lookGlow`, `deathGlow` | Colors and looks per action. |
 | `stop`, `skipTimer`, `resetAll` | End battles and clean up (admin). |
-| `permissions`, `reload`, `give`, `event ...`, `debug`, `debugLog`, `debugRecord`, `debugDump` | Server and debug tools. |
+| `apply <who> <action> [value]` | A wand action (buff, size, heal, cleanse, effect, morph, army, team...) on chosen players or mobs (admin). |
+| `permissions`, `reload`, `give`, `event ...`, `measure`, `test ...`, `debug`, `debugLog`, `debugRecord`, `debugDump` | Server, test and debug tools. |
 
 ## Documentation
 
@@ -143,7 +150,7 @@ Mob Battle can stay open to everyone (default) or enforce `dackoro.mob_battle.us
 
 ## Plugin developers
 
-Other server plugins can start and observe ownerless duel, royale and focus battles through `MobBattleApi`, which ships inside the Mob Battle jar. See [docs/plugin-api.md](docs/plugin-api.md).
+Other server plugins can start and observe ownerless duel, royale and focus battles through `MobBattleApi`, which ships inside the Mob Battle jar, and tell Mob Battle how their own mobs move (walk, fly, swim) and whether they attack from afar. See [docs/plugin-api.md](docs/plugin-api.md).
 
 ## Building from source and contributing
 
@@ -151,7 +158,7 @@ JDK 25 and Gradle (wrapper included): `./gradlew build`. Building against your o
 
 ## Translations
 
-To add a client language, copy `Server/Languages/en-US/server.lang` to `Server/Languages/<locale>/server.lang`, using the language code supported by the client (for example, `es-ES`). Translate only the values after `=`; keep every key, `\n` line break, command, and ID unchanged, and save the file as UTF-8. The current language files cover names and descriptions for the 13 wands, timer titles, and Watch controls. Many other messages are still raw English text in Java, including `MobBattleCommand`; translating those requires extracting translation keys with `Message.translation` and keeping the keys aligned across language files. The normal build includes `Server/**`, so no Gradle change is needed for a new language folder. Rebuild the normal package and check it in game with the client set to that language; support for an untested language or hot reload is not guaranteed.
+Mob Battle ships in English and Spanish: chat, titles, HUDs, command replies, help and the settings panel follow the game's language. To add a language, copy `Server/Languages/en-US/server.lang` to `Server/Languages/<locale>/server.lang`, using the language code supported by the client (for example, `es-ES`). Translate only the values after `=`; keep every key, `{name}` parameter, `\n` line break, command and ID unchanged, and save the file as UTF-8. Messages with counts use ICU plurals (`{n, plural, one {...} other {...}}`): translate the text inside the braces. The normal build includes `Server/**`, so no Gradle change is needed for a new language folder. Rebuild and check it in game with the client set to that language. Log lines, dev tools and the `/mobbattle settings` key dump stay in English.
 
 ## License
 

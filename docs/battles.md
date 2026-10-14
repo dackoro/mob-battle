@@ -60,6 +60,14 @@ Two team battles can use the same team names and colors without sharing targets,
 - **One chaos battle per group of mobs.** A new all vs one or royale ends, whole and without a winner, any other all vs one or royale that shares a mob with it. Duels and team battles only lose the mobs that move to the new battle.
 - A mob that gets a new target ignores its previous one for 30 s.
 
+## Battle waves
+
+The Snap Wand (without a battle), the battle royale and all vs one send a ring out from where they start. By default it is only a look: everyone in reach is taken at once, at any height.
+- [`/mobbattle battleWaveTravel on`](settings.md): each mob is reached when the ring gets there. A snap's dust starts then; royale and all vs one marks come with the ring (the battle itself still starts for everyone after the countdown).
+- [`/mobbattle battleWaveGroundOnly on`](settings.md): only mobs within 3 blocks above or below the wave are snapped or join the battle. Fliers and mobs in caves stay out.
+
+Both are off by default.
+
 ## Countdown
 
 `countdown <seconds>` (0-10, default 0 = start at once) shows a big `3`, `2`, `1` before any fight, one per second, then the start title. The chat counts too (`[DUEL: A vs B] 3`, `2`, `1`). It works globally or per kind (`countdown royale 5`).
@@ -73,12 +81,13 @@ Two team battles can use the same team names and colors without sharing targets,
 Fighters use their own AI to fight; Mob Battle only tells each one who to attack.
 
 - **Best enemy first.** When a fighter needs a new target, it takes the nearest living enemy of the best kind available:
-  1. enemies that can fight back (players always count here);
-  2. passive mobs (no attack: they only run away);
-  3. last, enemies it can't reach right now: an enemy that is flying while this fighter can't fly, or one outside a walled arena.
+  1. enemies in its own medium (land, air or water) that can fight back (players always count here);
+  2. passive mobs in its own medium (no attack: they only run away);
+  3. enemies in another medium it can still reach, the same two kinds (an archer shooting a fish at the surface);
+  4. last, enemies it can't reach right now (see Land, air and water below), or one outside a walled arena.
 - **Out of reach now.** If its current target flies off or leaves the walled arena, the fighter switches at once to an enemy it can reach, if there is one.
-- **Chase limit.** A fighter that goes 8 seconds without landing a hit gives up its target for the best other enemy. In a duel, and for the attackers in all vs one, there is no other enemy, so they keep it.
-- **Self defense** (per kind, default on). A fighter hit by an enemy that isn't its target turns on that enemy, and keeps it at least 3 seconds so two attackers can't pull it back and forth. A fighter that can't fly ignores hits from an enemy flying more than 4 blocks away (it could never reach it); a flier that dives in close is answered. With self defense off, every fighter keeps its target until that target falls.
+- **Chase limit.** A fighter that goes 8 seconds without landing a hit gives up its target for the best other enemy it can reach. In a duel, and for the attackers in all vs one, there is no other enemy, so they keep it.
+- **Self defense** (per kind, default on). A fighter hit by an enemy that isn't its target turns on that enemy, and keeps it at least 3 seconds so two attackers can't pull it back and forth. A fighter ignores hits from an enemy it can't reach that is more than 4 blocks away (a flier, a fish under water); one that comes in close is answered. With self defense off, every fighter keeps its target until that target falls.
 - **All vs one keeps its focus.** Every attacker stays on the lone target. A stray hit from a fellow attacker (with friendly fire on, the default for all vs one) still does its damage, but the attacker goes straight back to the target and ignores that ally for a while.
 - Allies never pick each other as targets. Players always choose their own target.
 
@@ -88,6 +97,28 @@ Other things to know:
 - The opening "provocation" hit that starts each fight does 0.01 damage and is healed back 0.3 s later.
 - Bosses with a `Main` combat state (such as `Bear_Voidtaken`) enter it when ordered to fight. Abilities tied to players or to a specific encounter may still need their original encounter.
 - A Trork's pet that spawns during a group battle joins its owner's side. If an owner and its pet are put on different sides, they leave their flock when the battle starts (permanently).
+
+### Land, air and water
+
+Each mob fights in its own medium, read from the game's own data for its role (so mobs from other mods work too):
+
+| Mob | Can reach |
+|---|---|
+| Walks (most mobs) | the ground and shallow water (2 blocks deep or less) |
+| Flies | the ground, the air and the water surface |
+| Swims (fish and sea creatures) | water only, at the surface or under it |
+| Breathes under water (skeletons and other undead) | also the bottom of deep water |
+| Attacks from afar (archers, mages, throwers) | also fliers and the water surface |
+
+- Which mobs attack from afar is learned the first time one of their kind hits something with a projectile. The game's mobs start from a list made by tests.
+- A mob that would drown doesn't follow a target into deep water, and a fish doesn't try to reach one on land: it waits and picks someone it can reach.
+- When nobody left can reach anybody (a fish in a lake and a wolf on land), the passiveWin countdown starts and the side with the most health left wins.
+- Teleports (stuck fighters, the arena wall, the Army Wand) put fish in water and walkers on dry land, never at the bottom of a lake.
+- A closing arena that leaves a fish's water outside moves the fish into water still inside the arena. If no water is left inside, the fish has 10 seconds and is then taken out, like a mob that can't come back into the arena.
+
+### Battle height band
+
+A royale or all vs one takes the mobs inside its area, but only from 50 blocks below its center to 40 above (`battleBelow`, `battleAbove`; `off` = the whole sphere as before): a battle on the surface leaves a deep cave's mobs alone, and fliers not too high still join. The band only chooses who joins. Separately, `arenaVertical <blocks>` (default off) makes the arena wall bring back a fighter that falls that far below the arena's level (a cave shaft) or climbs that far above it; fliers are never brought back for height.
 
 ## Rules per kind
 
@@ -116,11 +147,11 @@ Default: `on` for allVsOne and royale, `off` for duels and teams. Everyone sees 
 
 - **Size.** Chaos Wand battles use `areaRadius`. Duels and team battles use `arenaSize <8-128>|auto`, centered on the fighters; `auto` (default) covers their spread plus 6 blocks, at least 8.
 - **Teleports** put a fighter on a spot it can stand on (solid ground with room above) near its own height: a mob in a cave stays in the cave, one on a mountain stays up, and nobody lands inside a hill or in lava, fire or poison (water is fine). With no such spot, it is only pushed.
-- **Closing arena.** `arenaShrink <kind|all> on|off` makes the wall move steadily toward the center like a battle royale zone, down to `arenaShrinkTo` (4-128, default 15), over the battle's timer, or over `arenaShrinkTime` (default `2m`) when there is no timer. A closing arena is always drawn and always a wall, even with `arena off`, so spread-out fighters end up meeting. An arena already smaller than the final size does not close. Default: on for royale only.
+- **Closing arena.** `arenaShrink <kind|all> on|off` makes the wall move steadily toward the center like a battle royale zone, down to `arenaShrinkTo` (4-1024, default 15), over the battle's timer, or over `arenaShrinkTime` (default `2m`) when there is no timer. A closing arena is always drawn and always a wall, even with `arena off`, so spread-out fighters end up meeting. An arena already smaller than the final size does not close. Default: on for royale only.
 
 ## Timers and time up
 
-`timer <kind|all> <time>|off` gives a battle a time limit of up to 60 minutes. Times can be written `90`, `90s`, `2m`, `1m30s`, or `--minutes=1 --seconds=30`. Default: 3 minutes for royale, off for the rest.
+`timer <kind|all> <time>|off` gives a battle a time limit of up to 24 hours. Times can be written `90`, `90s`, `2m`, `1m30s`, or `--minutes=1 --seconds=30`. Default: 3 minutes for royale, off for the rest.
 
 - Players who see the titles get a **timer box** at the top right: the battle kind, who is fighting ("Skeleton vs Trork", "vs X: 5 attackers", "6 left"), the kill leader, and the time left. `timerStyle custom|portal` picks the mod's own box (default, with the game's container header and panel textures; its layout is the asset `Common/UI/Custom/MobBattle/TimerHud.ui`) or the game's Void portal box (only its title is the mod's; the client keeps its own "Fragment of Orbis" / "until the Veil closes" text).
 - If the timer is too short for the arena (fighters at opposite edges could not even meet, about 0.8 s per block of radius), the chat warns you and suggests a time.
@@ -199,6 +230,10 @@ A skeleton can never finish off a duck flying out of its reach. `passiveWin <sec
 
 **Training dummies.** While a mob on the `passiveWinIgnore <role,role*,...>|none` list is alive in the battle, `passiveWin` never ends the battle (its time never starts), so you can test a mob against an immortal dummy for as long as you like. The list is comma separated and case-insensitive, and a trailing `*` matches any ending. The default is `Test_Dummy*`, which covers the game's six test dummies. `none` removes every exception. In the panel it is "Never ends against" on the Battles tab.
 
+## Nobody fights: idleEnd
+
+Some mobs can fight but never start a fight: a battle royale of boars and bison can stand still for its whole timer. `idleEnd <seconds>|off` (0-300, default 150 = 2.5 minutes) ends a battle in a draw when no fighter hurts an enemy for that long, counted from the start or from the last hit. The end title says how long, e.g. "Nobody fought for 2m 30s". While a `passiveWinIgnore` mob (a training dummy) is alive, it never ends the battle either. In the panel it is "End when nobody fights" on the Battles tab.
+
 ## Winners, titles and end messages
 
 The winner is checked once per second per world. There is no minimum fight length. A single surviving side wins; if several sides are still alive at the 15-minute safety limit, it is a draw.
@@ -226,6 +261,13 @@ A fighter gets a kill when its hit kills an enemy of the same battle. Disintegra
 
 - The timer box shows the leader ("28 fighters left | top: Trork 5").
 - At the end, the chat shows the top 3 ("Most kills: 1. Trork (5), 2. ...").
+- Fighters with the same kills are ordered by `killTieBreak` (panel: Battles > Ties > "Kill table order", or each battle tab for its own battles):
+  - `damage` (default): more damage dealt to enemies goes first;
+  - `alive`: fighters still standing first, then more damage;
+  - `first`: whoever reached that number of kills first;
+  - `shared`: they share the place ("1. Trork 5, 1. Skeleton 5, 3. ..."), and the timer box says "top: 2 tied 5".
+  After that, whoever got there first. The timer box, the scoreboard, the chat top 3, the end camera and spectating all use this order.
+- `tieBreak` is a different tie: who **wins** when sides have the same Judge by score at time up. Both have a global value and a per-kind override (see [settings.md](settings.md)).
 - `tieBreak kills` and `judgeBy kills` use them, and the end camera can film the top killer.
 
 ## Battle buffs
@@ -238,7 +280,10 @@ Battles can make fighters bigger and stronger. Three battle sources, all off (0%
 | `streak` | A fighter, once per kill (up to `buff streak maxKills`, default 5) | Until that battle ends |
 | `champion` | The surviving members of the winning side | Until they die or get the Cleanse Wand |
 
-Each source can raise size, max health, damage and defense by a percentage, e.g. `/mobbattle buff lone size 50`, `/mobbattle buff champion all 10`. Sources add up. Size is the entity's scale (mobs and players), so a morph stays; all sources together stop at `buff sizeMax` (default +200%, x3). Jumps grow with the size: a player's jump force, a mob's jump and climb height. Health raises the max and keeps the same share of health; `buff <who> heal on` fills it to the new max. If the server stops mid-battle, the size and health stay on that mob (the Cleanse Wand resets them). Battle buffs' damage and defense only count against enemies of the battle. All buff settings, the Buff Wand and the buff looks are in [settings.md](settings.md) and [colors-and-looks.md](colors-and-looks.md).
+Each source can raise size, max health, damage, defense and speed by a percentage, e.g. `/mobbattle buff lone size 50`, `/mobbattle buff champion all 10`. Sources add up.
+
+With `/mobbattle buff unit multiplier` (or "Buff values as" in the panel), values are shown and typed as multipliers instead, with decimals: `/mobbattle buff lone damage 2` = x2 damage (+100%), `x1.5` = +50%. Defense x2 means the mob takes half the damage (50%), x100 is the most (99%). `x2` and `50%` always work, whatever the unit. Values below x1 are refused: a buff never shrinks or weakens. Only the way values are shown changes: sources and Buff Wand clicks still add up (two x2 sources = x3).
+ Size is the entity's scale (mobs and players), so a morph stays; all sources together stop at `buff sizeMax` (default +200%, x3). A player over x2 is told that weapon and tool reach does not grow with size: the game measures it from the eyes, so mobs at a giant's feet can be out of reach. Jumps and speed grow with the size (the speed stat adds to it): a player's jump force and walking speed, a mob's jump and climb height and its top speed (speed by the square root of the size, so x4 = twice as fast). Health raises the max and keeps the same share of health; `buff <who> heal on` fills it to the new max. If the server stops mid-battle, the size and health stay on that mob (the Cleanse Wand resets them). Battle buffs' damage and defense only count against enemies of the battle. Damage counts for every hit the mob or player deals itself: fists, weapons, its own attacks (a boss's slam), arrows and other projectiles it shoots. Damage it does to itself (its own burn, a fall) is not raised. All buff settings, the Buff Wand and the buff looks are in [settings.md](settings.md) and [colors-and-looks.md](colors-and-looks.md).
 
 ## Cameras
 
@@ -256,7 +301,7 @@ Each source can raise size, max health, damage and defense by a percentage, e.g.
 | `showcase` | Close-ups of `cameraShots` fighters picked at random (default 4, up to `maxMobs`), each from the front with a slow drift, at least 1.2 s each. With a short time it shows fewer: 12 shots need about 15 s of `cameraTime`. |
 | `teams` | One shot per side (up to 6), from between that side and the battle's center: it holds on one member, then sweeps across the others, left to right. |
 | `focus` | A close-up of the lone target (about a third of the time), then the camera circles it about 200 degrees, low and just outside the crowd, always looking at the attacker in front of it (one after another as it turns), with the target behind. In other kinds it centers on the first fighter (royale falls back to `showcase`). |
-| `drone` | One high flight across the battle from your side to the far side, diving past a few fighters picked at random (one every ~3 s, up to 4), passing beside each and looking at it, then climbing again. Keeps at least 3 blocks over the ground under it and just ahead; tree leaves can get in the way. Works in every kind. |
+| `drone` | One low, smooth flight across the battle from your side to the far side, weaving past a few fighters picked at random (one every ~1.5 s of flight, up to 6; left of one, right of the next) without stopping. It flies about 4 blocks over the ground or the tree tops, climbing before hills and trees ahead, looks ahead along its path and turns toward each fighter as it comes up to it. The last third of the shot swings around the battle, looking at its center, like the orbit. In an arena with a roof it stays under the roof and out of the stands. Works in every kind. |
 
 `cameraTime <0-30>`: intro length in seconds; `0` (default) = as long as the countdown. Shots follow the fighters as they move: `orbit` uses the game's own camera sequences (like the vanilla `/tpcinematic`), and every other style sends server camera frames every 50 ms from the fighters' current positions.
 
@@ -274,6 +319,7 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 ### Skipping a camera
 
 - **Crouch** while a camera plays to end it. A crouch you were already holding when it started must be released first, so the crouch + Battle Wand that started a fight doesn't skip it. The first camera of each session tells you so in chat.
+- **Esc can't** end it: the pause menu only exists on your side, the server never learns it was opened.
 - `/mobbattle skipCamera` does the same.
 - An intro also ends by itself when its battle ends (e.g. a duel won before the intro is over).
 - If anything goes wrong, the game's `/camera reset` gives the normal camera back.
@@ -304,7 +350,8 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 
 ## Duel card and watch cards
 
-- **Duel card** (`duelCard on|off`, default off): a read-only card on the left of the screen for a 1 vs 1 duel, with both fighters' health (now / max), attack, defense and size, including their buffs. It shows from the countdown to the end of the duel, for the players who see the titles, and refreshes once a second.
+- **Duel card** (`duelCard on|off`, default off): a read-only card on the right of the screen, in the scoreboard's place (it replaces that duel's scoreboard), for a 1 vs 1 duel, with both fighters' health (now / max), attack, defense and size, including their buffs. It shows from the countdown to the end of the duel, for the players who see the titles, and refreshes once a second.
+- **All vs one card** (`focusCard on|off`, default off): the same kind of card for an all vs one, also on the right in place of its scoreboard. On top, the lone target with its health (now / max), attack, defense, size (with its buffs) and kills; below, how many attackers are left out of the most there were, their summed health, and the attacker that dealt the most damage. It shows from the start of the battle (not during the countdown) until the end, for the players who see the titles, and refreshes once a second.
 - **Watch card**: while you watch, a card on the left shows the watched fighter's name, side, health, attack and defense buffs, size, kills, and how many fighters are left.
 - **Watch duel card**: in a 1 vs 1 duel the watch card shows both fighters instead, and tags the one you are watching with "Watching".
 
@@ -332,8 +379,9 @@ With `playerFights <kind> on` (default on for every kind), players are fighters 
 | Only one side left | That side wins. |
 | No side left | Draw. |
 | `passiveWin` time without a hit | The only side that can fight wins, or a draw if none can. |
+| `idleEnd` time without any hit between enemies | Draw. |
 | The timer reaches 0 | Whatever `timeUp` says. |
-| 15 minutes without a winner (safety limit, extended by a longer timer) | Draw. |
+| `battleMaxTime` minutes without a winner (default 15; `off` = infinite battle; extended by a longer timer) | Draw. |
 | A newer order takes mobs out and fewer than 2 sides remain | Ends without a winner title. |
 | Fighters unloaded with their chunks (no player near) | Cancelled: no winner, no champion, with a chat notice. Mobs killed by the Kill Wand or Snap still count as fallen. |
 | `/mobbattle stop`, `resetAll`, or the server shutting down | Ends with no winner. |

@@ -47,7 +47,7 @@ public class ClearSelectionInteraction extends SimpleInstantInteraction {
             }
             FightManager.clear(player.getUuid());
             MobBattlePlugin.debug("duel called off during its countdown by " + player.getUsername());
-            player.sendMessage(Message.raw("Duel cancelled.").color("#aaaaaa"));
+            player.sendMessage(I18n.tr("chat.duel.cancelled").color("#aaaaaa"));
             return;
         }
         var selected = FightManager.getSelection(player.getUuid());
@@ -55,6 +55,6 @@ public class ClearSelectionInteraction extends SimpleInstantInteraction {
         if (selected != null && selected.isValid() && selected.getStore() == context.getEntity().getStore()) {
             WandFx.onTarget(selected, WandFx.UNSELECT, buffer);
         }
-        player.sendMessage(Message.raw(had ? "Selection cleared." : "Nothing selected.").color("#aaaaaa"));
+        player.sendMessage(I18n.tr(had ? "chat.select.cleared" : "chat.select.nothing").color("#aaaaaa"));
     }
 }

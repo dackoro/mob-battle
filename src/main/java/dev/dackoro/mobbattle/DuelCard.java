@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * (health now/max, attack, defense, size), from the countdown until the duel ends. The numbers are the buffs they
  * carry ({@link Buffs#totalOf}), so a Buff Wand click shows up on the next refresh (once per second). Only duels with
  * exactly two fighters; shown to the owner's title viewers. A CustomUIHud like {@link Scoreboard}, layout in
- * Common/UI/Custom/MobBattle/DuelCard.ui (left edge, so it does not meet the timer and scoreboard on the right).
+ * Common/UI/Custom/MobBattle/DuelCard.ui (on the right, in the scoreboard's place: Scoreboard.cardShown hides the board).
  */
 final class DuelCard extends CustomUIHud {
 
@@ -134,17 +134,26 @@ final class DuelCard extends CustomUIHud {
         String name = mob.isValid() ? ChaosWand.nameOf(mob, store) : null;
         line(b, "#Name" + side, shorten(name == null ? "?" : name.replace('_', ' ')), up ? "#ffd23e" : "#888888");
         line(b, "#Health" + side, healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
-        line(b, "#Attack" + side, "Attack  " + stat(mob, Buffs.Stat.DAMAGE), color(mob, Buffs.Stat.DAMAGE));
-        line(b, "#Defense" + side, "Defense  " + stat(mob, Buffs.Stat.DEFENSE), color(mob, Buffs.Stat.DEFENSE));
+        line(b, "#Attack" + side, I18n.tr("hud.attack").param("v", stat(mob, Buffs.Stat.DAMAGE)), color(mob, Buffs.Stat.DAMAGE));
+        line(b, "#Defense" + side, I18n.tr("hud.defense").param("v", stat(mob, Buffs.Stat.DEFENSE)), color(mob, Buffs.Stat.DEFENSE));
         float scale = scaleOf(mob, store);
         boolean scaled = Math.abs(scale - 1f) > 0.01f;
-        line(b, "#Size" + side, "Size  " + (scaled ? "x" + String.format(java.util.Locale.ROOT, "%.2f", scale) : "base"),
-                scaled ? BUFFED : PLAIN);
+        line(b, "#Size" + side, I18n.tr("hud.size").param("v", sizeValue(scale)), scaled ? BUFFED : PLAIN);
     }
 
     /** A colored Message goes in TextSpans (.Text only takes a plain string; see Scoreboard). */
     private static void line(UICommandBuilder b, String id, String text, String color) {
         b.set(id + ".TextSpans", Message.raw(text).color(color));
+    }
+
+    static void line(UICommandBuilder b, String id, Message text, String color) {
+        b.set(id + ".TextSpans", text.color(color));
+    }
+
+    /** "x1.50", or "base" when the size is not buffed. */
+    static Message sizeValue(float scale) {
+        return Math.abs(scale - 1f) > 0.01f
+                ? Message.raw("x" + String.format(java.util.Locale.ROOT, "%.2f", scale)) : I18n.tr("hud.base");
     }
 
     /** The real size (EntityScaleComponent), so a size buff from before a restart still shows. */
@@ -159,22 +168,26 @@ final class DuelCard extends CustomUIHud {
         return name.length() <= 16 ? name : name.substring(0, 15) + "...";
     }
 
-    static String stat(Ref<EntityStore> mob, Buffs.Stat st) {
+    static Message stat(Ref<EntityStore> mob, Buffs.Stat st) {
         int pct = mob.isValid() ? Buffs.totalOf(mob, st) : 0;
-        return pct > 0 ? "+" + pct + "%" : "base";
+        return pct > 0 ? Message.raw(Buffs.brief(st, pct)) : I18n.tr("hud.base");
     }
 
     static String color(Ref<EntityStore> mob, Buffs.Stat st) {
         return mob.isValid() && Buffs.totalOf(mob, st) > 0 ? BUFFED : PLAIN;
     }
 
-    static String healthText(Ref<EntityStore> mob, Store<EntityStore> store, boolean up) {
-        if (!up) return "Health  down";
+    static Message healthText(Ref<EntityStore> mob, Store<EntityStore> store, boolean up) {
+        if (!up) return I18n.tr("hud.health.down");
         EntityStatMap stats = store.getComponent(mob, EntityStatMap.getComponentType());
         EntityStatValue h = stats != null ? stats.get(DefaultEntityStatTypes.getHealth()) : null;
-        if (h == null || h.getMax() <= 0) return "Health  ?";
+        if (h == null || h.getMax() <= 0) return I18n.tr("hud.health.unknown");
         int pct = Buffs.totalOf(mob, Buffs.Stat.HEALTH);
-        return "Health  " + Math.round(h.get()) + " / " + Math.round(h.getMax()) + (pct > 0 ? "  (+" + pct + "%)" : "");
+        // A living mob never shows 0: 0.3 HP left (fractional damage) read "0 / 90" on a winner (user, 2026-10-13).
+        long now = h.get() > 0 ? Math.max(1, Math.round(h.get())) : 0;
+        Message m = I18n.tr(pct > 0 ? "hud.health.buff" : "hud.health")
+                .param("now", now).param("max", Math.round(h.getMax()));
+        return pct > 0 ? m.param("buff", Buffs.brief(Buffs.Stat.HEALTH, pct)) : m;
     }
 
     private static void hide(PlayerRef player, Store<EntityStore> store) {

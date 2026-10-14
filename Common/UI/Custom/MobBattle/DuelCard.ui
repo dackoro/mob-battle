@@ -1,7 +1,7 @@
-// Mob Battle 1v1 duel card (DuelCard.java): both fighters and their stats, on the left edge. Paths are relative
+// Mob Battle 1v1 duel card (DuelCard.java): both fighters and their stats, on the right in the scoreboard's place (it replaces the board). Paths are relative
 // to this file. A malformed property makes the client reject the whole HUD, so change one thing at a time.
 Group {
-  Anchor: (Left: 24, Top: 110, Width: 270);
+  Anchor: (Right: 24, Top: 264, Width: 270);
   LayoutMode: Top;
 
   Group #Header {
@@ -10,7 +10,7 @@ Group {
     Padding: (Top: 6);
 
     Label #Title {
-      Text: "Duel";
+      Text: %server.mobbattle.hud.duel;
       Style: (FontSize: 14, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
               HorizontalAlignment: Center, VerticalAlignment: Center);
     }
@@ -28,7 +28,7 @@ Group {
     Label #DefenseA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
     Label #SizeA { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }
 
-    Label #Vs { Anchor: (Height: 26); Text: "VS"; Style: (FontSize: 14, TextColor: #96a9be, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center); }
+    Label #Vs { Anchor: (Height: 26); Text: %server.mobbattle.hud.vs; Style: (FontSize: 14, TextColor: #96a9be, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center); }
 
     Label #NameB { Anchor: (Height: 22); Text: ""; Style: (FontSize: 15, RenderBold: true, RenderUppercase: true); }
     Label #HealthB { Anchor: (Height: 17); Text: ""; Style: (FontSize: 12, RenderBold: true); }

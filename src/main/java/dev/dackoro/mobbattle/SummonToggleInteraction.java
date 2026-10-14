@@ -37,15 +37,14 @@ public class SummonToggleInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> target = context.getTargetEntity();
         NPCEntity npc = target != null && target.isValid() ? buffer.getComponent(target, NPCEntity.getComponentType()) : null;
         if (npc == null || npc.getRoleName() == null) {
-            player.sendMessage(Message.raw("Look at a mob and click it to add its type to the summon list.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.summon.look").color("#ffcc55"));
             return;
         }
         String role = npc.getRoleName();
         boolean added = SummonList.toggle(role);
         FxSettings.save();
         WandFx.onTarget(target, added ? WandFx.SUMMON_ADD : WandFx.SUMMON_REMOVE, buffer);
-        player.sendMessage(Message.raw((added ? "Added " + role + " x1 to" : "Removed " + role + " from")
-                + " the summon list (" + SummonList.ENTRIES.size() + " types). Change counts with /mobbattle summon modify "
-                + role + " <count|random>.").color(added ? "#4bff6a" : "#aaaaaa"));
+        player.sendMessage(I18n.tr(added ? "chat.summon.added" : "chat.summon.removed")
+                .param("role", role).param("types", SummonList.ENTRIES.size()).color(added ? "#4bff6a" : "#aaaaaa"));
     }
 }

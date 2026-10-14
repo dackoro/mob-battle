@@ -34,7 +34,6 @@ public class EffectCycleInteraction extends SimpleInstantInteraction {
         }
         FxSettings.effect = EffectWand.next(FxSettings.effect);
         FxSettings.save();
-        player.sendMessage(Message.raw("Effect Wand: " + FxSettings.effect
-                + " (/mobbattle wandEffect <id> for any other).").color("#b44bff"));
+        player.sendMessage(I18n.tr("chat.effect.cycle").param("effect", FxSettings.effect).color(EffectWand.colorOf(FxSettings.effect)));
     }
 }

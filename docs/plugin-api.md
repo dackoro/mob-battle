@@ -32,7 +32,7 @@ The API ships inside the Mob Battle jar. There is no separate Maven artifact or 
 3. Get the API with `MobBattlePlugin.getApi()` once Mob Battle has loaded, for example from your plugin's setup or start. It returns `null` while Mob Battle isn't loaded and after it shuts down.
 
 Also note:
-- `MobBattleApi.API_VERSION` (currently `1`) is an integer you can use to gate your integration if you support more than one API generation.
+- `MobBattleApi.API_VERSION` (currently `2`; 2 added `declareMedium` and `declareRanged`) is an integer you can use to gate your integration if you support more than one API generation.
 - The plugin ID is `Dackoro:Mob Battle`.
 - Compile against the same Mob Battle jar you deploy, and check `API_VERSION` when you update it.
 
@@ -62,8 +62,8 @@ Validation:
 | Request | Requirements |
 |---|---|
 | Duel | Two different UUIDs, both living NPCs in that world. |
-| Royale | A finite center, `radius` 1–512 blocks, `maxMobs` 2–200, and at least two living NPCs in the area. |
-| Focus | A living target NPC, `radius` 1–512, `maxMobs` 2–200, and at least one other living NPC within `radius` of the target. |
+| Royale | A finite center, `radius` 1–2048 blocks, `maxMobs` 2–100000, and at least two living NPCs in the area. |
+| Focus | A living target NPC, `radius` 1–2048, `maxMobs` 2–100000, and at least one other living NPC within `radius` of the target. |
 
 An invalid request completes with a rejected `StartResult`: `accepted()` is `false`, `snapshot()` is `null`, and `error()` holds a readable reason.
 
@@ -241,6 +241,18 @@ public final class RoyaleEvent implements AutoCloseable {
     }
 }
 ```
+
+## Your mobs in battles: medium and range
+
+Battles keep each mob in its medium: fish stay in water, walkers that would drown don't follow targets into deep water, and only fliers and mobs that attack from afar go for fliers and fish at the surface. Mob Battle reads this from each role (its `Walk`, `Fly` and `Dive` motion controllers and whether it breathes under water) and learns which roles attack from afar the first time one hits something with a projectile. If your mobs need it from the start, declare it once when your plugin starts:
+
+```java
+MobBattleApi api = MobBattlePlugin.getApi();
+api.declareMedium("MyMod_SeaSerpent", false, false, true, true);   // walks, flies, swims, breathes under water
+api.declareRanged("MyMod_Slingshot_Goblin", true);                  // attacks from afar
+```
+
+Declarations win over the role's data and over what was learned. They are kept in memory, so call them on every start.
 
 ## Not included
 

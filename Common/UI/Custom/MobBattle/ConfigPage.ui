@@ -10,7 +10,7 @@ $C.@DecoratedContainer {
     Group {
       LayoutMode: Left;
       $C.@Title {
-        @Text = "Dackoro's Mob Battle - Settings";
+        @Text = %server.mobbattle.panel.title;
         @Alignment = Center;
       }
     }
@@ -55,7 +55,7 @@ $C.@DecoratedContainer {
         Label #ReadOnly {
           Visible: false;
           Anchor: (Bottom: 6);
-          Text: "Read only: changing settings needs the dackoro.mob_battle.config permission (server permission mode).";
+          Text: %server.mobbattle.panel.readonlynote;
           Style: (FontSize: 13, TextColor: #ffcc55, Wrap: true);
         }
 
@@ -225,21 +225,21 @@ $C.@DecoratedContainer {
       }
 
       $C.@SecondaryTextButton #UndoButton {
-        @Text = "Undo last change";
+        @Text = %server.mobbattle.panel.undo;
         @Anchor = (Width: 220);
       }
 
       Group { Anchor: (Width: 10); }
 
       $C.@SecondaryTextButton #DiscardButton {
-        @Text = "Discard changes";
+        @Text = %server.mobbattle.panel.discard;
         @Anchor = (Width: 200);
       }
 
       Group { Anchor: (Width: 10); }
 
       $C.@TextButton #SaveButton {
-        @Text = "Save changes";
+        @Text = %server.mobbattle.panel.save;
         @Anchor = (Width: 200);
       }
     }

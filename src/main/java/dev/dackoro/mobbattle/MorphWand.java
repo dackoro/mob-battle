@@ -76,6 +76,14 @@ public final class MorphWand {
         PLAYER_SIZE.keySet().removeIf(r -> !r.isValid());
     }
 
+    /** RoleChange: the same mob under a new Ref keeps its morph (Cleanse and morph reset can still undo it). */
+    static synchronized void carry(Ref<EntityStore> old, Ref<EntityStore> neu) {
+        Original o = ORIGINALS.remove(old);
+        if (o != null) ORIGINALS.put(neu, o);
+        Copy c = MORPHS.remove(old);
+        if (c != null) MORPHS.put(neu, c);
+    }
+
     /** A player's size buff factor (1 = none), carried in their model's scale. */
     static synchronized float playerSize(Ref<EntityStore> entity) {
         return PLAYER_SIZE.getOrDefault(entity, 1f);
@@ -134,10 +142,43 @@ public final class MorphWand {
         }
         float scale = mc.getModel().getScale() / PLAYER_SIZE.getOrDefault(entity, 1f);
         PlayerSkinComponent skin = accessor.getComponent(entity, PlayerSkinComponent.getComponentType());
-        if (skin != null && skin.getPlayerSkin() != null) {
+        // A player under the frog potion or /model copies as that model, not as their own body (audit 2026-10-14);
+        // random-skin NPCs keep copying as their skin.
+        boolean ownBody = PLAYER_MODEL.equals(mc.getModel().getModelAssetId())
+                || accessor.getComponent(entity, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType()) == null;
+        if (skin != null && skin.getPlayerSkin() != null && ownBody) {
             return new Copy(mc.getModel().getModelAssetId(), scale, skin.getPlayerSkin(), ChaosWand.nameOf(entity, accessor));
         }
+        // The player body without a skin is not a look (a mob that wore a copied player look across a restart: the
+        // skin is not saved with it). Copied, it made a player bald (user, 2026-10-13, Morph swap wave with
+        // morphBurstSelf).
+        if (PLAYER_MODEL.equals(mc.getModel().getModelAssetId())) return null;
         return new Copy(mc.getModel().getModelAssetId(), scale);
+    }
+
+    /** The model asset vanilla builds every skin on (CosmeticsModule.createModel, javap). */
+    static final String PLAYER_MODEL = "Player";
+
+    /**
+     * A mob wearing the player body without a skin (it wore a copied player look when the server stopped: the model is
+     * saved, the skin and our ORIGINALS are not) gets its role's own model back (NPCEntity.setAppearance with the
+     * role's appearance). Roles whose own appearance is the player body (random-skin NPCs) are left alone. From
+     * NPC load (LookLoadSystem) and Cleanse. Returns true if it fixed one. World thread.
+     */
+    static boolean fixBald(Ref<EntityStore> entity, ComponentAccessor<EntityStore> accessor) {
+        if (!entity.isValid() || isPlayer(entity, accessor)) return false;
+        ModelComponent mc = accessor.getComponent(entity, ModelComponent.getComponentType());
+        if (mc == null || mc.getModel() == null || !PLAYER_MODEL.equals(mc.getModel().getModelAssetId())) return false;
+        PlayerSkinComponent skin = accessor.getComponent(entity, PlayerSkinComponent.getComponentType());
+        if (skin != null && skin.getPlayerSkin() != null) return false;
+        com.hypixel.hytale.server.npc.entities.NPCEntity npc =
+                accessor.getComponent(entity, com.hypixel.hytale.server.npc.entities.NPCEntity.getComponentType());
+        String own = npc != null && npc.getRole() != null ? npc.getRole().getAppearanceName() : null;
+        if (own == null || PLAYER_MODEL.equals(own)) return false;
+        if (!com.hypixel.hytale.server.npc.entities.NPCEntity.setAppearance(entity, own, accessor)) return false;
+        MobBattlePlugin.log("Morph: " + ChaosWand.nameOf(entity, accessor) + " had the bare player body (copied look lost in a restart), back to " + own);
+        modelChanged(entity);
+        return true;
     }
 
     /** The model the entity had before its first morph (read-only, for the Debug Wand), or null. */
@@ -171,6 +212,7 @@ public final class MorphWand {
 
     /** Puts the copy's look on the entity. Returns false if the model asset or the entity's model is missing. */
     public static synchronized boolean apply(Ref<EntityStore> entity, Copy copy, ComponentAccessor<EntityStore> accessor) {
+        if (copy.skin() == null && PLAYER_MODEL.equals(copy.modelId())) return false; // a bald player body, see read
         ModelComponent current = accessor.getComponent(entity, ModelComponent.getComponentType());
         boolean player = isPlayer(entity, accessor);
         Model model = current != null ? build(copy, player ? PLAYER_SIZE.getOrDefault(entity, 1f) : 1f) : null;
@@ -196,7 +238,7 @@ public final class MorphWand {
         Original original = ORIGINALS.remove(entity);
         MORPHS.remove(entity);
         if (original == null || !entity.isValid()) {
-            return false;
+            return original == null && entity.isValid() && fixBald(entity, accessor);
         }
         PlayerSkinComponent now = accessor.getComponent(entity, PlayerSkinComponent.getComponentType());
         if (original.skin() != null) {
@@ -217,18 +259,15 @@ public final class MorphWand {
     }
 
     /**
-     * Removes a copied skin from a mob and tells everyone who sees it. Vanilla only ever sends PlayerSkin updates
-     * (EntityTrackerSystems.EntitySkin, javap), never a removal, so the client kept the old skin half applied and the
-     * cleansed mob came out as a bare player body (user, 2026-10-13). EntityViewer.queueRemove sends the removal.
+     * Removes a copied skin from a mob. Vanilla only ever sends PlayerSkin updates (EntityTrackerSystems.EntitySkin,
+     * javap), never a removal, so the client kept the old skin and the cleansed mob came out as a bare player body
+     * (user, 2026-10-13). ❌ Sending the removal (EntityViewer.queueRemove PlayerSkin) crashed every client that saw it:
+     * "Removing PlayerSkin component isn't supported!" (client log, 2026-10-13). So the clients get the mob again from
+     * scratch instead ({@link SkinRespawnSystem}).
      */
     private static void dropSkin(Ref<EntityStore> entity, ComponentAccessor<EntityStore> accessor) {
         accessor.removeComponent(entity, PlayerSkinComponent.getComponentType());
-        var visible = accessor.getComponent(entity,
-                com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems.Visible.getComponentType());
-        if (visible == null || visible.visibleTo == null) return;
-        for (var viewer : visible.visibleTo.values()) {
-            viewer.queueRemove(entity, com.hypixel.hytale.protocol.ComponentUpdateType.PlayerSkin);
-        }
+        SkinRespawnSystem.respawn(entity);
     }
 
     /**
@@ -294,27 +333,38 @@ public final class MorphWand {
         if (center == null) return -1;
         Copy copy = shuffle ? null : copyOf(player.getUuid());
         if (!shuffle && copy == null) {
-            player.sendMessage(com.hypixel.hytale.server.core.Message.raw(
-                    "No model copied yet. Right click a mob, or use /mobbattle morph <model>.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.morph.nocopy").color("#ffcc55"));
             return -1;
         }
+        return burstAt(center, caster, copy, shuffle, buffer).size();
+    }
+
+    /**
+     * The wave itself, from {@code center}: {@code caster} may be null (a wave from a spot, /mobbattle test wave,
+     * 2026-10-13); {@code copy} is the look to give (ignored with {@code shuffle}). Returns who changes look.
+     */
+    static List<Ref<EntityStore>> burstAt(org.joml.Vector3d center, Ref<EntityStore> caster, Copy copy, boolean shuffle,
+                                          ComponentAccessor<EntityStore> buffer) {
         int radius = FxSettings.morphBurstRadius;
         List<Ref<EntityStore>> around = new ArrayList<>(ChaosWand.npcsAround(center, radius, buffer));
         if (FxSettings.morphPlayers) {
             // getAllEntitiesInSphere returns a thread-local list: read it right away.
             for (Ref<EntityStore> r : com.hypixel.hytale.server.core.util.TargetUtil.getAllEntitiesInSphere(center, radius, buffer)) {
-                if (!r.equals(caster) && PlayerFighters.isPlayer(r, buffer) && BattleManager.isAlive(r, buffer)) around.add(r);
+                if (!r.equals(caster) && PlayerFighters.inWave(r, buffer)) around.add(r);
             }
         }
+        // The caster asked to be in their own wave (morphBurstSelf), even with morphPlayers off.
+        if (caster != null && FxSettings.morphBurstSelf && !around.contains(caster)) around.add(caster);
+        around = WaveHit.filter(center, around, buffer);
         FightFx.shockwave(center, radius, Teams.PALETTE.get("Green"), buffer);
         WandFx.burst(null, "SFX_MobBattle_OmnitrixTransform", center, buffer);
-        int changed = 0;
+        Map<Ref<EntityStore>, Copy> plan = new HashMap<>();
         if (!shuffle) {
             for (Ref<EntityStore> r : around) {
-                if (!r.isValid() || copy.sameLook(read(r, buffer))) continue;
-                if (morphWithFx(r, copy, buffer)) changed++;
+                if (r.isValid() && !copy.sameLook(read(r, buffer))) plan.put(r, copy);
             }
-            return changed;
+            land(center, radius, plan, buffer);
+            return new ArrayList<>(plan.keySet());
         }
         // Shuffle: read every look first, then trade them in random pairs.
         List<Ref<EntityStore>> who = new ArrayList<>();
@@ -326,7 +376,7 @@ public final class MorphWand {
                 looks.add(c);
             }
         }
-        if (who.size() < 2) return 0;
+        if (who.size() < 2) return List.of();
         List<Integer> order = new ArrayList<>();
         for (int i = 0; i < who.size(); i++) order.add(i);
         java.util.Collections.shuffle(order, java.util.concurrent.ThreadLocalRandom.current());
@@ -346,10 +396,18 @@ public final class MorphWand {
         }
         for (int i = 0; i < who.size(); i++) {
             Copy next = looks.get(gets[i]);
-            if (next.sameLook(looks.get(i))) continue;
-            if (morphWithFx(who.get(i), next, buffer)) changed++;
+            if (!next.sameLook(looks.get(i))) plan.put(who.get(i), next);
         }
-        return changed;
+        land(center, radius, plan, buffer);
+        return new ArrayList<>(plan.keySet());
+    }
+
+    /** Each planned look goes on as the wave reaches its mob (WaveHit: waveTravel / waveGroundOnly). */
+    private static void land(org.joml.Vector3d center, double radius, Map<Ref<EntityStore>, Copy> plan,
+                             ComponentAccessor<EntityStore> buffer) {
+        WaveHit.hit(center, radius, new ArrayList<>(plan.keySet()), buffer, (group, acc) -> {
+            for (Ref<EntityStore> r : group) morphWithFx(r, plan.get(r), acc);
+        });
     }
 
     /** {@link #apply} plus the Morph Wand's look on the mob (green burst in the world, the model swap drops attached ones). */

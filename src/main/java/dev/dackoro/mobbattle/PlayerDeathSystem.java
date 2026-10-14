@@ -50,10 +50,11 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
         String name = player != null ? player.getUsername() : "A player";
         MobBattlePlugin.log("Battle: " + name + " fell and is out of the " + battle.kind.key + " battle");
         if (player != null) {
-            player.sendMessage(Message.raw("You fell: you are out of the battle.").color("#ff6b5e"));
+            player.sendMessage(I18n.tr("chat.death.self").color("#ff6b5e"));
         }
         if (battle.owner() != null && battle.owner().isValid() && battle.owner() != player) {
-            battle.owner().sendMessage(Message.raw(name + " fell and is out of the battle.").color("#aaaaaa"));
+            battle.owner().sendMessage((player != null ? I18n.tr("chat.death.other").param("name", name)
+                    : I18n.tr("chat.death.someone")).color("#aaaaaa"));
         }
     }
 

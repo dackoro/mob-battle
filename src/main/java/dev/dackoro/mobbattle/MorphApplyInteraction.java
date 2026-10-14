@@ -37,35 +37,35 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
             return;
         }
         Ref<EntityStore> target = context.getTargetEntity();
-        String look = FxSettings.morphPlayers ? "Look at a mob or player and click it." : "Look at a mob and click it.";
+        Message look = I18n.tr(FxSettings.morphPlayers ? "chat.look.mobOrPlayer" : "chat.look.mob");
         if (target == null || !target.isValid()) {
-            player.sendMessage(Message.raw(look).color("#ffcc55"));
+            player.sendMessage(look.color("#ffcc55"));
             return;
         }
         boolean isPlayer = PlayerFighters.isPlayer(target, buffer);
         if (isPlayer && !FxSettings.morphPlayers) {
-            player.sendMessage(Message.raw("Players can't be morphed. Turn it on with /mobbattle morphPlayers on").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.morph.noPlayers").color("#ffcc55"));
             return;
         }
         if (!isPlayer && buffer.getComponent(target, NPCEntity.getComponentType()) == null) {
-            player.sendMessage(Message.raw(look).color("#ffcc55"));
+            player.sendMessage(look.color("#ffcc55"));
             return;
         }
         MorphWand.Copy copy = MorphWand.copyOf(player.getUuid());
         if (copy == null) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            player.sendMessage(Message.raw("No model copied yet. Right click a mob, or use /mobbattle morph <model>.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.morph.noCopy").color("#ffcc55"));
             return;
         }
         String name = ChaosWand.nameOf(target, buffer);
         MorphWand.Copy now = MorphWand.read(target, buffer);
         if (copy.sameLook(now)) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            player.sendMessage(Message.raw(name + " already looks like " + copy.label() + ".").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.morph.already").param("name", name).param("model", copy.label()).color("#ffcc55"));
             return;
         }
         if (!MorphWand.apply(target, copy, buffer)) {
-            player.sendMessage(Message.raw("Could not apply model " + copy.label() + ".").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.morph.failed").param("model", copy.label()).color("#ffcc55"));
             return;
         }
         WandFx.onTarget(target, WandFx.MORPH, buffer);
@@ -76,8 +76,7 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         // The omnitrix transformation sound, played here and not by the effect: a re-applied effect (quick clicks)
         // does not replay its sound.
         WandFx.burst(null, "SFX_MobBattle_OmnitrixTransform", ChaosWand.positionOf(target, buffer), buffer);
-        player.sendMessage(Message.raw(name + " now looks like " + copy.label()
-                + (isPlayer ? ". Cleanse Wand or /mobbattle morph reset to undo."
-                : ". It keeps its own AI and attacks. Cleanse Wand or /mobbattle morph reset to undo.")).color("#7dff8a"));
+        player.sendMessage(I18n.tr(isPlayer ? "chat.morph.appliedPlayer" : "chat.morph.applied")
+                .param("name", name).param("model", copy.label()).color("#7dff8a"));
     }
 }

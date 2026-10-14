@@ -33,7 +33,7 @@ public final class FightFx {
                                       Ref<EntityStore> first, Ref<EntityStore> second,
                                       ComponentAccessor<EntityStore> buffer) {
         if (KindFx.startTitle(BattleManager.Kind.DUEL)) {
-            showTitle(player, "FIGHT!", a + "  vs  " + b);
+            showTitle(player, I18n.tr("battle.fight"), I18n.tr("battle.fight.vs").param("a", a).param("b", b), false);
         }
         if (KindFx.laser(BattleManager.Kind.DUEL)) {
             laser(playerEntity, first, second, buffer);
@@ -272,6 +272,19 @@ public final class FightFx {
     /** Ease-in exponent: the ring leaves the center slowly and speeds up toward the edge (1 = constant speed). */
     private static final double WAVE_EASE = 1.7;
 
+    /** How long a shockwave out to {@code radius} takes to reach its edge. */
+    static long waveMs(double radius) {
+        return Math.max(WAVE_MIN_MS, Math.min(WAVE_MAX_MS,
+                WAVE_MIN_MS + Math.round((radius - WAVE_BASE_RADIUS) * WAVE_MS_PER_BLOCK)));
+    }
+
+    /** When the ring of a shockwave out to {@code radius} reaches {@code distance} blocks (ms after it starts). */
+    static long waveReachMs(double distance, double radius) {
+        if (radius <= 0 || distance <= 0) return 0;
+        double share = Math.min(1, distance / radius);
+        return Math.round(waveMs(radius) * Math.pow(share, 1 / WAVE_EASE));
+    }
+
     /**
      * A shockwave: a ring on the ground growing from {@code center} out to {@code radius} (one DisplayDebug disc
      * with a hole per step, like the zone floor), then the full area edge for a moment. It leaves the center slowly
@@ -294,8 +307,7 @@ public final class FightFx {
         var world = buffer.getExternalData().getWorld();
         float[] matrix = com.hypixel.hytale.math.matrix.Matrix4dUtil.asFloatData(
                 new org.joml.Matrix4d().translate(center.x(), baseY, center.z()));
-        long duration = Math.max(WAVE_MIN_MS, Math.min(WAVE_MAX_MS,
-                WAVE_MIN_MS + Math.round((radius - WAVE_BASE_RADIUS) * WAVE_MS_PER_BLOCK)));
+        long duration = waveMs(radius);
         int steps = (int) Math.max(1, duration / WAVE_STEP_MS);
         // Thin for a small wave, thick for a big one: the base width scales with the radius (30 blocks = 1x).
         double width = WAVE_RING * Math.max(0.3, Math.min(2.5, radius / WAVE_BASE_RADIUS));
@@ -332,6 +344,14 @@ public final class FightFx {
      * (no loading); works under roofs, unlike the heightmap.
      */
     static java.util.function.DoubleBinaryOperator floorBelow(double fromY, ComponentAccessor<EntityStore> buffer) {
+        return floorBelow(fromY, buffer, false);
+    }
+
+    /**
+     * Same; {@code leaves}: tree leaves count as a floor too (a camera must fly over the canopy). Leaves have no
+     * Material in their block type (Assets.zip Plant_Leaves_Oak), so they are not Solid: they are told by their id.
+     */
+    static java.util.function.DoubleBinaryOperator floorBelow(double fromY, ComponentAccessor<EntityStore> buffer, boolean leaves) {
         var chunks = buffer.getExternalData().getWorld().getChunkStore();
         var store = chunks.getStore();
         var blockTypes = com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.getAssetMap();
@@ -351,12 +371,44 @@ public final class FightFx {
                 }
                 if (section == null) continue;
                 var type = blockTypes.getAsset(section.get(bx & 31, y & 31, bz & 31));
-                if (type != null && type.getMaterial() == com.hypixel.hytale.protocol.BlockMaterial.Solid) {
+                if (type != null && (type.getMaterial() == com.hypixel.hytale.protocol.BlockMaterial.Solid
+                        || leaves && type.getId() != null && type.getId().contains("Leaves"))) {
                     return y + 1.25;
                 }
             }
             return Double.NaN;
         };
+    }
+
+    /**
+     * Roof over (x, z) seen from {@code level} (e.g. an indoor arena, user 2026-10-13: the drone rode on the arena
+     * roof): the bottom of the first solid block above it within {@code range}, leaves not counted (trees are flown
+     * over, not under). POSITIVE_INFINITY = open sky; NaN = {@code level} itself is solid (a wall, a hill) or unloaded.
+     */
+    static double roofAbove(double x, double z, double level, int range, ComponentAccessor<EntityStore> buffer) {
+        var chunks = buffer.getExternalData().getWorld().getChunkStore();
+        var store = chunks.getStore();
+        var blockTypes = com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.getAssetMap();
+        var sectionType = com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection.getComponentType();
+        int bx = (int) Math.floor(x), bz = (int) Math.floor(z), from = (int) Math.floor(level);
+        com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection section = null;
+        int sectionY = Integer.MIN_VALUE;
+        for (int y = Math.max(0, from); y <= from + range; y++) {
+            if ((y >> 5) != sectionY) {
+                sectionY = y >> 5;
+                var ref = chunks.getChunkSectionReference(bx >> 5, sectionY, bz >> 5);
+                section = ref != null && ref.isValid() ? store.getComponent(ref, sectionType) : null;
+            }
+            if (section == null) {
+                if (y == from) return Double.NaN;
+                continue;
+            }
+            var type = blockTypes.getAsset(section.get(bx & 31, y & 31, bz & 31));
+            if (type != null && type.getMaterial() == com.hypixel.hytale.protocol.BlockMaterial.Solid) {
+                return y == from ? Double.NaN : y;
+            }
+        }
+        return Double.POSITIVE_INFINITY;
     }
 
     /**
@@ -366,6 +418,17 @@ public final class FightFx {
      * own level (a cave mob stays in the cave, a mountain mob on the mountain).
      */
     static double standableY(double x, double z, double preferY, int range, ComponentAccessor<EntityStore> buffer) {
+        return standableY(x, z, preferY, range, Spot.ANY, buffer);
+    }
+
+    /**
+     * Where a teleported mob may land (2026-10-14, user: the unstick moved fish out of the water, walkers would drown
+     * at the bottom of a lake): ANY = as before (water counts as free), LAND = solid floor with 2 dry blocks over it,
+     * WATER = 2 blocks of water (any floor, the feet in the lower one) for a swimmer.
+     */
+    enum Spot { ANY, LAND, WATER }
+
+    static double standableY(double x, double z, double preferY, int range, Spot spot, ComponentAccessor<EntityStore> buffer) {
         var chunks = buffer.getExternalData().getWorld().getChunkStore();
         var store = chunks.getStore();
         var blockTypes = com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.getAssetMap();
@@ -376,6 +439,8 @@ public final class FightFx {
         var fluids = com.hypixel.hytale.server.core.asset.type.fluid.Fluid.getAssetMap();
         // 1 = solid, 0 = free, -1 = unknown (unloaded) or a hurting fluid (lava), from top to bottom.
         int[] cell = new int[top - bottom + 1];
+        // A free block holding a harmless fluid (water, mud...).
+        boolean[] wet = new boolean[top - bottom + 1];
         com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection section = null;
         com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection fluidSection = null;
         int sectionY = Integer.MIN_VALUE;
@@ -399,11 +464,17 @@ public final class FightFx {
             int fluidId = fluidSection != null ? fluidSection.getFluidId(bx & 31, y & 31, bz & 31) : 0;
             var fluid = fluidId != 0 ? fluids.getAsset(fluidId) : null;
             cell[y - bottom] = fluid != null && hurts(fluid) ? -1 : 0;
+            wet[y - bottom] = fluid != null && cell[y - bottom] == 0;
         }
         double best = Double.NaN, bestDist = Double.MAX_VALUE;
         for (int y = bottom; y + 2 <= top; y++) {
             int i = y - bottom;
-            if (cell[i] == 1 && cell[i + 1] == 0 && cell[i + 2] == 0) {
+            boolean ok = switch (spot) {
+                case ANY -> cell[i] == 1 && cell[i + 1] == 0 && cell[i + 2] == 0;
+                case LAND -> cell[i] == 1 && cell[i + 1] == 0 && cell[i + 2] == 0 && !wet[i + 1] && !wet[i + 2];
+                case WATER -> cell[i] != -1 && cell[i + 1] == 0 && cell[i + 2] == 0 && wet[i + 1] && wet[i + 2];
+            };
+            if (ok) {
                 double dist = Math.abs(y + 1 - preferY);
                 if (dist < bestDist) {
                     bestDist = dist;
@@ -412,6 +483,32 @@ public final class FightFx {
             }
         }
         return best;
+    }
+
+    /** True if the block is solid (unloaded = solid, to stay safe). */
+    static boolean solidAt(int x, int y, int z, ComponentAccessor<EntityStore> buffer) {
+        var chunks = buffer.getExternalData().getWorld().getChunkStore();
+        var ref = chunks.getChunkSectionReference(x >> 5, y >> 5, z >> 5);
+        if (ref == null || !ref.isValid()) return true;
+        var section = chunks.getStore().getComponent(ref,
+                com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection.getComponentType());
+        if (section == null) return true;
+        var type = com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.getAssetMap().getAsset(section.get(x & 31, y & 31, z & 31));
+        return type != null && type.getMaterial() == com.hypixel.hytale.protocol.BlockMaterial.Solid;
+    }
+
+    /**
+     * Room for a mob wider than one block (2026-10-14, cave test: a horse teleported next to a rock wall stood inside
+     * it for a moment): the 3x3 blocks around the spot are free at its feet and one above.
+     */
+    static boolean roomy(double x, double y, double z, ComponentAccessor<EntityStore> buffer) {
+        int bx = (int) Math.floor(x), by = (int) Math.floor(y), bz = (int) Math.floor(z);
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (solidAt(bx + dx, by, bz + dz, buffer) || solidAt(bx + dx, by + 1, bz + dz, buffer)) return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -630,28 +727,45 @@ public final class FightFx {
                 rgb, LASER_STEP_MILLIS + 50));
     }
 
-    /** Big start title for group fights (startTitle of that kind). */
+    /** Big start title for group fights (startTitle of that kind). Plain text overload: shown as written. */
     public static void title(BattleManager.Kind kind, PlayerRef player, String main, String sub) {
+        title(kind, player, Message.raw(main), Message.raw(sub));
+    }
+
+    /** Same with translated (or any) Messages. */
+    public static void title(BattleManager.Kind kind, PlayerRef player, Message main, Message sub) {
         if (KindFx.startTitle(kind)) {
-            for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub);
+            for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub, false);
         }
     }
 
     /** Ownerless event title; recipients are resolved from the battle's immutable world/center anchor. */
     static void title(BattleManager.Battle battle, String main, String sub) {
+        title(battle, Message.raw(main), Message.raw(sub));
+    }
+
+    static void title(BattleManager.Battle battle, Message main, Message sub) {
         if (battle != null && KindFx.startTitle(battle.kind)) {
-            for (PlayerRef viewer : titleViewers(battle)) showTitle(viewer, main, sub);
+            for (PlayerRef viewer : titleViewers(battle)) showTitle(viewer, main, sub, false);
         }
     }
 
     /** Winner titles have their own switch (winTitle of that kind), independent of fight-start titles. */
     public static void winnerTitle(BattleManager.Kind kind, PlayerRef player, String main, String sub) {
+        winnerTitle(kind, player, Message.raw(main), Message.raw(sub));
+    }
+
+    public static void winnerTitle(BattleManager.Kind kind, PlayerRef player, Message main, Message sub) {
         if (KindFx.winTitle(kind)) {
             for (PlayerRef viewer : titleViewers(player)) showTitle(viewer, main, sub, true);
         }
     }
 
     static void winnerTitle(BattleManager.Battle battle, String main, String sub) {
+        winnerTitle(battle, Message.raw(main), Message.raw(sub));
+    }
+
+    static void winnerTitle(BattleManager.Battle battle, Message main, Message sub) {
         if (battle != null && KindFx.winTitle(battle.kind)) {
             for (PlayerRef viewer : titleViewers(battle)) showTitle(viewer, main, sub, true);
         }
@@ -746,7 +860,7 @@ public final class FightFx {
     public static final float TITLE_SECONDS = 2.5f;
     public static final float TITLE_FADE_OUT = 0.5f;
 
-    private record PendingTitle(String main, String sub, boolean victory) {
+    private record PendingTitle(Message main, Message sub, boolean victory) {
     }
 
     /** Per player: current title deadline, queued victories and latest fight-start title. */
@@ -765,11 +879,7 @@ public final class FightFx {
      * Keep all victory announcements, and coalesce only start titles. Victories have priority after
      * the currently visible title finishes, so a fast fight cannot lose its winner announcement.
      */
-    private static void showTitle(PlayerRef player, String main, String sub) {
-        showTitle(player, main, sub, false);
-    }
-
-    private static synchronized void showTitle(PlayerRef player, String main, String sub, boolean victory) {
+    private static synchronized void showTitle(PlayerRef player, Message main, Message sub, boolean victory) {
         java.util.UUID id = player.getUuid();
         TITLE_PENDING.computeIfAbsent(id, ignored -> new BattleTitleQueue<>())
                 .offer(new PendingTitle(main, sub, victory), victory);
@@ -806,15 +916,15 @@ public final class FightFx {
     }
 
     /** /mobbattle countdown: "3", "2", "1"... shown at once, about one second each. */
-    static void countdownTitle(PlayerRef owner, int left, String label) {
+    static void countdownTitle(PlayerRef owner, int left, Message label) {
         for (PlayerRef viewer : titleViewers(owner)) countdownTitleTo(viewer, left, label);
     }
 
-    static void countdownTitle(BattleManager.Battle.Anchor anchor, int left, String label) {
+    static void countdownTitle(BattleManager.Battle.Anchor anchor, int left, Message label) {
         for (PlayerRef viewer : scopeViewers(anchor, FxSettings.titleScope)) countdownTitleTo(viewer, left, label);
     }
 
-    private static synchronized void countdownTitleTo(PlayerRef player, int left, String label) {
+    private static synchronized void countdownTitleTo(PlayerRef player, int left, Message label) {
         if (!player.isValid()) {
             return;
         }
@@ -823,7 +933,7 @@ public final class FightFx {
             EventTitleUtil.hideEventTitleFromPlayer(player, 0f);
         }
         var style = FxSettings.pickTitleStyle();
-        EventTitleUtil.showEventTitleToPlayer(player, Message.raw(String.valueOf(left)), Message.raw(label), style, null,
+        EventTitleUtil.showEventTitleToPlayer(player, Message.raw(String.valueOf(left)), label, style, null,
                 0.6f, 0.1f, 0.2f);
         TITLE_BUSY_UNTIL.put(player.getUuid(), System.currentTimeMillis() + 950);
     }
@@ -831,7 +941,7 @@ public final class FightFx {
     private static void sendTitle(PlayerRef player, PendingTitle title, long now) {
         var style = FxSettings.pickTitleStyle();
         float fadeIn = EventTitleUtil.getDefaultFadeInDuration(style);
-        EventTitleUtil.showEventTitleToPlayer(player, Message.raw(title.main()), Message.raw(title.sub()), style, null,
+        EventTitleUtil.showEventTitleToPlayer(player, title.main(), title.sub(), style, null,
                 TITLE_SECONDS, fadeIn, TITLE_FADE_OUT);
         TITLE_BUSY_UNTIL.put(player.getUuid(), now + (long) ((fadeIn + TITLE_SECONDS + TITLE_FADE_OUT) * 1000));
     }

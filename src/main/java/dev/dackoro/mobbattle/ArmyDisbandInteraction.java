@@ -2,6 +2,7 @@ package dev.dackoro.mobbattle;
 
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.Message;
@@ -32,15 +33,34 @@ public class ArmyDisbandInteraction extends SimpleInstantInteraction {
             context.getState().state = InteractionState.Failed;
             return;
         }
+        disband(player, context.getEntity(), buffer);
+    }
+
+    /** One Army Wand right click (the wand and /mobbattle test wand armydisband). */
+    static void disband(PlayerRef player, Ref<EntityStore> me, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
+        // Recruiting for someone else (crouch click): that army is the one disbanded.
+        Army.Pick pick = Army.pickOf(player.getUuid());
+        if (pick != null) {
+            var theirs = Army.members(pick.owner());
+            for (var npc : theirs) {
+                if (npc.getStore() == me.getStore()) WandFx.onTarget(npc, WandFx.ARMY_REMOVE, buffer);
+            }
+            Ref<EntityStore> ownerEntity = pick.leader() != null ? pick.leader() : Army.entityOf(pick.owner());
+            int n = Army.disband(pick.owner(), ownerEntity, buffer);
+            player.sendMessage((n == 0
+                    ? I18n.tr("chat.army.none.other").param("owner", pick.name())
+                    : I18n.tr("chat.army.disbanded.other").param("owner", pick.name()).param("count", n)).color(n == 0 ? "#ffcc55" : "#aaaaaa"));
+            return;
+        }
         var mobs = Army.members(player.getUuid());
         for (var npc : mobs) {
-            if (npc.getStore() == context.getEntity().getStore()) {
+            if (npc.getStore() == me.getStore()) {
                 WandFx.onTarget(npc, WandFx.ARMY_REMOVE, buffer);
             }
         }
-        int n = Army.disband(player.getUuid(), context.getEntity(), buffer);
-        player.sendMessage(Message.raw(n == 0
-                ? "You have no army. Left click mobs with the Army Wand to recruit them."
-                : "Army disbanded: " + n + " mobs went back to their own AI.").color(n == 0 ? "#ffcc55" : "#aaaaaa"));
+        int n = Army.disband(player.getUuid(), me, buffer);
+        player.sendMessage((n == 0
+                ? I18n.tr("chat.army.none")
+                : I18n.tr("chat.army.disbanded").param("count", n)).color(n == 0 ? "#ffcc55" : "#aaaaaa"));
     }
 }

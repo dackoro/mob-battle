@@ -1,6 +1,6 @@
 $C = "../../Common.ui";
 
-// One mob of the Summon Wand list: icon, role, count (number or random), team, remove. Count and team are
+// One mob of the Summon Wand list: icon, role, count (number or random), team color, team, remove. Count and team are
 // kept in the panel's draft (name in gold) until Save changes.
 Group {
   LayoutMode: Left;
@@ -17,7 +17,13 @@ Group {
   }
 
   $C.@TextField #Count {
-    @Anchor = (Width: 90, Right: 94, Top: 3);
+    @Anchor = (Width: 90, Right: 60, Top: 3);
+  }
+
+  // The team's color, as on the Teams page; hidden for no team.
+  Group #Swatch {
+    Anchor: (Width: 26, Height: 26, Top: 9, Right: 8);
+    Background: #808080;
   }
 
   $C.@DropdownBox #Team {
@@ -25,7 +31,7 @@ Group {
   }
 
   $C.@SmallSecondaryTextButton #Remove {
-    @Text = "Remove";
+    @Text = %server.mobbattle.panel.button.remove;
     @Anchor = (Width: 110, Top: 6);
   }
 }

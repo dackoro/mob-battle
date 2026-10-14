@@ -51,6 +51,8 @@ final class Unstick {
     private static final double SHOVE_UP = 4;
     /** The shove aims to land about this far from the opponent (inside melee reach). */
     private static final double SHOVE_STOP = 2;
+    /** No stand-off shove past this gap: a mob that far is still walking in (ChaseSupport). */
+    private static final double STANDOFF_MAX_GAP = 16;
 
     private static final class Track {
         Ref<EntityStore> target;
@@ -125,6 +127,12 @@ final class Unstick {
             // Same level and still apart: a stand-off. Shove it toward the opponent; again after standoffTime if needed.
             long standoffMs = FxSettings.standoffSeconds * 1000L;
             if (standoffMs <= 0 || now - t.since < standoffMs) return;
+            if (dist > STANDOFF_MAX_GAP) {
+                // Far behind a crowd: ChaseSupport walks it in; a shove from 40+ blocks was a long flying leap (log, 2026-10-13).
+                t.since = now;
+                t.best = dist;
+                return;
+            }
             long stood = now - t.since;
             t.since = now;
             t.best = dist;
@@ -137,20 +145,31 @@ final class Unstick {
             return;
         }
         if (!FxSettings.unstick || now - t.since < (flier ? FLY_STUCK_MS : STUCK_MS)) return;
+        // Medium (2026-10-14): never next to a target it can't reach (a fish on land, a walker after a fish in deep
+        // water), and only where it can live: water for a fish, dry land for a walker that drowns.
+        Medium.Can can = Medium.of(mob, store);
+        if (!Medium.reaches(can, Medium.where(target, store))) {
+            t.since = now;
+            return;
+        }
+        FightFx.Spot spot = Medium.spotFor(can);
         // Stuck: next to the opponent, at its height.
         double angle = Math.atan2(me.z - them.z, me.x - them.x);
-        for (int attempt = 0; attempt < 6; attempt++) {
-            double a = angle + attempt * Math.PI / 3, r = 2 + attempt % 3;
+        // Room around the spot first (a wide mob next to a wall stood inside it, 2026-10-14); a tight one if nothing else.
+        for (int attempt = 0; attempt < 12; attempt++) {
+            double a = angle + (attempt % 6) * Math.PI / 3, r = 2 + attempt % 3;
             double x = them.x + Math.cos(a) * r, z = them.z + Math.sin(a) * r;
-            double y = FightFx.standableY(x, z, them.y, STAND_RANGE, store);
+            double y = FightFx.standableY(x, z, them.y, STAND_RANGE, spot, store);
             if (!Double.isFinite(y)) continue;
+            if (attempt < 6 && spot != FightFx.Spot.WATER && !FightFx.roomy(x, y, z, store)) continue;
             Vector3d to = new Vector3d(x, y, z);
             float yaw = (float) Math.atan2(them.x - x, them.z - z);
             store.putComponent(mob, Teleport.getComponentType(), Teleport.createExact(to, new Rotation3f(0f, yaw, 0f)));
             WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
             MobBattlePlugin.debug("unstick: " + ChaosWand.nameOf(mob, store) + (flier ? " (flier)" : "") + " could not reach "
                     + ChaosWand.nameOf(target, store) + " (" + Math.round(Math.abs(them.y - me.y)) + " blocks up/down) for "
-                    + (now - t.since) / 1000 + " s: moved next to it");
+                    + (now - t.since) / 1000 + " s: moved next to it" + String.format(java.util.Locale.ROOT, " (%.1f %.1f %.1f -> %.1f %.1f %.1f)",
+                    me.x, me.y, me.z, to.x, to.y, to.z));
             break;
         }
         TRACKS.remove(mob);

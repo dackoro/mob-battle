@@ -66,14 +66,18 @@ The list is saved with the world settings. Presets never change it.
 |---|---|
 | `summon` | Summons the list around you. |
 | `summon list` | Shows the list. |
-| `summon add <role> [count\|random] [team]` | Adds a mob type, e.g. `summon add Skeleton 5`, `summon add Trork_Warrior random blue`. Count defaults to 1. A new role ID must match the game's case; one already in the list matches in any case. |
-| `summon modify <role> <count\|random>` | Changes the count of an entry, keeping its team rule and its place in the list. |
-| `summon remove <role>` / `summon clear` | Removes one type / empties the list. |
-| `summon team <role> <team>\|none` | Team rule for a mob type: summons of that type spawn straight into that team of your Team Wand teams, and `teams auto` uses it too. |
-| `summon random <min> <max>` | Range for `random` counts (default 1-5, limits 0-100; a reversed range is reordered). |
+| `summon add <role> [count\|random] [team]` | Adds a mob type, e.g. `summon add Skeleton 5`, `summon add Trork_Warrior random blue`. Count defaults to 1. A new role ID must match the game's case; one already in the list matches in any case. The same mob with the same team adds to that entry's count (10 + 5 = 15; a random count on either side makes a new entry instead); with another team it is one more entry, named `<role>#2`, `#3`... (e.g. `summon add Skeleton_Archer 10 red` and `summon add Skeleton_Archer 10 green`). |
+| `summon modify <entry> [team\|none] <count\|random>` | Sets the exact count of an entry, keeping its team rule and its place in the list. With a team it picks that mob's entry in that team (`summon modify Zombie red 5`). |
+| `summon remove <entry>` / `summon clear` | Removes one entry / empties the list. An entry is its role (the first one) or `<role>#2`... |
+| `summon team <entry> <team>\|none` | Team rule for an entry: its summons spawn straight into that team of your Team Wand teams, and `teams auto` uses it too (a type listed in several teams is dealt over them in turn). |
+| `summon random <min> <max>` | Range for `random` counts (default 1-5, limits 0-100000, more than 60 warns; a reversed range is reordered). |
 | `summon atLeastOne true\|false` | `true` (default): every `random` type spawns at least 1. `false`: it may spawn 0. |
 
 In the panel, the Summon list page shows each mob with its icon, count and team (edits wait for **Save changes**), a searchable list to add mobs, the random range, the summon radius and the "summons leave" settings.
+
+### Random battles
+
+`/mobbattle summon fill <types> [each:<n>] [teams:<n>] [mod:<name>|mod:hytale] [type:fighters|defend] [group:<group>] [add]` fills the list with random mobs that fight, using the same mob classification as the settings panel: no passive mobs, no kickers, no turrets or patrol variants, and no water mobs or bosses unless you ask for that group. They are of similar strength (their max health), so a boss doesn't face frogs. `teams:2` deals them into two balanced teams (strongest first, in turns). It replaces the list unless you add `add`. The panel's Summon list tab has two buttons for it: a random battle (6 types, 3 each) and a random team battle (8 types, 2 teams, 3 each). Then summon them as usual.
 
 ### Where and how many
 
@@ -106,6 +110,15 @@ None of the exits drop loot. Summons are tracked while the server runs: a summon
 - `summonJade on|off` (default off): summons come out wearing the jade look, as if the Effect Wand gave it. It is kept the same way (it comes back when another effect ends), glows with `lookGlow`, and they shatter into jade when killed. `summonJadeColor <color>` picks its palette color (default green). See [colors-and-looks.md](colors-and-looks.md).
 - `summonArmy on|off` (default off): summons join your army, as if you added each one with the Army Wand. Summons that spawn into a team (team rule) don't.
 
+### Calm summons
+
+`summonCalm off|summons|all` (default off) keeps new summons from fighting as soon as they appear, so you can summon a Feastmaster and 100 skeletons and set up the battle first.
+- `summons`: summons ignore each other.
+- `all`: they also ignore players and other mobs nearby.
+- A summon stays calm until a battle, a wand fight or your army takes it. Then the battle decides who it fights.
+- If something hits a calm summon, it can fight back that attacker. It stays calm toward everyone else.
+- Summons in your army (`summonArmy`) are never calm. Calm is only kept while the server runs: a summon that was unloaded and loaded again, or one from before a restart, acts as usual again.
+
 ## Armies
 
 ### Army Wand
@@ -115,7 +128,12 @@ None of the exits drop loot. Summons are tracked while the server runs: a summon
 | Click | Effect |
 |---|---|
 | Left click a mob | Adds it to your army (it flashes blue). Click it again to remove it (it flashes red). |
-| Right click | Disbands your army. |
+| Crouch + left click a mob | Recruit for that mob from now on: your next clicks put mobs in **its** army, and it leads them. It shows a gold ring while you hold the wand. |
+| Crouch + left click a player | Recruit for that player: your next clicks put mobs in their army. With server permissions on (`/mobbattle permissions server`), this needs `dackoro.mob_battle.config`. |
+| Crouch + left click the air (or yourself) | Recruit for your own army again. |
+| Right click | Disbands the army you recruit for (yours, or the picked player's or leader's). |
+
+Crouch clicks need you on the ground: while flying in Creative the crouch key flies you down and the game doesn't count it as crouching.
 
 - Joining an army takes the mob out of any battle, fight or team.
 - Leaving (or a disband) gives each mob its own AI back, and it ignores you for a while instead of attacking at once.
@@ -142,6 +160,21 @@ Army mobs follow these rules, most urgent first:
 
 - Every second, each army mob's home point moves to you, so mobs that return home walk after you.
 - An army mob that isn't fighting and is more than 20 blocks away is teleported back around you with a summon burst. They land spread over a ring that grows with the army: 4 blocks for a few mobs, up to 20 for a big one.
+
+### Other owners and mob leaders
+
+An army can belong to another player or be led by a mob (admin command, also from the server console):
+
+- `/mobbattle apply <who> army add` puts mobs in your own army.
+- `/mobbattle apply <who> army add <player>` puts them in that player's army.
+- `/mobbattle apply <who> army add id:<uuid>` (or `last`) makes that mob their **leader**. The army follows the leader, defends itself and the leader, and attacks whatever the leader attacks, by the same four rules.
+- `/mobbattle apply <who> army remove` takes mobs out of whatever army they are in.
+
+A leader can serve in another army, which gives a chain of command: you lead a Trork chieftain, the chieftain leads goblins. A loop (a mob leading the army it serves in) is refused. The whole chain counts as one army: the goblins never attack you or the chieftain, and nobody in it hurts the others (see friendly fire below). When a leader dies or unloads, its army goes back to its own AI. Army mobs that fight in a battle (army summons in a royale) stay in it: they are not pulled back to their owner until it ends.
+
+### Friendly fire in an army
+
+`armyFriendlyFire on|off` (default off): with it on, hits inside one army (mates, a leader and its mobs, an owner and their mobs, and every army down a chain of command) do their damage, but nobody fights back or calls the others: they stay allies. With it off, those hits do nothing. In the panel: Battles, next to Battle PvP.
 
 ### Army tint
 

@@ -47,6 +47,15 @@ final class PlayerFighters {
         return ref != null && ref.isValid() && accessor.getComponent(ref, PlayerRef.getComponentType()) != null;
     }
 
+    /**
+     * A player a wand wave (heal, cleanse, effect) may touch: alive and not spectating (audit 2026-10-14: a wave cast near
+     * a battle reached /mobbattle watch spectators and players on the respawn screen).
+     */
+    static boolean inWave(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        return isPlayer(ref, accessor) && BattleManager.isAlive(ref, accessor)
+                && !com.hypixel.hytale.server.core.modules.entity.component.Spectating.isSpectating(ref, accessor);
+    }
+
     /** True if {@code ref} is a player in Creative or spectating (/spectate, /mobbattle watch): they never fight. */
     static boolean isCreative(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
         Player p = ref != null && ref.isValid() ? accessor.getComponent(ref, Player.getComponentType()) : null;
@@ -79,19 +88,19 @@ final class PlayerFighters {
     static boolean eligible(PlayerRef asker, Ref<EntityStore> target, BattleManager.Kind kind,
                             ComponentAccessor<EntityStore> accessor) {
         if (!FxSettings.playerFights(kind)) {
-            asker.sendMessage(Message.raw("Players can't fight in " + kind.key + " battles. Turn it on with /mobbattle playerFights "
-                    + kind.key + " on").color(WARN));
+            asker.sendMessage(I18n.tr("chat.fighters.disabled").param("kind", kind.key).color(WARN));
             return false;
         }
         String name = ChaosWand.nameOf(target, accessor);
         boolean self = asker.getReference() == target;
         if (isCreative(target, accessor)) {
-            asker.sendMessage(Message.raw((self ? "You are" : name + " is") + " in Creative: Creative players don't fight. "
-                    + "Switch to Adventure (/gamemode adventure).").color(WARN));
+            asker.sendMessage((self ? I18n.tr("chat.fighters.creative.self") : I18n.tr("chat.fighters.creative.other").param("name", name))
+                    .color(WARN));
             return false;
         }
         if (!BattleManager.isAlive(target, accessor)) {
-            asker.sendMessage(Message.raw((self ? "You are" : name + " is") + " not alive.").color(WARN));
+            asker.sendMessage((self ? I18n.tr("chat.fighters.dead.self") : I18n.tr("chat.fighters.dead.other").param("name", name))
+                    .color(WARN));
             return false;
         }
         return true;
@@ -109,19 +118,18 @@ final class PlayerFighters {
         if (!eligible(player, me, BattleManager.Kind.TEAMS, store)) return;
         int team = teamName != null ? BattleManager.teamIndex(teamName) : -1;
         if (team < 0) {
-            player.sendMessage(Message.raw("Usage: /mobbattle teams join <team> (see /mobbattle teams list)").color(WARN));
+            player.sendMessage(I18n.tr("chat.fighters.joinusage").color(WARN));
             return;
         }
         BattleManager.markPlayer(me, player.getUuid());
         BattleManager.assign(BattleManager.draft(player), me, team);
-        player.sendMessage(Message.raw("You joined the " + Teams.name(team) + " team: its mobs won't attack you. "
-                + "Start the battle with the Team Wand or /mobbattle teams start.").color(Teams.color(team)));
+        player.sendMessage(I18n.tr("chat.fighters.joined").param("team", Teams.name(team)).color(Teams.color(team)));
     }
 
     /** /mobbattle teams leave: out of your team, or out of the team battle you are in. */
     static void leaveTeam(PlayerRef player, Ref<EntityStore> me) {
         boolean left = BattleManager.leave(me);
-        player.sendMessage(Message.raw(left ? "You left your team." : "You are not in a team.").color(left ? "#aaaaaa" : WARN));
+        player.sendMessage(I18n.tr(left ? "chat.fighters.left" : "chat.fighters.notinteam").color(left ? "#aaaaaa" : WARN));
     }
 
     /**
@@ -187,7 +195,7 @@ final class PlayerFighters {
         // and this runs (and tells them) only once.
         if (!BattleManager.leave(p)) BattleManager.unmarkPlayer(p);
         if (player != null) {
-            player.sendMessage(Message.raw("Creative: you don't count as a fighter any more.").color(WARN));
+            player.sendMessage(I18n.tr("chat.fighters.creativeleft").color(WARN));
             MobBattlePlugin.log("Battle: " + player.getUsername() + " switched to Creative and left the fight");
         }
     }

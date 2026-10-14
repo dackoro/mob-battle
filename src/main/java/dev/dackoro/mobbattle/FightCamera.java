@@ -20,6 +20,7 @@ import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.entity.entities.player.CameraManager;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.modules.camera.CameraSequenceBuilder;
+import com.hypixel.hytale.server.core.modules.entity.component.BoundingBox;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -82,9 +83,22 @@ final class FightCamera {
 
     private static void introFor(BattleManager.Kind kind, PlayerRef player, Vector3d center,
                                  List<List<Ref<EntityStore>>> sides, ComponentAccessor<EntityStore> buffer) {
+        introFor(kind, KindFx.cameraStyle(kind), KindFx.introSeconds(kind), KindFx.cameraShots(kind), player, center, sides, buffer);
+    }
+
+    /**
+     * /mobbattle test camera (2026-10-13): one intro style for one player over the given fighters, without a battle
+     * and whatever the camera settings say. World thread.
+     */
+    static void test(String style, int seconds, PlayerRef player, List<List<Ref<EntityStore>>> sides,
+                     ComponentAccessor<EntityStore> buffer) {
+        introFor(null, style, seconds, KindFx.cameraShots(null), player, null, sides, buffer);
+    }
+
+    private static void introFor(BattleManager.Kind kind, String chosenStyle, int seconds, int shots, PlayerRef player,
+                                 Vector3d center, List<List<Ref<EntityStore>>> sides, ComponentAccessor<EntityStore> buffer) {
         // Never let a camera problem break the fight that called it.
         try {
-            int seconds = KindFx.introSeconds(kind);
             // A /mobbattle watch spectator keeps the camera they chose.
             if (seconds <= 0 || player == null || !player.isValid() || BattleWatch.isWatching(player)) return;
             List<List<Ref<EntityStore>>> live = new ArrayList<>();
@@ -101,7 +115,7 @@ final class FightCamera {
             if (center == null) center = centroid(all, buffer);
             if (center == null) return;
             long total = seconds * 1000L;
-            String style = KindFx.cameraStyle(kind);
+            String style = chosenStyle;
             if (("duel".equals(style) || "focus".equals(style)) && live.size() < 2) style = "showcase";
             if ("teams".equals(style) && live.size() < 2) style = "showcase";
             MobBattlePlugin.debug("intro camera " + style + " for " + (kind != null ? kind.key : "?") + ", " + seconds + " s, "
@@ -118,7 +132,7 @@ final class FightCamera {
                     focus(player, target, crowd, total, buffer);
                 }
                 case "drone" -> drone(player, center, all, total, buffer);
-                default -> showcase(player, all, KindFx.cameraShots(kind), total, buffer);
+                default -> showcase(player, all, shots, total, buffer);
             }
             // Remember what this intro films, so the battle's end cuts it (battleOver); the end camera is never cut.
             Long shot = SHOT.get(player.getUuid());
@@ -160,7 +174,7 @@ final class FightCamera {
                 if (p == null) return null;
                 double eye = track.eye(focus, acc);
                 double swing = -0.6 + 1.2 * t / total;
-                return closeUp(p, track.yaw(focus, acc), eye, swing, Math.max(4, eye * 2.6), eye * 0.6 + 1.2);
+                return closeUp(p, track.yaw(focus, acc), eye, swing, closeDist(4, 2.6, eye, track.size(focus, acc)), eye * 0.6 + 1.2);
             }));
             playShots(player, buffer.getExternalData().getWorld(), shots);
             watchSkip(player, buffer.getExternalData().getWorld());
@@ -207,7 +221,8 @@ final class FightCamera {
             int shot = i;
             shots.add(new Shot(each, (t, acc) -> {
                 Vector3d pa = track.pos(a, acc), pb = track.pos(b, acc);
-                return pa == null || pb == null ? null : duelFrame(pa, pb, shot);
+                return pa == null || pb == null ? null
+                        : duelFrame(pa, pb, track.size(a, acc), track.size(b, acc), shot);
             }));
         }
         playShots(player, buffer.getExternalData().getWorld(), shots);
@@ -233,7 +248,7 @@ final class FightCamera {
                 if (p == null) return null;
                 double eye = track.eye(mob, acc);
                 double swing = -0.35 + 0.7 * t / each;
-                return closeUp(p, track.yaw(mob, acc), eye, swing, Math.max(3, eye * 2.2), eye * 0.9 + 0.4);
+                return closeUp(p, track.yaw(mob, acc), eye, swing, closeDist(3, 2.2, eye, track.size(mob, acc)), eye * 0.9 + 0.4);
             }));
         }
         playShots(player, buffer.getExternalData().getWorld(), shots);
@@ -262,16 +277,20 @@ final class FightCamera {
                 }
                 if (k == 0) return null;
                 Vector3d c = new Vector3d(cx / k, cy / k, cz / k);
-                double spread = 1.5;
+                double spread = 1.5, tall = NORMAL_SIZE[0], wide = NORMAL_SIZE[1];
                 for (Ref<EntityStore> m : members) {
                     Vector3d p = track.pos(m, acc);
                     if (p != null) spread = Math.max(spread, Math.hypot(p.x - c.x, p.z - c.z));
+                    double[] sz = track.size(m, acc);
+                    tall = Math.max(tall, sz[0]);
+                    wide = Math.max(wide, sz[1]);
                 }
                 double dx = center.x - c.x, dz = center.z - c.z;
                 double len = Math.hypot(dx, dz);
                 if (len < 1) { dx = 1; dz = 0; len = 1; }
-                double dist = Math.min(spread + 5, 40);
-                Vector3d at = new Vector3d(c.x + dx / len * dist, c.y + 2.5 + spread * 0.25, c.z + dz / len * dist);
+                // Bigger members (a boss, a size buff): further back and higher, so their whole upper half is seen.
+                double dist = Math.min(Math.max(spread + 5, spread + wide + tall * 1.1), 60);
+                Vector3d at = new Vector3d(c.x + dx / len * dist, c.y + Math.max(2.5, tall * 0.7) + spread * 0.25, c.z + dz / len * dist);
                 // Hold on the first one, then sweep across the rest.
                 double u = (double) t / each;
                 // Few stops, each kept at least FOCUS_HOLD_MS (evenly spread over the team): one stop per member made
@@ -284,7 +303,7 @@ final class FightCamera {
                 }
                 Vector3d look = track.pos(members.get(idx), acc);
                 if (look == null) look = c;
-                return frame(at, new Vector3d(look.x, look.y + 1.2, look.z), DUEL_LERP);
+                return frame(at, new Vector3d(look.x, look.y + lookHeight(track.size(members.get(idx), acc)) - 0.3, look.z), DUEL_LERP);
             }));
         }
         playShots(player, buffer.getExternalData().getWorld(), shots);
@@ -320,19 +339,24 @@ final class FightCamera {
             Vector3d q = track.pos(target, acc);
             if (q == null) return null;
             double eye = track.eye(target, acc);
-            return closeUp(q, track.yaw(target, acc), eye, -0.3 + 0.6 * t / first, Math.max(3, eye * 2.2), eye * 0.9 + 0.4);
+            return closeUp(q, track.yaw(target, acc), eye, -0.3 + 0.6 * t / first, closeDist(3, 2.2, eye, track.size(target, acc)), eye * 0.9 + 0.4);
         }));
         // The attacker in front of the camera, kept at least FOCUS_HOLD_MS: picking the closest one every frame made
         // the camera jump from one to another many times a second in a big crowd.
         @SuppressWarnings("unchecked")
         Ref<EntityStore>[] held = new Ref[1];
         long[] heldSince = {-FOCUS_HOLD_MS};
+        double[] focusRoof = {Double.NaN};
         shots.add(new Shot(circle, (t, acc) -> {
             Vector3d c = track.pos(target, acc);
             if (c == null) return null;
+            // A big target (boss, size buff): the circle opens up and rises so it is not filmed from inside.
+            double[] ts = track.size(target, acc);
+            double r = Math.max(ring, Math.min(60, ts[1] + ts[0] * 1.4 + 2));
             double a = a0 + FOCUS_SWEEP * t / circle;
-            double x = c.x + Math.cos(a) * ring, z = c.z + Math.sin(a) * ring;
-            double y = Math.max(c.y + 2.5 + ring * 0.15, ground(x, z, c.y, acc) + 2.5);
+            double x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+            double y = underRoof(Math.max(c.y + Math.max(2.5, ts[0] * 0.7) + r * 0.15,
+                    canopy(x, z, c.y, c.y + 1.5, focusRoof, true, acc) + 2.5), focusRoof);
             boolean keep = held[0] != null && held[0].isValid() && BattleManager.isAlive(held[0], acc)
                     && t - heldSince[0] < FOCUS_HOLD_MS;
             if (!keep) {
@@ -356,16 +380,18 @@ final class FightCamera {
             // Halfway between that attacker and the target: the target never leaves the shot, and a change of
             // attacker only moves the view half as far.
             Vector3d look = q == null ? c : new Vector3d((q.x + c.x) / 2, (q.y + c.y) / 2, (q.z + c.z) / 2);
-            return frame(new Vector3d(x, y, z), new Vector3d(look.x, look.y + 1.2, look.z), DUEL_LERP);
+            return frame(new Vector3d(x, y, z), new Vector3d(look.x, look.y + Math.max(1.2, ts[0] * 0.4), look.z), DUEL_LERP);
         }));
         playShots(player, buffer.getExternalData().getWorld(), shots);
     }
 
     /**
-     * Drone: one flight across the battle, from the player's side to the far side, high above the ground. It dives
-     * past a few fighters picked at random (one every ~3 s, up to 4), looking at each as it goes by, then climbs
-     * again and heads for the next. Never lower than {@link #DRONE_CLEAR} blocks over the ground under it and just
-     * ahead of it (hills); tree leaves may still get in the way.
+     * Drone: one low flight across the battle, from the player's side to the far side, along a smooth curve that
+     * weaves past a few fighters (left of one, right of the next) without stopping. It keeps {@link #DRONE_LOW}
+     * blocks over the ground or the tree tops under it and just ahead (climbs fast, sinks slowly), looks ahead along
+     * its path, a little down, and turns toward the fighter it is coming up to, then ahead again once past it.
+     * (2026-10-13, user video: the old one stopped at each fighter, stared down at it and climbed away, and flew
+     * through tree tops: leaves are not Solid blocks.)
      */
     private static void drone(PlayerRef player, Vector3d center, List<Ref<EntityStore>> fighters, long total,
                               ComponentAccessor<EntityStore> buffer) {
@@ -376,18 +402,27 @@ final class FightCamera {
             if (q != null) spread = Math.max(spread, Math.hypot(q.x - center.x, q.z - center.z));
         }
         double r = Math.max(12, Math.min(80, spread + 8));
-        double cruise = center.y + r * 0.35 + 8;
         Eye eye = eyeOf(player, buffer);
         double aS = eye != null ? Math.atan2(eye.pos.z - center.z, eye.pos.x - center.x) : 0;
         double ux = -Math.cos(aS), uz = -Math.sin(aS);    // flight direction (toward the far side)
         double px = -uz, pz = ux;                          // sideways
-        Vector3d from = new Vector3d(center.x - ux * r, cruise, center.z - uz * r);
-        Vector3d to = new Vector3d(center.x + ux * r, cruise, center.z + uz * r);
-        // The fighters it dives past, in flight order.
-        int dives = (int) Math.max(1, Math.min(4, Math.min(fighters.size(), usable / 3000)));
+        Vector3d from = new Vector3d(center.x - ux * r, center.y, center.z - uz * r);
+        Vector3d to = new Vector3d(center.x + ux * r, center.y, center.z + uz * r);
+        // Indoor arena (a roof over the center; user video 2026-10-13: the drone started and ended inside the stands
+        // and flew through their corridors): its ends and passing points are pulled in to open floor.
+        double level = center.y + 1.5;
+        boolean indoor = Double.isFinite(FightFx.roofAbove(center.x, center.z, level, (int) GROUND_SCAN, buffer));
+        if (indoor) {
+            from = inward(from, center, level, buffer);
+            to = inward(to, center, level, buffer);
+        }
+        Vector3d start = from, end = to;
+        long flyMs = Math.max(STEP_MS, (long) (usable * DRONE_FLY_SHARE));
+        // The fighters it flies past, in flight order.
+        int passes = (int) Math.max(1, Math.min(DRONE_MAX_PASSES, Math.min(fighters.size(), usable / DRONE_PASS_MS)));
         List<Ref<EntityStore>> picked = new ArrayList<>(fighters);
         java.util.Collections.shuffle(picked);
-        picked = new ArrayList<>(picked.subList(0, dives));
+        picked = new ArrayList<>(picked.subList(0, passes));
         Map<Ref<EntityStore>, Double> along = new java.util.HashMap<>();
         for (Ref<EntityStore> f : picked) {
             Vector3d q = ChaosWand.positionOf(f, buffer);
@@ -396,43 +431,176 @@ final class FightCamera {
         picked.sort(java.util.Comparator.comparingDouble(along::get));
         List<Ref<EntityStore>> stops = picked;
         Track track = new Track();
+        double[] alt = {Double.NaN};
+        double[] roof = {Double.NaN};
+        Vector3d[] look = {null};
         List<Shot> shots = List.of(new Shot(usable, (t, acc) -> {
-            // Waypoints: start edge, each dive (beside the fighter, low), far edge.
+            // Waypoints from the live positions: start edge, beside each fighter (sides alternate), far edge.
             int n = stops.size() + 2;
-            Vector3d[] pts = new Vector3d[n];
-            Vector3d[] watch = new Vector3d[n];
-            pts[0] = from;
-            pts[n - 1] = to;
+            double[] xs = new double[n], zs = new double[n];
+            xs[0] = start.x;
+            zs[0] = start.z;
+            xs[n - 1] = end.x;
+            zs[n - 1] = end.z;
+            Vector3d[] at = new Vector3d[stops.size()];
             for (int i = 0; i < stops.size(); i++) {
                 Vector3d q = track.pos(stops.get(i), acc);
-                if (q == null) q = center;
-                pts[i + 1] = new Vector3d(q.x + px * DRONE_SIDE, q.y + DRONE_LOW, q.z + pz * DRONE_SIDE);
-                watch[i + 1] = new Vector3d(q.x, q.y + 1, q.z);
+                at[i] = q != null ? q : center;
+                double side = (i % 2 == 0 ? 1 : -1) * Math.max(DRONE_SIDE, track.size(stops.get(i), acc)[1] + 3);
+                double sx = at[i].x + px * side, sz = at[i].z + pz * side;
+                if (indoor && !droneOpen(sx, sz, level, acc)) {
+                    // A wall or the stands on that side: the other side, else closer in.
+                    double ox = at[i].x - px * side, oz = at[i].z - pz * side;
+                    Vector3d in = droneOpen(ox, oz, level, acc) ? new Vector3d(ox, 0, oz)
+                            : inward(new Vector3d(sx, 0, sz), at[i], level, acc);
+                    sx = in.x;
+                    sz = in.z;
+                }
+                xs[i + 1] = sx;
+                zs[i + 1] = sz;
             }
-            double u = (double) t / usable * (n - 1);
-            int i = (int) Math.min(n - 2, Math.floor(u));
-            double f = u - i;
-            double e = f * f * (3 - 2 * f);   // ease in and out of each stop
-            Vector3d a = pts[i], b = pts[i + 1];
-            double x = a.x + (b.x - a.x) * e, z = a.z + (b.z - a.z) * e;
-            // Low at the dives, back up to cruise height between them.
-            double base = a.y + (b.y - a.y) * e;
-            double y = base + Math.max(0, cruise - base) * Math.sin(Math.PI * f);
-            double ax = x + (b.x - a.x) * 0.15, az = z + (b.z - a.z) * 0.15;
-            y = Math.max(y, Math.max(ground(x, z, y, acc), ground(ax, az, y, acc)) + DRONE_CLEAR);
-            // Watch the fighter just passed for a moment, then the next stop (the battle's center at the end).
-            Vector3d look = f < 0.35 && watch[i] != null ? watch[i]
-                    : watch[i + 1] != null ? watch[i + 1] : new Vector3d(center.x, center.y + 1, center.z);
-            return frame(new Vector3d(x, y, z), look, DUEL_LERP);
+            double[] cum = new double[n];
+            for (int i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.max(0.01, Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]));
+            // Nearly even speed, easing only into the start and out of the end. After the pass (flyMs) it swings
+            // around the battle like the orbit (user, 2026-10-13), from where the pass ended, a little closer in.
+            boolean orbiting = t > flyMs;
+            double[] p, q;
+            if (!orbiting) {
+                double u = Math.min(1, (double) t / flyMs);
+                double s = (0.6 * u + 0.4 * u * u * (3 - 2 * u)) * cum[n - 1];
+                p = spline(xs, zs, cum, s);
+                q = spline(xs, zs, cum, s + 1);
+            } else {
+                double f = Math.min(1, (double) (t - flyMs) / Math.max(1, usable - flyMs));
+                double a0 = Math.atan2(xs[n - 1] - center.x, zs[n - 1] - center.z);
+                double r0 = Math.max(DRONE_ORBIT_MIN, Math.hypot(xs[n - 1] - center.x, zs[n - 1] - center.z));
+                double rad = r0 * (1 - (1 - DRONE_ORBIT_SHRINK) * Math.min(1, f * 3));
+                double a = a0 + DRONE_ORBIT_SWEEP * f;
+                double a2 = a + 0.05;
+                p = new double[] {center.x + Math.sin(a) * rad, center.z + Math.cos(a) * rad};
+                q = new double[] {center.x + Math.sin(a2) * rad, center.z + Math.cos(a2) * rad};
+                if (indoor && !droneOpen(p[0], p[1], level, acc)) {
+                    Vector3d in = inward(new Vector3d(p[0], 0, p[1]), center, level, acc);
+                    p = new double[] {in.x, in.z};
+                }
+            }
+            double dx = q[0] - p[0], dz = q[1] - p[1];
+            double len = Math.hypot(dx, dz);
+            if (len < 1e-6) {
+                dx = ux;
+                dz = uz;
+            } else {
+                dx /= len;
+                dz /= len;
+            }
+            // Height: over the highest ground or tree top here and a little ahead.
+            double from0 = Double.isNaN(alt[0]) ? center.y + DRONE_LOW : alt[0];
+            double here = canopy(p[0], p[1], from0, level, roof, true, acc);
+            double top = here;
+            for (double ahead : DRONE_AHEAD) {
+                top = Math.max(top, canopy(p[0] + dx * ahead, p[1] + dz * ahead, from0, level, roof, false, acc));
+            }
+            double want = top + DRONE_LOW;
+            if (Double.isNaN(alt[0])) alt[0] = want;
+            else alt[0] += (want - alt[0]) * (want > alt[0] ? DRONE_CLIMB : DRONE_SINK);
+            alt[0] = underRoof(Math.max(alt[0], here + DRONE_CLEAR), roof);
+            Vector3d pos = new Vector3d(p[0], alt[0], p[1]);
+            // Ahead along the path, a little down; turned toward the fighter it is coming up to.
+            Vector3d target = orbiting ? new Vector3d(center.x, center.y + 1.5, center.z)
+                    : new Vector3d(p[0] + dx * DRONE_LOOK, alt[0] - DRONE_LOOK_DOWN, p[1] + dz * DRONE_LOOK);
+            double best = orbiting ? 0 : DRONE_TURN_RANGE;
+            Vector3d mob = null;
+            double mobEye = 1;
+            for (int i = 0; i < at.length; i++) {
+                double ahead = (at[i].x - p[0]) * dx + (at[i].z - p[1]) * dz;
+                if (ahead > 0.5 && ahead < best) {
+                    best = ahead;
+                    mob = at[i];
+                    mobEye = track.eye(stops.get(i), acc);
+                }
+            }
+            if (mob != null) {
+                double w = DRONE_TURN * (1 - best / DRONE_TURN_RANGE);
+                target = new Vector3d(target.x + (mob.x - target.x) * w, target.y + (mob.y + mobEye * 0.6 - target.y) * w,
+                        target.z + (mob.z - target.z) * w);
+            }
+            Vector3d prev = look[0];
+            look[0] = prev == null ? target : new Vector3d(prev.x + (target.x - prev.x) * DRONE_LOOK_EASE,
+                    prev.y + (target.y - prev.y) * DRONE_LOOK_EASE, prev.z + (target.z - prev.z) * DRONE_LOOK_EASE);
+            return frame(pos, look[0], DRONE_LERP);
         }));
         playShots(player, buffer.getExternalData().getWorld(), shots);
     }
 
-    /** Height of the ground at (x, z), searched from a bit above {@code fromY} down; {@code fromY} if none found. */
-    private static double ground(double x, double z, double fromY, ComponentAccessor<EntityStore> acc) {
-        double g = FightFx.floorBelow(fromY + GROUND_SCAN, acc).applyAsDouble(x, z);
-        return Double.isFinite(g) ? g : fromY - DRONE_CLEAR;
+    /**
+     * Point at distance {@code s} along a Catmull-Rom curve through (xs, zs) ({@code cum}: distance to each point
+     * along the straight segments), clamped to the ends.
+     */
+    private static double[] spline(double[] xs, double[] zs, double[] cum, double s) {
+        int n = xs.length;
+        if (s <= 0) return new double[] {xs[0], zs[0]};
+        if (s >= cum[n - 1]) return new double[] {xs[n - 1], zs[n - 1]};
+        int i = 0;
+        while (i < n - 2 && s > cum[i + 1]) i++;
+        double f = (s - cum[i]) / (cum[i + 1] - cum[i]);
+        int a = Math.max(0, i - 1), d = Math.min(n - 1, i + 2);
+        return new double[] {catmull(xs[a], xs[i], xs[i + 1], xs[d], f), catmull(zs[a], zs[i], zs[i + 1], zs[d], f)};
     }
+
+    private static double catmull(double p0, double p1, double p2, double p3, double f) {
+        double f2 = f * f, f3 = f2 * f;
+        return 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f2 + (3 * p1 - p0 - 3 * p2 + p3) * f3);
+    }
+
+    /**
+     * Top of the ground or tree leaves at (x, z), searched from a bit above {@code fromY} down. Under a roof seen from
+     * the fighters' {@code level} (an indoor arena, user 2026-10-13: the drone flew over it and then rode on the roof)
+     * the search starts right under the roof. {@code roof[0]} is the last roof met: a wall column keeps it, open sky
+     * clears it (only when {@code update}); callers keep the camera ROOF_CLEAR under it.
+     */
+    private static double canopy(double x, double z, double fromY, double level, double[] roof, boolean update,
+                                 ComponentAccessor<EntityStore> acc) {
+        double r = FightFx.roofAbove(x, z, level, (int) GROUND_SCAN, acc);
+        if (update) {
+            if (r == Double.POSITIVE_INFINITY) roof[0] = Double.NaN;
+            else if (!Double.isNaN(r)) roof[0] = r;
+        }
+        double over = r != Double.POSITIVE_INFINITY && !Double.isNaN(r) ? r : Double.isNaN(r) ? roof[0] : Double.NaN;
+        // floorBelow starts 3 blocks above its argument: start right under the roof.
+        double scan = Double.isNaN(over) ? fromY + GROUND_SCAN : over - 4;
+        double g = FightFx.floorBelow(scan, acc, true).applyAsDouble(x, z);
+        return Double.isFinite(g) ? g : fromY - DRONE_LOW;
+    }
+
+    /**
+     * Indoor drone: a column it can fly through at the fighters' {@code level}: not inside a wall, not over the raised
+     * stands (floor more than 1.5 blocks above the level), not under a low ceiling (a corridor under the stands).
+     */
+    private static boolean droneOpen(double x, double z, double level, ComponentAccessor<EntityStore> acc) {
+        double roof = FightFx.roofAbove(x, z, level, (int) GROUND_SCAN, acc);
+        if (Double.isNaN(roof)) return false;
+        boolean sky = roof == Double.POSITIVE_INFINITY;
+        // floorBelow starts 3 blocks above its argument.
+        double floor = FightFx.floorBelow(sky ? level - 1 : Math.min(roof, level + 2) - 4, acc, false).applyAsDouble(x, z);
+        if (!Double.isFinite(floor) || floor > level + 1.5) return false;
+        return sky || roof - floor >= DRONE_HEADROOM;
+    }
+
+    /** {@code p} moved toward {@code toward} until it is open (droneOpen), at most all the way. */
+    private static Vector3d inward(Vector3d p, Vector3d toward, double level, ComponentAccessor<EntityStore> acc) {
+        for (int i = 0; i <= 10; i++) {
+            double t = 1 - i * 0.1;
+            double x = toward.x + (p.x - toward.x) * t, z = toward.z + (p.z - toward.z) * t;
+            if (droneOpen(x, z, level, acc)) return new Vector3d(x, p.y, z);
+        }
+        return new Vector3d(toward.x, p.y, toward.z);
+    }
+
+    /** {@code y}, kept ROOF_CLEAR under the roof met last, if any. */
+    private static double underRoof(double y, double[] roof) {
+        return Double.isNaN(roof[0]) ? y : Math.min(y, roof[0] - ROOF_CLEAR);
+    }
+
 
     /** The side's members ordered left to right as seen from the battle's center. */
     private static List<Ref<EntityStore>> sortedAcross(List<Ref<EntityStore>> side, Vector3d center,
@@ -490,6 +658,7 @@ final class FightCamera {
         private final Map<Ref<EntityStore>, Vector3d> last = new java.util.HashMap<>();
         private final Map<Ref<EntityStore>, Float> yaw = new java.util.HashMap<>();
         private final Map<Ref<EntityStore>, Double> eye = new java.util.HashMap<>();
+        private final Map<Ref<EntityStore>, double[]> size = new java.util.HashMap<>();
 
         Vector3d pos(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
             Vector3d p = r.isValid() && r.getStore() == acc ? ChaosWand.positionOf(r, acc) : null;
@@ -504,14 +673,36 @@ final class FightCamera {
             return yaw.getOrDefault(r, 0f);
         }
 
+        /**
+         * {height, half width} of the hitbox (already grown by a size buff or the builder tools' scale), the last
+         * known one if it can't be read now, else a normal mob's.
+         */
+        double[] size(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
+            BoundingBox bb = r.isValid() && r.getStore() == acc ? acc.getComponent(r, BoundingBox.getComponentType()) : null;
+            if (bb != null && bb.getBoundingBox() != null) {
+                var box = bb.getBoundingBox();
+                double h = box.max.y - box.min.y;
+                double w = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2;
+                if (h > 0) size.put(r, new double[] {Math.min(MAX_FRAMED, h), Math.min(MAX_FRAMED, Math.max(0.3, w))});
+            }
+            return size.getOrDefault(r, NORMAL_SIZE);
+        }
+
+        /**
+         * Eye height for the close-ups: the model's, or 0.8 of the hitbox height when that is more (a size buff grows
+         * the hitbox, not the model; a giant boss went past the old cap of 12 and was filmed at the knees).
+         */
         double eye(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
-            return eye.computeIfAbsent(r, k -> {
+            double model = eye.computeIfAbsent(r, k -> {
                 ModelComponent mc = k.isValid() && k.getStore() == acc
                         ? acc.getComponent(k, ModelComponent.getComponentType()) : null;
                 Model m = mc != null ? mc.getModel() : null;
                 double h = m != null ? m.getEyeHeight(k, acc) : 1.6;
-                return Math.max(0.6, Math.min(12, h));
+                return Math.max(0.6, Math.min(MAX_FRAMED, h));
             });
+            size(r, acc);
+            double[] box = size.get(r);   // only a hitbox really read, not NORMAL_SIZE (small mobs)
+            return box != null ? Math.max(model, box[0] * 0.8) : model;
         }
     }
 
@@ -568,28 +759,58 @@ final class FightCamera {
         schedule(uuid, id, 0, step[0]);
     }
 
-    /** Shot 0: close on A from B's side; 1: close on B from A's side; 2: both from the side. */
-    private static ServerCameraSettings duelFrame(Vector3d pa, Vector3d pb, int shot) {
+    /**
+     * Shot 0: close on A from B's side; 1: close on B from A's side; 2: both from the side. {@code sa}/{@code sb}:
+     * each fighter's {height, half width} (Track.size). A normal mob (2 high) keeps the old framing; a bigger one is
+     * filmed from further away and higher, so a giant boss shows more than its legs (user, 2026-10-13).
+     */
+    private static ServerCameraSettings duelFrame(Vector3d pa, Vector3d pb, double[] sa, double[] sb, int shot) {
         double dx = pb.x - pa.x, dz = pb.z - pa.z;
         double len = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
         double ux = dx / len, uz = dz / len;   // from A toward B
         double px = -uz, pz = ux;               // sideways
         if (shot == 0) {
-            return frame(near(pa, ux, uz, px, pz, 3), new Vector3d(pa.x, pa.y + 1.5, pa.z), DUEL_LERP);
+            return frame(near(pa, ux, uz, px, pz, sa), new Vector3d(pa.x, pa.y + lookHeight(sa), pa.z), DUEL_LERP);
         }
         if (shot == 1) {
-            return frame(near(pb, -ux, -uz, -px, -pz, 3), new Vector3d(pb.x, pb.y + 1.5, pb.z), DUEL_LERP);
+            return frame(near(pb, -ux, -uz, -px, -pz, sb), new Vector3d(pb.x, pb.y + lookHeight(sb), pb.z), DUEL_LERP);
         }
         Vector3d mid = new Vector3d((pa.x + pb.x) / 2, (pa.y + pb.y) / 2, (pa.z + pb.z) / 2);
-        double side = Math.max(6, len + 4);
-        return frame(new Vector3d(mid.x + px * side, mid.y + 2.5, mid.z + pz * side),
-                new Vector3d(mid.x, mid.y + 1, mid.z), DUEL_LERP);
+        double tall = Math.max(sa[0], sb[0]);
+        double side = Math.max(Math.max(6, len + 4), tall * 1.6 + Math.max(sa[1], sb[1]));
+        return frame(new Vector3d(mid.x + px * side, mid.y + Math.max(2.5, tall * 0.6), mid.z + pz * side),
+                new Vector3d(mid.x, mid.y + Math.max(1, tall * 0.4), mid.z), DUEL_LERP);
     }
 
-    /** {@code dist} blocks from {@code p} along (ux, uz), 1.2 to the side, at face height. */
-    private static Vector3d near(Vector3d p, double ux, double uz, double px, double pz, double dist) {
-        return new Vector3d(p.x + ux * dist + px * 1.2, p.y + 1.8, p.z + uz * dist + pz * 1.2);
+    /**
+     * In front of the fighter at {@code p}, along (ux, uz) and a bit to the side, at face height. Normal size (2 high,
+     * 0.5 wide): 3 blocks away, 1.2 to the side, 1.8 up. Bigger: away by its width plus 1.1 x its height (its whole
+     * upper half in the shot), up at 0.75 of its height.
+     */
+    private static Vector3d near(Vector3d p, double ux, double uz, double px, double pz, double[] size) {
+        double h = size[0], w = size[1];
+        double dist = Math.max(3, w + h * 1.1);
+        double side = Math.max(1.2, w * 0.6);
+        return new Vector3d(p.x + ux * dist + px * side, p.y + Math.max(1.8, h * 0.75), p.z + uz * dist + pz * side);
     }
+
+    /**
+     * Close-up distance: {@code min} blocks, {@code k} x the eye height, or its half width + 1.1 x its hitbox height,
+     * whichever is most (2026-10-13, user: showcase, focus and end shots only grew with the eye height, so a wide boss
+     * or a size-buffed mob was filmed from inside). Capped at MAX_FRAMED.
+     */
+    private static double closeDist(double min, double k, double eye, double[] size) {
+        return Math.min(MAX_FRAMED, Math.max(Math.max(min, eye * k), size[1] + size[0] * 1.1));
+    }
+
+    /** Where a close duel shot looks: 1.5 up on a normal mob, 0.6 of the height on a bigger one. */
+    private static double lookHeight(double[] size) {
+        return Math.max(1.5, size[0] * 0.6);
+    }
+
+    /** Hitbox of a normal mob for the camera ({height, half width}), and the most a framing counts (blocks). */
+    private static final double[] NORMAL_SIZE = {2, 0.5};
+    private static final double MAX_FRAMED = 60;
 
     private static final long STEP_MS = 50;
     private static final long BACK_MS = 900;
@@ -602,12 +823,40 @@ final class FightCamera {
     private static final double FOCUS_SWEEP = 3.5;
     /** Focus circle: the attacker it looks at is kept at least this long. */
     private static final long FOCUS_HOLD_MS = 1500;
-    /** Drone: height over a fighter it dives past, side offset (so it passes beside, not over), ground clearance. */
-    private static final double DRONE_LOW = 3.5;
-    private static final double DRONE_SIDE = 5;
-    private static final double DRONE_CLEAR = 3;
+    /**
+     * Drone: flying height over the ground or tree tops, side offset past a fighter (more for wide ones), least
+     * clearance right under it, share of the gap to the wanted height closed per frame going up / down.
+     */
+    private static final double DRONE_LOW = 4;
+    private static final double DRONE_SIDE = 4;
+    private static final double DRONE_CLEAR = 2;
+    private static final double DRONE_CLIMB = 0.3;
+    private static final double DRONE_SINK = 0.06;
+    /** Drone: ground checked this many blocks ahead along the path, so it climbs before a hill or a tree. */
+    private static final double[] DRONE_AHEAD = {3, 6, 10};
+    /** Drone: fighters passed (one per DRONE_PASS_MS of flight, at most DRONE_MAX_PASSES). */
+    private static final int DRONE_MAX_PASSES = 6;
+    private static final long DRONE_PASS_MS = 1500;
+    /** Drone look: a point this far ahead and this far below the camera; a fighter closer ahead than the range pulls it up to DRONE_TURN. */
+    private static final double DRONE_LOOK = 10;
+    private static final double DRONE_LOOK_DOWN = 3;
+    private static final double DRONE_TURN_RANGE = 14;
+    private static final double DRONE_TURN = 0.6;
+    /** Drone: share of the gap to the new look point closed per frame (smooths the turns), and the client glide. */
+    private static final double DRONE_LOOK_EASE = 0.25;
+    private static final float DRONE_LERP = 0.35f;
     /** Ground search starts this far above the camera (hills taller than that are missed). */
     private static final double GROUND_SCAN = 30;
+    /** Drone: share of the shot spent on the pass; the rest swings around the battle (DRONE_ORBIT_SWEEP radians). */
+    private static final double DRONE_FLY_SHARE = 0.65;
+    private static final double DRONE_ORBIT_SWEEP = 1.6;
+    /** Drone swing: closes in to this share of the radius where the pass ended, never under DRONE_ORBIT_MIN blocks. */
+    private static final double DRONE_ORBIT_SHRINK = 0.8;
+    private static final double DRONE_ORBIT_MIN = 8;
+    /** Indoor drone: a column with less than this between floor and ceiling is a corridor, not the arena. */
+    private static final double DRONE_HEADROOM = 8;
+    /** Indoor arena: the camera stays this far under the bottom of the roof. */
+    private static final double ROOF_CLEAR = 1.2;
     /** Glide between frames: follows a walking mob, and moves between shots in about half a second. */
     private static final float DUEL_LERP = 0.15f;
     private static final float LERP_BACK = 0.1f;
@@ -814,7 +1063,7 @@ final class FightCamera {
         boolean orbit = shot == null && ORBITS.containsKey(id);
         if (shot == null && !orbit) return;
         if (SKIP_HINTED.add(id)) {
-            player.sendMessage(com.hypixel.hytale.server.core.Message.raw("Crouch to skip the camera.").color("#aaaaaa"));
+            player.sendMessage(I18n.tr("battle.camera.skip").color("#aaaaaa"));
         }
         boolean[] armed = {false};
         Runnable[] poll = new Runnable[1];

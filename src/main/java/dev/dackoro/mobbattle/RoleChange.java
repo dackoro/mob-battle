@@ -53,10 +53,17 @@ final class RoleChange {
         Army.carry(old, ref, store);
         LookLight.carry(old, ref);
         SummonDespawn.carry(old, ref);
+        ChaseSupport.carry(old, ref);
+        MorphWand.carry(old, ref);
         if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("role change: " + ChaosWand.nameOf(ref, store) + " carried over");
     }
 
     /** BattleManager.maintain (1/s): a Ref keeps its whole world alive. */
+    /** True while the entity with this UUID is between its old and new role (Army keeps a leader meanwhile). */
+    static boolean pending(UUID id) {
+        return id != null && PENDING.containsKey(id);
+    }
+
     static void prune() {
         if (PENDING.isEmpty()) return;
         long now = System.currentTimeMillis();

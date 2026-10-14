@@ -30,7 +30,11 @@ final class KindFx {
         MUSIC("music"),
         LASER("fightLaser"),
         AREA_STYLE("areaStyle"),
-        RUNES("runes");
+        RUNES("runes"),
+        /** Who wins an even judgeBy score at time up (global: battle.tiebreak). */
+        TIE_BREAK("tieBreak"),
+        /** Order of fighters with the same kills in the kill table (global: battle.killtiebreak). */
+        KILL_TIE_BREAK("killTieBreak");
 
         /** Command word in camelCase (help, settings); the property key uses it lowercased. */
         final String word;
@@ -46,12 +50,20 @@ final class KindFx {
 
     static final String[] CAMERA_STYLES = {"auto", "orbit", "duel", "showcase", "teams", "focus", "drone"};
     static final String[] END_CAMERAS = {"off", "winner", "lasthit"};
-    static final int MAX_CAMERA_TIME = 30;
+    static final String[] TIE_BREAKS = {"damage", "kills", "random", "draw"};
+    /**
+     * Kill table ties (user, 2026-10-13): damage = more damage dealt, alive = standing fighters first then damage,
+     * first = who reached the count first, shared = even counts share a place. Every one ends with "first".
+     */
+    static final String[] KILL_TIE_BREAKS = {"damage", "alive", "first", "shared"};
+    static final int MAX_CAMERA_TIME = 600;
+    static final int CAMERA_TIME_WARN = 30;
     /** cameraShots goes up to maxMobs: a battle never has more fighters to show. */
     static int maxCameraShots() {
         return FxSettings.maxMobs;
     }
-    static final int MAX_END_CAMERA_TIME = 15;
+    static final int MAX_END_CAMERA_TIME = 600;
+    static final int END_CAMERA_TIME_WARN = 15;
 
     /** Kind -> option -> value (canonical, see {@link #parse}). Missing = the global value. */
     private static final Map<BattleManager.Kind, Map<Opt, String>> OVERRIDES = new EnumMap<>(BattleManager.Kind.class);
@@ -139,6 +151,11 @@ final class KindFx {
         return get(kind, Opt.AREA_STYLE);
     }
 
+    /** damage, alive, first or shared (see KILL_TIE_BREAKS). */
+    static String killTieBreak(BattleManager.Kind kind) {
+        return get(kind, Opt.KILL_TIE_BREAK);
+    }
+
     /** Music track of this kind's battles, or null for no music. A kind set to "on" uses the global track. */
     static String musicTrack(BattleManager.Kind kind) {
         String v = get(kind, Opt.MUSIC);
@@ -193,6 +210,8 @@ final class KindFx {
             case LASER -> onOff(FxSettings.laserEnabled);
             case AREA_STYLE -> FxSettings.areaStyle;
             case RUNES -> onOff(FxSettings.runes);
+            case TIE_BREAK -> FxSettings.tieBreak;
+            case KILL_TIE_BREAK -> FxSettings.killTieBreak;
         };
     }
 
@@ -220,6 +239,8 @@ final class KindFx {
             case LASER -> FxSettings.laserEnabled = "on".equals(value);
             case AREA_STYLE -> FxSettings.areaStyle = value;
             case RUNES -> FxSettings.runes = "on".equals(value);
+            case TIE_BREAK -> FxSettings.tieBreak = value;
+            case KILL_TIE_BREAK -> FxSettings.killTieBreak = value;
         }
     }
 
@@ -239,6 +260,8 @@ final class KindFx {
             case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH -> onOffWord(lower);
             case CAMERA_STYLE -> oneOf(lower, CAMERA_STYLES);
             case END_CAMERA -> oneOf(lower, END_CAMERAS);
+            case TIE_BREAK -> oneOf(lower, TIE_BREAKS);
+            case KILL_TIE_BREAK -> oneOf(lower, KILL_TIE_BREAKS);
             case AREA_STYLE -> FxSettings.parseAreaStyle(lower);
             case MUSIC -> {
                 String onOff = onOffWord(lower);
@@ -261,6 +284,8 @@ final class KindFx {
             case END_CAMERA -> "off|winner|lastHit";
             case AREA_STYLE -> String.join("|", FxSettings.AREA_STYLES);
             case MUSIC -> "on|off|<track>";
+            case TIE_BREAK -> String.join("|", TIE_BREAKS);
+            case KILL_TIE_BREAK -> String.join("|", KILL_TIE_BREAKS);
         };
     }
 
@@ -289,6 +314,14 @@ final class KindFx {
 
     static boolean isOverrideKey(String key) {
         return key.startsWith("kind.");
+    }
+
+    /**
+     * A per-kind override of a battle rule (tieBreak, killTieBreak), not of the presentation: built-in presets keep
+     * it, as they keep the global rule (audit 2026-10-13).
+     */
+    static boolean isRuleOverrideKey(String key) {
+        return isOverrideKey(key) && (key.endsWith("." + Opt.TIE_BREAK.key()) || key.endsWith("." + Opt.KILL_TIE_BREAK.key()));
     }
 
     static String propKey(BattleManager.Kind kind, Opt opt) {

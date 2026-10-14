@@ -46,7 +46,7 @@ public class ChaosFocusInteraction extends SimpleInstantInteraction {
         }
         if (target == null || !target.isValid() || buffer.getComponent(target, NPCEntity.getComponentType()) == null
                 || !BattleManager.isAlive(target, buffer)) {
-            player.sendMessage(Message.raw("Look at a living mob and click it.").color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.look.livingMob").color("#ffcc55"));
             return;
         }
         ChaosWand.focus(player, context.getEntity(), target, buffer);

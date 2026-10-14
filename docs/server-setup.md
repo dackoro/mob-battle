@@ -61,11 +61,61 @@ Mob Battle registers these defaults with the server, so in `server` mode an ordi
 - `permissions open|server`, `reload`, `give`.
 - `stop`, `resetAll`, `skipTimer`.
 - `army clearAll`, `teams clearAll`, `teams reset`, `morph reset`.
+- `apply` (wand actions on chosen players or mobs, see below).
+- `measure [look|id:<uuid>|last] [seconds]` (`measure stop` ends it early with its summary): for 10 s (up to 60) the chat shows the speed (blocks/s) and height above the start of you, of the mob you look at, or of any entity by its id (this form works from the server console), every second, then the cruising speed (the steady seconds, without starting and stopping), the top speed, the average while moving, the distance, the best jump (from where it took off) and the highest point. It starts by saying the size and speed buff of what it measures and the speed they should give (square root of the size × speed buff). For a player it also shows the base speed and jump force the server sent, against the game's defaults. Useful to check size and speed buffs on a measured track.
 - `debugLog`, `debugRecord`, `debugDump`.
 - `event duel|royale|focus|list`.
+- `test ...`, the test tools below.
 - `eyeTest` (experimental).
 - The Debug Wand (both clicks).
 - The settings panel's Admin page.
+
+### Test tools (admin, console too)
+
+`/mobbattle test` works with coordinates and entity ids, so the server console can run it without a player looking at anything. Every reply also goes to the server log as `[test] ...`. `last` is the newest mob these tools spawned; `apply` and `measure` also take `id:<uuid>` or `last`.
+
+| Command | What it does |
+|---|---|
+| `test spawn <role> <here\|x y z> [count] [world] [calm]` | Spawns test mobs (up to 50) and prints their ids. `calm` puts them in the calm set as summons (needs `summonCalm summons\|all`). |
+| `test list` / `test clear` | The test mobs still alive, with ids, position and health / removes them all. |
+| `test chase <id\|last> <here\|x y z>` | Puts a still training dummy there and the mob runs to attack it: a way to move any mob that can attack from A to B (e.g. to measure its speed). |
+| `test walk <id\|last> <x> <z>` | A path to that block, as the game's `/npc path`. Only the few roles with a path behaviour follow it (mostly bosses). |
+| `test duel <roleA> <roleB> <distance> <here\|x y z> [world]` | Spawns both facing each other, starts a duel, logs every hit (damage, cause, distance between centers and between body edges) and ends with a summary: winner, time, hits, damage and reach of each side. |
+| `test royale <role:count+...> <here\|x y z> <radius> [world]` | Spawns the mix (up to 200) and starts a battle royale there; a summary when it ends. |
+| `test wave <heal\|cleanse\|effect\|morph\|shuffle> <here\|x y z> [world] [effect\|model]` | A wand's held-click wave from that spot with the current settings (no player needed): how many it reached, and when the ring got to the first and the last. `morph` needs a model. |
+| `test roles [mod:<name>\|mod:hytale] [type:<fighters\|defend\|noattack\|avoid>] [text]` | The mob roles the settings panel's **Show** filters keep, with their mod and type (read from each role's definition, a guess), to pick mobs for tests by what they are. |
+| `test verify <here\|x y z> [mod:..] [type:..] [text] [time:<s>] [batch:<n>]` | Checks the **Type** guesses with real hits: each role (Avoid ones skipped) fights a copy of itself in a silent Mob Battle duel (no countdown, camera or titles), 24 pairs at a time (`batch:`, up to 60) in a grid centred on the spot, 12 blocks apart (stand near it so those chunks are loaded). Only its copy can hurt it (area attacks of other pairs and loose mobs are cancelled); anything left near a pair after its turn (a summoned pet, a tentacle) is removed. Fighters and Defend only should land a hit, No attack should not. Mismatches go to chat, every result to `tests/verify_<time>.txt`. It tests whether a mob can fight, not whether it starts fights on its own. (A still training dummy was used before: mobs with the intelligent combat AI never take it as an enemy.) |
+| `test speed <role> <here\|x y z> [sizes like 1+2+4]` | How fast a mob runs at each size: one lane per size side by side, each mob runs 25 blocks along +X to a still dummy (inside a zombie's 28-block sight), all at once. Reports the time, the average and the top speed over half a second per lane, in chat and `tests/speed_<time>.txt`. |
+| `test hit <player> <id\|last> [damage]` | That player hits the mob through the normal damage pipeline (as a sword hit, default 1 damage), so the Army Wand's owner's order can be tested from the console. |
+| `test tick [world]` | The world's average and highest tick time over the last 10 seconds, to read while a big battle runs. |
+| `test calls <here\|x y z> [mod:..] [type:..] [text] [time:<s>] [batch:<n>] [watchers:<n>]` | Every role that fights duels a copy of itself while onlookers of the same kind stand 6 blocks away. Fails when a group call (goblins, Trork, skeletons...) pulls an onlooker into the duel or a fighter off its opponent. Report in `tests/calls_<time>.txt`. |
+| `test wand <owner> <duel\|focus\|brawl\|kill\|snap> [target] [target2]` | Does what that player's wand click would do, with the same checks: targets are player names or mobs (`last`, `id:<uuid>`). Tests battles with players from the console. |
+| `test wipe <here\|x y z> [radius]` | Cleans a test field: removes every entity that is not a player (mobs, dropped items, projectiles) within the radius (default 96). Unlike `sudo <player> entity clean`, it runs from the console without a player. |
+| `test jump <role> <here\|x y z> [sizes like 1+2+3] [time:<s>]` | How high a mob climbs at each size: builds steps 1 to 8 blocks high (3x3 platforms, 8 blocks apart along +X) with a still dummy on each, then one mob per step and size, with the size buff, is ordered at it. Reports the highest step it stood on per size and puts the blocks back after. Mobs only jump when their path needs it, which is why it uses steps. Report in `tests/jump_<time>.txt`. |
+| `test ai <here\|x y z> [mod:..] [type:..] [text]` | Reads each role's AI: every role the filters keep is spawned for one tick and removed. It reports the chase Mob Battle uses to keep far fighters walking in (state, range) and the soft leash ranges that would send a fighting mob home. Mods' mobs too. Fighters with no chase found go to chat, every role to `tests/ai_<time>.txt`. |
+| `test stats <id\|last>` | One line: health, size, buffs, effects, battle and team, calm, army, model. |
+| `test expect <id\|last> <field> <op> <value>` | A check, ✅ or ❌ in the log; a script counts them in its summary. Fields: `alive`, `health`, `maxhealth`, `healthpct`, `size`, `buff.<size\|health\|damage\|defense\|speed>`, `effect` (has an effect whose id contains the value; `!=` = hasn't), `battle` (none or the kind), `team`, `calm`, `army`, `morphed`, `model`, `x`, `y`, `z`. Operators `= != > < >= <=`. |
+| `test camera <orbit\|duel\|showcase\|teams\|focus\|drone> <player> [seconds]` | That intro camera over the living test mobs, for that player, whatever the camera settings say. |
+| `test snapshot [name]` / `test restore [name]` | Saves `fx.properties` (settings, teams and summon list) to `tests/snapshots/<name>.properties` and puts it back (as `/mobbattle reload`). Start a script with a snapshot and end it with a restore, so tests never keep their changes. |
+| `test perf <role> <count> <here\|x y z> [world]` | The world's tick time (average and longest over 10 s, against the budget) before and after spawning up to 300 mobs. |
+| `test run <script>` / `test stop` | Runs `<plugin data dir>/tests/<script>.txt`: one command per line (with or without `/`), `wait <seconds>`, `say <text>`, `#` comments. It runs as whoever started it. |
+
+Example script:
+
+```
+# smoke.txt
+mobbattle test snapshot before
+mobbattle test spawn Goblin_Scrapper 200 124 300
+mobbattle apply last speed x2
+mobbattle test chase last 200 124 330
+mobbattle measure last 8
+wait 9
+mobbattle test expect last buff.speed = 100
+mobbattle test duel Skeleton_Soldier Trork_Warrior 6 215 124 300
+wait 40
+mobbattle test clear
+mobbattle test restore before
+```
 
 ### Assigning a custom group in `permissions.json`
 
@@ -103,7 +153,38 @@ The Admin page appears only for players with a real `dackoro.mob_battle.admin` g
 | Server log | **Debug log** and **Debug recorder** toggles (see [Debug tools](#debug-tools)). Only admins can change them. |
 | Permissions | The current mode, with **Open** and **Server** buttons. |
 | Server | **Reload** (reads `fx.properties` again and drops unsaved changes in the form), **Give wands**, **End timers** (every running timer ends now by its time-up rule), **Royale event** (an ownerless royale around you, using the area radius and max mobs), **Save debug record**. |
+| Measure | **Measure**: your speed and jump for 10 s in chat (`/mobbattle measure`); closes the panel so you can move. |
+| Apply to players or mobs | Who, action and value, then **Apply**: the same as `/mobbattle apply` (see below). |
 | Clean up | **Stop all**, **Disband armies**, **Clear all teams**, **Undo morphs**, **Reset all**. These ask for a second click to confirm. |
+
+### Wand actions on players and mobs (`apply`)
+
+`/mobbattle apply <who> <action> [value]` does what a wand click does, on chosen players or mobs, without the wand. It is for testing settings quickly and for running a server. Admin only (a real `dackoro.mob_battle.admin` grant, in both permission modes). The Admin tab of the settings panel has the same thing as one row.
+
+| Who | Reaches |
+|---|---|
+| `player <name>` (or just the name) | That online player, in any world. With `player`, the chat suggests the names. |
+| `me` | You. |
+| `look` | The mob or player you are looking at (up to 64 blocks). |
+| `near <radius>` | Every mob and player within that many blocks of you, not you. |
+| `players` | Every player in your world. |
+
+| Action | What it does |
+|---|---|
+| `buff <clicks>` | Sets the Buff Wand stacks (0 = takes them off), as that many clicks. |
+| `size\|health\|damage\|defense <value>` | A direct amount, in the buff unit (`x3`, `200`, `50%`); 0 = off. No shimmer or crown. It adds to the other buffs and lasts until Cleanse, `unbuff`, death or a restart. |
+| `unbuff` | Takes every buff off (Buff Wand, battle buffs and direct amounts), but not the effects. |
+| `heal` | Full health, as the Heal Wand. |
+| `cleanse` | As the Cleanse Wand: effects, buffs and morph go. |
+| `effect <id>` | Gives an effect, as the Effect Wand (`A>B` gives B when A ends). |
+| `look jade\|shimmer[:color]` | Puts a jade or shimmer look on. |
+| `morph <model\|player>` | Puts a model, or a player's current look, on the target. |
+| `unmorph` | Its own model back. |
+| `army add\|remove` | Puts a mob in your army or takes it out (mobs only). |
+| `team <team\|none>` | Puts the target in one of your Team Wand teams, or takes it out. |
+
+The chat suggests the targets, the actions and their usual values (effects of the Effect Wand's quick list, teams, x2/x3...). The reply says what was applied, e.g. `size x3 (+200%)` or `2/5 stacks (size +20% (x1.2), ...)`. There is no kill or snap on purpose. Examples: `/mobbattle apply Steve size x3`, `/mobbattle apply near 20 effect Burn`, `/mobbattle apply look team Red`.
+
 
 **Reset all** stops everything and clears teams, buffs, armies and marks. Settings stay.
 
@@ -172,8 +253,8 @@ Admins can start NPC battles that have no player owner, from the console or in g
 - `world` accepts a world name or UUID. When you leave it out, a player's command uses that player's current world and a console command uses the server's default world.
 - `duel` starts a duel between two different living NPCs, given by their UUIDs.
 - `royale` gathers the living NPCs within `radius` of the center and starts a battle royale.
-  - `radius` is 1–512 blocks.
-  - `maxMobs` caps the fighters (2–200) and defaults to the configured maximum (`maxMobs` setting).
+  - `radius` is 1–2048 blocks.
+  - `maxMobs` caps the fighters (2–100000) and defaults to the configured maximum (`maxMobs` setting).
   - To give a world without `maxMobs`, put the world name or UUID right after `radius`. A whole number in that position is read as `maxMobs`.
   - At least two living NPCs must be in the area.
 - `focus` starts an everyone-versus-one battle with the given NPC as the lone target. The attackers are the living NPCs within the configured Chaos area radius, capped at the configured max mobs.

@@ -58,6 +58,14 @@
           }
         }
       ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_SkipCamera",
+          "RunTime": 0
+        }
+      ]
     }
   },
   "IconProperties": {

@@ -51,9 +51,10 @@
             "1.5": {
               "Type": "MobBattle_MorphBurst",
               "Effects": {
-                "ItemAnimationId": "CastSummonCharged"
+                "ItemPlayerAnimationsId": "MobBattle_SnapWand",
+                "ItemAnimationId": "SnapSlam"
               },
-              "RunTime": 0.3
+              "RunTime": 0.6
             }
           }
         }
@@ -92,11 +93,20 @@
             "1.5": {
               "Type": "MobBattle_MorphShuffle",
               "Effects": {
-                "ItemAnimationId": "CastSummonCharged"
+                "ItemPlayerAnimationsId": "MobBattle_SnapWand",
+                "ItemAnimationId": "SnapSlam"
               },
-              "RunTime": 0.3
+              "RunTime": 0.6
             }
           }
+        }
+      ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_SkipCamera",
+          "RunTime": 0
         }
       ]
     }

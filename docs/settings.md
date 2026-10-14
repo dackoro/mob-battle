@@ -35,7 +35,7 @@ Per-kind settings use these words: `duel` (Battle Wand), `allVsOne` (Chaos Wand 
 
 ## Per-kind overrides
 
-Fourteen presentation options have a **global value** and an optional **override per battle kind**:
+Fourteen presentation options and the two tie breaks have a **global value** and an optional **override per battle kind**:
 
 | Command | Sets |
 |---|---|
@@ -48,7 +48,7 @@ Examples: `/mobbattle countdown royale 5`, `/mobbattle cameraStyle royale showca
 
 By default no kind has an override: every kind follows the global value.
 
-Overrides are saved as `kind.<kind>.<option>` with the option word in lowercase, for example `kind.royale.countdown=5` or `kind.duel.camera=off`. On/off overrides are stored as `on`/`off`. In the panel they are the Presentation and Cameras sections of each battle-kind tab, where **Global** (or an empty number box) means no override. `/mobbattle settings` lists them after "per kind".
+Overrides are saved as `kind.<kind>.<option>` with the option word in lowercase, for example `kind.royale.countdown=5` or `kind.duel.camera=off`. On/off overrides are stored as `on`/`off`. In the panel they are the Presentation, Cameras and Ties sections of each battle-kind tab, where **Global** (or an empty number box) means no override. `/mobbattle settings` lists them after "per kind".
 
 | Option | Global key | Override key | Override values | Reset group |
 |---|---|---|---|---|
@@ -61,11 +61,13 @@ Overrides are saved as `kind.<kind>.<option>` with the option word in lowercase,
 | `areaStyle` | `chaos.area` | `kind.<kind>.areastyle` | border, disc, discBorder, wall, off | effects |
 | `camera` | `fight.camera` | `kind.<kind>.camera` | on, off | cameras |
 | `cameraStyle` | `camera.style` | `kind.<kind>.camerastyle` | auto, orbit, duel, showcase, teams, focus, drone | cameras |
-| `cameraTime` | `camera.time` | `kind.<kind>.cameratime` | 0-30 | cameras |
+| `cameraTime` | `camera.time` | `kind.<kind>.cameratime` | 0-600 (above 30 warns) | cameras |
 | `cameraShots` | `camera.shots` | `kind.<kind>.camerashots` | 1 to maxMobs | cameras |
 | `endCamera` | `camera.end` | `kind.<kind>.endcamera` | off, winner, lastHit | cameras |
-| `endCameraTime` | `camera.end.time` | `kind.<kind>.endcameratime` | 1-15 | cameras |
+| `endCameraTime` | `camera.end.time` | `kind.<kind>.endcameratime` | 1-600 (above 15 warns) | cameras |
 | `autoWatch` | `camera.autowatch` | `kind.<kind>.autowatch` | on, off | cameras |
+| `tieBreak` | `battle.tiebreak` | `kind.<kind>.tiebreak` | damage, kills, random, draw | arenas |
+| `killTieBreak` | `battle.killtiebreak` | `kind.<kind>.killtiebreak` | damage, alive, first, shared | arenas |
 
 The battle rules, arena and timer settings (isolation, arena, timer and so on) are not overrides: they always have one value per kind, with no global value. `all` sets every kind.
 
@@ -88,10 +90,10 @@ A preset changes many settings at once. In the panel, loading a preset only fill
 | `default` | Every setting back to its default and every per-kind override removed. |
 | `fight` | Just the fights: no countdown, intro or end camera, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
 | `effects` | All the show but no cameras: countdown 3, titles, music, runes, area `discBorder`, a scoreboard for every kind; duels, all vs one and teams get a 2 minute timer with `timeUp health`, the royale keeps its 3 minutes and `judge`. |
-| `debug` | Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
+| `debug` | Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card, the all vs one card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
 | `cinematic` | Countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
 
-Every built-in preset except `default` first puts the presentation settings back to their defaults (countdown, cameras, titles, music, laser, area look, runes, crown, waves, border colors, mob looks, duel card, scoreboards) and removes every per-kind override, then applies its own values. Settings it doesn't name (area radius, max mobs, battle rules, buffs, wands and so on) stay as they are.
+Every built-in preset except `default` first puts the presentation settings back to their defaults (countdown, cameras, titles, music, laser, area look, runes, crown, waves, border colors, mob looks, duel card, all vs one card, scoreboards) and removes every per-kind override, then applies its own values. Settings it doesn't name (area radius, max mobs, battle rules, buffs, wands and so on) stay as they are.
 
 ### Saved presets
 
@@ -110,9 +112,9 @@ Every built-in preset except `default` first puts the presentation settings back
 | `effects` | Fighter laser and its color, runes, area look, color, height and "only with the wand", waves, border colors, mob looks, lone-target crown, team look (mode, time, only with the wand), army tint and color, wand effects, Cleanse/Buff/Heal Wand colors and lights, look glow, death glow, summon jade and its color; per-kind `fightLaser`, `runes`, `areaStyle`. |
 | `cameras` | Intro camera, camera style, time, showcase shots, who sees the cameras, end camera and its time, auto watch; their per-kind overrides. |
 | `titles` | Countdown, start and winner titles, title style, who sees the titles, battle music and track; per-kind `countdown`, `startTitle`, `winTitle`, `music`. |
-| `arenas` | Arena, timer, at time up, judge by, closing arena (per kind, plus its final radius and time), scoreboard, arena size, timer box, tie break, unstick, stand-off shove, passive win and its "never ends against" list, duel card. |
+| `arenas` | Arena, timer, at time up, judge by, closing arena (per kind, plus its final radius and time), scoreboard, arena size, timer box, tie break, unstick, stand-off shove, passive win and its "never ends against" list, duel card, all vs one card. |
 | `rules` | Isolation, self defense, friendly fire, players can fight, battle PvP, duel mode, area radius, max mobs, team by type, every buff setting, summon area, random counts, at least one, summons leave, lifetime, how they leave, summons join my army. |
-| `wands` | Effect Wand effect, Kill Wand (soul rip time, cast hit delay, loot, players), Snap Wand (mode, share, time, hit delay, reach, players), Cleanse Wand wave and its reach, Morph Wand (players, held-click waves and their reach), Debug Wand follow time. |
+| `wands` | Heal Wand wave and reach, Effect Wand effect, its wave and reach, Kill Wand (soul rip time, cast hit delay, loot, players), Snap Wand (mode, share, time, hit delay, reach, players), Cleanse Wand wave and its reach, Morph Wand (players, held-click waves and their reach), Debug Wand follow time. |
 | `all` | Everything (the same as `preset default`). |
 
 Teams, the summon list and the security settings are never reset. The reset group of each setting is also in the tables below.
@@ -144,13 +146,14 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 |---|---|---|---|---|---|
 | Intro camera | `/mobbattle camera on\|off` | `fight.camera` | true, false | on | cameras |
 | Camera style | `/mobbattle cameraStyle <style>` | `camera.style` | auto, orbit, duel, showcase, teams, focus, drone | auto | cameras |
-| Camera time | `/mobbattle cameraTime <seconds>` | `camera.time` | 0-30, 0 = as long as the countdown | 0 | cameras |
+| Camera time | `/mobbattle cameraTime <seconds>` | `camera.time` | 0-600, 0 = as long as the countdown (above 30 warns: viewers have no controls meanwhile) | 0 | cameras |
 | Showcase shots | `/mobbattle cameraShots <n>` | `camera.shots` | 1 to maxMobs | 4 | cameras |
 | Who sees the cameras | `/mobbattle cameraScope owner\|nearby\|world` | `camera.scope` | owner, nearby, world | owner | cameras |
 | End camera | `/mobbattle endCamera off\|winner\|lastHit` | `camera.end` | off, winner, lasthit | off | cameras |
-| End camera time | `/mobbattle endCameraTime <seconds>` | `camera.end.time` | 1-15 | 5 | cameras |
+| End camera time | `/mobbattle endCameraTime <seconds>` | `camera.end.time` | 1-600 (above 15 warns) | 5 | cameras |
 | Auto watch | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
 | Duel card | `/mobbattle duelCard on\|off` | `battle.duelCard` | true, false | off | arenas |
+| All vs one card | `/mobbattle focusCard on\|off` | `battle.focusCard` | true, false | off | arenas |
 
 Not settings: `/mobbattle skipCamera` ends your running camera, `/mobbattle watch [exit]` spectates a battle.
 
@@ -160,14 +163,20 @@ Not settings: `/mobbattle skipCamera` ends your running camera, `/mobbattle watc
 |---|---|---|---|---|---|
 | Battle PvP | `/mobbattle battlePvp on\|off` | `battle.pvp` | true, false | off | rules |
 | Unstick stalled fighters | `/mobbattle unstick on\|off` | `battle.unstick` | true, false | on | arenas |
-| Stand-off shove | `/mobbattle standoffTime <seconds>\|off` | `battle.standoff` | 0-120, 0 = never | 15 | arenas |
-| Win against passive mobs | `/mobbattle passiveWin <seconds>\|off` | `battle.passivewin` | 0-120, 0 = never | 15 | arenas |
+| Stand-off shove | `/mobbattle standoffTime <seconds>\|off` | `battle.standoff` | 0-3600, 0 = never | 15 | arenas |
+| Win against passive mobs | `/mobbattle passiveWin <seconds>\|off` | `battle.passivewin` | 0-3600, 0 = never | 15 | arenas |
+| Battle depth (below) | `/mobbattle battleBelow <blocks>\|off` | `battle.below` | 0-512 (0 = no limit) | 50 | arenas |
+| Battle height (above) | `/mobbattle battleAbove <blocks>\|off` | `battle.above` | 0-512 (0 = no limit) | 40 | arenas |
+| Arena vertical limit | `/mobbattle arenaVertical <blocks>\|off` | `battle.arena.vertical` | 0-512 (0 = no limit) | off | arenas |
+| End when nobody fights | `/mobbattle idleEnd <seconds>\|off` | `battle.idleend` | 0-3600, 0 = never | 150 (2.5 min) | arenas |
+| Longest battle | `/mobbattle battleMaxTime <minutes>\|off` | `battle.maxtime` | 0-10080 minutes, 0 = infinite (only a winner, idleEnd, passiveWin or `/mobbattle stop` ends it) | 15 | arenas |
 | Never ends against | `/mobbattle passiveWinIgnore <role,role*,...>\|none` | `battle.passivewin.ignore` | Role IDs, comma separated, `*` = any ending, case-insensitive; empty/`none` = no exception | `Test_Dummy*` | arenas |
 | Timer box | `/mobbattle timerStyle custom\|portal` | `battle.timer.style` | custom, portal | custom | arenas |
-| Arena size (duels, teams) | `/mobbattle arenaSize <8-128>\|auto` | `battle.arena.size` | 0 = auto, or 8-128 | auto (0) | arenas |
-| Closing arena ends at | `/mobbattle arenaShrinkTo <blocks>` | `battle.shrink.to` | 4-128 | 15 | arenas |
-| Closing time without timer | `/mobbattle arenaShrinkTime <time>` | `battle.shrink.time` | 10 s to 60 min (seconds in the file) | 120 (2m) | arenas |
-| Tie break | `/mobbattle tieBreak damage\|kills\|random\|draw` | `battle.tiebreak` | damage, kills, random, draw | damage | arenas |
+| Arena size (duels, teams) | `/mobbattle arenaSize <blocks>\|auto` | `battle.arena.size` | 0 = auto, or 8-1024 (above 128 warns) | auto (0) | arenas |
+| Closing arena ends at | `/mobbattle arenaShrinkTo <blocks>` | `battle.shrink.to` | 4-1024 | 15 | arenas |
+| Closing time without timer | `/mobbattle arenaShrinkTime <time>` | `battle.shrink.time` | 10 s to 24 h (seconds in the file) | 120 (2m) | arenas |
+| Winner when even (Ties) | `/mobbattle tieBreak [kind] damage\|kills\|random\|draw` | `battle.tiebreak` | damage, kills, random, draw | damage | arenas |
+| Kill table order (Ties) | `/mobbattle killTieBreak [kind] damage\|alive\|first\|shared` | `battle.killtiebreak` | damage, alive, first, shared | damage | arenas |
 
 ### Duel, All vs one, Royale, Team battles (per kind)
 
@@ -181,7 +190,7 @@ The presentation and camera overrides of these tabs are listed under [Per-kind o
 | Friendly fire (All vs one, Team battles) | `/mobbattle friendlyFire <allVsOne\|teams\|all> on\|off` | `battle.friendlyfire.<kind>` | true, false | - / on / - / off | rules |
 | Players can fight | `/mobbattle playerFights <kind\|all> on\|off` | `battle.players.<kind>` | true, false | on / on / on / on | rules |
 | Arena | `/mobbattle arena <kind\|all> on\|show\|wall\|off` | `battle.arena.<kind>` | on, show, wall, off | off / on / on / off | arenas |
-| Timer | `/mobbattle timer <kind\|all> <time>\|off` | `battle.timer.<kind>` | 0-3600 seconds, 0 = none | off / off / 3 min (180) / off | arenas |
+| Timer | `/mobbattle timer <kind\|all> <time>\|off` | `battle.timer.<kind>` | 0-86400 seconds (24 h), 0 = none | off / off / 3 min (180) / off | arenas |
 | At time up | `/mobbattle timeUp <kind\|all> <rule>` | `battle.timeup.<kind>` | draw, kill, continue, health, judge | draw / draw / judge / draw | arenas |
 | Judge by | `/mobbattle judgeBy <kind\|all> <score>` | `battle.judgeby.<kind>` | health, damage, kills, mix | health for all | arenas |
 | Closing arena | `/mobbattle arenaShrink <kind\|all> on\|off` | `battle.shrink.<kind>` | true, false | off / off / on / off | arenas |
@@ -194,10 +203,10 @@ Creative players never fight, whatever Players can fight says.
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
 | Area look | `/mobbattle areaStyle <style>` | `chaos.area` | border, disc, discBorder, wall, off | border | effects |
-| Area radius | `/mobbattle areaRadius <blocks>` | `chaos.radius` | 2-430 | 60 | rules |
-| Max mobs | `/mobbattle maxMobs <n>` | `chaos.maxmobs` | 2-200 | 200 | rules |
+| Area radius | `/mobbattle areaRadius <blocks>` | `chaos.radius` | 2-2048 (above 128 warns) | 60 | rules |
+| Max mobs | `/mobbattle maxMobs <n>` | `chaos.maxmobs` | 2-100000 (more than 60 warns: it can lag the server) | 200 | rules |
 | Area color | `/mobbattle areaColor <color>\|random` | `chaos.area.color` | palette color, random | Red | effects |
-| Area height | `/mobbattle areaHeight <blocks>` | `chaos.height` | 3-128 | 30 | effects |
+| Area height | `/mobbattle areaHeight <blocks>` | `chaos.height` | 3-512 (above 64 warns) | 30 | effects |
 | Area only while holding the wand | `/mobbattle areaOnlyWand on\|off` | `chaos.area.onlywand` | true, false | off | effects |
 
 `areaStyle` is also a per-kind override. A bigger `areaRadius` searches a much larger sphere on every Chaos Wand click, and only loaded mobs are considered. A world keeps the radius it saved, so a world saved before the current default keeps its old value until you set it (`/mobbattle areaRadius 60`). Above about 60 mobs (`maxMobs`) the server may lag. Changing `areaRadius`, `areaStyle`, `areaColor`, `areaHeight` or `areaOnlyWand` by command draws the area around you as a preview. `maxMobs` also caps one summon. The file also holds `chaos.area.styles=2`, an internal marker for the area style format; leave it as it is.
@@ -211,6 +220,7 @@ Creative players never fight, whatever Players can fight says.
 | Team look only with the Team Wand | `/mobbattle teamLook onlyWand on\|off` | `team.fx.onlywand` | true, false | off | effects |
 | Army tint | `/mobbattle armyTint on\|off` | `army.tint` | true, false | off | effects |
 | Army tint color | `/mobbattle armyTintColor <color>` | `army.tint.color` | palette color | Blue | effects |
+| Army friendly fire | `/mobbattle armyFriendlyFire on\|off` | `army.friendlyfire` | true, false | off | rules |
 | Crown on the lone target | `/mobbattle crown gold\|<color>\|off` | `fx.crown` | Gold, palette color, off | Gold | effects |
 | Cleanse Wand color | `/mobbattle cleanseColor <color>` | `wand.cleanse.color` | palette color | White | effects |
 | Look glow | `/mobbattle lookGlow <0-15>` | `fx.glow.look` | 0-15, 0 = off | 6 | effects |
@@ -234,21 +244,28 @@ Sources (`<who>`): `lone` (the all vs one target, for that battle), `streak` (pe
 
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
-| Size | `/mobbattle buff <who> size <percent>` | `buff.<who>.size` | 0-900 | 0; wand 10 | rules |
-| Size limit | `/mobbattle buff sizeMax <percent>` | `buff.size.max` | 50-900 | 200 (x3) | rules |
-| Health | `/mobbattle buff <who> health <percent>` | `buff.<who>.health` | 0-1000 | 0; wand 20 | rules |
-| Damage | `/mobbattle buff <who> damage <percent>` | `buff.<who>.damage` | 0-1000 | 0; wand 10 | rules |
-| Defense | `/mobbattle buff <who> defense <percent>` | `buff.<who>.defense` | 0-90 | 0; wand 5 | rules |
+| Size | `/mobbattle buff <who> size <percent>` | `buff.<who>.size` | 0-9900 | 0; wand 10 | rules |
+| Buff values as | `/mobbattle buff unit percent\|multiplier` | `buff.unit` | percent, multiplier | percent | rules |
+| Size limit | `/mobbattle buff sizeMax <percent>` | `buff.size.max` | 50-9900 (above 200 warns) | 200 (x3) | rules |
+| Speed from size | `/mobbattle buff sizeSpeed off\|natural\|strong\|full` | `buff.size.speed` | off, natural, strong, full | natural | rules |
+| Jump from size | `/mobbattle buff sizeJump off\|natural\|strong\|full` | `buff.size.jump` | off, natural, strong, full | natural | rules |
+| Health | `/mobbattle buff <who> health <percent>` | `buff.<who>.health` | 0-99900 | 0; wand 20 | rules |
+| Damage | `/mobbattle buff <who> damage <percent>` | `buff.<who>.damage` | 0-99900 | 0; wand 10 | rules |
+| Defense | `/mobbattle buff <who> defense <percent>` | `buff.<who>.defense` | 0-99 | 0; wand 5 | rules |
+| Speed | `/mobbattle buff <who> speed <percent>` | `buff.<who>.speed` | 0-4900 (above 300 warns) | 0 | rules |
 | Heal when given | `/mobbattle buff <who> heal on\|off` | `buff.<who>.heal` | true, false | off | rules |
-| Streak max kills | `/mobbattle buff streak maxKills <n>` | `buff.streak.maxkills` | 1-50 | 5 | rules |
-| Buff Wand max stacks | `/mobbattle buff wand maxStacks <n>` | `buff.wand.maxstacks` | 1-50 | 5 | rules |
+| Streak max kills | `/mobbattle buff streak maxKills <n>` | `buff.streak.maxkills` | 1-1000 | 5 | rules |
+| Buff Wand max stacks | `/mobbattle buff wand maxStacks <n>` | `buff.wand.maxstacks` | 1-1000 | 5 | rules |
 | Buff color | `/mobbattle buffColor <color>` | `wand.buff.color` | palette color | Purple | effects |
+| Buffed mob look | `/mobbattle buffLook shimmer\|runes\|off` | `wand.buff.look` | shimmer (veins, eye flames, runes), runes (only eye flames and runes), off | shimmer | effects |
 | Buff Wand light | `/mobbattle buffLight buff\|<color>\|off` | `wand.buff.light` | buff (= in the buff color), palette color, off | buff | effects |
 | Buffed mobs' crown | `/mobbattle buff crown gold\|<color>\|off` | `buff.crown` | Gold, palette color, off | off | rules |
 
+Speed from size: how much faster a size buff makes a mob or player. natural (default) = x4 runs twice as fast (realistic; measured in game: 11 -> 22 blocks/s running); strong = x4 is 2.8 times as fast; full = x4 is 4 times as fast (the steps match the ground, but it is hard to steer); off = no change. Jump from size works the same way for the jump: natural = the jump height grows with the size. The speed stat multiplies on top of either.
+
 Size limit: the most extra size one mob or player can get, all sources together. Above 200 (x3) the command and the panel warn: big players don't fit under roofs or in caves, their camera can end up inside blocks, and runes and crowns can sink into big heads. The buff looks grow less than the body (with the square root of the size: x4 body, x2 runes).
 
-Shortcuts: `/mobbattle buff <who> all <percent>` sets the four stats at once (defense stops at 90, the size total at the size limit); `/mobbattle buff <who> off` sets them all to 0. `buff lone heal on` heals the all vs one target when it is picked, even with no lone buff.
+Shortcuts: `/mobbattle buff <who> all <percent>` sets every stat at once, speed too (defense stops at 99, the size total at the size limit); `/mobbattle buff <who> off` sets them all to 0. `buff lone heal on` heals the all vs one target when it is picked, even with no lone buff.
 
 ### Wands
 
@@ -257,6 +274,16 @@ Shortcuts: `/mobbattle buff <who> all <percent>` sets the four stats at once (de
 | Wand effects | `/mobbattle wandFx on\|off` | `wand.fx` | true, false | on | effects |
 | Heal Wand light | `/mobbattle healLight <color>\|off` | `wand.heal.light` | palette color, off (heals at once) | Green | effects |
 | Effect Wand effect | `/mobbattle wandEffect <id>` | `effect.id` | any loaded effect ID; a chain `A>B>C`; `jade[:color]`, `shimmer[:color]` | `Burn` | wands |
+| Wand waves: hit as the ring arrives | `/mobbattle waveTravel on\|off` | `wand.wave.travel` | true, false | on | wands |
+| Wand waves: ground only | `/mobbattle waveGroundOnly on\|off` | `wand.wave.groundonly` | true, false | off | wands |
+| Battle waves: reach as the ring arrives | `/mobbattle battleWaveTravel on\|off` | `battle.wave.travel` | true, false | off | arenas |
+| Battle waves: ground only | `/mobbattle battleWaveGroundOnly on\|off` | `battle.wave.groundonly` | true, false | off | arenas |
+| Heal wave (hold left click) | `/mobbattle healArea on\|off` | `heal.area` | true, false | on | wands |
+| Heal wave reach | `/mobbattle healRadius <blocks>` | `heal.area.radius` | 2-2048 (above 128 warns) | 12 | wands |
+| Heal wave heals you | `/mobbattle healAreaSelf on\|off` | `heal.area.self` | true, false | on | wands |
+| Effect wave (hold left click) | `/mobbattle effectArea on\|off` | `effect.area` | true, false | on | wands |
+| Effect wave reach | `/mobbattle effectRadius <blocks>` | `effect.area.radius` | 2-2048 (above 128 warns) | 12 | wands |
+| Effect wave hits you | `/mobbattle effectAreaSelf on\|off` | `effect.area.self` | true, false | off | wands |
 | Soul rip time | `/mobbattle killDelay <seconds>` | `kill.delay.millis` | 0-3 s in the command; 0-3000 ms in the file and panel; 0 = instant | 0.5 s (500) | wands |
 | Cast hit delay | `/mobbattle killHitDelay <ms>` | `kill.hitdelay` | 0-2000, 0 = on the click | 175 | wands |
 | Drop loot | `/mobbattle killLoot on\|off` | `kill.loot` | true, false | off | wands |
@@ -264,16 +291,18 @@ Shortcuts: `/mobbattle buff <who> all <percent>` sets the four stats at once (de
 | Works on players (Kill Wand) | `/mobbattle killPlayers on\|off` | `kill.players` | true, false | on | wands |
 | Snap mode | `/mobbattle snapMode global\|team` | `snap.mode` | global, team | global | wands |
 | Share that turns to dust | `/mobbattle snapPercent <1-100>` | `snap.percent` | 1-100 | 50 | wands |
-| Dust time | `/mobbattle snapTime <1-30>` | `snap.time` | 1-30 seconds | 5 | wands |
+| Dust time | `/mobbattle snapTime <seconds>` | `snap.time` | 1-600 seconds | 5 | wands |
 | Slam hit delay | `/mobbattle snapHitDelay <ms>` | `snap.hitdelay` | 0-2000 | 310 | wands |
-| Snap reach | `/mobbattle snapRadius <blocks>` | `snap.radius` | 2-430 | 60 | wands |
+| Snap reach | `/mobbattle snapRadius <blocks>` | `snap.radius` | 2-2048 (above 128 warns) | 60 | wands |
 | Snap players | `/mobbattle snapPlayers on\|off` | `snap.players` | true, false | on | wands |
 | Morph players | `/mobbattle morphPlayers on\|off` | `morph.players` | true, false | on | wands |
 | Morph wave (hold left click) | `/mobbattle morphBurst on\|off` | `morph.burst` | true, false | on | wands |
 | Cleanse wave (hold left click) | `/mobbattle cleanseArea on\|off` | `cleanse.area` | true, false | on | wands |
-| Cleanse wave reach | `/mobbattle cleanseRadius <blocks>` | `cleanse.area.radius` | 2-430 | 12 | wands |
+| Cleanse wave reach | `/mobbattle cleanseRadius <blocks>` | `cleanse.area.radius` | 2-2048 (above 128 warns) | 12 | wands |
+| Cleanse wave cleanses you | `/mobbattle cleanseAreaSelf on\|off` | `cleanse.area.self` | true, false | off | wands |
 | Swap wave (hold right click) | `/mobbattle morphShuffle on\|off` | `morph.shuffle` | true, false | on | wands |
-| Morph wave reach | `/mobbattle morphBurstRadius <blocks>` | `morph.burst.radius` | 2-430 | 12 | wands |
+| Morph wave reach | `/mobbattle morphBurstRadius <blocks>` | `morph.burst.radius` | 2-2048 (above 128 warns) | 12 | wands |
+| Morph waves change you | `/mobbattle morphBurstSelf on\|off` | `morph.burst.self` | true, false | off | wands |
 | Follow time (Debug Wand) | `/mobbattle debugTrack <seconds>` | `wand.debug.track` | 0-600, 0 = report only | 30 | wands |
 
 `killHitDelay` (default 175: the hit at 0.175 s of the Kill Wand's cast animation) and `snapHitDelay` (default 310: frame ~30 of 60 at `Speed` 1.6 in `Server/Item/Animations/MobBattle_SnapWand.json`) line the effect up with the wand's animation; with `wandFx off` they are skipped and the action fires on the click. Raise one if the effect lands before the hit, lower it if after. If you change an animation or its `Speed`, retune with `delay = hit frame / 60 / Speed * 1000`. `snapRadius` is separate from `areaRadius`, so a big battle area does not make the snap reach farther.
@@ -292,12 +321,13 @@ The team list itself (names and colors, at most 14 teams, at least 2) is saved a
 
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
-| Summon area | `/mobbattle summonRadius <1-64>\|auto` | `summon.radius` | 0 = auto, 1-64 | auto (0) | rules |
-| Random count from / to | `/mobbattle summon random <min> <max>` | `summon.min`, `summon.max` | 0-100 each (a reversed range is reordered) | 1 / 5 | rules |
+| Summon area | `/mobbattle summonRadius <blocks>\|auto` | `summon.radius` | 0 = auto, 1-512 (above 64 warns) | auto (0) | rules |
+| Random count from / to | `/mobbattle summon random <min> <max>` | `summon.min`, `summon.max` | 0-100000 each (a reversed range is reordered; above 60 warns) | 1 / 5 | rules |
 | At least one | `/mobbattle summon atLeastOne true\|false` | `summon.atleastone` | true, false | true | rules |
 | Summons leave | `/mobbattle summonDespawn never\|battleEnd\|timer` | `summon.despawn` | never, battleEnd, timer | never | rules |
 | Summon lifetime | `/mobbattle summonLifetime <seconds>` | `summon.lifetime` | 5-3600 | 60 | rules |
 | How they leave | `/mobbattle summonExit disintegrate\|vanish\|shatter` | `summon.exit` | disintegrate, vanish, shatter | disintegrate | rules |
+| Calm until a battle | `/mobbattle summonCalm off\|summons\|all` | `summon.calm` | off, summons, all | off | rules |
 | Summons join my army | `/mobbattle summonArmy on\|off` | `summon.army` | true, false | off | rules |
 | Summons in jade | `/mobbattle summonJade on\|off` | `summon.jade` | true, false | off | effects |
 | Summon jade color | `/mobbattle summonJadeColor <color>` | `summon.jade.color` | palette color | Green | effects |
