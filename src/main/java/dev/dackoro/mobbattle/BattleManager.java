@@ -862,8 +862,18 @@ public final class BattleManager {
         detach(npcs);
         FightManager.endFightsOf(npcs);
         Battle battle = new Battle(owner, anchor, true, null);
-        for (int i = 0; i < npcs.size(); i++) {
-            battle.add(npcs.get(i), i);
+        // Every mob for itself, but an army (a whole chain of command, its owner too if they fight) is one side
+        // (test 2026-10-14, user: army mobs in a royale fought each other).
+        Map<java.util.UUID, Integer> armySide = new java.util.HashMap<>();
+        int side = 0;
+        for (Ref<EntityStore> npc : npcs) {
+            java.util.UUID top = npc.isValid() ? Army.topOf(npc, Army.keyOf(npc, npc.getStore())) : null;
+            Integer t = top != null ? armySide.get(top) : null;
+            if (t == null) {
+                t = side++;
+                if (top != null) armySide.put(top, t);
+            }
+            battle.add(npc, t);
         }
         BATTLES.add(battle);
         return battle;

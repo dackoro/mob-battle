@@ -26,7 +26,10 @@ public class BattleUnloadSystem extends RefSystem<EntityStore> {
     @Override
     public void onEntityAdded(Ref<EntityStore> ref, AddReason reason, Store<EntityStore> store, CommandBuffer<EntityStore> buffer) {
         // The second half of a role change (RoleChange): the same mob is back under a new Ref.
-        if (reason == AddReason.LOAD) RoleChange.arrived(ref, store);
+        if (reason != AddReason.LOAD) return;
+        RoleChange.arrived(ref, store);
+        // An army mob or leader unloaded with its chunk is back (a reconnect, the owner walking back).
+        Army.loaded(ref, store);
     }
 
     @Override
@@ -34,6 +37,7 @@ public class BattleUnloadSystem extends RefSystem<EntityStore> {
         if (reason != RemoveReason.UNLOAD) return;
         // A role change (0.7.0 boss stages, ...) re-creates the mob at once: carried over, not abandoned.
         if (RoleChange.leaving(ref, store)) return;
+        Army.unloaded(ref, store);
         if (!BattleManager.hasBattles()) return;
         BattleManager.Battle battle = BattleManager.battleOf(ref);
         if (battle == null || battle.over) return;

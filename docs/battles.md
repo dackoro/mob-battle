@@ -10,7 +10,7 @@ Every command here starts with `/mobbattle`. Most settings are also in the setti
 |---|---|---|---|---|
 | Duel | `duel` | Battle Wand: click mob A, then mob B | Two fighters | The one left standing |
 | All vs one | `allVsOne` | Chaos Wand left click on a mob (or player) | Every mob within `areaRadius` against the clicked one | The lone target if it survives, else the attackers |
-| Battle royale | `royale` | Chaos Wand right click | Every mob within `areaRadius`, each on its own | The last one standing |
+| Battle royale | `royale` | Chaos Wand right click | Every mob within `areaRadius`, each on its own (an army is one side) | The last one standing |
 | Team battle | `teams` | Team Wand: build teams, then right click a mob (or `teams start`) | Two or more teams | The last team standing |
 
 The key is what you type when a setting works per kind, e.g. `/mobbattle arena royale wall` or `/mobbattle countdown duel 3`. `all` sets every kind at once.
@@ -44,7 +44,7 @@ Every mob within `areaRadius` of the clicked mob attacks it; the lone target fig
 
 ▶ [Watch it](https://youtu.be/qorX35UQVe0)
 
-Every mob within `areaRadius` fights on its own, centered on the mob you aim at (or on you). Each fighter starts on one of its 3 closest opponents, picked at random; when its target falls it goes for the nearest survivor. Players in the area join too with `playerFights royale on`.
+Every mob within `areaRadius` fights on its own, centered on the mob you aim at (or on you). An Army Wand army (its whole chain of command, and its owner if they fight) is one side: its mobs fight together and the last army or mob standing wins. When a mob or leader of an army unloads with its chunk (you leave or walk away), it is back in its army when it loads again. Each fighter starts on one of its 3 closest opponents, picked at random; when its target falls it goes for the nearest survivor. Players in the area join too with `playerFights royale on`.
 
 ### Team battles (Team Wand)
 

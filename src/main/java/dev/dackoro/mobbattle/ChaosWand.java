@@ -305,10 +305,13 @@ public final class ChaosWand {
     private static final int NEAREST_START = 3;
 
     /** One of the NEAREST_START closest others of {@code around[i]}, at random (any other if positions are unknown). */
-    private static Ref<EntityStore> nearbyOpponent(List<Ref<EntityStore>> around, List<Vector3d> at, int i) {
+    private static Ref<EntityStore> nearbyOpponent(BattleManager.Battle battle, List<Ref<EntityStore>> around, List<Vector3d> at, int i) {
         Vector3d me = at.get(i);
         List<Integer> others = new ArrayList<>(around.size() - 1);
-        for (int j = 0; j < around.size(); j++) if (j != i) others.add(j);
+        // Not one of its own side (an army is one side in a royale).
+        int mine = battle.team(around.get(i));
+        for (int j = 0; j < around.size(); j++) if (j != i && battle.team(around.get(j)) != mine) others.add(j);
+        if (others.isEmpty()) return null;
         if (me != null) {
             others.sort((x, y) -> Double.compare(
                     at.get(x) != null ? at.get(x).distanceSquared(me) : Double.MAX_VALUE,
@@ -342,7 +345,8 @@ public final class ChaosWand {
         java.util.Map<String, int[]> roles = MobBattlePlugin.debugging() ? new java.util.TreeMap<>() : null;
         for (int i = 0; i < around.size(); i++) {
             Ref<EntityStore> npc = around.get(i);
-            Ref<EntityStore> enemy = nearbyOpponent(around, at, i);
+            Ref<EntityStore> enemy = nearbyOpponent(battle, around, at, i);
+            if (enemy == null) continue;
             BattleManager.setTarget(battle, npc, enemy);
             FightManager.Result result = FightManager.turnAgainst(npc, enemy, buffer);
             if (result == FightManager.Result.AGGRESSIVE) {

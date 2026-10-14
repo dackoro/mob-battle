@@ -137,6 +137,53 @@ final class Army {
         }
     }
 
+    /**
+     * Army mobs and leaders unloaded with their chunk (the owner logged off or walked away; test 2026-10-14: the army
+     * was gone after a reconnect, since a reloaded mob comes back under a new Ref). Kept by the mob's UUID, which the
+     * game saves with it, and put back when it loads again. {@code bossIsLeader}: its owner was a leader mob, so it only
+     * comes back while that leader still exists.
+     */
+    private record Away(UUID owner, boolean bossIsLeader, boolean leads, boolean fought, long at) {
+    }
+
+    private static final Map<UUID, Away> AWAY = new ConcurrentHashMap<>();
+    /** An unloaded army mob is forgotten after this long. */
+    private static final long AWAY_MS = 6 * 3600_000L;
+
+    /** An NPC unloaded with its chunk (BattleUnloadSystem, not a role change): an army mob or leader is remembered. */
+    static void unloaded(Ref<EntityStore> ref, com.hypixel.hytale.component.Store<EntityStore> store) {
+        if (OWNER.isEmpty() && LEADERS.isEmpty()) return;
+        UUID owner = OWNER.get(ref);
+        UUID leads = leaderKey(ref);
+        if (owner == null && leads == null) return;
+        // Already dying: it fell, it doesn't come back.
+        if (store.getComponent(ref, com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent.getComponentType()) != null) return;
+        var id = store.getComponent(ref, com.hypixel.hytale.server.core.entity.UUIDComponent.getComponentType());
+        if (id == null) return;
+        AWAY.put(id.getUuid(), new Away(owner, owner != null && LEADERS.containsKey(owner), leads != null,
+                FOUGHT.contains(ref), System.currentTimeMillis()));
+    }
+
+    /** An NPC loaded again (BattleUnloadSystem, AddReason.LOAD): back in its army, or leading it again. */
+    static void loaded(Ref<EntityStore> ref, com.hypixel.hytale.component.Store<EntityStore> store) {
+        if (AWAY.isEmpty()) return;
+        var id = store.getComponent(ref, com.hypixel.hytale.server.core.entity.UUIDComponent.getComponentType());
+        Away a = id != null ? AWAY.remove(id.getUuid()) : null;
+        if (a == null) return;
+        UUID uuid = id.getUuid();
+        if (a.leads()) {
+            LEADERS.put(uuid, ref);
+            PICKS.replaceAll((k, p) -> uuid.equals(p.owner()) && p.leader() != null ? new Pick(p.owner(), ref, p.name()) : p);
+        }
+        // Its leader died meanwhile: it stays free.
+        if (a.owner() != null && (!a.bossIsLeader() || LEADERS.containsKey(a.owner()))) {
+            OWNER.put(ref, a.owner());
+            if (a.fought()) FOUGHT.add(ref);
+        }
+        // Befriended again along its chain on the next follow pass (a reloaded mob has no attitude overrides).
+        RENEWED.clear();
+    }
+
     /** Owner key -> when its army was last befriended along its chain, and the owner's entity then. */
     private record Renew(long at, Ref<EntityStore> me) {
     }
@@ -228,6 +275,7 @@ final class Army {
         List<Ref<EntityStore>> mobs = members(owner);
         releaseAll(mobs, playerEntity);
         OWNER.values().removeIf(owner::equals);
+        AWAY.values().removeIf(a -> owner.equals(a.owner()));
         FOUGHT.retainAll(OWNER.keySet());
         return mobs.size();
     }
@@ -247,6 +295,7 @@ final class Army {
         LEADERS.clear();
         PICKS.clear();
         RENEWED.clear();
+        AWAY.clear();
         return n;
     }
 
@@ -623,13 +672,17 @@ final class Army {
     static void prune() {
         // Picks of a gone leader (unless it is changing role) or of a picker who left: else Army.any() stayed true for
         // good and every NPC hit went through the army checks.
-        PICKS.values().removeIf(p -> p.leader() != null && !p.leader().isValid() && !RoleChange.pending(p.owner()));
+        PICKS.values().removeIf(p -> p.leader() != null && !p.leader().isValid() && !RoleChange.pending(p.owner())
+                && !AWAY.containsKey(p.owner()));
+        long now = System.currentTimeMillis();
+        AWAY.values().removeIf(a -> now - a.at() > AWAY_MS);
         PICKS.keySet().removeIf(viewer -> com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(viewer) == null);
         RENEWED.values().removeIf(r -> !r.me().isValid());
         // A dead or unloaded leader: its army goes back to its own AI (RoleChange.carry already moved a role swap).
         for (Map.Entry<UUID, Ref<EntityStore>> e : LEADERS.entrySet()) {
             if (e.getValue().isValid()) continue;
             if (RoleChange.pending(e.getKey())) continue; // a role change re-adds it under its new Ref in a moment
+            if (AWAY.containsKey(e.getKey())) continue;   // unloaded with its chunk: it leads again when it loads
             LEADERS.remove(e.getKey());
             List<Ref<EntityStore>> mobs = members(e.getKey());
             if (!mobs.isEmpty()) {
@@ -642,7 +695,8 @@ final class Army {
         FOUGHT.retainAll(OWNER.keySet());
         // A living leader whose army is empty leads nothing any more (add() puts it back when it gets a mob).
         LEADERS.entrySet().removeIf(e -> e.getValue().isValid() && !OWNER.containsValue(e.getKey())
-                && PICKS.values().stream().noneMatch(p -> p.leader() == e.getValue()));
+                && PICKS.values().stream().noneMatch(p -> p.leader() == e.getValue())
+                && AWAY.values().stream().noneMatch(a -> e.getKey().equals(a.owner())));
         RENEWED.keySet().retainAll(new java.util.HashSet<>(OWNER.values()));
     }
 }
