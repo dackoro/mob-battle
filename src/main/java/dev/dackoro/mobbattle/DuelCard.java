@@ -44,6 +44,7 @@ final class DuelCard extends CustomUIHud {
     @Override
     protected void build(UICommandBuilder builder) {
         builder.append(UI);
+        CinemaBars.shift(builder, getPlayerRef());
     }
 
     /** Cheap check for BattleLifecycleSystem: anything to show or to take down? */

@@ -29,6 +29,7 @@ final class PassiveAlert extends CustomUIHud {
     @Override
     protected void build(UICommandBuilder builder) {
         builder.append(UI);
+        CinemaBars.shift(builder, getPlayerRef());
     }
 
     /** Shows or refreshes the alert for {@code player} (world thread of {@code store}). */

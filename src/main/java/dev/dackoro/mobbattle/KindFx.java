@@ -25,6 +25,14 @@ final class KindFx {
         END_CAMERA("endCamera"),
         END_CAMERA_TIME("endCameraTime"),
         AUTO_WATCH("autoWatch"),
+        /** Black cinema bars over the intro and end cameras (CinemaBars). */
+        CAMERA_BARS("cameraBars"),
+        /** Background blur of the intro and end cameras (FightCamera depth of field). */
+        CAMERA_BLUR("cameraBlur"),
+        /** The camera viewers get the battle film (FilmCamera) from the battle start, until it ends. */
+        AUTO_FILM("autoFilm"),
+        /** Smash-like VS screen over the first seconds of the countdown (VsScreen), before the intro camera. */
+        VS_SCREEN("vsScreen"),
         START_TITLE("startTitle"),
         WIN_TITLE("winTitle"),
         MUSIC("music"),
@@ -48,8 +56,11 @@ final class KindFx {
         }
     }
 
-    static final String[] CAMERA_STYLES = {"auto", "orbit", "duel", "showcase", "teams", "focus", "drone"};
+    static final String[] CAMERA_STYLES = {"auto", "orbit", "duel", "showcase", "teams", "focus", "drone", "spotlight"};
     static final String[] END_CAMERAS = {"off", "winner", "lasthit"};
+    /** cameraBars sizes (CinemaBars.heightOf) and cameraBlur strengths (FightCamera.blurOf). */
+    static final String[] CAMERA_BARS = {"off", "slim", "classic", "wide"};
+    static final String[] CAMERA_BLURS = {"off", "soft", "strong"};
     static final String[] TIE_BREAKS = {"damage", "kills", "random", "draw"};
     /**
      * Kill table ties (user, 2026-10-13): damage = more damage dealt, alive = standing fighters first then damage,
@@ -93,7 +104,10 @@ final class KindFx {
         return "on".equals(get(kind, Opt.CAMERA));
     }
 
-    /** The intro camera style, "auto" resolved: duel western shots, allvsone focus, teams sweep, royale orbit. */
+    /**
+     * The intro camera style, "auto" resolved: duel western shots, allvsone focus, teams and royale spotlight
+     * (2026-10-16, user; royale was orbit, teams the sweep).
+     */
     static String cameraStyle(BattleManager.Kind kind) {
         String s = get(kind, Opt.CAMERA_STYLE);
         if (!"auto".equals(s)) return s;
@@ -101,8 +115,7 @@ final class KindFx {
         return switch (kind) {
             case DUEL -> "duel";
             case ALL_VS_ONE -> "focus";
-            case TEAMS -> "teams";
-            default -> "orbit";
+            default -> "spotlight";
         };
     }
 
@@ -129,6 +142,26 @@ final class KindFx {
     /** /mobbattle autoWatch: the camera viewers start watching (BattleWatch) as soon as the battle starts. */
     static boolean autoWatch(BattleManager.Kind kind) {
         return "on".equals(get(kind, Opt.AUTO_WATCH));
+    }
+
+    /** /mobbattle autoFilm: the camera viewers get the battle film (FilmCamera) as soon as the battle starts. */
+    static boolean autoFilm(BattleManager.Kind kind) {
+        return "on".equals(get(kind, Opt.AUTO_FILM));
+    }
+
+    /** /mobbattle vsScreen: the VS screen opens the countdown (VsScreen.countdownMs). */
+    static boolean vsScreen(BattleManager.Kind kind) {
+        return "on".equals(get(kind, Opt.VS_SCREEN));
+    }
+
+    /** off, slim, classic or wide. */
+    static String cameraBars(BattleManager.Kind kind) {
+        return get(kind, Opt.CAMERA_BARS);
+    }
+
+    /** off, soft or strong. */
+    static String cameraBlur(BattleManager.Kind kind) {
+        return get(kind, Opt.CAMERA_BLUR);
     }
 
     static boolean startTitle(BattleManager.Kind kind) {
@@ -204,6 +237,10 @@ final class KindFx {
             case END_CAMERA -> FxSettings.endCamera;
             case END_CAMERA_TIME -> String.valueOf(FxSettings.endCameraSeconds);
             case AUTO_WATCH -> onOff(FxSettings.autoWatch);
+            case CAMERA_BARS -> FxSettings.cameraBars;
+            case CAMERA_BLUR -> FxSettings.cameraBlur;
+            case AUTO_FILM -> onOff(FxSettings.autoFilm);
+            case VS_SCREEN -> onOff(FxSettings.vsScreen);
             case START_TITLE -> onOff(FxSettings.titleEnabled);
             case WIN_TITLE -> onOff(FxSettings.winTitleEnabled);
             case MUSIC -> FxSettings.battleMusic ? FxSettings.musicTrack : "off";
@@ -226,6 +263,10 @@ final class KindFx {
             case END_CAMERA -> FxSettings.endCamera = value;
             case END_CAMERA_TIME -> FxSettings.endCameraSeconds = intOf(value);
             case AUTO_WATCH -> FxSettings.autoWatch = "on".equals(value);
+            case CAMERA_BARS -> FxSettings.cameraBars = value;
+            case CAMERA_BLUR -> FxSettings.cameraBlur = value;
+            case AUTO_FILM -> FxSettings.autoFilm = "on".equals(value);
+            case VS_SCREEN -> FxSettings.vsScreen = "on".equals(value);
             case START_TITLE -> FxSettings.titleEnabled = "on".equals(value);
             case WIN_TITLE -> FxSettings.winTitleEnabled = "on".equals(value);
             case MUSIC -> {
@@ -257,9 +298,11 @@ final class KindFx {
             case CAMERA_TIME -> number(lower, 0, MAX_CAMERA_TIME);
             case CAMERA_SHOTS -> number(lower, 1, maxCameraShots());
             case END_CAMERA_TIME -> number(lower, 1, MAX_END_CAMERA_TIME);
-            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH -> onOffWord(lower);
+            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH, AUTO_FILM, VS_SCREEN -> onOffWord(lower);
             case CAMERA_STYLE -> oneOf(lower, CAMERA_STYLES);
             case END_CAMERA -> oneOf(lower, END_CAMERAS);
+            case CAMERA_BARS -> oneOf(lower, CAMERA_BARS);
+            case CAMERA_BLUR -> oneOf(lower, CAMERA_BLURS);
             case TIE_BREAK -> oneOf(lower, TIE_BREAKS);
             case KILL_TIE_BREAK -> oneOf(lower, KILL_TIE_BREAKS);
             case AREA_STYLE -> FxSettings.parseAreaStyle(lower);
@@ -279,9 +322,11 @@ final class KindFx {
             case CAMERA_TIME -> "<seconds 0-" + MAX_CAMERA_TIME + "> (0 = as long as the countdown)";
             case CAMERA_SHOTS -> "<1-" + maxCameraShots() + "> (up to maxMobs)";
             case END_CAMERA_TIME -> "<seconds 1-" + MAX_END_CAMERA_TIME + ">";
-            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH -> "on|off";
+            case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH, AUTO_FILM, VS_SCREEN -> "on|off";
             case CAMERA_STYLE -> "auto|orbit|duel|showcase|teams|focus|drone";
             case END_CAMERA -> "off|winner|lastHit";
+            case CAMERA_BARS -> String.join("|", CAMERA_BARS);
+            case CAMERA_BLUR -> String.join("|", CAMERA_BLURS);
             case AREA_STYLE -> String.join("|", FxSettings.AREA_STYLES);
             case MUSIC -> "on|off|<track>";
             case TIE_BREAK -> String.join("|", TIE_BREAKS);

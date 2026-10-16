@@ -47,6 +47,7 @@ final class Scoreboard extends CustomUIHud {
     @Override
     protected void build(UICommandBuilder builder) {
         builder.append(UI);
+        CinemaBars.shift(builder, getPlayerRef());
     }
 
     static boolean any() {

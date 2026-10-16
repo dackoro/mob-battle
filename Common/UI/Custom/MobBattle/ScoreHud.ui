@@ -1,36 +1,54 @@
 // Mob Battle scoreboard (Scoreboard.java): one row per side, under the timer box. Rows are hidden with
 // #RowN.Visible = false when there are fewer sides. Paths are relative to this file. A malformed property makes
 // the client reject the whole HUD, so change one thing at a time.
-Group {
-  Anchor: (Right: 24, Top: 264, Width: 250);
+// Under the cinema bars (CinemaBars.shift, 2026-10-16, user): #ShiftBar takes the band's height and #ShiftPad
+// hides, so the card sits just under the top band while a camera films; without bars it is where it always was.
+Group #Shift {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
   LayoutMode: Top;
 
-  Group #Header {
-    Anchor: (Height: 34);
-    Background: (TexturePath: "../Common/ContainerHeader.png", HorizontalBorder: 50, VerticalBorder: 0);
-    Padding: (Top: 6);
+  Group #ShiftBar { FlexWeight: 0; }
+  Group #ShiftRest {
+    FlexWeight: 1000;
+    LayoutMode: Top;
 
-    Label #Title {
-      Text: "";
-      Style: (FontSize: 13, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
-              HorizontalAlignment: Center, VerticalAlignment: Center);
+    Group #ShiftPad { Anchor: (Height: 94); }
+    Group #ShiftSlot {
+      FlexWeight: 1;
+
+      Group {
+        Anchor: (Right: 24, Top: 170, Width: 250);
+        LayoutMode: Top;
+
+        Group #Header {
+          Anchor: (Height: 34);
+          Background: (TexturePath: "../Common/ContainerHeader.png", HorizontalBorder: 50, VerticalBorder: 0);
+          Padding: (Top: 6);
+
+          Label #Title {
+            Text: "";
+            Style: (FontSize: 13, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
+                    HorizontalAlignment: Center, VerticalAlignment: Center);
+          }
+        }
+
+        Group #Row0 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text0 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+        Group #Row1 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text1 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+        Group #Row2 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text2 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+        Group #Row3 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text3 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+        Group #Row4 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text4 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+        Group #Row5 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text5 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+        Group #Row6 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text6 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+        Group #Row7 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
+          Label #Text7 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
+      }
     }
   }
-
-  Group #Row0 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text0 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
-  Group #Row1 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text1 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
-  Group #Row2 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text2 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
-  Group #Row3 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text3 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
-  Group #Row4 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text4 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
-  Group #Row5 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text5 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
-  Group #Row6 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text6 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
-  Group #Row7 { Anchor: (Height: 26); Padding: (Horizontal: 14); Background: (TexturePath: "../Common/ContainerPatch.png", Border: 10);
-    Label #Text7 { Text: ""; Style: (FontSize: 13, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center); } }
 }

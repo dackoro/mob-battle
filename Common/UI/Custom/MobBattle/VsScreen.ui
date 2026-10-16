@@ -1,0 +1,185 @@
+// Mob Battle VS screen (VsScreen.java, /mobbattle test vs; prototype 2026-10-16): Smash-like "A VS B" before a
+// battle. Full-screen layers on top of each other (the root has no LayoutMode, so its children overlay):
+//  - #LeftLayer / #RightLayer: each splits the width by FlexWeight between its half and a transparent rest, in
+//    thousandths of the screen; the code grows both halves from 0 to 500 (they meet in the middle) and back.
+//    Each half holds its content against its inner edge, so the content slides in from the screen edge.
+//  - #Flash: a white flash when the halves meet; #Center: the big VS.
+// Colors and pictures are set by the code (Background as PatchStyle, AssetImage.AssetPath, Label.Text).
+Group #Vs {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+
+  Group #LeftLayer {
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    LayoutMode: Left;
+
+    Group #LHalf {
+      FlexWeight: 0;
+      Background: #3a0d0d;
+      LayoutMode: Right;
+
+      Group #LContent {
+        Anchor: (Width: 860);
+        LayoutMode: Middle;
+
+        Group #LBox {
+          Anchor: (Height: 600);
+          LayoutMode: Top;
+
+          Label #LTeam {
+            Anchor: (Height: 56, Right: 40);
+            Style: (FontSize: 40, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                    HorizontalAlignment: End, VerticalAlignment: Center);
+          }
+
+          Group #LRow {
+            Anchor: (Height: 430);
+            LayoutMode: Right;
+
+            Group #L2 {
+              Anchor: (Width: 210, Right: 10);
+              LayoutMode: Bottom;
+              AssetImage #Img { Anchor: (Width: 200, Height: 200); }
+              Label #Name {
+                Anchor: (Height: 26);
+                Style: (FontSize: 16, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                        HorizontalAlignment: Center, VerticalAlignment: Center);
+              }
+            }
+
+            Group #L1 {
+              Anchor: (Width: 250, Right: 10);
+              LayoutMode: Bottom;
+              AssetImage #Img { Anchor: (Width: 240, Height: 240); }
+              Label #Name {
+                Anchor: (Height: 28);
+                Style: (FontSize: 18, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                        HorizontalAlignment: Center, VerticalAlignment: Center);
+              }
+            }
+
+            Group #L0 {
+              Anchor: (Width: 380, Right: 40);
+              LayoutMode: Bottom;
+              AssetImage #Img { Anchor: (Width: 380, Height: 380); }
+              Label #Name {
+                Anchor: (Height: 40);
+                Style: (FontSize: 28, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
+                        HorizontalAlignment: Center, VerticalAlignment: Center);
+              }
+            }
+          }
+
+          Label #LMore {
+            Anchor: (Height: 50, Right: 40);
+            Style: (FontSize: 30, FontName: "Secondary", TextColor: #ffffff, RenderBold: true,
+                    HorizontalAlignment: End, VerticalAlignment: Center);
+          }
+        }
+      }
+
+      Group #LEdge {
+        Anchor: (Width: 14);
+        Background: #ff4040;
+      }
+    }
+
+    Group #LRest { FlexWeight: 1000; }
+  }
+
+  Group #RightLayer {
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    LayoutMode: Left;
+
+    Group #RRest { FlexWeight: 1000; }
+
+    Group #RHalf {
+      FlexWeight: 0;
+      Background: #0d1a3a;
+      LayoutMode: Left;
+
+      Group #REdge {
+        Anchor: (Width: 14);
+        Background: #4080ff;
+      }
+
+      Group #RContent {
+        Anchor: (Width: 860);
+        LayoutMode: Middle;
+
+        Group #RBox {
+          Anchor: (Height: 600);
+          LayoutMode: Top;
+
+          Label #RTeam {
+            Anchor: (Height: 56, Left: 40);
+            Style: (FontSize: 40, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                    HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          Group #RRow {
+            Anchor: (Height: 430);
+            LayoutMode: Left;
+
+            Group #R0 {
+              Anchor: (Width: 380, Left: 40);
+              LayoutMode: Bottom;
+              AssetImage #Img { Anchor: (Width: 380, Height: 380); }
+              Label #Name {
+                Anchor: (Height: 40);
+                Style: (FontSize: 28, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
+                        HorizontalAlignment: Center, VerticalAlignment: Center);
+              }
+            }
+
+            Group #R1 {
+              Anchor: (Width: 250, Left: 10);
+              LayoutMode: Bottom;
+              AssetImage #Img { Anchor: (Width: 240, Height: 240); }
+              Label #Name {
+                Anchor: (Height: 28);
+                Style: (FontSize: 18, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                        HorizontalAlignment: Center, VerticalAlignment: Center);
+              }
+            }
+
+            Group #R2 {
+              Anchor: (Width: 210, Left: 10);
+              LayoutMode: Bottom;
+              AssetImage #Img { Anchor: (Width: 200, Height: 200); }
+              Label #Name {
+                Anchor: (Height: 26);
+                Style: (FontSize: 16, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                        HorizontalAlignment: Center, VerticalAlignment: Center);
+              }
+            }
+          }
+
+          Label #RMore {
+            Anchor: (Height: 50, Left: 40);
+            Style: (FontSize: 30, FontName: "Secondary", TextColor: #ffffff, RenderBold: true,
+                    HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+        }
+      }
+    }
+  }
+
+  Group #Flash {
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    Background: #ffffff(0.7);
+    Visible: false;
+  }
+
+  Group #Center {
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    LayoutMode: Middle;
+    Visible: false;
+
+    Label #VsText {
+      Anchor: (Height: 200);
+      Text: "VS";
+      Style: (FontSize: 150, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true,
+              HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+  }
+}

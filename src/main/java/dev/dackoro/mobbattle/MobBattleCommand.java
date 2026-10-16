@@ -93,6 +93,17 @@ public class MobBattleCommand extends CommandBase {
                 "  help.titles.14",
                 "help.titles.15",
                 "help.titles.16",
+                "help.titles.20",
+                "help.titles.21",
+                "help.titles.22",
+                "help.titles.30",
+                "help.titles.23",
+                "help.titles.24",
+                "help.titles.25",
+                "help.titles.26",
+                "help.titles.27",
+                "help.titles.28",
+                "help.titles.29",
                 "help.titles.17",
                 "help.titles.18",
                 "  help.titles.19",
@@ -174,6 +185,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.battles.62",
                 "  help.battles.63",
                 "  help.battles.64",
+                "help.battles.74",
                 "help.battles.65",
                 "help.battles.66",
                 "help.battles.67",
@@ -739,6 +751,10 @@ public class MobBattleCommand extends CommandBase {
             case "endcamera" -> KindFx.Opt.END_CAMERA;
             case "endcameratime" -> KindFx.Opt.END_CAMERA_TIME;
             case "autowatch" -> KindFx.Opt.AUTO_WATCH;
+            case "camerabars" -> KindFx.Opt.CAMERA_BARS;
+            case "camerablur" -> KindFx.Opt.CAMERA_BLUR;
+            case "autofilm" -> KindFx.Opt.AUTO_FILM;
+            case "vsscreen" -> KindFx.Opt.VS_SCREEN;
             case "runes" -> KindFx.Opt.RUNES;
             case "tiebreak" -> KindFx.Opt.TIE_BREAK;
             case "killtiebreak" -> KindFx.Opt.KILL_TIE_BREAK;
@@ -818,6 +834,10 @@ public class MobBattleCommand extends CommandBase {
                 words(I18n.id("cmd.desc.title_scope"), "owner", "nearby", "world")));
         addSubCommand(new Sub("camerascope", I18n.id("cmd.desc.who_sees_the_fight_cameras_o"),
                 words(I18n.id("cmd.desc.camera_scope"), "owner", "nearby", "world")));
+        addSubCommand(new Sub("camerahud", I18n.id("cmd.desc.camera_hud"),
+                words(I18n.id("cmd.desc.camera_hud"), FxSettings.CAMERA_HUDS)));
+        addSubCommand(new Sub("cameraface", I18n.id("cmd.desc.camera_face"),
+                words(I18n.id("cmd.desc.camera_face"), "on", "off")));
         addSubCommand(new Sub("titlestyle", I18n.id("cmd.desc.title_style"), words(I18n.id("cmd.desc.title_style"), "default", "major", "goblinbreach", "voideviction", "random")));
         addSubCommand(kindFxSub("fightlaser", I18n.id("cmd.desc.laser_line_between_fighters"), "on", "off"));
         addSubCommand(new Sub("fightlasercolor", I18n.id("cmd.desc.color_of_the_fighter_laser_a"), colorWords("random")));
@@ -953,6 +973,8 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("skipcamera", I18n.id("cmd.desc.end_your_intro_or_end_camera")));
         addSubCommand(new Sub("watch",I18n.id("cmd.desc.spectate_a_running_battle_ri"),
                 new Sub("exit", I18n.id("cmd.desc.stop_watching_back_to_your_g"))));
+        addSubCommand(new Sub("film", I18n.id("cmd.desc.film"),
+                new Sub("exit", I18n.id("cmd.desc.film_exit"))));
         addSubCommand(new Sub("stop", I18n.id("cmd.desc.end_every_battle_countdown_t")));
         addSubCommand(new Sub("reset", I18n.id("cmd.desc.settings_of_one_group_back_t"),
                 new Sub("effects", I18n.id("cmd.desc.waves_border_glow_mob_looks")),
@@ -991,7 +1013,7 @@ public class MobBattleCommand extends CommandBase {
                         words(I18n.id("cmd.desc.filter"), "mod:hytale", "type:fighters", "type:defend", "type:noattack", "type:avoid")),
                 new Sub("expect", I18n.id("cmd.desc.expect_id_last_field_op_valu"), words(I18n.id("cmd.desc.who"), "last")),
                 new Sub("camera", I18n.id("cmd.desc.camera_style_player_seconds"),
-                        words(I18n.id("cmd.desc.style"), "orbit", "duel", "showcase", "teams", "focus", "drone")),
+                        words(I18n.id("cmd.desc.style"), "orbit", "duel", "showcase", "teams", "focus", "drone", "spotlight")),
                 new Sub("snapshot", I18n.id("cmd.desc.snapshot_name_save_fx_proper")),
                 new Sub("restore", I18n.id("cmd.desc.restore_name_put_a_snapshot")),
                 new Sub("run", I18n.id("cmd.desc.run_script_runs_data_dir_tes")),
@@ -1001,7 +1023,7 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(kindFxSub("countdown", I18n.id("cmd.desc.seconds_of_3_2_1_titles_befo"),
                 "0", "3", "5", "10"));
         addSubCommand(kindFxSub("camerastyle", I18n.id("cmd.desc.intro_camera_auto_orbit_area"),
-                "auto", "orbit", "duel", "showcase", "teams", "focus", "drone"));
+                "auto", "orbit", "duel", "showcase", "teams", "focus", "drone", "spotlight"));
         addSubCommand(kindFxSub("cameratime", I18n.id("cmd.desc.intro_camera_seconds_0_as_lo"),
                 "0", "3", "5", "10"));
         addSubCommand(kindFxSub("camerashots", I18n.id("cmd.desc.showcase_camera_how_many_fig"), "3", "4", "6", "12", "25"));
@@ -1010,6 +1032,28 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(kindFxSub("endcameratime", I18n.id("cmd.desc.end_camera_seconds"), "3", "5", "8"));
         addSubCommand(kindFxSub("autowatch", I18n.id("cmd.desc.start_watching_spectator_cam"),
                 "on", "off"));
+        addSubCommand(kindFxSub("camerabars", I18n.id("cmd.desc.camera_cinema_bars"),
+                "off", "slim", "classic", "wide"));
+        addSubCommand(kindFxSub("camerablur", I18n.id("cmd.desc.camera_background_blur"),
+                "off", "soft", "strong"));
+        addSubCommand(kindFxSub("autofilm", I18n.id("cmd.desc.film_auto"), "on", "off"));
+        addSubCommand(kindFxSub("vsscreen", I18n.id("cmd.desc.vs_screen"), "on", "off"));
+        addSubCommand(new Sub("filmplayershots", I18n.id("cmd.desc.film_player_shots"),
+                words(I18n.id("cmd.desc.film_player_shots"), "0", "15", "30", "50", "100")));
+        addSubCommand(new Sub("filmwideshots", I18n.id("cmd.desc.film_wide_shots"),
+                words(I18n.id("cmd.desc.film_wide_shots"), "0", "15", "30", "50", "100")));
+        addSubCommand(new Sub("filmshot", I18n.id("cmd.desc.film_shot"),
+                words(I18n.id("cmd.desc.film_shot"), FilmCamera.SHOT_WORDS)));
+        addSubCommand(new Sub("filmshottime", I18n.id("cmd.desc.film_shot_time"),
+                words(I18n.id("cmd.desc.film_shot_time"), "5", "8", "12", "20")));
+        addSubCommand(new Sub("filmshotvariation", I18n.id("cmd.desc.film_shot_variation"),
+                words(I18n.id("cmd.desc.film_shot_variation"), "0", "25", "50")));
+        addSubCommand(new Sub("filmpace", I18n.id("cmd.desc.film_pace"),
+                words(I18n.id("cmd.desc.film_pace"), "50", "100", "150", "200")));
+        addSubCommand(new Sub("filmtransition", I18n.id("cmd.desc.film_transition"),
+                words(I18n.id("cmd.desc.film_transition"), "cut", "glide")));
+        addSubCommand(new Sub("filmshots", I18n.id("cmd.desc.film_shots"),
+                words(I18n.id("cmd.desc.film_shots"), "default", "all", "battle", "wide,arc,landscape", "playerback,playerclose")));
         addSubCommand(kindFxSub("runes", I18n.id("cmd.desc.summoning_runes_and_fighter"), "on", "off"));
         addSubCommand(new Sub("preset", I18n.id("cmd.desc.presets_built_in_or_your_own"),
                 new Sub("list", I18n.id("cmd.desc.built_in_and_saved_presets")),
@@ -1204,7 +1248,7 @@ public class MobBattleCommand extends CommandBase {
                 || command.equals("debugrecord") || command.equals("debugdump")) return Perms.ADMIN;
         if (command.equals("army") || command.equals("apply") || command.equals("measure") || command.equals("test")) return Perms.ADMIN;
         if (command.equals("chaos")) return Perms.USE;
-        if (command.equals("watch")) return sub.equals("exit") ? null : Perms.USE;
+        if (command.equals("watch") || command.equals("film")) return sub.equals("exit") ? null : Perms.USE;
         if (command.equals("skipcamera")) return null;
         if (command.equals("eyetest")) return Perms.ADMIN;
         if (command.equals("snap") || command.equals("debug")) return Perms.USE;
@@ -1317,7 +1361,7 @@ public class MobBattleCommand extends CommandBase {
                 return;
             }
             case "laser", "title", "wintitle", "music", "camera", "countdown", "area",
-                 "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch", "runes",
+                 "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch", "camerabars", "camerablur", "autofilm", "vsscreen", "runes",
                  "tiebreak", "killtiebreak" -> {
                 if (!setKindFx(ctx, optFor(key))) return;
             }
@@ -1632,6 +1676,23 @@ public class MobBattleCommand extends CommandBase {
                 });
                 return;
             }
+            case "film" -> {
+                String[] w = argsAfter(ctx, "film");
+                var ref = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
+                boolean exit = w.length == 1 && "exit".equalsIgnoreCase(w[0]);
+                if (ref == null || !ref.isValid() || w.length > 1 || (w.length == 1 && !exit)) {
+                    usagePlayer(ctx, "/mobbattle film [exit]");
+                    return;
+                }
+                var store = ref.getStore();
+                store.getExternalData().getWorld().execute(() -> {
+                    var pr = store.getComponent(ref, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
+                    if (pr == null) return;
+                    if (exit) FilmCamera.exit(pr);
+                    else FilmCamera.start(pr, ref, store);
+                });
+                return;
+            }
             case "snap" -> {
                 var ref = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
                 if (ref == null || !ref.isValid()) {
@@ -1644,6 +1705,87 @@ public class MobBattleCommand extends CommandBase {
                     Snap.snap(pr, ref, null, store);
                 });
                 return;
+            }
+            case "filmshot" -> {
+                // filmShot <shot> <0-300>: that shot's percent of its usual weight.
+                String[] words = ctx.getInputString() == null ? new String[0] : ctx.getInputString().trim().split("\\s+");
+                String shot = null, num = null;
+                for (int i = 0; i < words.length - 2; i++) {
+                    if (words[i].equalsIgnoreCase("filmshot")) {
+                        shot = words[i + 1].toLowerCase(java.util.Locale.ROOT);
+                        num = words[i + 2].replace("%", "");
+                    }
+                }
+                int n;
+                try {
+                    n = num == null ? -1 : Integer.parseInt(num.trim());
+                } catch (NumberFormatException e) {
+                    n = -1;
+                }
+                if (shot == null || !java.util.Arrays.asList(FilmCamera.SHOT_WORDS).contains(shot) || n < 0) {
+                    usage(ctx, "/mobbattle filmShot <" + String.join("|", FilmCamera.SHOT_WORDS) + "> <0-" + FxSettings.MAX_FILM_WEIGHT + ">");
+                    return;
+                }
+                FxSettings.filmWeights.put(shot, Math.min(FxSettings.MAX_FILM_WEIGHT, n));
+            }
+            case "filmplayershots", "filmwideshots", "filmshottime", "filmshotvariation", "filmpace" -> {
+                int min = switch (key) {
+                    case "filmshottime" -> FxSettings.MIN_FILM_SHOT;
+                    case "filmpace" -> FxSettings.MIN_FILM_PACE;
+                    default -> 0;
+                };
+                int max = switch (key) {
+                    case "filmshottime" -> FxSettings.MAX_FILM_SHOT;
+                    case "filmpace" -> FxSettings.MAX_FILM_PACE;
+                    case "filmshotvariation" -> 90;
+                    default -> 100;
+                };
+                int n;
+                try {
+                    n = Integer.parseInt(val == null ? "" : val.replace("%", "").replace("s", "").trim());
+                } catch (NumberFormatException e) {
+                    String word = switch (key) {
+                        case "filmshottime" -> "filmShotTime <seconds ";
+                        case "filmpace" -> "filmPace <percent ";
+                        case "filmshotvariation" -> "filmShotVariation <percent ";
+                        case "filmwideshots" -> "filmWideShots <percent ";
+                        default -> "filmPlayerShots <percent ";
+                    };
+                    usage(ctx, "/mobbattle " + word + min + "-" + max + ">");
+                    return;
+                }
+                n = Math.max(min, Math.min(max, n));
+                switch (key) {
+                    case "filmshottime" -> FxSettings.filmShotSeconds = n;
+                    case "filmpace" -> FxSettings.filmPace = n;
+                    case "filmshotvariation" -> FxSettings.filmShotVariation = n;
+                    case "filmwideshots" -> FxSettings.filmWideShots = n;
+                    default -> FxSettings.filmPlayerShots = n;
+                }
+            }
+            case "filmtransition" -> {
+                if (!"cut".equalsIgnoreCase(val) && !"glide".equalsIgnoreCase(val)) {
+                    usage(ctx, "/mobbattle filmTransition cut|glide");
+                    return;
+                }
+                FxSettings.filmTransition = val.toLowerCase(java.util.Locale.ROOT);
+            }
+            case "filmshots" -> {
+                if ("default".equalsIgnoreCase(val)) {
+                    FxSettings.filmWeights.clear();   // every shot back to FILM_DEFAULT_WEIGHTS
+                    break;
+                }
+                String shots = FilmCamera.parseShots(val);
+                if (shots == null) {
+                    usage(ctx, "/mobbattle filmShots all|battle|<" + String.join(",", FilmCamera.SHOT_WORDS) + ">");
+                    return;
+                }
+                // Shortcut: the listed shots on (100 % unless already set), the rest off.
+                java.util.Set<String> on = java.util.Set.of(shots.split(","));
+                for (String w : FilmCamera.SHOT_WORDS) {
+                    if (!on.contains(w)) FxSettings.filmWeights.put(w, 0);
+                    else if (FxSettings.filmWeight(w) == 0) FxSettings.filmWeights.put(w, 100);
+                }
             }
             case "timerstyle" -> {
                 if (!"custom".equalsIgnoreCase(val) && !"portal".equalsIgnoreCase(val)) {
@@ -1683,6 +1825,22 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.titleScope = scope;
+            }
+            case "camerahud" -> {
+                String hud = val == null ? "" : val.toLowerCase(java.util.Locale.ROOT);
+                if (!java.util.Arrays.asList(FxSettings.CAMERA_HUDS).contains(hud)) {
+                    usage(ctx, "/mobbattle cameraHud hide|show");
+                    return;
+                }
+                FxSettings.cameraHud = hud;
+            }
+            case "cameraface" -> {
+                String v = val == null ? "" : val.toLowerCase(java.util.Locale.ROOT);
+                if (!v.equals("on") && !v.equals("off")) {
+                    usage(ctx, "/mobbattle cameraFace on|off");
+                    return;
+                }
+                FxSettings.cameraFace = v.equals("on");
             }
             case "camerascope" -> {
                 String scope = val == null ? "" : val.toLowerCase();

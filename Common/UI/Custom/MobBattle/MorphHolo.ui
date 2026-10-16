@@ -1,0 +1,30 @@
+// Morph Wand hologram as a HUD (MorphHologram.java, /mobbattle test hologram on hud; prototype 2026-10-16): the
+// copied mob's green hologram picture in the bottom right corner while the Morph Wand is in hand, for when the panel
+// over the wand can't show (a player's model update and their skin update replace each other's attachments).
+Group #Holo {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+  LayoutMode: Bottom;
+
+  Group #Row {
+    Anchor: (Height: 236, Bottom: 120);
+    LayoutMode: Right;
+
+    Group #Box {
+      Anchor: (Width: 220, Right: 32);
+      Background: #04140a(0.55);
+      LayoutMode: Top;
+      Padding: (Top: 6, Bottom: 6, Left: 6, Right: 6);
+
+      AssetImage #Img {
+        Anchor: (Width: 208, Height: 208);
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+      }
+
+      Label #Name {
+        Anchor: (Height: 18);
+        Style: (FontSize: 13, FontName: "Secondary", TextColor: #7dff8a, RenderBold: true, RenderUppercase: true,
+                HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+    }
+  }
+}

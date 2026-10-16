@@ -8,10 +8,35 @@ $C.@DecoratedContainer {
 
   #Title {
     Group {
-      LayoutMode: Left;
       $C.@Title {
         @Text = %server.mobbattle.panel.title;
         @Alignment = Center;
+      }
+
+      // Search over every page (2026-10-16, user): typing fills #SearchResults with the matching settings. Same
+      // look and place as the game's own search (Common.ui @HeaderSearch in the title bar of CommandListPage /
+      // EntitySpawnPage: a magnifying glass that opens into a field), copied here because our id is #Search.
+      // The icon is a PatchStyle on the game's texture, as our HUD cards load ../Common/ContainerHeader.png. Tried
+      // before: the string "../Common/SearchIcon.png" (client disconnected: "Could not resolve relative path") and
+      // our own copy of the icon in this folder (drawn as a missing-texture X).
+      Group {
+        Anchor: (Width: 280, Right: 40);
+
+        CompactTextField #Search {
+          Anchor: (Height: 30, Right: 10);
+          CollapsedWidth: 34;
+          ExpandedWidth: 270;
+          PlaceholderText: %server.mobbattle.panel.search.placeholder;
+          Style: (FontSize: 16);
+          PlaceholderStyle: (TextColor: #3d5a85, RenderUppercase: true, FontSize: 13);
+          Padding: (Horizontal: 12, Left: 34);
+          Decoration: (
+            Default: (
+              Icon: (Texture: (TexturePath: "../Common/SearchIcon.png"), Width: 16, Height: 16, Offset: 9),
+              ClearButtonStyle: $C.@ClearButtonStyle
+            )
+          );
+        }
       }
     }
   }
@@ -62,6 +87,14 @@ $C.@DecoratedContainer {
         Group #Pages {
           FlexWeight: 1;
           LayoutMode: Top;
+
+          Group #SearchResults {
+            Visible: false;
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 12, Bottom: 8);
+          }
 
           Group #Page0 {
             Visible: false;

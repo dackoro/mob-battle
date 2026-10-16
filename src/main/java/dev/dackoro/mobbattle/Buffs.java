@@ -509,10 +509,33 @@ final class Buffs {
         return sizeScale(mob, accessor);
     }
 
-    /** How much bigger it is drawn: the entity scale (a size buff, the builder tools). */
+    /**
+     * How much bigger it is drawn than its own size: a player's entity scale (their model carries the same factor,
+     * MorphWand.setPlayerSize); a mob's entity scale over its model's scale, since vanilla draws an entity scale INSTEAD
+     * of the model's (EntityScaleBoundingBoxSystem.resolveBoxScale = entity / model scale, javap 0.7.2).
+     */
     static float sizeScale(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
         EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
-        return scale != null ? scale.getScale() : 1f;
+        if (scale == null) return 1f;
+        return isPlayer(mob, accessor) ? scale.getScale() : scale.getScale() / naturalScale(mob, accessor);
+    }
+
+    /**
+     * The entity scale a mob has without any size buff: its model's scale (2026-10-16, user: Souls-like Bosses'
+     * Nightlord, model MinScale/MaxScale 2.5, shrank to x1.1 with a +10% buff and to x1 with Cleanse, because the
+     * base was a fixed 1). Players: 1 (their buff rebuilds the model at the factor). A builder-tools scale is not
+     * kept, as before: after a restart it can't be told apart from a size buff saved with the mob.
+     */
+    static float naturalScale(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
+        if (isPlayer(mob, accessor)) return 1f;
+        com.hypixel.hytale.server.core.modules.entity.component.ModelComponent mc = accessor.getComponent(mob,
+                com.hypixel.hytale.server.core.modules.entity.component.ModelComponent.getComponentType());
+        float s = mc != null && mc.getModel() != null ? mc.getModel().getScale() : 1f;
+        return Float.isFinite(s) && s > 0 ? s : 1f;
+    }
+
+    private static boolean isPlayer(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
+        return accessor.getComponent(mob, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType()) != null;
     }
 
     /** Stacks of the Buff Wand on a mob (0 = none). */
@@ -572,9 +595,13 @@ final class Buffs {
                 EntityStatValue after = stats.get(index);
                 if (had && oldValue > 0 && after != null && after.getMax() > 0) stats.setStatValue(index, Math.min(oldValue, after.getMax()));
             }
-            // A size buff left on it goes too (saved with it; otherwise only the builder tools scale entities).
+            // A size buff left on it goes too (saved with it; otherwise only the builder tools scale entities): back to
+            // the model's own scale, which an entity scale replaces.
             EntityScaleComponent scale = mob.isValid() ? accessor.getComponent(mob, EntityScaleComponent.getComponentType()) : null;
-            if (scale != null && scale.getScale() != 1f) scale.setScale(1f);
+            if (scale != null) {
+                float natural = naturalScale(mob, accessor);
+                if (scale.getScale() != natural) scale.setScale(natural);
+            }
             MorphWand.setPlayerSize(mob, 1f, accessor);
             BuffJump.npc(mob, 1f, 1f, accessor);
             return;
@@ -637,10 +664,11 @@ final class Buffs {
         float scaleBefore = sizeScale(mob, accessor);
         MorphWand.setPlayerSize(mob, size > 0 ? 1 + size / 100f : 1f, accessor);
         if (size > 0) {
-            // Always 1, not the current scale: a size buff saved with the mob before a restart/reload is still on it
-            // (our state isn't saved), and taking that scale as the base made it grow again on every new buff
-            // and need two Cleanse clicks. Same assumption as clearNow (only the builder tools scale entities).
-            if (s.baseScale == null) s.baseScale = 1f;
+            // Its model's scale (1 for players), not the current entity scale: a size buff saved with the mob before a
+            // restart/reload is still on it (our state isn't saved), and taking that scale as the base made it grow
+            // again on every new buff and need two Cleanse clicks. Not a fixed 1 either: an entity scale replaces the
+            // model's, so a mob built 2.5x big (Nightlord) shrank (2026-10-16). Same rule as clearNow.
+            if (s.baseScale == null) s.baseScale = naturalScale(mob, accessor);
             float want = s.baseScale * (1 + size / 100f);
             if (scale == null) accessor.putComponent(mob, EntityScaleComponent.getComponentType(), new EntityScaleComponent(want));
             else if (scale.getScale() != want) scale.setScale(want);

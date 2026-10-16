@@ -130,6 +130,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             return;
         }
         Ref<EntityStore> enemy = FightManager.enemyOf(self);
+        MajorDungeonsCompat.keepBoss(self, buffer);
         if (enemy != null) {
             relock(self, enemy, buffer);
             // Army fights too: no soft leash back mid-fight, and a far enemy is still walked to (ChaseSupport).
@@ -253,6 +254,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         if (battle.over || !BattleManager.isAlive(self, buffer)) {
             return;
         }
+        MajorDungeonsCompat.keepBoss(self, buffer);   // its arena must not reset (remove) it mid-battle
         if (battle.killAll && battle.team(self) != battle.survivorTeam) {
             if (!WandFx.isDying(self)) WandFx.kill(self, null, true, buffer);
             return;

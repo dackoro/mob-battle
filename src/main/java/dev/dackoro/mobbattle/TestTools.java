@@ -68,7 +68,7 @@ final class TestTools {
     static final String USAGE = "Usage: /mobbattle test spawn <role> <here|x y z> [count] [world] | list | clear | walk <id|last> <x> <z>"
             + " | chase <id|last> <here|x y z> | duel <roleA> <roleB> <distance> <here|x y z> [world] | royale <role:count+...> <here|x y z> <radius> [world]"
             + " | wave <heal|cleanse|effect|morph|shuffle> <here|x y z> [world] [effect|model] | stats <id|last> | expect <id|last> <field> <op> <value>"
-            + " | camera <style> <player> [seconds] | snapshot [name] | restore [name] | perf <role> <count> <here|x y z> [world] | run <script> | stop";
+            + " | camera <style> <player> [seconds] | preview [two] [spin N] [tilt N] [scale N] | thumbnail [pose auto|idle|run|jump|<set>] [t 0..1] [side left|right|front|profileLeft|profileRight] [size N] [flat] | hologram on|off | thumbnails <rebuild [force] [mod:<m>|<text>]|status> | snapshot [name] | restore [name] | perf <role> <count> <here|x y z> [world] | run <script> | stop";
     private static final String OK = "#7dff8a";
     private static final String INFO = "#c8e6ff";
     private static final String ERR = "#ff6b6b";
@@ -125,6 +125,11 @@ final class TestTools {
                 }
                 case "expect" -> expect(to, a);
                 case "camera" -> camera(to, a);
+                case "preview" -> PreviewTest.command(ctx, a);
+                case "thumbnail" -> ThumbnailTest.command(ctx, a);
+                case "thumbnails" -> thumbnailsCommand(to, a);
+                case "vs" -> VsScreen.command(ctx, a);
+                case "hologram" -> MorphHologram.command(ctx, a);
                 case "snapshot" -> snapshot(to, a.length > 1 ? a[1] : "default");
                 case "restore" -> restore(to, a.length > 1 ? a[1] : "default");
                 case "run" -> runScript(to, a.length > 1 ? a[1] : null);
@@ -138,6 +143,47 @@ final class TestTools {
             say(to, "Test failed: " + e, ERR);
             MobBattlePlugin.log("[test] " + e);
         }
+    }
+
+    /**
+     * test thumbnails rebuild [force] [mod:&lt;m&gt;|mod:hytale|&lt;text&gt;] | status (2026-10-16): ThumbnailCache in the
+     * background. Without force only missing or outdated pictures are drawn; mod: uses the panel's model list.
+     */
+    private static void thumbnailsCommand(CommandSender to, String[] a) {
+        String what = a.length > 1 ? a[1].toLowerCase(Locale.ROOT) : "";
+        if (what.equals("status")) {
+            say(to, ThumbnailCache.running() ? "Thumbnails are being made in the background." : "No thumbnail run going.", INFO);
+            return;
+        }
+        if (!what.equals("rebuild")) {
+            say(to, "Usage: /mobbattle test thumbnails <rebuild [force] [mod:<m>|<text>]|status>", ERR);
+            return;
+        }
+        boolean force = false;
+        String mod = null, text = null;
+        for (int i = 2; i < a.length; i++) {
+            String w = a[i];
+            if (w.equalsIgnoreCase("force")) force = true;
+            else if (w.regionMatches(true, 0, "mod:", 0, 4)) mod = w.substring(4);
+            else text = w.toLowerCase(Locale.ROOT);
+        }
+        java.util.function.Predicate<String> which = id -> true;
+        if (mod != null) {
+            java.util.Set<String> ids = new java.util.HashSet<>();
+            boolean hytale = mod.equalsIgnoreCase("hytale");
+            for (PickLists.Entry e : PickLists.models()) {
+                if (hytale ? e.mod() == null : mod.equalsIgnoreCase(e.mod())) ids.add(e.value());
+            }
+            which = ids::contains;
+        }
+        if (text != null) {
+            String t = text;
+            java.util.function.Predicate<String> before = which;
+            which = id -> before.test(id) && id.toLowerCase(Locale.ROOT).contains(t);
+        }
+        boolean started = ThumbnailCache.rebuild(which, force, r -> say(to, "Thumbnails: " + ThumbnailCache.describe(r), OK));
+        say(to, started ? "Thumbnails: making them in the background" + (force ? " (all again)" : " (missing or outdated only)") + "..."
+                : "A thumbnail run is already going.", started ? INFO : ERR);
     }
 
     // ---- targets by id ----
@@ -2260,7 +2306,7 @@ final class TestTools {
 
     // ---- camera ----
 
-    static final List<String> CAMERA_STYLES = List.of("orbit", "duel", "showcase", "teams", "focus", "drone");
+    static final List<String> CAMERA_STYLES = List.of("orbit", "duel", "showcase", "teams", "focus", "drone", "spotlight");
 
     /** test camera &lt;style&gt; &lt;player&gt; [seconds]: that style over the living test mobs of the player's world. */
     private static void camera(CommandSender to, String[] a) {

@@ -95,6 +95,12 @@ public final class MorphWand {
 
     public static void setCopy(UUID player, Copy copy) {
         COPIES.put(player, copy);
+        MorphHologram.refresh(player);
+    }
+
+    /** Whether the entity wears a Morph Wand copy now (its model is not its own). */
+    static synchronized boolean wearsMorph(Ref<EntityStore> entity) {
+        return MORPHS.containsKey(entity);
     }
 
     /** Model asset ID matching ignoring case, or null. */

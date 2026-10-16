@@ -81,6 +81,15 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private final Ref<EntityStore> entity;
     private final Store<EntityStore> store;
     private int page;
+    /**
+     * The search box's text (2026-10-16, user: find "countdown" without knowing its page): two or more characters show
+     * every matching setting (#SearchResults, grouped by page, editable as on their page) instead of the open page.
+     */
+    private String query = "";
+    /** Matches shown for the current search (for the line under the title). */
+    private int searchCount;
+    private static final int MAX_RESULTS = 60;
+    private static final int MIN_QUERY = 2;
     /** Field index -> new value (canonical), only for values that differ from the saved settings. */
     private final Map<Integer, String> draft = new LinkedHashMap<>();
     /** Field index -> its row selector in the current build. */
@@ -171,9 +180,12 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Button", data("Nav").append("P", String.valueOf(i)), false);
             // Only the open page gets its rows: a page change rebuilds (the draft lives here, not in the client).
             // All 14 at once was ~3500 dropdown entries (music tracks in 5 lists, NPC roles, models) per build.
-            if (i != page) continue;
+            if (i != page || searching()) continue;
             pageRows(new Rows(ui, ev, "#Page" + i), p, live);
         }
+        if (searching()) searchRows(new Rows(ui, ev, "#SearchResults"), live);
+        ui.set("#Search.Value", query);
+        ev.addEventBinding(CustomUIEventBindingType.ValueChanged, "#Search", data("Search").append("@V", "#Search.Value"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#SaveButton", data("Save"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#DiscardButton", data("Discard"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#UndoButton", data("Undo"), false);
@@ -187,7 +199,13 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private void pageRows(Rows rows, ConfigSchema.Page p, Properties live) {
         for (ConfigSchema.Item item : p.items()) {
             switch (item) {
-                case ConfigSchema.Section s -> rows.section(s.title());
+                case ConfigSchema.Section s -> {
+                    rows.section(s.title());
+                    // Film shots: one button puts every percent back to its default (2026-10-16, user).
+                    if ("filmshots".equals(s.id())) {
+                        rows.action(I18n.tr("panel.filmshots.reset.label"), I18n.tr("panel.filmshots.reset.button"), data("FilmShotsDefault"));
+                    }
+                }
                 case ConfigSchema.Note n -> rows.note(n.text());
                 case ConfigSchema.FieldItem f -> fieldRow(rows, f.field(), live);
             }
@@ -219,6 +237,16 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         }
         UICommandBuilder ui = new UICommandBuilder();
         UIEventBuilder ev = new UIEventBuilder();
+        if (searching()) {
+            // The results only hold fields: draw them again as they are.
+            ui.clear("#SearchResults");
+            clearRowMaps();
+            searchRows(new Rows(ui, ev, "#SearchResults"), FxSettings.toProperties());
+            showPage(ui);
+            status(ui);
+            sendUpdate(ui, ev, false);
+            return;
+        }
         String container = "#Page" + page;
         ui.clear(container);
         rowOf.clear();
@@ -367,19 +395,155 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
 
     private void showPage(UICommandBuilder ui) {
         boolean admin = admin();
+        boolean searching = searching();
+        ui.set("#SearchResults.Visible", searching);
         int nav = 0;
         for (int i = 0; i < ConfigSchema.PAGES.size(); i++) {
             ConfigSchema.Page p = ConfigSchema.PAGES.get(i);
-            boolean open = i == page;
+            boolean open = i == page && !searching;
             ui.set("#Page" + i + ".Visible", open);
             if (p.adminOnly() && !admin) continue;
             String sel = "#Nav[" + nav++ + "]";
             ui.set(sel + " #Sel.Visible", open);
             ui.set(sel + " #Button.Style", Value.ref("Common.ui", open ? "SmallSecondaryTextButtonStyle" : "SmallTertiaryTextButtonStyle"));
         }
+        if (searching) {
+            I18n.text(ui, "#PageTitle.Text", I18n.tr("panel.search.title").param("query", query));
+            I18n.text(ui, "#PageHint.Text", I18n.tr("panel.search.count").param("n", searchCount));
+            return;
+        }
         ConfigSchema.Page p = ConfigSchema.PAGES.get(page);
         I18n.text(ui, "#PageTitle.Text", p.title());
         I18n.text(ui, "#PageHint.Text", p.hint());
+    }
+
+    // ---- search ----
+
+    private boolean searching() {
+        return query.length() >= MIN_QUERY;
+    }
+
+    /** Typed in the search box: the results replace the open page in place (no rebuild, so the box keeps focus). */
+    private void search(String raw) {
+        String q = raw == null ? "" : raw.trim();
+        if (q.length() > 60) q = q.substring(0, 60);
+        boolean was = searching();
+        if (q.equals(query)) return;
+        query = q;
+        if (!was && !searching()) return;   // one letter: nothing changes yet
+        UICommandBuilder ui = new UICommandBuilder();
+        UIEventBuilder ev = new UIEventBuilder();
+        clearRowMaps();
+        ui.clear("#SearchResults");
+        ui.clear("#Page" + page);
+        Properties live = FxSettings.toProperties();
+        if (searching()) searchRows(new Rows(ui, ev, "#SearchResults"), live);
+        else pageRows(new Rows(ui, ev, "#Page" + page), ConfigSchema.PAGES.get(page), live);
+        showPage(ui);
+        status(ui);
+        sendUpdate(ui, ev, false);
+    }
+
+    /** Every row map the page rows fill (refilled by whoever draws rows next). */
+    private void clearRowMaps() {
+        rowOf.clear();
+        previewOf.clear();
+        swatchOf.clear();
+        summonRowOf.clear();
+        filterTarget.clear();
+        filterRowOf.clear();
+        confirmButtons.clear();
+        teamRowOf.clear();
+    }
+
+    private record Hit(int page, int order, int score, ConfigSchema.Field field) {
+    }
+
+    /** The matching settings, each group under its page's title, with the same controls as on its page. */
+    private void searchRows(Rows rows, Properties live) {
+        List<Hit> hits = searchHits();
+        searchCount = hits.size();
+        if (hits.isEmpty()) {
+            rows.note(I18n.tr("panel.search.none").param("query", query));
+            return;
+        }
+        int shown = -1;
+        for (Hit h : hits) {
+            if (h.page() != shown) {
+                rows.section(ConfigSchema.PAGES.get(h.page()).title());
+                shown = h.page();
+            }
+            fieldRow(rows, h.field(), live);
+        }
+    }
+
+    /**
+     * Fields whose name (in the player's language and in English), setting key or description holds every word of
+     * the search, accents and case ignored. At most MAX_RESULTS, the best first (name, then key, then description),
+     * then shown in page order. Admin-only pages only for admins.
+     */
+    private List<Hit> searchHits() {
+        String[] words = norm(query).split("\\s+");
+        String lang = playerRef.getLanguage();
+        if (lang == null || lang.isBlank()) lang = "en-US";
+        boolean admin = admin();
+        List<Hit> hits = new ArrayList<>();
+        java.util.Set<Integer> seen = new java.util.HashSet<>();
+        for (int i = 0; i < ConfigSchema.PAGES.size(); i++) {
+            ConfigSchema.Page p = ConfigSchema.PAGES.get(i);
+            if (p.adminOnly() && !admin) continue;
+            int order = 0;
+            for (ConfigSchema.Item item : p.items()) {
+                if (!(item instanceof ConfigSchema.FieldItem fi)) continue;
+                ConfigSchema.Field f = fi.field();
+                order++;
+                if (!seen.add(f.index)) continue;
+                String labelKey = I18n.id("panel.field." + f.id + ".label");
+                String label = f.labelSupplier != null ? "" : norm(translated(lang, labelKey) + " " + translated("en-US", labelKey));
+                String key = norm(f.key.replace('.', ' '));
+                String tip = f.tipSupplier != null ? "" : norm(translated(lang, I18n.id("panel.field." + f.tipId + ".tip")));
+                int score = score(words, label, key, tip);
+                if (score >= 0) hits.add(new Hit(i, order, score, f));
+            }
+        }
+        if (hits.size() > MAX_RESULTS) {
+            hits.sort(java.util.Comparator.comparingInt(Hit::score));
+            hits = new ArrayList<>(hits.subList(0, MAX_RESULTS));
+        }
+        hits.sort(java.util.Comparator.comparingInt(Hit::page).thenComparingInt(Hit::order));
+        return hits;
+    }
+
+    /** Every word somewhere: 0 = all in the name, 1 = some only in the key, 2 = some only in the description; -1 = no. */
+    private static int score(String[] words, String label, String key, String tip) {
+        int worst = 0;
+        for (String w : words) {
+            if (w.isEmpty()) continue;
+            int s = label.contains(w) ? 0 : key.contains(w) ? 1 : tip.contains(w) ? 2 : -1;
+            if (s < 0) return -1;
+            worst = Math.max(worst, s);
+        }
+        return worst;
+    }
+
+    /** Lowercase, without accents (camara finds cámara). */
+    private static String norm(String s) {
+        if (s == null) return "";
+        String d = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
+        return d.replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
+    }
+
+    /** A translation as the game's I18nModule holds it ("" if none or unreadable). */
+    private static String translated(String lang, String key) {
+        try {
+            var i18n = com.hypixel.hytale.server.core.modules.i18n.I18nModule.get();
+            if (i18n == null) return "";
+            String v = i18n.getMessage(lang, key);
+            if (v == null && key.startsWith("server.")) v = i18n.getMessage(lang, key.substring("server.".length()));
+            return v == null ? "" : v;
+        } catch (RuntimeException e) {
+            return "";
+        }
     }
 
     private void status(UICommandBuilder ui) {
@@ -421,6 +585,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         I18n.text(rows.ui, sel + " #Label.Text", I18n.tr("panel.row.morph.label"));
         List<ConfigSchema.Opt> models = filtered("morph");
         rows.ui.set(sel + " #Input.Entries", entries(models));
+        rows.ui.set(sel + " #Button.Disabled", models.isEmpty());
         // Start on the model the wand has now (set by Use, /mobbattle morph or a right click copy), else the first.
         MorphWand.Copy copy = MorphWand.copyOf(playerRef.getUuid());
         String held = copy == null ? null : copy.modelId();
@@ -662,6 +827,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         I18n.text(rows.ui, sel + " #Label.Text", I18n.tr("panel.row.addmob.label"));
         List<ConfigSchema.Opt> roles = filtered("summonAdd");
         rows.ui.set(sel + " #Input.Entries", entries(roles));
+        // Nothing left by the filter: nothing to add (a dropdown has no proven Disabled property, the button has).
+        rows.ui.set(sel + " #Button.Disabled", roles.isEmpty());
         // Starts on this player's last pick, else the plain test dummy (it never fights back: good for trying a mob),
         // else the first role.
         String[] last = LAST_SUMMON_PICK.get(playerRef.getUuid());
@@ -831,16 +998,19 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         String[] f = filterOf(key);
         // A mod that is gone since (unloaded): back to every mod.
         if (mods.stream().noneMatch(o -> o.value().equalsIgnoreCase(f[0]))) f[0] = PickLists.ALL;
+        boolean mobs = "summonAdd".equals(key);
+        // Types follow the mod, groups follow both: a pick they no longer have goes back to "every".
+        List<ConfigSchema.Opt> types = mobs ? PickLists.kindChoices(all, f[0]) : List.of();
+        if (mobs && types.stream().noneMatch(o -> o.value().equalsIgnoreCase(f[1]))) f[1] = PickLists.ALL;
         List<ConfigSchema.Opt> groups = PickLists.groupChoices(all, f[0], typeOf(key, f));
         if (groups.stream().noneMatch(o -> o.value().equalsIgnoreCase(f[2]))) f[2] = PickLists.ALL;
         String sel = rows.add("PickFilter.ui");
         filterRowOf.put(key, sel);
         rows.ui.set(sel + " #Mod.Entries", entries(mods));
         rows.ui.set(sel + " #Mod.Value", f[0]);
-        boolean mobs = "summonAdd".equals(key);
         rows.ui.set(sel + " #Type.Visible", mobs);
         if (mobs) {
-            rows.ui.set(sel + " #Type.Entries", entries(PickLists.kindChoices()));
+            rows.ui.set(sel + " #Type.Entries", entries(types));
             rows.ui.set(sel + " #Type.Value", f[1]);
         }
         rows.ui.set(sel + " #Group.Entries", entries(groups));
@@ -861,10 +1031,21 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         String kind = mobs && type != null ? type : PickLists.ALL;
         String[] before = filterOf(key);
         UICommandBuilder ui = new UICommandBuilder();
+        String rowSel = filterRowOf.get(key);
+        // The type choices follow the mod: refilled when it changed, and a type it has no mobs of goes back to every
+        // type (user, 2026-10-16).
+        if (mobs && !mod.equals(before[0])) {
+            List<ConfigSchema.Opt> types = PickLists.kindChoices(listOf(key), mod);
+            String wanted = kind;
+            if (types.stream().noneMatch(o -> o.value().equalsIgnoreCase(wanted))) kind = PickLists.ALL;
+            if (rowSel != null) {
+                ui.set(rowSel + " #Type.Entries", entries(types));
+                ui.set(rowSel + " #Type.Value", kind);
+            }
+        }
         // The group choices follow mod and type: refilled when one of them changed, and a group they no longer have
         // goes back to every group.
         String g = group != null ? group : PickLists.ALL;
-        String rowSel = filterRowOf.get(key);
         if (!mod.equals(before[0]) || !kind.equals(before[1])) {
             List<ConfigSchema.Opt> groups = PickLists.groupChoices(listOf(key), mod, mobs ? kind : null);
             String wanted = g;
@@ -884,6 +1065,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             setInput(ui, sel, field, value(field, FxSettings.toProperties()));
         } else {
             ui.set(sel + " #Input.Entries", entries(opts));
+            ui.set(sel + " #Button.Disabled", opts.isEmpty());
             // Keep the pick when the filter still lists it, else the first one left.
             String keep = mobs ? (LAST_SUMMON_PICK.containsKey(playerRef.getUuid()) ? LAST_SUMMON_PICK.get(playerRef.getUuid())[0] : null)
                     : (MorphWand.copyOf(playerRef.getUuid()) != null ? MorphWand.copyOf(playerRef.getUuid()).modelId() : null);
@@ -927,6 +1109,13 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         java.util.NavigableSet<String> icons = iconNames();
         String[] tries = {name, name.replaceFirst("^(Tamed|Template)_", ""), name.replaceFirst("_(Calf|Piglet|Cub|Baby|Juvenile)$", "")};
         for (String t : tries) if (icons.contains(t)) return ICON_DIR + t + ".png";
+        // No game icon (modded mobs such as SLB_Nightlord, Test_Dummy...): our own, drawn from its model and
+        // registered at boot for every model without one (ThumbnailCache icons, 2026-10-16, user: all mobs); else its
+        // VS screen picture.
+        String own = ThumbnailCache.iconFor(name);
+        if (own != null) return own;
+        String vs = VsScreen.iconFor(name);
+        if (vs != null) return vs;
         // No icon of its own (the game has none for e.g. Skeleton): a relative's, dropping name parts from the end.
         // Skeleton -> Skeleton_Soldier, Goblin_Boss -> a Goblin_*. Still none: the AssetImage fallback.
         String t = tries[1];
@@ -939,6 +1128,11 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             t = cut > 0 ? t.substring(0, cut) : null;
         }
         return null;
+    }
+
+    /** Whether the game has an icon of this model itself (declared, or Icons/ModelsGenerated/&lt;id&gt;.png). */
+    static boolean hasGameIcon(String model) {
+        return model != null && (declaredIcon(model) != null || iconNames().contains(model));
     }
 
     /**
@@ -1146,6 +1340,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         if (type == null) return;
         switch (type) {
             case "Nav" -> nav(parseInt(str(doc, "P"), -1));
+            case "Search" -> search(str(doc, "@V"));
             case "Preview" -> {
                 String sel = previewOf.get(str(doc, "K"));
                 if (sel == null) return;
@@ -1168,6 +1363,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                 sendUpdate(ui);
             }
             case "Set" -> set(parseInt(str(doc, "F"), -1), str(doc, "@V"));
+            case "FilmShotsDefault" -> filmShotsDefault();
             case "Filter" -> filterChanged(str(doc, "K"), str(doc, "@M"), str(doc, "@Y"), str(doc, "@G"));
             case "Save" -> save();
             case "SumEdit" -> summonEdit(str(doc, "N"), str(doc, "K"), str(doc, "@V"));
@@ -1216,8 +1412,9 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private void nav(int target) {
         if (target < 0 || target >= ConfigSchema.PAGES.size()) return;
         if (ConfigSchema.PAGES.get(target).adminOnly() && !admin()) return;
-        if (target == page) return;
+        if (target == page && !searching()) return;
         page = target;
+        query = "";
         LAST_PAGE.put(playerRef.getUuid(), target);
         notice = null;
         rebuild();
@@ -1370,6 +1567,28 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
      * only with {@code listInputs} (Discard); after a Save they already show the saved values, so only the marks go.
      * Rows not on the open page are skipped.
      */
+    /** The film shot fields back to FxSettings.FILM_DEFAULT_WEIGHTS in the draft (Save applies them); other edits stay. */
+    private void filmShotsDefault() {
+        if (!canEdit()) {
+            say(I18n.tr("panel.status.readonly"), WARN);
+            return;
+        }
+        Properties live = FxSettings.toProperties();
+        Map<Integer, String> shown = new LinkedHashMap<>();
+        for (ConfigSchema.Field f : ConfigSchema.FIELDS) {
+            if (!f.key.startsWith(FILM_WEIGHT)) continue;
+            String v = String.valueOf(FxSettings.FILM_DEFAULT_WEIGHTS.getOrDefault(f.key.substring(FILM_WEIGHT.length()), 100));
+            shown.put(f.index, "");
+            if (v.equals(saved(f, live))) draft.remove(f.index);
+            else draft.put(f.index, v);
+        }
+        notice = I18n.tr("panel.notice.filmshots.default");
+        noticeColor = GOLD;
+        refreshInPlace(shown, List.of(), List.of(), false);
+    }
+
+    private static final String FILM_WEIGHT = "camera.film.weight.";
+
     private void refreshInPlace(Map<Integer, String> fields, java.util.Collection<String> roles, java.util.Collection<Integer> slots,
             boolean listInputs) {
         Properties live = FxSettings.toProperties();

@@ -12,6 +12,13 @@
 - Every setting has a short line under it saying what it does, and number fields show their range.
 - The X in the corner closes the panel. Closing it drops any changes you have not saved.
 
+### Searching
+
+- The magnifying glass in the panel's title bar opens a search box that looks through every tab at once. Type two letters or more (for example `countdown`, `camera` or `buff`).
+- It looks in each setting's name (in your language and in English), its setting key and its description, ignoring accents and case. Every word you type has to match.
+- The results show the matching settings grouped under their tab's name, with the same controls as on their tab: change them there and **Save changes** as usual.
+- Clear the box, or pick a tab on the left, to go back.
+
 ### Draft, Save, Discard
 
 Changing a value does **not** apply it yet:
@@ -103,6 +110,15 @@ Intro camera before the fight, end camera on the winner, watch mode and the duel
 | | Camera time | How long the intro films (seconds, 0 = as long as the countdown). Per kind. |
 | | Showcase shots | How many fighters the Showcase style shows (up to Max mobs). Per kind. |
 | | Who sees the cameras | Owner, players nearby (64 blocks) or the whole world. Fighters never get an intro. |
+| | Film bands | Black bands at the top and bottom of the screen while an intro or end camera films: Off, Slim, Classic (default) or Wide. Per kind. |
+| | Background blur | Each intro or end shot stays sharp on what it films and blurs the rest: Off, Soft (default) or Strong. Per kind. |
+| Battle film | Auto film | Camera viewers get the battle film (`/mobbattle film`) from the battle start, after the intro. Wins over Auto watch. Per kind. |
+| | Shots of you | Percent of film shots that show you watching the battle (default 30, 0 = only the battle). |
+| | Shot length | Seconds each film shot lasts (default 8). |
+| | Shot length variation | Each shot up to this percent longer or shorter, at random (default 25). |
+| | Camera pace | How far the camera moves in a shot, in percent (default 100). |
+| | Between shots | Cut or Glide to the next shot (default cut). |
+| | Film shots | One percent per shot type (0 = never, 100 = normal, 200 = twice as often): wide, track, arc, push-in, close-up, landscape, over your shoulder, close on you, zenith, spiral, telephoto, crane down, from the ground, profile. |
 | End camera | End camera | Off, Winner, or Last hit (who landed the final kill). Per kind. |
 | | End camera time | How long the end camera films (seconds). Per kind. |
 | Watch & HUD | Auto watch | Camera viewers start watching (spectator camera) as soon as a battle starts. Per kind. |
@@ -155,6 +171,9 @@ One tab per battle kind: **Duel** (Battle Wand), **All vs one** (Chaos Wand left
 | | End camera | End camera |
 | | End camera time | End camera time |
 | | Auto watch | Auto watch |
+| | Film bands | Film bands |
+| | Background blur | Background blur |
+| | Auto film | Auto film |
 
 **Rules, Arena & timer** (always per kind):
 
@@ -314,7 +333,7 @@ The Summon Wand list. Add, remove and clear apply at once; counts, teams and the
 Below the settings:
 
 - **Mobs in the list:** one row per entry with its icon, a **count** (a number 0-100000 or `random`), a **team** (or No team) and **Remove**. The same mob can have several entries, one per team (10 archers in red and 10 in green).
-- **Add a mob:** pick a mob (searchable, with an icon preview; the list opens wide so long names fit). The **Show** row above it filters the list: by mod (every mod, Hytale only, or one mod) and by type (Fighters, Defend only, No attack, Avoid: immortal, scenery and test roles), and by group (the first part of the name: Aquatic, Undead...). The group list only offers groups that the chosen mod and type still have. The type is read from each mob's definition, so a mod's unusual mob can land in the wrong one. With every mod shown, mobs from mods are marked ★. Each player's filters are remembered until the server restarts. Then pick a count and a team, then **Add**. The same mob and team as a listed entry changes its count; another team adds an entry. The row starts on your last pick (else the test dummy), so adding the same mob for another team is one click.
+- **Add a mob:** pick a mob (searchable, with an icon preview; the list opens wide so long names fit). The **Show** row above it filters the list: by mod (every mod, Hytale only, or one mod) and by type (Fighters, Defend only, No attack, Avoid: immortal, scenery and test roles), and by group (the first part of the name: Aquatic, Undead...). The group list only offers groups that the chosen mod and type still have. The type is read from each mob's definition, so a mod's unusual mob can land in the wrong one. With every mod shown, mobs from mods are marked *. Each player's filters are remembered until the server restarts. Then pick a count and a team, then **Add**. The same mob and team as a listed entry changes its count; another team adds an entry. The row starts on your last pick (else the test dummy), so adding the same mob for another team is one click.
 - **Clear list** (confirm) and **Summon** (summons the list around you now).
 
 ### Presets & reset

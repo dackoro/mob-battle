@@ -1,0 +1,21 @@
+$C = "../Common.ui";
+
+// /mobbattle test preview (dev spike, 2026-10-16): can the vanilla PrefabPreviewComponent (prefab editor browser)
+// show a mob's real 3D model in our own page? PreviewTest.java fills it with a BuilderToolPrefabPreview packet whose
+// entityChanges carry the mob's model. Drag to turn it, wheel to zoom, as in the prefab browser.
+$C.@DecoratedContainer {
+  @CloseButton = true;
+  Anchor: (Width: 640, Height: 720);
+
+  #Content {
+    LayoutMode: Full;
+
+    PrefabPreviewComponent #Preview {
+      AllowDragYaw: true;
+      AllowDragPitch: true;
+      AllowZoom: true;
+      AllowPan: true;
+      ShowAnchor: false;
+    }
+  }
+}

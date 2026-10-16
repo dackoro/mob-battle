@@ -39,6 +39,7 @@ final class TimerHud extends CustomUIHud {
     @Override
     protected void build(UICommandBuilder builder) {
         builder.append(UI[lines - 1]);
+        CinemaBars.shift(builder, getPlayerRef());
         builder.set("#Title.Text", title);
     }
 

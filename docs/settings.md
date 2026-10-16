@@ -60,12 +60,16 @@ Overrides are saved as `kind.<kind>.<option>` with the option word in lowercase,
 | `runes` | `fx.runes` | `kind.<kind>.runes` | on, off | effects |
 | `areaStyle` | `chaos.area` | `kind.<kind>.areastyle` | border, disc, discBorder, wall, off | effects |
 | `camera` | `fight.camera` | `kind.<kind>.camera` | on, off | cameras |
-| `cameraStyle` | `camera.style` | `kind.<kind>.camerastyle` | auto, orbit, duel, showcase, teams, focus, drone | cameras |
+| `vsScreen` | `camera.vsscreen` | `kind.<kind>.vsscreen` | on, off | cameras |
+| `cameraStyle` | `camera.style` | `kind.<kind>.camerastyle` | auto, orbit, duel, showcase, teams, focus, drone, spotlight | cameras |
 | `cameraTime` | `camera.time` | `kind.<kind>.cameratime` | 0-600 (above 30 warns) | cameras |
 | `cameraShots` | `camera.shots` | `kind.<kind>.camerashots` | 1 to maxMobs | cameras |
 | `endCamera` | `camera.end` | `kind.<kind>.endcamera` | off, winner, lastHit | cameras |
 | `endCameraTime` | `camera.end.time` | `kind.<kind>.endcameratime` | 1-600 (above 15 warns) | cameras |
 | `autoWatch` | `camera.autowatch` | `kind.<kind>.autowatch` | on, off | cameras |
+| `cameraBars` | `camera.bars` | `kind.<kind>.camerabars` | off, slim, classic, wide | cameras |
+| `cameraBlur` | `camera.blur` | `kind.<kind>.camerablur` | off, soft, strong | cameras |
+| `autoFilm` | `camera.autofilm` | `kind.<kind>.autofilm` | on, off | cameras |
 | `tieBreak` | `battle.tiebreak` | `kind.<kind>.tiebreak` | damage, kills, random, draw | arenas |
 | `killTieBreak` | `battle.killtiebreak` | `kind.<kind>.killtiebreak` | damage, alive, first, shared | arenas |
 
@@ -91,7 +95,7 @@ A preset changes many settings at once. In the panel, loading a preset only fill
 | `fight` | Just the fights: no countdown, intro or end camera, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
 | `effects` | All the show but no cameras: countdown 3, titles, music, runes, area `discBorder`, a scoreboard for every kind; duels, all vs one and teams get a 2 minute timer with `timeUp health`, the royale keeps its 3 minutes and `judge`. |
 | `debug` | Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card, the all vs one card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
-| `cinematic` | Countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
+| `cinematic` | Countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), `cameraBars wide`, titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
 
 Every built-in preset except `default` first puts the presentation settings back to their defaults (countdown, cameras, titles, music, laser, area look, runes, crown, waves, border colors, mob looks, duel card, all vs one card, scoreboards) and removes every per-kind override, then applies its own values. Settings it doesn't name (area radius, max mobs, battle rules, buffs, wands and so on) stay as they are.
 
@@ -133,29 +137,42 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Title style | `/mobbattle titleStyle <style>` | `title.style` | `Default`, `Major`, `GoblinBreach`, `VoidEviction`, `random` | `Major` | titles |
 | Who sees the titles | `/mobbattle titleScope owner\|nearby\|world` | `title.scope` | owner, nearby (64 blocks), world | nearby | titles |
 | Battle music | `/mobbattle music on\|off\|<track>` | `battle.music` | true, false | on | titles |
-| Music track | `/mobbattle music <track>` | `battle.music.track` | any music container ID | `Track_Z1D_Goblin_Boss_Battle` | titles |
+| Music track | `/mobbattle music <track>` | `battle.music.track` | any music container ID | `MobBattle_Battle_Music` | titles |
 | Fighter laser | `/mobbattle fightLaser on\|off` | `laser.enabled` | true, false | off | effects |
 | Laser color | `/mobbattle fightLaserColor <color>\|random` | `laser.color` | palette color (stored as its hex) or `random` | red (`#FF4B3E`) | effects |
 | Summoning runes | `/mobbattle runes on\|off` | `fx.runes` | true, false | on | effects |
 
-`music <track>` also turns the music on. Game battle tracks: `Track_Z1D_Goblin_Boss_Battle`, `Track_Void_Escalation`, `Track_Void_Tension`.
+`music <track>` also turns the music on. Default: `MobBattle_Battle_Music` (the goblin boss battle song, louder and looping). Game battle tracks: `Track_Z1D_Goblin_Boss_Battle` (quiet, plays once), `Track_Void_Escalation`, `Track_Void_Tension`.
 
 ### Cameras
 
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
 | Intro camera | `/mobbattle camera on\|off` | `fight.camera` | true, false | on | cameras |
-| Camera style | `/mobbattle cameraStyle <style>` | `camera.style` | auto, orbit, duel, showcase, teams, focus, drone | auto | cameras |
+| VS screen | `/mobbattle vsScreen on\|off` | `camera.vsscreen` | true, false | on | cameras |
+| Camera style | `/mobbattle cameraStyle <style>` | `camera.style` | auto, orbit, duel, showcase, teams, focus, drone, spotlight | auto | cameras |
 | Camera time | `/mobbattle cameraTime <seconds>` | `camera.time` | 0-600, 0 = as long as the countdown (above 30 warns: viewers have no controls meanwhile) | 0 | cameras |
-| Showcase shots | `/mobbattle cameraShots <n>` | `camera.shots` | 1 to maxMobs | 4 | cameras |
+| Close-up shots (showcase, spotlight) | `/mobbattle cameraShots <n>` | `camera.shots` | 1 to maxMobs | 4 | cameras |
 | Who sees the cameras | `/mobbattle cameraScope owner\|nearby\|world` | `camera.scope` | owner, nearby, world | owner | cameras |
+| Game HUD while filming | `/mobbattle cameraHud hide\|show` | `camera.hud` | hide, show | hide | cameras |
 | End camera | `/mobbattle endCamera off\|winner\|lastHit` | `camera.end` | off, winner, lasthit | off | cameras |
 | End camera time | `/mobbattle endCameraTime <seconds>` | `camera.end.time` | 1-600 (above 15 warns) | 5 | cameras |
 | Auto watch | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
+| Film bands | `/mobbattle cameraBars off\|slim\|classic\|wide` | `camera.bars` | off, slim, classic, wide | classic | cameras |
+| Background blur | `/mobbattle cameraBlur off\|soft\|strong` | `camera.blur` | off, soft, strong | soft | cameras |
+| Auto film | `/mobbattle autoFilm on\|off` | `camera.autofilm` | true, false | off | cameras |
+| Shots of you | `/mobbattle filmPlayerShots <0-100>` | `camera.film.player` | 0-100 (percent, 0 = only the battle) | 20 | cameras |
+| Far wide shots | `/mobbattle filmWideShots <0-100>` | `camera.film.wide` | 0-100 (percent, +15 with a mob over 4 blocks tall) | 30 | cameras |
+| Close-ups face the mob | `/mobbattle cameraFace on\|off` | `camera.face` | on, off | on | cameras |
+| Shot length | `/mobbattle filmShotTime <seconds>` | `camera.film.shot` | 3-60 | 8 | cameras |
+| Shot length variation | `/mobbattle filmShotVariation <0-90>` | `camera.film.variation` | 0-90 (percent) | 25 | cameras |
+| Camera pace | `/mobbattle filmPace <25-300>` | `camera.film.pace` | 25-300 (percent) | 100 | cameras |
+| Between shots | `/mobbattle filmTransition cut\|glide` | `camera.film.transition` | cut, glide | cut | cameras |
+| Film shots | `/mobbattle filmShot <shot> <0-300>` (`filmShots <list>` = those on, the rest off; `filmShots default` = all back to default; panel: Defaults button) | `camera.film.weight.<shot>` | 0-300 percent of normal per shot: wide, track, arc, pushin, closeup, landscape, playerback, playerclose, zenith, spiral, telephoto, descent, groundrise, profile | 100; spiral 80, telephoto and descent 70, landscape and groundrise 50, zenith 40 | cameras |
 | Duel card | `/mobbattle duelCard on\|off` | `battle.duelCard` | true, false | off | arenas |
 | All vs one card | `/mobbattle focusCard on\|off` | `battle.focusCard` | true, false | off | arenas |
 
-Not settings: `/mobbattle skipCamera` ends your running camera, `/mobbattle watch [exit]` spectates a battle.
+Not settings: `/mobbattle skipCamera` ends your running camera, `/mobbattle watch [exit]` spectates a battle, `/mobbattle film [exit]` films one.
 
 ### Battles (every kind)
 

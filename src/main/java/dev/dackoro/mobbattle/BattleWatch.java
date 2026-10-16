@@ -138,7 +138,8 @@ final class BattleWatch extends CustomUIHud {
      * owner (cameraScope) start watching it, unless they fight, already watch or spectate; it ends their intro.
      */
     static void auto(BattleManager.Battle battle) {
-        if (battle == null || battle.store == null || !KindFx.autoWatch(battle.kind)) return;
+        // autoFilm on as well: the film (FilmCamera.auto) wins.
+        if (battle == null || battle.store == null || !KindFx.autoWatch(battle.kind) || KindFx.autoFilm(battle.kind)) return;
         Store<EntityStore> store = battle.store;
         // Game mode and camera changes outside the system iteration that started the battle.
         store.getExternalData().getWorld().execute(() -> {

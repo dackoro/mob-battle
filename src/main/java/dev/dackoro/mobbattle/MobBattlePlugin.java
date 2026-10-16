@@ -113,6 +113,10 @@ public class MobBattlePlugin extends JavaPlugin {
         Army.loadSaved(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
         listenAssetReloads();
+        // Model thumbnails (2026-10-16): once the server has booted, before players join; missing or outdated ones
+        // only, on ThumbnailCache's own background thread.
+        getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.BootEvent.class,
+                event -> ThumbnailCache.startup());
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent.class,
                 event -> {
@@ -158,6 +162,8 @@ public class MobBattlePlugin extends JavaPlugin {
         DuelCard.clearAll();
         FocusCard.clearAll();
         MobBattleApi.shutdown();
+        ThumbnailCache.stop();
+        MorphHologram.clear();
         super.shutdown();
         WELCOMED.clear();
         instance = null;

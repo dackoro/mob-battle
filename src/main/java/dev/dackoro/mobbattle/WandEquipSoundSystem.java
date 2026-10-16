@@ -49,6 +49,8 @@ public class WandEquipSoundSystem extends EntityEventSystem<EntityStore, Invento
         InventoryComponent.Hotbar hotbar = store.getComponent(player, InventoryComponent.Hotbar.getComponentType());
         if (hotbar == null || hotbar.getInventory() == null) return;
         ItemStack item = hotbar.getInventory().getItemStack((short) slot);
+        PlayerRef holder = store.getComponent(player, PlayerRef.getComponentType());
+        if (holder != null) MorphHologram.refresh(holder.getUuid());   // panel only while the Morph Wand is in hand
         String sound = item == null ? null : SOUNDS.get(item.getItemId());
         if (sound == null) return;
         PlayerRef who = store.getComponent(player, PlayerRef.getComponentType());

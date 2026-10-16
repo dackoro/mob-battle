@@ -56,7 +56,8 @@ final class PickLists {
     static final String ALL = "all";
     static final String HYTALE = "hytale";
     /** Marks a modded entry while every mod is shown. */
-    private static final String MOD_MARK = "★ ";
+    // "*", not a star: the game's font has no ★ and drew "?" (user, 2026-10-16).
+    private static final String MOD_MARK = "* ";
 
     private record Cached(int signature, List<Entry> entries) {
     }
@@ -280,11 +281,18 @@ final class PickLists {
         };
     }
 
-    /** Type filter choices for mobs. */
-    static List<ConfigSchema.Opt> kindChoices() {
+    /**
+     * Type filter choices for mobs: every type, then only the types the mod filter has mobs of (user, 2026-10-16: a
+     * mod with no passive mobs still offered "No attack", and the list below came out empty).
+     */
+    static List<ConfigSchema.Opt> kindChoices(List<Entry> all, String mod) {
+        Set<Kind> present = java.util.EnumSet.noneOf(Kind.class);
+        for (Entry e : all) if (e.kind() != null && keeps(e, mod, null)) present.add(e.kind());
         List<ConfigSchema.Opt> out = new ArrayList<>();
         out.add(new ConfigSchema.Opt(ALL, "Every type"));
-        for (Kind k : Kind.values()) out.add(new ConfigSchema.Opt(k.name().toLowerCase(Locale.ROOT), k.label));
+        for (Kind k : Kind.values()) {
+            if (present.contains(k)) out.add(new ConfigSchema.Opt(k.name().toLowerCase(Locale.ROOT), k.label));
+        }
         return out;
     }
 

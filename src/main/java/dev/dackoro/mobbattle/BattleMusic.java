@@ -23,9 +23,16 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class BattleMusic {
 
-    public static final String DEFAULT_TRACK = "Track_Z1D_Goblin_Boss_Battle";
+    /**
+     * Mob Battle's own music container (Server/Audio/MusicContainers/MobBattle/MobBattle_Battle_Music.json, 2026-10-16,
+     * user: no battle music, or very quiet): the game's goblin boss battle song, +6 volume and looping until the battle
+     * ends. The game's Track_Z1D_Goblin_Boss_Battle has no volume boost and plays once (LoopCount 1, 0.7.2), so a
+     * setting still naming it plays this one (OLD_DEFAULT_TRACK).
+     */
+    public static final String DEFAULT_TRACK = "MobBattle_Battle_Music";
+    static final String OLD_DEFAULT_TRACK = "Track_Z1D_Goblin_Boss_Battle";
     /** Battle music tracks shipped with the game (Assets.zip, Server/Audio/MusicContainers). */
-    public static final List<String> SUGGESTED = List.of(DEFAULT_TRACK, "Track_Void_Escalation", "Track_Void_Tension");
+    public static final List<String> SUGGESTED = List.of(DEFAULT_TRACK, OLD_DEFAULT_TRACK, "Track_Void_Escalation", "Track_Void_Tension");
     /** Time for a countdown's battle to register before the music is stopped for having no battle. */
     private static final long GRACE_MS = 2000;
 
@@ -47,12 +54,14 @@ final class BattleMusic {
     static void start(BattleManager.Kind kind, PlayerRef owner, BattleManager.Battle.Anchor anchor,
                       ComponentAccessor<EntityStore> buffer) {
         String track = KindFx.musicTrack(kind);
+        if (OLD_DEFAULT_TRACK.equals(track)) track = DEFAULT_TRACK;
         if (track == null || owner != null && !owner.isValid()
                 || owner == null && (anchor == null || anchor.world() == null)) {
             return;
         }
         int index = MusicContainer.getAssetMap().getIndex(track);
         if (index <= 0) {
+            MobBattlePlugin.log("Battle music: no music track named " + track);
             return;
         }
         UUID session = owner != null ? owner.getUuid() : anchor.eventId();
@@ -65,6 +74,10 @@ final class BattleMusic {
         }
         if (kind != null) KINDS.put(session, kind);
         STARTED.put(session, System.currentTimeMillis());
+        // 2026-10-16, user: no music heard on the test server; this says whether it started and for whom.
+        if (MobBattlePlugin.debugging()) {
+            MobBattlePlugin.debug("music: " + track + " (index " + index + ") for " + listeners.size() + " of " + viewers.size() + " viewer(s)");
+        }
     }
 
     /**

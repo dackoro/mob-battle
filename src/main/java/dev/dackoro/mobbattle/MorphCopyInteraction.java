@@ -19,6 +19,11 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
 
     public static final String TYPE = "MobBattle_MorphCopy";
 
+    /** The "what you have copied" hint (a right click on nothing) at most this often per player. */
+    private static final long HINT_GAP_MS = 3000;
+    /** Player -> when the hint last showed. One small entry per player who used the wand. */
+    private static final java.util.Map<java.util.UUID, Long> LAST_HINT = new java.util.concurrent.ConcurrentHashMap<>();
+
     public static final BuilderCodec<MorphCopyInteraction> CODEC = BuilderCodec
             .builder(MorphCopyInteraction.class, MorphCopyInteraction::new, SimpleInstantInteraction.CODEC)
             .documentation("Morph Wand: copies the clicked entity's model.")
@@ -36,6 +41,12 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> target = context.getTargetEntity();
         MorphWand.Copy copy = target != null && target.isValid() ? MorphWand.read(target, buffer) : null;
         if (copy == null) {
+            // Once per HINT_GAP_MS: a right click with no mob under the cursor came 4-5 times in a row (user,
+            // 2026-10-16: the chat filled with the yellow line, which read as if it had copied from far away).
+            long now = System.currentTimeMillis();
+            Long last = LAST_HINT.get(player.getUuid());
+            if (last != null && now - last < HINT_GAP_MS) return;
+            LAST_HINT.put(player.getUuid(), now);
             MorphWand.Copy current = MorphWand.copyOf(player.getUuid());
             player.sendMessage((current == null
                     ? I18n.tr("chat.morph.copyHint")

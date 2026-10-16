@@ -141,6 +141,8 @@ final class Countdown {
             start.accept(buffer);
             return;
         }
+        // The VS screen comes first and adds its seconds (2026-10-16, user: it must not eat the intro's time).
+        seconds += (int) (VsScreen.countdownMs(kind) / 1000);
         Store<EntityStore> store = buffer.getExternalData().getWorld().getEntityStore().getStore();
         Pending p = new Pending(kind, System.currentTimeMillis() + seconds * 1000L, store,
                 player != null ? player.getUuid() : null, anchor, label, set, start, onEnd);
@@ -162,6 +164,36 @@ final class Countdown {
         if (p.cancelled || p.owner != null && (player == null || !player.isValid())) {
             return;
         }
+        // A fighter fell during the countdown (2026-10-16, user: a duel's 10..1 and its camera went on after one of the
+        // two died, then "FIGHT!" and an instant win): fewer than two standing calls it off. World thread for the check.
+        if (p.mobs.size() >= 2 && !p.store.isShutdown()) {
+            p.store.getExternalData().getWorld().execute(() -> {
+                if (p.cancelled) return;
+                int alive = 0;
+                for (Ref<EntityStore> r : p.mobs) {
+                    if (!BattleManager.isAlive(r, p.store)) continue;
+                    alive++;
+                    MajorDungeonsCompat.keepBoss(r, p.store);   // a boss waiting for its fight is not reset either
+                }
+                if (alive < 2) fell(p, player);
+                else announce(p, player, left);
+            });
+            return;
+        }
+        announce(p, player, left);
+    }
+
+    /** Fewer than two fighters standing before the start: no battle, the intro camera is cut. */
+    private static void fell(Pending p, PlayerRef player) {
+        finish(p, MobBattleApi.EndReason.CANCELLED_COUNTDOWN);
+        FightCamera.battleOver(p.mobs);
+        MobBattlePlugin.debug("countdown " + p.label.id() + " called off: a fighter fell before the start");
+        if (player != null && player.isValid()) {
+            player.sendMessage(I18n.tr("battle.countdown.fell").param("label", p.label.text()).color("#aaaaaa"));
+        }
+    }
+
+    private static void announce(Pending p, PlayerRef player, int left) {
         if (player != null) {
             player.sendMessage(I18n.tr("battle.countdown.tick").param("label", p.label.text()).param("left", left)
                     .color("#ffd23e"));

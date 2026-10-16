@@ -1,0 +1,34 @@
+// Mob Battle cinema bars (CinemaBars.java, /mobbattle cameraBars): a black band at the top and the bottom of the
+// screen while an intro or end camera films. Two full-screen layers on top of each other (the root has no
+// LayoutMode, so its children overlay): the top one lays out from the top edge, the bottom one from the bottom
+// edge. Each splits its height by FlexWeight between a black band and a transparent rest, in thousandths of the
+// screen; the code slides the bands in and out by setting both weights. Solid colors only, no textures.
+Group #Bars {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+
+  Group #TopLayer {
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    LayoutMode: Top;
+
+    Group #BarTop { FlexWeight: 0; Background: #000000; }
+    Group #TopRest { FlexWeight: 1000; }
+  }
+
+  Group #BottomLayer {
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    LayoutMode: Bottom;
+
+    Group #BottomRest { FlexWeight: 1000; }
+    Group #BarBottom {
+      FlexWeight: 0;
+      Background: #000000;
+
+      // debugLog on: the name of the shot playing now (CinemaBars.shotName, 2026-10-16, user).
+      Label #ShotName {
+        Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+        Text: "";
+        Style: (FontSize: 18, TextColor: #ffd23e, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+    }
+  }
+}

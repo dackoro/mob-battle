@@ -421,6 +421,8 @@ final class ConfigSchema {
                     switch (opt) {
                         case CAMERA_STYLE -> out.addAll(opts(KindFx.CAMERA_STYLES));
                         case END_CAMERA -> out.addAll(opts(KindFx.END_CAMERAS));
+                        case CAMERA_BARS -> out.addAll(opts(KindFx.CAMERA_BARS));
+                        case CAMERA_BLUR -> out.addAll(opts(KindFx.CAMERA_BLURS));
                         case AREA_STYLE -> out.addAll(opts(FxSettings.AREA_STYLES));
                         case TIE_BREAK -> out.addAll(opts(KindFx.TIE_BREAKS));
                         case KILL_TIE_BREAK -> out.addAll(opts(KindFx.KILL_TIE_BREAKS));
@@ -468,13 +470,41 @@ final class ConfigSchema {
         pages.add(new Page("cameras", List.of(
                 section("introcamera"),
                 toggle("fight.camera"),
+                toggle("camera.vsscreen"),
                 choice("camera.style", KindFx.CAMERA_STYLES),
                 number("camera.time", 0, KindFx.MAX_CAMERA_TIME),
                 number("camera.shots", 1, FxSettings.MAX_MOBS_LIMIT),
                 choice("camera.scope", FxSettings.TITLE_SCOPES),
+                choice("camera.hud", FxSettings.CAMERA_HUDS),
+                toggle("camera.face"),
+                choice("camera.bars", KindFx.CAMERA_BARS),
+                choice("camera.blur", KindFx.CAMERA_BLURS),
                 section("endcamera"),
                 choice("camera.end", KindFx.END_CAMERAS),
                 number("camera.end.time", 1, KindFx.MAX_END_CAMERA_TIME),
+                section("film"),
+                toggle("camera.autofilm"),
+                number("camera.film.player", 0, 100),
+                number("camera.film.wide", 0, 100),
+                number("camera.film.shot", FxSettings.MIN_FILM_SHOT, FxSettings.MAX_FILM_SHOT),
+                number("camera.film.variation", 0, 90),
+                number("camera.film.pace", FxSettings.MIN_FILM_PACE, FxSettings.MAX_FILM_PACE),
+                choice("camera.film.transition", FxSettings.FILM_TRANSITIONS),
+                section("filmshots"),
+                number("camera.film.weight.wide", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.track", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.arc", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.pushin", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.closeup", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.landscape", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.playerback", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.playerclose", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.zenith", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.spiral", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.telephoto", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.descent", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.groundrise", 0, FxSettings.MAX_FILM_WEIGHT),
+                number("camera.film.weight.profile", 0, FxSettings.MAX_FILM_WEIGHT),
                 section("watchhud"),
                 toggle("camera.autowatch"),
                 toggle("battle.duelCard"),
@@ -525,12 +555,16 @@ final class ConfigSchema {
             tab.add(override(k, KindFx.Opt.AREA_STYLE));
             tab.add(section("kindcameras"));
             tab.add(override(k, KindFx.Opt.CAMERA));
+            tab.add(override(k, KindFx.Opt.VS_SCREEN));
             tab.add(override(k, KindFx.Opt.CAMERA_STYLE));
             tab.add(override(k, KindFx.Opt.CAMERA_TIME));
             tab.add(override(k, KindFx.Opt.CAMERA_SHOTS));
             tab.add(override(k, KindFx.Opt.END_CAMERA));
             tab.add(override(k, KindFx.Opt.END_CAMERA_TIME));
             tab.add(override(k, KindFx.Opt.AUTO_WATCH));
+            tab.add(override(k, KindFx.Opt.CAMERA_BARS));
+            tab.add(override(k, KindFx.Opt.CAMERA_BLUR));
+            tab.add(override(k, KindFx.Opt.AUTO_FILM));
             tab.add(section("rules"));
             if (k == BattleManager.Kind.DUEL) {
                 tab.add(choice("duel.mode", "exclusive", "accumulate"));

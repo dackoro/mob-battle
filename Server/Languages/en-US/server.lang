@@ -86,7 +86,7 @@ mobbattle.chat.morph.burstNoneMorph = Nobody within {radius} blocks to morph.
 mobbattle.chat.morph.burstSwapped = {count, plural, one {1 mob} other {{count} mobs}} swapped looks. Cleanse Wand or /mobbattle morph reset to undo.
 mobbattle.chat.morph.burstMorphed = {count, plural, one {1 mob} other {{count} mobs}} now look like {model}. Cleanse Wand or /mobbattle morph reset to undo.
 mobbattle.chat.morph.copyHint = Right click a mob to copy its model, or use /mobbattle morph <model>.
-mobbattle.chat.morph.copyCurrent = Copied model: {model}. Left click a mob to apply it.
+mobbattle.chat.morph.copyCurrent = You have {model} copied (no mob under the cursor). Right click a mob to copy another, left click one to apply it.
 mobbattle.chat.morph.copied = Copied the model of {name} ({model}). Left click a mob to give it this look.
 mobbattle.chat.summon.look = Look at a mob and click it to add its type to the summon list.
 mobbattle.chat.summon.added = Added {role} x1 to the summon list ({types} types). Change counts with /mobbattle summon modify {role} <count|random>.
@@ -219,10 +219,11 @@ mobbattle.battle.why.mix = {pct}% score vs {other}%
 mobbattle.battle.killsummary = Most kills: {list}
 mobbattle.battle.cancelled.unloaded = Battle cancelled: some fighters were unloaded (too far from every player). No winner.
 mobbattle.battle.countdown.tick = [{label}] {left}
+mobbattle.battle.countdown.fell = [{label}] called off: a fighter fell before the fight.
 mobbattle.battle.countdown.cancelled = [{label}] cancelled: its mobs got a new order.
 mobbattle.battle.warn.short.timer = The {kind} timer ({time}) is short for an arena of radius {radius}: fighters far apart may not meet before time is up. Try /mobbattle timer {kind} {needed} or a smaller area.
 mobbattle.battle.warn.short.timer.shrink = The {kind} timer ({time}) is short for an arena of radius {radius}: fighters far apart may not meet before time is up. Try /mobbattle timer {kind} {needed}, /mobbattle arenaShrink {kind} on or a smaller area.
-mobbattle.battle.camera.skip = Crouch to skip the camera.
+mobbattle.battle.camera.skip = Press Q with a Mob Battle wand in hand (or crouch) to skip the camera.
 mobbattle.battle.passive.title.nobody = Nobody left can fight
 mobbattle.battle.passive.title.only = Only passive mobs left
 mobbattle.battle.passive.title.unreach = Nobody can reach the others
@@ -243,6 +244,14 @@ mobbattle.battle.watch.noearlier = No earlier fighter to go back to: right click
 mobbattle.battle.watch.notwatching = You are not watching a battle.
 mobbattle.battle.watch.cant.stop = Can't stop watching right now.
 mobbattle.battle.watch.stopped = Stopped watching.
+mobbattle.battle.film.already = You are already filming a battle. Q with a Mob Battle wand in hand, crouch or /mobbattle film exit to stop.
+mobbattle.battle.film.none = No battle to film in this world.
+mobbattle.battle.film.not = You are not filming a battle.
+mobbattle.battle.film.stopped = Stopped filming.
+mobbattle.battle.film.fighting = You are fighting in a battle: you can't film it.
+mobbattle.battle.film.watching = You are watching a battle: /mobbattle watch exit first.
+mobbattle.battle.film.cant = Can't film right now.
+mobbattle.battle.film.help = Filming the battle until it ends. Crouch or /mobbattle film exit to stop.
 mobbattle.hud.duel = Duel
 mobbattle.hud.allvsone = All vs one
 mobbattle.hud.watching = Watching
@@ -287,6 +296,12 @@ mobbattle.hud.score.down = {name}  down
 mobbattle.hud.score.attackers = Attackers  {alive}/{total}
 mobbattle.hud.score.left = {alive}/{total} left
 mobbattle.hud.score.place = {place}. {name}  {kills, plural, one {1 kill} other {{kills} kills}}
+mobbattle.hud.vs.everyone = Everyone
+mobbattle.hud.vs.everyoneElse = Everyone else
+mobbattle.hud.vs.red = Red team
+mobbattle.hud.vs.blue = Blue team
+mobbattle.hud.vs.champion = Champion
+mobbattle.hud.vs.side = Side {n}
 # --- cmd ---
 mobbattle.cmd.usage = Usage: {usage}
 mobbattle.cmd.usage.player = Usage (player): {usage}
@@ -465,9 +480,9 @@ mobbattle.help.titles.5 = titleStyle default|major|goblinBreach|voidEviction|ran
 mobbattle.help.titles.6 = titleScope owner|nearby|world - who sees fight titles
 mobbattle.help.titles.7 = cameraScope owner|nearby|world - who sees the cameras (a fighter never gets the intro)
 mobbattle.help.titles.8 = camera on|off - intro camera during the countdown (or cameraTime)
-mobbattle.help.titles.9 = cameraStyle auto|orbit|duel|showcase|teams|focus|drone - auto: duel western, allVsOne focus, teams sweep, royale orbit
+mobbattle.help.titles.9 = cameraStyle auto|orbit|duel|showcase|teams|focus|drone|spotlight - auto: duel western, allVsOne focus, teams and royale spotlight
 mobbattle.help.titles.10 = cameraTime <seconds> - intro camera length; 0 = the countdown; >0 films even with countdown 0
-mobbattle.help.titles.11 = cameraShots <n> - showcase: how many fighters it shows (1 to maxMobs; each shot needs 1.2 s of cameraTime)
+mobbattle.help.titles.11 = cameraShots <n> - showcase and spotlight: how many fighters they show up close (1 to maxMobs; a showcase shot needs 1.2 s of cameraTime, a spotlight one 1.1 s)
 mobbattle.help.titles.12 = endCamera off|winner|lastHit - films the winner or who landed the final kill, with its kill count
 mobbattle.help.titles.13 = endCameraTime <seconds> - end camera length
 mobbattle.help.titles.14 = crouch while a camera plays, or skipCamera, to end it; an intro also ends when its battle ends
@@ -476,6 +491,17 @@ mobbattle.help.titles.16 = autoWatch on|off - start watching by yourself when th
 mobbattle.help.titles.17 = music on|off|<track> - battle music from the countdown to the end
 mobbattle.help.titles.18 = runes on|off - summoning runes and fighter marks at the start
 mobbattle.help.titles.19 = e.g. countdown royale 5, cameraStyle royale showcase, camera duel off, endCamera all winner
+mobbattle.help.titles.20 = cameraBars off|slim|classic|wide - black film bands at the top and bottom while an intro or end camera plays (default classic)
+mobbattle.help.titles.21 = cameraBlur off|soft|strong - blurs what is in front of and behind what each shot films (default soft)
+mobbattle.help.titles.22 = autoFilm on|off - the camera viewers get the battle film (see film) from the battle start, after the intro, until it ends; it wins over autoWatch (default off)
+mobbattle.help.titles.30 = vsScreen on|off - a Smash-like VS screen (both sides, their strongest fighters, a big VS) opens the countdown for 2.5 s, then the intro camera; needs a countdown of 2 s or more (default on)
+mobbattle.help.titles.23 = filmPlayerShots <0-100> - % of film shots that show you watching (default 20); filmShotTime <3-60> - seconds per shot (default 8)
+mobbattle.help.titles.24 = filmShotVariation <0-90> - each shot that % longer or shorter at random (default 25); filmPace <25-300> - how far the camera moves in a shot, % (default 100)
+mobbattle.help.titles.25 = filmTransition cut|glide - jump to the next shot or glide to it (default cut); filmShots all|battle|<list> - shots used: wide, track, arc, pushIn, closeUp, landscape, playerBack, playerClose
+mobbattle.help.titles.26 = cameraHud hide|show - hide the game's HUD (hotbar, compass, boss bar...) while a camera films, keeping chat and titles (default hide)
+mobbattle.help.titles.29 = cameraFace on|off - close-ups stand in front of the mob's face wherever it looks; off = toward the battle or the opponent (default on)
+mobbattle.help.titles.28 = filmShot <shot> <0-300> - how often the battle film uses that shot, % of normal: 0 = never, 200 = twice as often (defaults: 100, landscape and groundrise 50, zenith 40, spiral 80, telephoto and descent 70; filmShots <list> = those on, the rest off; filmShots default = every shot back to its default)
+mobbattle.help.titles.27 = filmWideShots <0-100> - % of battle film shots that are far wide shots, for big attacks seen from afar; +15 with a mob over 4 blocks tall (default 30)
 mobbattle.help.chaos.1 = Chaos area
 mobbattle.help.chaos.2 = areaStyle border|disc|discBorder|wall|off - what areas and arenas draw: border (only the border glow, default), disc (a disc on the ground), discBorder (both), wall (disc + see-through wall) or off
 mobbattle.help.chaos.3 = areaColor <color>|random - palette color
@@ -549,6 +575,7 @@ mobbattle.help.battles.61 = timeUp <kind|all> draw|kill|continue|health|judge - 
 mobbattle.help.battles.62 = watch - spectate the nearest running battle (yours first), even after it started: the camera follows a fighter
 mobbattle.help.battles.63 = right click: nearest fighter (not seen yet), left click: back to the previous one, mouse: turn the camera, Q or watch exit: leave
 mobbattle.help.battles.64 = when the fighter dies the camera goes to its killer; a card shows its stats; after the battle you come back
+mobbattle.help.battles.74 = film - a slow film camera shoots the nearest running battle (yours first) until it ends: wide shots, pans, arcs, push-ins and shots of you watching; crouch or film exit to stop
 mobbattle.help.battles.65 = stop - end every battle, countdown, timer box, arena, camera shot, battle music and watch
 mobbattle.help.battles.66 = skipTimer - every running timer jumps to 0: the battles end by their timeUp rule (draw, judge...)
 mobbattle.help.battles.67 = army clearAll - disband every player's army
@@ -623,7 +650,7 @@ mobbattle.help.presets.3 = preset default - every setting back to default (team 
 mobbattle.help.presets.4 = preset fight - just the fights: no countdown, cameras, titles, music, lasers, runes, waves, borders, mob looks, crown, drawings or timers
 mobbattle.help.presets.5 = preset effects - countdown 3, 2 min timer (most health wins; royale keeps 3 min judge), titles, music, runes, area discBorder, waves, borders, mob looks, scoreboards; no cameras or lasers
 mobbattle.help.presets.6 = preset debug - everything visible: area wall, waves, borders, mob looks, lasers, runes, arenas, team look both, duel card, scoreboards (presets never change the debug log: it's admin only)
-mobbattle.help.presets.7 = preset cinematic - countdown 5, cameras (duel western, royale drone, allVsOne focus, teams sweep), end camera with kill count, music, area, waves, arenas, mob looks and crown; no lasers, runes or border glow
+mobbattle.help.presets.7 = preset cinematic - countdown 5, cameras (duel western, royale drone, allVsOne focus, teams sweep), end camera with kill count, wide film bands, music, area, waves, arenas, mob looks and crown; no lasers, runes or border glow
 mobbattle.help.presets.8 = preset save <name> / load <name> / delete <name> - your own presets
 mobbattle.help.presets.9 = reset effects|cameras|titles|arenas|rules|wands|all - only that group of settings back to default
 mobbattle.help.server.1 = Server setup
@@ -649,7 +676,7 @@ mobbattle.help.server.20 = test stats <id|last> - health, size, buffs, effects, 
 mobbattle.help.server.21 = test verify <here|x y z> [mod:<name>|mod:hytale] [type:<fighters|defend|noattack>] [text] [time:<s>] [batch:<n>] - each role is ordered to attack a still dummy; says which Type guesses were wrong (report in tests/)
 mobbattle.help.server.22 = test roles [mod:<name>|mod:hytale] [type:<fighters|defend|noattack|avoid>] [text] - the mob roles the panel's Show filters keep, with mod and type
 mobbattle.help.server.23 = test expect <id|last> <field> <=|!=|>|<|>=|<=> <value> - a check (alive, health, maxhealth, healthpct, size, buff.<stat>, effect, battle, team, calm, army, morphed, model, x, y, z); scripts count them
-mobbattle.help.server.24 = test camera <orbit|duel|showcase|teams|focus|drone> <player> [seconds] - that intro camera over the test mobs, for that player
+mobbattle.help.server.24 = test camera <orbit|duel|showcase|teams|focus|drone|spotlight> <player> [seconds] - that intro camera over the test mobs, for that player
 mobbattle.help.server.25 = test snapshot [name] | test restore [name] - save fx.properties (settings, teams, summon list) and put it back
 mobbattle.help.server.26 = test run <script> | test stop - runs <data dir>/tests/<script>.txt: one command per line, wait <seconds>, say <text>, # comments
 mobbattle.help.server.27 = apply <player|me|look|near <radius>|players|id:<uuid>|last> <action> [value] - a wand action on chosen players or mobs (admin): buff <clicks>, size|health|damage|defense <value>, unbuff, heal, cleanse, effect <id>, look jade|shimmer[:color], morph <model|player>, unmorph, army add|remove, team <team|none>
@@ -736,11 +763,12 @@ mobbattle.cmd.desc.admin_event_commands_for_ser = Admin event commands for serve
 mobbattle.cmd.desc.receive_one_of_each_of_the_t = Receive one of each of the thirteen Mob Battle wands
 mobbattle.cmd.desc.fight_start_title_on_off_per = Fight-start title on/off (per battle kind too)
 mobbattle.cmd.desc.winner_title_on_off_per_batt = Winner title on/off (per battle kind too)
-mobbattle.cmd.desc.battle_music_on_off_or_a_mus = Battle music: on, off, or a music track ID (default Track_Z1D_Goblin_Boss_Battle)
+mobbattle.cmd.desc.battle_music_on_off_or_a_mus = Battle music: on, off, or a music track ID (default MobBattle_Battle_Music)
 mobbattle.cmd.desc.intro_camera_during_the_coun = Intro camera during the countdown: orbit of the Chaos Wand area, western shots of a duel (per battle kind too)
 mobbattle.cmd.desc.who_sees_fight_titles_owner = Who sees fight titles: owner, nearby (default, 64 blocks) or world
 mobbattle.cmd.desc.title_scope = Title scope
 mobbattle.cmd.desc.who_sees_the_fight_cameras_o = Who sees the fight cameras: owner (default), nearby (64 blocks) or world; a fighter never gets the intro
+mobbattle.cmd.desc.camera_hud = Game HUD while a camera films: hide (default) or show
 mobbattle.cmd.desc.camera_scope = Camera scope
 mobbattle.cmd.desc.title_style = Title style
 mobbattle.cmd.desc.laser_line_between_fighters = Laser line between fighters at fight start on/off (per battle kind too)
@@ -893,12 +921,27 @@ mobbattle.cmd.desc.stop_the_running_script = Stop the running script
 mobbattle.cmd.desc.army_wand_armies = Army Wand armies
 mobbattle.cmd.desc.disband_every_player_s_army = Disband every player's army
 mobbattle.cmd.desc.seconds_of_3_2_1_titles_befo = Seconds of 3, 2, 1 titles before a fight starts (0-10, 0 = instant; per battle kind too)
-mobbattle.cmd.desc.intro_camera_auto_orbit_area = Intro camera: auto, orbit (area), duel (western), showcase (close-ups), teams (team sweep), focus (the one, then around through the crowd), drone (flight over the battle)
+mobbattle.cmd.desc.intro_camera_auto_orbit_area = Intro camera: auto, orbit (area), duel (western), showcase (close-ups), teams (team sweep), focus (the one, then around through the crowd), drone (flight over the battle), spotlight (close-ups of the strongest, then the crowd)
 mobbattle.cmd.desc.intro_camera_seconds_0_as_lo = Intro camera seconds, 0 = as long as the countdown; >0 films even with no countdown
-mobbattle.cmd.desc.showcase_camera_how_many_fig = Showcase camera: how many fighters it shows (1 to maxMobs)
+mobbattle.cmd.desc.showcase_camera_how_many_fig = Showcase and spotlight cameras: how many fighters they show up close (1 to maxMobs)
 mobbattle.cmd.desc.camera_at_the_end_off_winner = Camera at the end: off, winner, or lastHit (who landed the final kill), with its kill count
 mobbattle.cmd.desc.end_camera_seconds = End camera seconds
 mobbattle.cmd.desc.start_watching_spectator_cam = Start watching (spectator camera on the fighters) by yourself as soon as the battle starts, after the countdown; it ends any intro camera
+mobbattle.cmd.desc.camera_cinema_bars = Black film bands at the top and bottom of the screen during the intro and end cameras
+mobbattle.cmd.desc.camera_background_blur = Blur in front of and behind what the intro and end cameras film
+mobbattle.cmd.desc.film = Film the nearest running battle (yours first) with slow wide shots, pans, arcs and push-ins, until it ends; crouch to stop
+mobbattle.cmd.desc.film_exit = Stop the battle film: back to your own camera
+mobbattle.cmd.desc.film_auto = The camera viewers get the battle film from the battle start (after the intro) until it ends; wins over autoWatch
+mobbattle.cmd.desc.vs_screen = A Smash-like VS screen opens the countdown, before the intro camera
+mobbattle.cmd.desc.film_player_shots = Percent of battle film shots that show you watching (0 = only the battle)
+mobbattle.cmd.desc.camera_face = Close-ups in front of the mob's face (default on)
+mobbattle.cmd.desc.film_wide_shots = Battle film: percent of far wide shots (default 30)
+mobbattle.cmd.desc.film_shot_time = Seconds each battle film shot lasts before the next one
+mobbattle.cmd.desc.film_shot_variation = Each battle film shot lasts up to this percent longer or shorter, at random
+mobbattle.cmd.desc.film_pace = How far the battle film camera moves in a shot, in percent of normal
+mobbattle.cmd.desc.film_transition = How the battle film goes to the next shot: cut at once or glide there
+mobbattle.cmd.desc.film_shots = Battle film shots to use: all, battle, or a comma list (wide, track, arc, pushIn, closeUp, landscape, playerBack, playerClose)
+mobbattle.cmd.desc.film_shot = Battle film: how often a shot comes up, percent of normal (0 = never)
 mobbattle.cmd.desc.summoning_runes_and_fighter = Summoning runes and fighter marks at the start
 mobbattle.cmd.desc.presets_built_in_or_your_own = Presets: built-in or your own (preset list, save, load, delete)
 mobbattle.cmd.desc.built_in_and_saved_presets = Built-in and saved presets
@@ -906,7 +949,7 @@ mobbattle.cmd.desc.every_setting_back_to_defaul = Every setting back to default 
 mobbattle.cmd.desc.just_the_fights_no_countdown = Just the fights: no countdown, cameras, titles, music, lasers, runes, drawings or timers
 mobbattle.cmd.desc.countdown_3_2_min_timer_most = Countdown 3, 2 min timer (most health wins; royale keeps its own), titles, music, runes, area, scoreboards; no cameras or lasers
 mobbattle.cmd.desc.everything_visible_area_wall = Everything visible: area wall, waves, borders, mob looks, lasers, runes, arenas, duel card, scoreboards; no cinematics (the debug log is admin only: debugLog)
-mobbattle.cmd.desc.countdown_full_camera_work_e = Countdown, full camera work, end camera with kill count, music, area, waves, arenas; no lasers, runes or border glow
+mobbattle.cmd.desc.countdown_full_camera_work_e = Countdown, full camera work, end camera with kill count, wide film bands, music, area, waves, arenas; no lasers, runes or border glow
 mobbattle.cmd.desc.save_your_current_settings_s = Save your current settings: save <name>
 mobbattle.cmd.desc.load_a_saved_preset_load_nam = Load a saved preset: load <name>
 mobbattle.cmd.desc.delete_a_saved_preset_delete = Delete a saved preset: delete <name>
@@ -1078,15 +1121,17 @@ mobbattle.panel.field.fx.runes.tip = Runes on the ground during the countdown an
 mobbattle.panel.field.fight.camera.label = Intro camera
 mobbattle.panel.field.fight.camera.tip = Camera shots of the fighters during the countdown.
 mobbattle.panel.field.camera.style.label = Camera style
-mobbattle.panel.field.camera.style.tip = auto = duel shots for duels, focus for all vs one, sweep for teams, orbit for royale.
+mobbattle.panel.field.camera.style.tip = auto = duel shots for duels, focus for all vs one, spotlight for teams and royale. Spotlight: a close-up of every fighter when few and the time allows, else of the strongest (each team's first), then a wide shot of the rest.
 mobbattle.panel.field.camera.time.label = Camera time
 mobbattle.panel.field.camera.time.tip = How long the intro camera films.
 mobbattle.panel.field.camera.time.hint = seconds, 0 = as long as the countdown
-mobbattle.panel.field.camera.shots.label = Showcase shots
-mobbattle.panel.field.camera.shots.tip = How many fighters the showcase style shows.
+mobbattle.panel.field.camera.shots.label = Close-up shots
+mobbattle.panel.field.camera.shots.tip = How many fighters the showcase and spotlight styles show up close.
 mobbattle.panel.field.camera.shots.hint = fighters shown (up to Max mobs)
 mobbattle.panel.field.camera.scope.label = Who sees the cameras
 mobbattle.panel.field.camera.scope.tip = owner, players nearby (64 blocks) or the whole world. Fighters never get an intro.
+mobbattle.panel.field.camera.hud.label = Game HUD while filming
+mobbattle.panel.field.camera.hud.tip = hide = the hotbar, compass, health and boss bar go away during intro, end and film cameras (chat and titles stay); show = they stay.
 mobbattle.panel.field.camera.end.label = End camera
 mobbattle.panel.field.camera.end.tip = Film the winner or who landed the last hit when a battle ends.
 mobbattle.panel.field.camera.end.time.label = End camera time
@@ -1094,6 +1139,75 @@ mobbattle.panel.field.camera.end.time.tip = How long the end camera films.
 mobbattle.panel.field.camera.end.time.hint = seconds
 mobbattle.panel.field.camera.autowatch.label = Auto watch
 mobbattle.panel.field.camera.autowatch.tip = Camera viewers start watching (spectator camera) as soon as a battle starts.
+mobbattle.panel.field.camera.bars.label = Film bands
+mobbattle.panel.field.camera.bars.tip = Black bands at the top and bottom of the screen while an intro or end camera films, sliding in and out (default classic).
+mobbattle.panel.field.camera.blur.label = Background blur
+mobbattle.panel.field.camera.blur.tip = Each intro or end shot stays sharp on what it films and blurs the rest, the background most (default soft).
+mobbattle.panel.field.camera.autofilm.label = Auto film
+mobbattle.panel.field.camera.autofilm.tip = Camera viewers get the battle film (/mobbattle film) from the battle start, after the intro, until it ends. Wins over Auto watch (default off).
+mobbattle.panel.field.camera.vsscreen.label = VS screen
+mobbattle.panel.field.camera.vsscreen.tip = A Smash-like VS screen opens the countdown for 2.5 s: both sides, their strongest fighters and a big VS. The intro camera follows with the time left. Needs a countdown of 2 s or more. The first time a mob shows, players may notice a short hitch while its picture loads (default on).
+mobbattle.panel.field.camera.film.player.label = Shots of you
+mobbattle.panel.field.camera.film.player.tip = Share of film shots that show you watching the battle: over your shoulder, or close on you with the battle blurred behind (default 20).
+mobbattle.panel.field.camera.film.player.hint = percent, 0 = only the battle
+mobbattle.panel.field.camera.face.label = Close-ups face the mob
+mobbattle.panel.field.camera.face.tip = Intro, duel and film close-ups stand in front of the mob's face, wherever it looks. Off = from the battle's or the opponent's side, as before. Either way they keep clear of walls and other mobs (default on).
+mobbattle.panel.field.camera.film.weight.wide.label = Wide
+mobbattle.panel.field.camera.film.weight.wide.tip = The whole battle from its edge, sliding sideways.
+mobbattle.panel.field.camera.film.weight.wide.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.track.label = Track
+mobbattle.panel.field.camera.film.weight.track.tip = Low, alongside the fight, moving with it.
+mobbattle.panel.field.camera.film.weight.track.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.arc.label = Arc
+mobbattle.panel.field.camera.film.weight.arc.tip = Goes part way round the battle.
+mobbattle.panel.field.camera.film.weight.arc.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.pushin.label = Push-in
+mobbattle.panel.field.camera.film.weight.pushin.tip = Closes in on where the action is.
+mobbattle.panel.field.camera.film.weight.pushin.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.closeup.label = Close-up
+mobbattle.panel.field.camera.film.weight.closeup.tip = One fighter up close: a fresh exchange of hits, the lone target, the top killer or damage dealer. Fewer the more fighters there are.
+mobbattle.panel.field.camera.film.weight.closeup.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.landscape.label = Landscape
+mobbattle.panel.field.camera.film.weight.landscape.tip = Starts on the land around and turns quickly to the battle.
+mobbattle.panel.field.camera.film.weight.landscape.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.playerback.label = Over your shoulder
+mobbattle.panel.field.camera.film.weight.playerback.tip = You watching the battle, from behind you (part of "Shots of you").
+mobbattle.panel.field.camera.film.weight.playerback.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.playerclose.label = Close on you
+mobbattle.panel.field.camera.film.weight.playerclose.tip = Close on you with the battle blurred behind (part of "Shots of you").
+mobbattle.panel.field.camera.film.weight.playerclose.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.zenith.label = Zenith
+mobbattle.panel.field.camera.film.weight.zenith.tip = Straight down from above the fight, turning slowly.
+mobbattle.panel.field.camera.film.weight.zenith.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.spiral.label = Spiral
+mobbattle.panel.field.camera.film.weight.spiral.tip = Circles the fight while rising.
+mobbattle.panel.field.camera.film.weight.spiral.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.telephoto.label = Telephoto
+mobbattle.panel.field.camera.film.weight.telephoto.tip = From far away with a long lens: the fighters look packed together.
+mobbattle.panel.field.camera.film.weight.telephoto.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.descent.label = Crane down
+mobbattle.panel.field.camera.film.weight.descent.tip = Starts high above and comes down into the fight.
+mobbattle.panel.field.camera.film.weight.descent.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.groundrise.label = From the ground
+mobbattle.panel.field.camera.film.weight.groundrise.tip = Starts at grass level and rises.
+mobbattle.panel.field.camera.film.weight.groundrise.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.weight.profile.label = Profile
+mobbattle.panel.field.camera.film.weight.profile.tip = Two fighters side by side, from the side.
+mobbattle.panel.field.camera.film.weight.profile.hint = percent of normal, 0 = never
+mobbattle.panel.field.camera.film.wide.label = Far wide shots
+mobbattle.panel.field.camera.film.wide.tip = Share of battle shots filmed wide and from far away, to see big attacks whole; a mob over 4 blocks tall adds 15 (default 30).
+mobbattle.panel.field.camera.film.wide.hint = percent, 0 = never
+mobbattle.panel.field.camera.film.shot.label = Shot length
+mobbattle.panel.field.camera.film.shot.tip = How long each film shot lasts before the next one (default 8).
+mobbattle.panel.field.camera.film.shot.hint = seconds
+mobbattle.panel.field.camera.film.variation.label = Shot length variation
+mobbattle.panel.field.camera.film.variation.tip = Each shot lasts up to this much longer or shorter, at random, so the cuts don't come like clockwork (default 25).
+mobbattle.panel.field.camera.film.variation.hint = percent, 0 = always the same
+mobbattle.panel.field.camera.film.pace.label = Camera pace
+mobbattle.panel.field.camera.film.pace.tip = How far the camera moves in a shot: pans, arcs and push-ins (default 100).
+mobbattle.panel.field.camera.film.pace.hint = percent of normal
+mobbattle.panel.field.camera.film.transition.label = Between shots
+mobbattle.panel.field.camera.film.transition.tip = Cut = the next shot starts at once; glide = the camera travels there (default cut).
 mobbattle.panel.field.battle.duelcard.label = Duel card
 mobbattle.panel.field.battle.duelcard.tip = Card with both fighters' stats during 1 vs 1 duels, on the right; it replaces the duel scoreboard.
 mobbattle.panel.field.battle.focuscard.label = All vs one card
@@ -1160,6 +1274,10 @@ mobbattle.panel.field.kind.endcamera.label = End camera
 mobbattle.panel.field.kind.endcameratime.label = End camera time
 mobbattle.panel.field.kind.endcameratime.hint = empty = global (seconds 1-{max})
 mobbattle.panel.field.kind.autowatch.label = Auto watch
+mobbattle.panel.field.kind.camerabars.label = Film bands
+mobbattle.panel.field.kind.camerablur.label = Background blur
+mobbattle.panel.field.kind.autofilm.label = Auto film
+mobbattle.panel.field.kind.vsscreen.label = VS screen
 mobbattle.panel.field.kind.tiebreak.label = Winner when even
 mobbattle.panel.field.kind.killtiebreak.label = Kill table order
 mobbattle.panel.field.duel.mode.label = Battle Wand duels
@@ -1417,6 +1535,11 @@ mobbattle.panel.section.start = Start
 mobbattle.panel.section.musicfx = Music and effects
 mobbattle.panel.section.introcamera = Intro camera
 mobbattle.panel.section.endcamera = End camera
+mobbattle.panel.section.film = Battle film
+mobbattle.panel.filmshots.reset.label = Every film shot back to its default percent
+mobbattle.panel.filmshots.reset.button = Defaults
+mobbattle.panel.notice.filmshots.default = Film shots back to their default percents (gold until you save).
+mobbattle.panel.section.filmshots = Film shots (percent of normal, 0 = never)
 mobbattle.panel.section.watchhud = Watch & HUD
 mobbattle.panel.section.everybattle = Every battle
 mobbattle.panel.section.battlewaves = Battle waves
@@ -1498,6 +1621,10 @@ mobbattle.panel.buffhint.mult.limit = x ({min} to {max}, default x3)
 mobbattle.panel.buffhint.mult = x (1 = off, up to {max})
 mobbattle.panel.buffhint.mult.defense = x (1 = off, up to {max}: takes 1/{div} of the damage)
 mobbattle.panel.title = Dackoro's Mob Battle - Settings
+mobbattle.panel.search.placeholder = Search settings: countdown, camera, buff...
+mobbattle.panel.search.title = Search: {query}
+mobbattle.panel.search.count = {n, plural, one {1 setting found} other {{n} settings found}}. Change them here as on their own page, then save. Clear the box or pick a page to go back.
+mobbattle.panel.search.none = Nothing matches "{query}". Try another word, in English or Spanish.
 mobbattle.panel.readonlynote = Read only: changing settings needs the dackoro.mob_battle.config permission (server permission mode).
 mobbattle.panel.undo = Undo last change
 mobbattle.panel.discard = Discard changes
@@ -1651,3 +1778,4 @@ mobbattle.limits.summonradius = Warning: a summon ring above {warn} blocks sprea
 mobbattle.limits.cameratime = Warning: cameras longer than {warn} s keep the viewers locked out of their controls that long (crouch or /mobbattle skipCamera cuts them).
 mobbattle.limits.speed = Warning: a speed buff above +{warn}% (x4) makes players rubber-band (the client corrects them) and mobs can slip through corners.
 mobbattle.panel.note.buffwand.stack = Each click adds to the mob's base value, it never multiplies what it already has. With x2 (+100%) per click, a mob with 10 health has 20 after one click, 30 after two and 60 after five (not 20, 40, 80). Every buff source adds up the same way. Defense is the share of damage blocked: x2 = takes half; two x2 clicks would block it all, so it stops at x100 (takes 1/100).
+mobbattle.music.battle.name = Mob Battle: goblin boss battle (louder, loops)

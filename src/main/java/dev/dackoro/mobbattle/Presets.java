@@ -37,7 +37,7 @@ final class Presets {
     /** Presentation keys a built-in preset first puts back to default (with every per-kind override). */
     private static final String[] PRESENTATION_KEYS = {
             "fight.countdown", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
-            "camera.end.time", "camera.autowatch", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
+            "camera.end.time", "camera.autowatch", "camera.bars", "camera.blur", "camera.autofilm", "camera.vsscreen", "camera.film.player", "camera.film.wide", "camera.face", "camera.film.shot", "camera.film.variation", "camera.film.pace", "camera.film.transition", "camera.film.weight.wide", "camera.film.weight.track", "camera.film.weight.arc", "camera.film.weight.pushin", "camera.film.weight.closeup", "camera.film.weight.landscape", "camera.film.weight.playerback", "camera.film.weight.playerclose", "camera.film.weight.zenith", "camera.film.weight.spiral", "camera.film.weight.telephoto", "camera.film.weight.descent", "camera.film.weight.groundrise", "camera.film.weight.profile", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
             "laser.enabled", "chaos.area", "fx.runes", "fx.crown", "battle.duelCard", "battle.focusCard"
     };
 
@@ -120,6 +120,8 @@ final class Presets {
                 m.put("camera.shots", "4");
                 m.put("camera.end", "winner");
                 m.put("camera.end.time", "5");
+                // Widest film bands (2026-10-16); the blur stays at its default.
+                m.put("camera.bars", "wide");
                 m.put("title.enabled", "true");
                 m.put("wintitle.enabled", "true");
                 m.put("battle.music", "true");
@@ -299,7 +301,7 @@ final class Presets {
             // kind.<kind>.<option>: by its option.
             String opt = key.substring(key.lastIndexOf('.') + 1);
             return switch (opt) {
-                case "camera", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch" -> "cameras";
+                case "camera", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch", "camerabars", "camerablur", "autofilm", "vsscreen" -> "cameras";
                 case "countdown", "starttitle", "wintitle", "music" -> "titles";
                 case "tiebreak", "killtiebreak" -> "arenas";
                 default -> "effects";

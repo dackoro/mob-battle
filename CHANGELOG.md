@@ -2,6 +2,36 @@
 
 Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (`v1.0.0`, ...) and matches the file uploaded to CurseForge.
 
+## Unreleased
+
+### New: cameras
+- **Film look for the intro and end cameras.** Black film bands slide in at the top and the bottom of the screen while a camera films (`cameraBars off|slim|classic|wide`, default classic), and each shot stays sharp on what it films with the background blurred (`cameraBlur off|soft|strong`, default soft). Both can be set per battle kind and in the settings panel; the `cinematic` preset uses wide bands.
+- **Battle film.** `/mobbattle film` films a running battle with slow, smooth movie shots until it ends: mostly wide pans and arcs framed to fit the fight's area, low tracking shots, push-ins on the action, close-ups on the fighter worth watching (more of them as fewer are left), a landscape pan that ends on the battle, and shots of you watching (over your shoulder, or close on you with the battle blurred behind). The camera stays out of hills, trees and roofs. Everything is a setting: how many shots show you, shot length and its random variation, camera pace, cut or glide between shots, and which shots it uses. `autoFilm` gives it to the camera viewers from the battle start.
+- **Western duel intro.** The duel camera now opens on a low wide shot panning past both fighters, goes over each one's shoulder at the other, zooms in slowly on each one's eyes and ends with both from the side. Short intros keep fewer shots.
+
+- **Cameras no longer come back to you through a shot of yourself.** An intro now ends on a wide shot of the fighters running at each other, then gives you your view back; with Auto film on it hands over straight to the battle film.
+- **The game's HUD hides while a camera films** (hotbar, compass, health, boss bar; chat and titles stay): `cameraHud hide|show`, default hide.
+- **Escape ends the battle film** in single player (the pause menu).
+- **The battle film frames big mobs.** Its general shots back off and aim higher for the tallest and widest fighters, so they no longer end up inside a boss; close-ups still get close to small mobs.
+- **Far wide shots in the battle film** (`filmWideShots`, default 30%): some shots are filmed wide and from far away, so big attacks show whole; more of them when a big mob fights.
+
+### New: settings panel
+- **Search box.** Click the magnifying glass in the title bar of the panel (`/mobbattle config`), type a word, and every matching setting from every tab shows up, ready to change, in English or Spanish.
+
+### New: spotlight intro camera
+- **`cameraStyle spotlight`**, now the default for battle royales and team battles. With few fighters and enough countdown, each one gets a close-up, building up to the strongest. With many, only the strongest get one (each team's best first), then a wide shot of everyone else. Want the old orbit back? `/mobbattle cameraStyle royale orbit`.
+- **Cards stay clear of the film bands.** While the black bands show, the timer and score cards move just under the top band and the "can't fight back" alert just over the bottom one. Without bands they stay where they always were.
+- **Faces in the close-ups.** Every close-up (spotlight, duel eyes, the film) stands in front of the face, wherever the mob looks, and turns round when a wall, the ground or another mob would block the view.
+- **Every film shot has its own percent** (`/mobbattle filmShot <shot> <0-300>`, one field per shot in the panel): 0 = never, 200 = twice as often.
+- **Six new film shots**: zenith (straight down), spiral, telephoto, crane down, from the ground and profile, with defaults that keep the showy ones a surprise. "Shots of you" now defaults to 20 %.
+- The landscape shot (from the land to the battle) is rarer and turns to the fight faster.
+
+### Fixes
+- **Battle music is back.** The game's goblin boss battle track plays quietly and only once on 0.7.2; Mob Battle now ships its own version of that song, louder and looping until the battle ends, and uses it by default.
+- **MajorDungeons bosses no longer reset mid-battle.** Its arenas removed and respawned a boss after 10 s with no player near, which ended Mob Battle fights at once (Baron vs Baron). Bosses fighting, or waiting in a countdown, now keep their place.
+- **Big mobs no longer shrink with a size buff or the Cleanse Wand.** Mobs whose model is made bigger than normal (for example some modded bosses) went back to normal size; now a size buff grows them from their own size and Cleanse leaves them at it.
+- **Settings panel filters only offer what exists.** In the mob list, the "type" filter only lists the types the chosen mod has, and the Add button is off while the filters leave no mob.
+
 ## 1.1.0 (2026-10-14)
 
 ### New: wands
@@ -42,7 +72,7 @@ Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (
 
 ### New: settings panel and language
 - **Spanish translation.** Chat, battle titles, HUDs, command replies, help and the settings panel follow your game language (English and Spanish for now).
-- The mob, Morph model and effect lists have a **Show** filter: by mod, by group (Aquatic, Avian, Undead...) and, for mobs, by type (fighters, defend only, no attack, avoid). Mods' entries are marked ★ instead of a [mod] tag on every name, and the lists are built once instead of on every page. Which game mobs never attack or only defend comes from real tests in game.
+- The mob, Morph model and effect lists have a **Show** filter: by mod, by group (Aquatic, Avian, Undead...) and, for mobs, by type (fighters, defend only, no attack, avoid). Mods' entries are marked * instead of a [mod] tag on every name, and the lists are built once instead of on every page. Which game mobs never attack or only defend comes from real tests in game.
 - The "Add a mob" row remembers your last pick, and the search lists open wider so long names fit. The Buff Wand comes first on the Buffs tab; summon list rows and every team picker show the team's color; a long summon list scrolls in its own box; buttons that ask for a second click turn red and read "Confirm?".
 
 ### New: admin, servers and mod makers

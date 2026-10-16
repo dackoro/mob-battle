@@ -121,6 +121,8 @@ public final class BattleManager {
         volatile boolean unreachEnded;
         /** idleEnd: the battle's start or its last hit between enemies; ended by it. */
         volatile long lastHit = System.currentTimeMillis();
+        /** Who took the last enemy hit (FilmCamera leans toward it while lastHit is recent). */
+        volatile Ref<EntityStore> lastVictim;
         volatile boolean idleEnded;
         /** When the battle began: only flock mates spawned after it join a side (joinOwnersSide). */
         final long startedAt = System.currentTimeMillis();
@@ -1825,6 +1827,7 @@ public final class BattleManager {
             // passiveWin: a hit on the mobs that can't fight back starts its time again.
             if (b.passiveSince != 0) b.passiveSince = System.currentTimeMillis();
             b.lastHit = System.currentTimeMillis();
+            b.lastVictim = victim;
         }
     }
 

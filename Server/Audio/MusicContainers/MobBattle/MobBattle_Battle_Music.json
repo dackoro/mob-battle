@@ -1,0 +1,8 @@
+{
+  "AudioCategory": "AudioCat_Music_In_Game",
+  "Type": "SingleTrack",
+  "NameTranslationKey": "server.mobbattle.music.battle.name",
+  "Track": "Music/Zone1/Z1D_Goblin_Boss_Battle.ogg",
+  "Volume": 6,
+  "LoopCount": 0
+}

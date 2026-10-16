@@ -36,7 +36,7 @@ final class ApplyCommand {
     static final String USAGE = "Usage: " + USAGE_SYNTAX;
     static final List<String> ACTIONS = List.of("buff", "size", "health", "damage", "defense", "speed", "unbuff", "heal", "cleanse",
             "effect", "look", "morph", "unmorph", "army", "team");
-    private static final double LOOK_RANGE = 64;
+    static final double LOOK_RANGE = 64;
     private static final String OK = "#7dff8a";
     private static final String ERR = "#ff6b6b";
 

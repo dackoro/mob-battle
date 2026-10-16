@@ -502,6 +502,67 @@ public final class FxSettings {
     public static int endCameraSeconds = 5;
     /** The camera viewers start watching (/mobbattle watch) as soon as a battle starts (/mobbattle autoWatch). */
     public static boolean autoWatch = false;
+    /** Black cinema bars over the intro and end cameras (/mobbattle cameraBars): off, slim, classic or wide (KindFx). */
+    public static String cameraBars = "classic";
+    /** /mobbattle cameraHud: hide = the game's HUD (hotbar, compass, boss bar...) goes away while a camera films (CameraHud). */
+    public static String cameraHud = "hide";
+    /**
+     * /mobbattle cameraFace on|off (2026-10-16, user): close-ups (spotlight, duel eyes, film) stand in front of the
+     * mob's face, wherever it looks; off = toward the battle / the opponent, as before. Either way they keep clear of
+     * walls and other mobs.
+     */
+    public static boolean cameraFace = true;
+    static final String[] CAMERA_HUDS = {"hide", "show"};
+    /** Background blur of the intro and end cameras, focused on what each shot films (/mobbattle cameraBlur): off, soft or strong. */
+    public static String cameraBlur = "soft";
+    /** The camera viewers get the battle film (FilmCamera, /mobbattle film) from the battle start (/mobbattle autoFilm, KindFx). */
+    public static boolean autoFilm = false;
+    /** Smash-like VS screen over the first seconds of the countdown, before the intro camera (VsScreen, /mobbattle vsScreen, KindFx). */
+    public static boolean vsScreen = true;
+    /** Battle film: share of shots that show the player watching (percent, /mobbattle filmPlayerShots). */
+    public static int filmPlayerShots = 20;
+    /** Battle film: share of battle shots that are far wide shots (percent, /mobbattle filmWideShots; +15 with a big mob). */
+    public static int filmWideShots = 30;
+    /**
+     * Battle film: how often each shot type comes up, percent of its usual weight (/mobbattle filmShot <shot> <0-300>,
+     * keys camera.film.weight.<shot>; 2026-10-16, user: a percent per shot instead of on/off buttons; 0 = never,
+     * 200 = twice as often). Defaults in FILM_DEFAULT_WEIGHTS (2026-10-16, user: "all the shots are good, which
+     * weights for great cinematics?"): the showy ones lower so they stay a surprise.
+     */
+    static final java.util.Map<String, Integer> filmWeights = new java.util.concurrent.ConcurrentHashMap<>();
+    static final int MAX_FILM_WEIGHT = 300;
+    static final java.util.Map<String, Integer> FILM_DEFAULT_WEIGHTS = java.util.Map.ofEntries(
+            java.util.Map.entry("wide", 100), java.util.Map.entry("track", 100), java.util.Map.entry("arc", 100),
+            java.util.Map.entry("pushin", 100), java.util.Map.entry("closeup", 100), java.util.Map.entry("landscape", 50),
+            java.util.Map.entry("playerback", 100), java.util.Map.entry("playerclose", 100), java.util.Map.entry("zenith", 40),
+            java.util.Map.entry("spiral", 80), java.util.Map.entry("telephoto", 70), java.util.Map.entry("descent", 70),
+            java.util.Map.entry("groundrise", 50), java.util.Map.entry("profile", 100));
+    /** Shots that came after the old on/off list (an old camera.film.shots never mentions them). */
+    static final java.util.Set<String> FILM_NEWER_SHOTS = java.util.Set.of("zenith", "spiral", "telephoto", "descent", "groundrise", "profile");
+
+    static int filmWeight(String shot) {
+        return filmWeights.getOrDefault(shot, FILM_DEFAULT_WEIGHTS.getOrDefault(shot, 100));
+    }
+
+    /** "wide 100%, track 100%, ..." for /mobbattle settings. */
+    static String filmWeightsText() {
+        StringBuilder sb = new StringBuilder();
+        for (String w : FilmCamera.SHOT_WORDS) sb.append(sb.length() > 0 ? ", " : "").append(w).append(' ').append(filmWeight(w)).append('%');
+        return sb.toString();
+    }
+    /** Battle film: length of each shot in seconds (/mobbattle filmShotTime). */
+    public static int filmShotSeconds = 8;
+    /** Battle film: how far the camera moves in a shot, percent of normal (/mobbattle filmPace). */
+    public static int filmPace = 100;
+    /** Battle film: each shot lasts filmShotTime plus or minus up to this percent, at random (/mobbattle filmShotVariation). */
+    public static int filmShotVariation = 25;
+    /** Battle film: how one shot goes to the next, cut (at once) or glide (the camera travels) (/mobbattle filmTransition). */
+    public static String filmTransition = "cut";
+    static final String[] FILM_TRANSITIONS = {"cut", "glide"};
+    static final int MIN_FILM_SHOT = 3;
+    static final int MAX_FILM_SHOT = 60;
+    static final int MIN_FILM_PACE = 25;
+    static final int MAX_FILM_PACE = 300;
     /** Summoning runes and the fighters' rage/lone/brawl marks at the start (/mobbattle runes). */
     public static boolean runes = true;
     /** Team Wand: a clicked mob brings every mob of its type in areaRadius into the team (/mobbattle teamByType). */
@@ -917,6 +978,35 @@ public final class FxSettings {
             endCameraSeconds = Math.max(1, Math.min(KindFx.MAX_END_CAMERA_TIME, intOr(p, "camera.end.time", endCameraSeconds)));
             runes = Boolean.parseBoolean(p.getProperty("fx.runes", String.valueOf(runes)));
             autoWatch = Boolean.parseBoolean(p.getProperty("camera.autowatch", String.valueOf(autoWatch)));
+            String bars = KindFx.parse(KindFx.Opt.CAMERA_BARS, p.getProperty("camera.bars", cameraBars));
+            cameraBars = bars != null ? bars : "classic";
+            String hud = p.getProperty("camera.hud", cameraHud).trim().toLowerCase(java.util.Locale.ROOT);
+            cameraHud = java.util.Arrays.asList(CAMERA_HUDS).contains(hud) ? hud : "hide";
+            cameraFace = Boolean.parseBoolean(p.getProperty("camera.face", String.valueOf(cameraFace)));
+            String blur = KindFx.parse(KindFx.Opt.CAMERA_BLUR, p.getProperty("camera.blur", cameraBlur));
+            cameraBlur = blur != null ? blur : "soft";
+            autoFilm = Boolean.parseBoolean(p.getProperty("camera.autofilm", String.valueOf(autoFilm)));
+            vsScreen = Boolean.parseBoolean(p.getProperty("camera.vsscreen", String.valueOf(vsScreen)));
+            filmPlayerShots = Math.max(0, Math.min(100, intOr(p, "camera.film.player", filmPlayerShots)));
+            filmWideShots = Math.max(0, Math.min(100, intOr(p, "camera.film.wide", filmWideShots)));
+            filmShotSeconds = Math.max(MIN_FILM_SHOT, Math.min(MAX_FILM_SHOT, intOr(p, "camera.film.shot", filmShotSeconds)));
+            filmPace = Math.max(MIN_FILM_PACE, Math.min(MAX_FILM_PACE, intOr(p, "camera.film.pace", filmPace)));
+            filmShotVariation = Math.max(0, Math.min(90, intOr(p, "camera.film.variation", filmShotVariation)));
+            String ft = p.getProperty("camera.film.transition", filmTransition).toLowerCase(java.util.Locale.ROOT);
+            filmTransition = java.util.Arrays.asList(FILM_TRANSITIONS).contains(ft) ? ft : "cut";
+            // Older files: camera.film.shots (on/off list) and camera.film.closeups (percent) set the defaults.
+            String oldList = p.getProperty("camera.film.shots");
+            String parsed = oldList != null ? FilmCamera.parseShots(oldList) : null;
+            java.util.Set<String> listed = parsed != null ? java.util.Set.of(parsed.split(",")) : null;
+            java.util.Map<String, Integer> weights = new java.util.HashMap<>();
+            for (String w : FilmCamera.SHOT_WORDS) {
+                int def = FILM_DEFAULT_WEIGHTS.getOrDefault(w, 100);
+                if (listed != null && !FILM_NEWER_SHOTS.contains(w) && !listed.contains(w)) def = 0;
+                if (w.equals("closeup") && def > 0) def = intOr(p, "camera.film.closeups", def);
+                weights.put(w, Math.max(0, Math.min(MAX_FILM_WEIGHT, intOr(p, "camera.film.weight." + w, def))));
+            }
+            filmWeights.clear();
+            filmWeights.putAll(weights);
             String camScope = p.getProperty("camera.scope", cameraScope).toLowerCase(java.util.Locale.ROOT);
             cameraScope = java.util.Arrays.asList(TITLE_SCOPES).contains(camScope) ? camScope : "owner";
             teamByType = Boolean.parseBoolean(p.getProperty("team.bytype", String.valueOf(teamByType)));
@@ -1056,6 +1146,19 @@ public final class FxSettings {
         p.setProperty("camera.end", endCamera);
         p.setProperty("camera.end.time", String.valueOf(endCameraSeconds));
         p.setProperty("camera.autowatch", String.valueOf(autoWatch));
+        p.setProperty("camera.bars", cameraBars);
+        p.setProperty("camera.hud", cameraHud);
+        p.setProperty("camera.face", String.valueOf(cameraFace));
+        p.setProperty("camera.blur", cameraBlur);
+        p.setProperty("camera.autofilm", String.valueOf(autoFilm));
+        p.setProperty("camera.vsscreen", String.valueOf(vsScreen));
+        p.setProperty("camera.film.player", String.valueOf(filmPlayerShots));
+        p.setProperty("camera.film.wide", String.valueOf(filmWideShots));
+        p.setProperty("camera.film.shot", String.valueOf(filmShotSeconds));
+        p.setProperty("camera.film.pace", String.valueOf(filmPace));
+        p.setProperty("camera.film.variation", String.valueOf(filmShotVariation));
+        p.setProperty("camera.film.transition", filmTransition);
+        for (String w : FilmCamera.SHOT_WORDS) p.setProperty("camera.film.weight." + w, String.valueOf(filmWeight(w)));
         p.setProperty("fx.runes", String.valueOf(runes));
         p.setProperty("camera.scope", cameraScope);
         SCOREBOARD.forEach((k, v) -> p.setProperty("battle.scoreboard." + k.key, String.valueOf(v)));
@@ -1184,6 +1287,8 @@ public final class FxSettings {
                 "Titles: countdown " + countdownSeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope + ", camera " + onOff(fightCamera) + ", music " + (battleMusic ? musicTrack : "off")
                         + ", runes " + onOff(runes) + " | cameraStyle " + cameraStyle + ", cameraTime " + (cameraSeconds > 0 ? cameraSeconds + " s" : "countdown")
                         + ", cameraShots " + cameraShots + ", endCamera " + endCamera + ", endCameraTime " + endCameraSeconds + " s, cameraScope " + cameraScope + ", autoWatch " + onOff(autoWatch)
+                        + ", cameraBars " + cameraBars + ", cameraBlur " + cameraBlur + ", cameraHud " + cameraHud + ", cameraFace " + onOff(cameraFace)
+                        + ", vsScreen " + onOff(vsScreen) + ", autoFilm " + onOff(autoFilm) + ", filmPlayerShots " + filmPlayerShots + "%, filmWideShots " + filmWideShots + "%, filmShotTime " + filmShotSeconds + " s, filmShotVariation " + filmShotVariation + "%, filmPace " + filmPace + "%, filmTransition " + filmTransition + ", filmShot " + filmWeightsText()
                         + " | per kind: " + KindFx.describeOverrides(),
                 "Fighter laser: fightLaser " + onOff(laserEnabled) + ", fightLaserColor " + laserColorName(),
                 "Battles: duelMode " + (accumulateDuels ? "accumulate" : "exclusive")
@@ -1213,7 +1318,7 @@ public final class FxSettings {
     /** Which describeLines() line a setting key belongs to. */
     public static int groupOf(String key) {
         return switch (key) {
-            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch" -> 0;
+            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch", "camerabars", "camerablur", "camerahud", "cameraface", "vsscreen", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "film" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "battlebelow", "battleabove", "arenavertical", "passivewin", "passivewinignore", "idleend", "battlemaxtime", "duelcard", "focuscard", "timerstyle", "tiebreak", "killtiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;

@@ -213,7 +213,8 @@ final class Arena {
     static void setup(BattleManager.Battle battle, Vector3d center, double radius, String color,
                       ComponentAccessor<EntityStore> buffer) {
         if (battle == null || center == null) return;
-        // /mobbattle autoWatch: right after the battle starts (its countdown is over).
+        // /mobbattle autoFilm and autoWatch: right after the battle starts (its countdown is over); film wins.
+        FilmCamera.auto(battle);
         BattleWatch.auto(battle);
         Mode mode = FxSettings.arenaMode(battle.kind);
         int seconds = FxSettings.timerSeconds(battle.kind);
