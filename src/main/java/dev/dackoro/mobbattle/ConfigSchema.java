@@ -715,7 +715,8 @@ final class ConfigSchema {
         List<String> out = new ArrayList<>();
         for (String k : p.stringPropertyNames()) {
             if (known.contains(k) || k.equals(FxSettings.PERMISSIONS_KEY) || k.equals(FxSettings.AREA_STYLES_KEY)
-                    || k.equals("teams.list") || k.equals("summon.list") || k.equals("summon.teams")) continue;
+                    || k.equals("teams.list") || k.equals("summon.list") || k.equals("summon.teams")
+                    || k.equals("teams.kits") || k.equals("summon.kits") || k.startsWith(Kits.PREFIX)) continue;
             out.add(k);
         }
         Collections.sort(out);

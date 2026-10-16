@@ -235,6 +235,17 @@ Put weapons, an off hand item and armor on mobs.
 - The off hand only works on mobs whose role has one; on the rest it is locked.
 - Mobs only. From the console: `/mobbattle apply <who> equip <item>` and `apply <who> unequip`.
 
+### Equipment kits
+
+A kit is a named set for the six slots. Each slot can hold several items: every mob gets one of them at random. A slot can also say `-` (empty it) or be left out (the mob keeps what it has).
+
+- **Make one:** the panel's "Save as kit" saves the mob's current set; `/mobbattle kit save <name>` saves the set you copied with the wand (or `kit save <name> look` the mob you look at); `/mobbattle kit set <name> <slot> <item|item2|->` sets one slot's options (`none` = leave it alone). `kit list`, `kit show <name>`, `kit remove <name>`.
+- **Summon list:** `/mobbattle summon kit <mob> <kit|none>`, or the Kit dropdown on each row of the panel's Summon list. Those mobs spawn wearing it.
+- **Battle teams:** `/mobbattle teams kit <team> <kit|none>`, or the Kit dropdown on the Teams page. When a team battle starts, that team's mobs put it on, and they get their own gear back when it ends.
+- **Your army:** `/mobbattle army kit <kit>` puts it on every mob of your army now.
+- **Any mob:** the panel's "Apply kit", or `/mobbattle apply <who> kit <kit>`.
+- Kits follow the wand's rules: mobs that need their own weapon keep it, two-handed items empty the off hand.
+
 ## Kill Wand (`MobBattle_KillWand`)
 
 ![Kill Wand](images/cards/MobBattle_KillWand_card.png)

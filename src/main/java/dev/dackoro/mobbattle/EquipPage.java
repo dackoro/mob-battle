@@ -106,6 +106,9 @@ final class EquipPage extends InteractiveCustomUIPage<EquipPage.Unused> {
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#Paste", data("Paste"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#Restore", data("Restore"), false);
         ev.addEventBinding(CustomUIEventBindingType.Activating, "#ClearAll", data("ClearAll"), false);
+        ev.addEventBinding(CustomUIEventBindingType.Activating, "#SaveKit", data("SaveKit").append("@N", "#KitName.Value"), false);
+        ev.addEventBinding(CustomUIEventBindingType.Activating, "#ApplyKit", data("ApplyKit").append("@K", "#KitPick.Value"), false);
+        kitList(ui);
         String[] now = EquipWand.read(mob, st);
         if (locked(selected, now)) selected = firstOpen(now);
         rows(ui, now);
@@ -229,6 +232,26 @@ final class EquipPage extends InteractiveCustomUIPage<EquipPage.Unused> {
                 else msg = I18n.tr(EquipWand.apply(mob, set, store).isEmpty() ? "equip.pastedhere" : "equip.pastedkept");
             }
             case "Restore" -> msg = I18n.tr(EquipWand.restore(mob, store) ? "equip.restored" : "equip.norestore");
+            case "SaveKit" -> {
+                String name = str(doc, "@N");
+                name = name == null ? "" : name.trim();
+                if (!Kits.validName(name)) msg = I18n.tr("cmd.kit.name");
+                else if (!Kits.put(Kits.fromSet(name, EquipWand.read(mob, store)))) msg = I18n.tr("cmd.kit.full").param("max", String.valueOf(Kits.MAX_KITS));
+                else {
+                    FxSettings.save();
+                    kitList(ui);
+                    ui.set("#KitPick.Value", name);
+                    msg = I18n.tr("equip.kitsaved").param("kit", name);
+                }
+            }
+            case "ApplyKit" -> {
+                Kits.Kit kit = Kits.get(str(doc, "@K"));
+                if (kit == null) msg = I18n.tr("cmd.kit.none");
+                else {
+                    Kits.apply(mob, kit, store);
+                    msg = I18n.tr("equip.kitapplied").param("kit", kit.name());
+                }
+            }
             case "ClearAll" -> {
                 boolean kept = !EquipWand.apply(mob, new String[EquipWand.SLOTS.length], store).isEmpty();
                 msg = kept ? I18n.tr("equip.clearedkept") : null;
@@ -248,6 +271,16 @@ final class EquipPage extends InteractiveCustomUIPage<EquipPage.Unused> {
         status(ui, msg != null ? msg : defaultStatus(now));
         if (regrid) grid(ui, ev);
         sendUpdate(ui, ev, false);
+    }
+
+    /** The kit dropdown: every saved kit (the first picked), or "-" when there are none. */
+    private void kitList(UICommandBuilder ui) {
+        List<String> names = Kits.names();
+        List<DropdownEntryInfo> list = new ArrayList<>();
+        if (names.isEmpty()) list.add(entry("-", ""));
+        for (String k : names) list.add(entry(k, k));
+        ui.set("#KitPick.Entries", list);
+        ui.set("#KitPick.Value", names.isEmpty() ? "" : names.get(0));
     }
 
     // ---- slots ----

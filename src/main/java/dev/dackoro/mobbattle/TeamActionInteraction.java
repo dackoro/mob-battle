@@ -101,6 +101,8 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
             byColor.add(k >= 0 ? teams.get(k) : new ArrayList<>());
         }
         BattleManager.Battle battle = BattleManager.startTeams(player, byColor);
+        // Each team's equipment kit (teams kit), taken off again when the battle ends.
+        Kits.teamBattleStart(battle, buffer);
         Arena.setupAround(battle, buffer);
         FightManager.splitFlocksAcrossSides(battle, buffer);
         BattleManager.clearDraft(player.getUuid());

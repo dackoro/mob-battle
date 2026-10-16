@@ -32,10 +32,10 @@ import java.util.Locale;
 final class ApplyCommand {
 
     static final String USAGE_SYNTAX = "/mobbattle apply <me|look|players|near <radius>|player <name>|id:<uuid>|last> <buff <clicks>|size|health|damage|defense|speed <value>"
-            + "|unbuff|heal|cleanse|effect <id>|look <jade|shimmer>[:color]|morph <model|player>|unmorph|army add [player|id:<uuid>|last]|army remove|team <team|none>|equip <item>|unequip>";
+            + "|unbuff|heal|cleanse|effect <id>|look <jade|shimmer>[:color]|morph <model|player>|unmorph|army add [player|id:<uuid>|last]|army remove|team <team|none>|equip <item>|unequip|kit <kit>>";
     static final String USAGE = "Usage: " + USAGE_SYNTAX;
     static final List<String> ACTIONS = List.of("buff", "size", "health", "damage", "defense", "speed", "unbuff", "heal", "cleanse",
-            "effect", "look", "morph", "unmorph", "army", "team", "equip", "unequip");
+            "effect", "look", "morph", "unmorph", "army", "team", "equip", "unequip", "kit");
     private static final double LOOK_RANGE = 64;
     private static final String OK = "#7dff8a";
     private static final String ERR = "#ff6b6b";
@@ -245,6 +245,7 @@ final class ApplyCommand {
             case "team" -> "Into one of your Team Wand teams, or none";
             case "equip" -> "A weapon or item in its hand, or an armor piece on it (mobs only)";
             case "unequip" -> "Empty hand and no armor (mobs only)";
+            case "kit" -> "An equipment kit (mobs only; /mobbattle kit list)";
             default -> action;
         };
     }
@@ -300,6 +301,12 @@ final class ApplyCommand {
                         || w.length == 2 && w[0].equalsIgnoreCase("add");
                 if (!ok) return usageProblem("apply <who> army add [player|id:<uuid>|last] | army remove",
                         "Usage: apply <who> army add [player|id:<uuid>|last] | army remove", null);
+            }
+            case "kit" -> {
+                if (value == null || Kits.get(value) == null) {
+                    return new Problem(Message.join(I18n.tr("cmd.usage").param("usage", "apply <who> kit <kit>"), Message.raw(" "), Kits.listMessage()),
+                            "Usage: apply <who> kit <kit>. Kits: " + Kits.names());
+                }
             }
             case "equip" -> {
                 if (value == null) return usageProblem("apply <who> equip <item>", "Usage: apply <who> equip <item>", null);
@@ -436,6 +443,9 @@ final class ApplyCommand {
                 if (copy == null) return "no such model here";
                 if (!MorphWand.apply(t, copy, store)) return "can't wear it";
                 WandFx.onTarget(t, WandFx.MORPH, store);
+            }
+            case "kit" -> {
+                if (!Kits.apply(t, Kits.get(value), store)) return "not a mob";
             }
             case "equip", "unequip" -> {
                 NPCEntity mob = store.getComponent(t, NPCEntity.getComponentType());

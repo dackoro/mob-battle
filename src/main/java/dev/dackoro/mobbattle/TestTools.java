@@ -629,6 +629,38 @@ final class TestTools {
                             + (key == null ? null : i18n.getMessage("es-ES", key)) + "' / '" + (short_ == null ? null : i18n.getMessage("es-ES", short_)) + "'", OK);
                 }
             }
+            case "near" -> {
+                // test equip near <player> [radius]: every mob around that player with what it wears (max 24).
+                PlayerRef p = a.length > 2 ? ApplyCommand.onlinePlayer(a[2]) : null;
+                Ref<EntityStore> pr = p != null ? p.getReference() : null;
+                if (pr == null || !pr.isValid()) {
+                    say(to, "Usage: /mobbattle test equip near <player> [radius]", ERR);
+                    return;
+                }
+                double radius = 16;
+                try {
+                    if (a.length > 3) radius = Double.parseDouble(a[3]);
+                } catch (NumberFormatException ignored) {
+                }
+                double r = radius;
+                Store<EntityStore> store = pr.getStore();
+                store.getExternalData().getWorld().execute(() -> {
+                    var center = ChaosWand.positionOf(pr, store);
+                    if (center == null) return;
+                    List<Ref<EntityStore>> mobs = new ArrayList<>();
+                    for (Ref<EntityStore> m : com.hypixel.hytale.server.core.util.TargetUtil.getAllEntitiesInSphere(center, r, store)) {
+                        if (m != null && m.isValid() && EquipWand.inventory(m, store) != null) mobs.add(m);
+                    }
+                    int n = 0;
+                    for (Ref<EntityStore> m : mobs) {
+                        if (n++ >= 24) break;
+                        var b = BattleManager.battleOf(m);
+                        say(to, EquipWand.nameOf(m, store) + (b != null ? " [battle team " + b.team(m) + "]" : "") + ": "
+                                + EquipWand.describe(EquipWand.read(m, store)), OK);
+                    }
+                    say(to, mobs.size() + " mobs within " + r + " blocks.", OK);
+                });
+            }
             case "power" -> {
                 // test equip power <item...>: the damage breakdown the game gives each weapon (calibration).
                 for (int i = 2; i < a.length; i++) {

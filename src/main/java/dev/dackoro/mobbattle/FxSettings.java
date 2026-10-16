@@ -761,6 +761,7 @@ public final class FxSettings {
             String tintColor = SummonList.parseJadeColor(p.getProperty("army.tint.color"));
             if (tintColor != null) armyTintColor = tintColor;
             effect = p.getProperty("effect.id", effect);
+            Kits.load(p);
             Teams.load(p);
             SummonList.load(p);
             String fx = p.getProperty("team.fx", teamFx);
@@ -1041,6 +1042,7 @@ public final class FxSettings {
         p.setProperty("snap.hitdelay", String.valueOf(snapHitDelayMs));
         p.setProperty("snap.radius", String.valueOf(snapRadius));
         p.setProperty("effect.id", effect);
+        Kits.save(p);
         Teams.save(p);
         SummonList.save(p);
         p.setProperty("team.fx", teamFx);

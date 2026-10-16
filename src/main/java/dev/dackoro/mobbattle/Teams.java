@@ -155,7 +155,19 @@ public final class Teams {
         return true;
     }
 
+    /** Each team slot's equipment kit (Kits) for team battles, or null. Saved as teams.kits = slot:kit,. */
+    private static final String[] KIT = new String[MAX];
+
+    static String kit(int slot) {
+        return slot >= 0 && slot < MAX && exists(slot) ? KIT[slot] : null;
+    }
+
+    static void setKit(int slot, String kit) {
+        if (slot >= 0 && slot < MAX) KIT[slot] = kit;
+    }
+
     public static void remove(int slot) {
+        KIT[slot] = null;
         BattleManager.removeConfiguredTeam(slot);
         BattleManager.TEAM_NAMES[slot] = null;
         BattleManager.TEAM_COLORS[slot] = null;
@@ -274,6 +286,15 @@ public final class Teams {
     // ---- persistence (fx.properties, via FxSettings; must load before SummonList) ----
 
     static void load(Properties p) {
+        java.util.Arrays.fill(KIT, null);
+        for (String item : p.getProperty("teams.kits", "").split(",")) {
+            String[] kv = item.trim().split(":");
+            try {
+                int slot = kv.length == 2 ? Integer.parseInt(kv[0].trim()) : -1;
+                if (slot >= 0 && slot < MAX && Kits.validName(kv[1].trim())) KIT[slot] = kv[1].trim();
+            } catch (NumberFormatException ignored) {
+            }
+        }
         String list = p.getProperty("teams.list");
         if (list == null || list.isBlank()) {
             resetDefaults();
@@ -310,6 +331,9 @@ public final class Teams {
             }
         }
         p.setProperty("teams.list", sb.toString());
+        StringBuilder kits = new StringBuilder();
+        for (int i = 0; i < MAX; i++) if (exists(i) && KIT[i] != null) kits.append(i).append(':').append(KIT[i]).append(',');
+        p.setProperty("teams.kits", kits.toString());
     }
 
     /** Older saves store bare hex values, including previously allowed custom colors. */

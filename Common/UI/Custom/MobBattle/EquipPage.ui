@@ -4,7 +4,7 @@ $C = "../Common.ui";
 // Right: search, filters and a gallery of items (Equip/GridCell.ui, as the game's barter grid); a click puts it on.
 $C.@DecoratedContainer {
   @CloseButton = true;
-  Anchor: (Width: 1120, Height: 780);
+  Anchor: (Width: 1120, Height: 840);
 
   #Title {
     Group {
@@ -59,6 +59,34 @@ $C.@DecoratedContainer {
         $C.@SecondaryTextButton #ClearAll {
           @Anchor = (Width: 170);
           @Text = %server.mobbattle.equip.clearall;
+        }
+      }
+
+      // Kits: save this mob's set under a name, or put a saved kit on it.
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Top: 12);
+
+        $C.@TextField #KitName {
+          @Anchor = (Width: 170, Top: 4, Right: 8);
+          PlaceholderText: %server.mobbattle.equip.kitname;
+        }
+        $C.@SecondaryTextButton #SaveKit {
+          @Anchor = (Width: 170);
+          @Text = %server.mobbattle.equip.savekit;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Top: 6);
+
+        $C.@DropdownBox #KitPick {
+          Anchor: (Width: 170, Top: 4, Height: 32, Right: 8);
+        }
+        $C.@SecondaryTextButton #ApplyKit {
+          @Anchor = (Width: 170);
+          @Text = %server.mobbattle.equip.applykit;
         }
       }
 

@@ -556,6 +556,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                     data("TeamEdit").append("N", String.valueOf(slot)).append("K", "color").append("@V", sel + " #Color.Value"), false);
             rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Remove",
                     data("Act").append("A", "teamRemove").append("N", name), false);
+            kitPicker(rows, sel, Teams.kit(slot), "teamKit", name);
             confirmButtons.put("teamRemove" + name, new Confirm(sel + " #Remove", () -> I18n.tr("panel.button.remove")));
         }
         rows.section(I18n.tr("panel.section.addteam"));
@@ -654,6 +655,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                     data("SumEdit").append("N", role).append("K", "team").append("@V", sel + " #Team.Value"), false);
             rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Remove",
                     data("Act").append("A", "summonRemove").append("N", role), false);
+            kitPicker(rows, sel, SummonList.KIT_OF.get(role), "summonKit", role);
         }
         rows.section(I18n.tr("panel.section.addmob"));
         filterRow(rows, "summonAdd");
@@ -1631,9 +1633,37 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         return SummonList.isCount(v) ? SummonList.normalCount(v) : null;
     }
 
+    /**
+     * A row's equipment kit dropdown ("-" = none + every kit). A pick runs summon kit / teams kit at once (lists
+     * apply right away on this page, like Remove). Picks right after the rows were sent are ignored: refilling a
+     * dropdown can echo its first entry, which would clear the kit (the Equipment Wand panel's type filter did).
+     */
+    private void kitPicker(Rows rows, String sel, String current, String action, String name) {
+        List<ConfigSchema.Opt> opts = new ArrayList<>();
+        opts.add(new ConfigSchema.Opt("", "-"));
+        for (String k : Kits.names()) opts.add(new ConfigSchema.Opt(k, k));
+        rows.ui.set(sel + " #Kit.Entries", entries(opts));
+        rows.ui.set(sel + " #Kit.Value", current != null ? current : "");
+        rows.ev.addEventBinding(CustomUIEventBindingType.ValueChanged, sel + " #Kit",
+                data("Act").append("A", action).append("N", name).append("@V", sel + " #Kit.Value"), false);
+        kitEchoUntil = System.currentTimeMillis() + 800;
+    }
+
+    private long kitEchoUntil;
+
     private void act(String action, String name, String value, String text, String count, String extra) {
         if (action == null) return;
         switch (action) {
+            case "summonKit", "teamKit" -> {
+                if (name == null || value == null || System.currentTimeMillis() < kitEchoUntil) return;
+                boolean summon = action.equals("summonKit");
+                String role = summon ? listedRole(name) : name;
+                if (role == null) return;
+                int slot = summon ? -1 : Teams.find(name);
+                String now = summon ? SummonList.KIT_OF.get(role) : Teams.kit(slot);
+                if (value.equals(now == null ? "" : now)) return;
+                runList((summon ? "summon kit " : "teams kit ") + role + " " + (value.isEmpty() ? "none" : value));
+            }
             // Teams (config)
             case "teamRemove" -> {
                 String team = teamOf(name);
