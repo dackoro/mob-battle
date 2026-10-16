@@ -1651,3 +1651,6 @@ mobbattle.limits.summonradius = Warning: a summon ring above {warn} blocks sprea
 mobbattle.limits.cameratime = Warning: cameras longer than {warn} s keep the viewers locked out of their controls that long (crouch or /mobbattle skipCamera cuts them).
 mobbattle.limits.speed = Warning: a speed buff above +{warn}% (x4) makes players rubber-band (the client corrects them) and mobs can slip through corners.
 mobbattle.panel.note.buffwand.stack = Each click adds to the mob's base value, it never multiplies what it already has. With x2 (+100%) per click, a mob with 10 health has 20 after one click, 30 after two and 60 after five (not 20, 40, 80). Every buff source adds up the same way. Defense is the share of damage blocked: x2 = takes half; two x2 clicks would block it all, so it stops at x100 (takes 1/100).
+
+mobbattle.cmd.apply.unknownitem = Unknown item: {value}.
+mobbattle.cmd.apply.why.canthold = can't hold it

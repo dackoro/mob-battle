@@ -180,6 +180,8 @@ The Admin page appears only for players with a real `dackoro.mob_battle.admin` g
 | `look jade\|shimmer[:color]` | Puts a jade or shimmer look on. |
 | `morph <model\|player>` | Puts a model, or a player's current look, on the target. |
 | `unmorph` | Its own model back. |
+| `equip <item>` | Mobs only: a weapon or item in its hand, or an armor piece (any item id, as vanilla NPC roles use). Whether the mob fights with it depends on its role. |
+| `unequip` | Mobs only: empty hand and no armor. |
 | `army add\|remove` | Puts a mob in your army or takes it out (mobs only). |
 | `team <team\|none>` | Puts the target in one of your Team Wand teams, or takes it out. |
 
