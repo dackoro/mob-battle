@@ -229,7 +229,7 @@ Put weapons, an off hand item and armor on mobs.
 - **Left click a mob:** puts the copied set on it.
 - **Hold left (1.5 s):** puts the copied set on every mob within 12 blocks (never players).
 - Only items that make sense in a fight are listed: weapons, tools, potions, food, fish, runes, bombs, torches and lanterns, and any mod item that is not a block.
-- Weapons are only a look: a mob still attacks with its role's own attacks and damage. Armor protects it with the game's normal resistances (a full adamantite Trork took 18% less damage in a test duel).
+- Weapons are only a look by default: a mob still attacks with its role's own attacks and damage. Turn on `/mobbattle equipWeaponDamage on` (Battles page of the panel) and its hits are scaled by the weapon's power against its role's own weapon (a skeleton with an adamantite sword instead of its rusty axe hits x1.45, with a crude sword x0.58; x0.25 to x3). Mobs without a weapon of their own count as a fist; staffs, wands and spellbooks give no bonus. Armor protects it with the game's normal resistances (a full adamantite Trork took 18% less damage in a test duel).
 - Two-handed items (battleaxes, longswords, maces, spears, staffs, bows, daggers, spellbooks) empty and lock the off hand, as for players.
 - Some mobs only attack with their own weapon in hand (the Goblin Guardians and the Dungeon Goblin Mace, and mod mobs built the same way). Their hands are locked in the panel, and Copy/Paste keep their weapon, so they keep fighting.
 - The off hand only works on mobs whose role has one; on the rest it is locked.

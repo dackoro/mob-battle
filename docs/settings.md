@@ -221,6 +221,7 @@ Creative players never fight, whatever Players can fight says.
 | Army tint | `/mobbattle armyTint on\|off` | `army.tint` | true, false | off | effects |
 | Army tint color | `/mobbattle armyTintColor <color>` | `army.tint.color` | palette color | Blue | effects |
 | Army friendly fire | `/mobbattle armyFriendlyFire on\|off` | `army.friendlyfire` | true, false | off | rules |
+| Weapon damage bonus | `/mobbattle equipWeaponDamage on\|off` | `equip.weapon.damage` | true, false | off | rules |
 | Crown on the lone target | `/mobbattle crown gold\|<color>\|off` | `fx.crown` | Gold, palette color, off | Gold | effects |
 | Cleanse Wand color | `/mobbattle cleanseColor <color>` | `wand.cleanse.color` | palette color | White | effects |
 | Look glow | `/mobbattle lookGlow <0-15>` | `fx.glow.look` | 0-15, 0 = off | 6 | effects |

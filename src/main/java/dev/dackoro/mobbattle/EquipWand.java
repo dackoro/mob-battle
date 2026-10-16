@@ -202,6 +202,96 @@ final class EquipWand {
         return kept;
     }
 
+    // ---- weapon power (weapon damage bonus) ----
+
+    /**
+     * The breakdown the game computes for a weapon's player attacks (ItemWeapon.getBasicDamageBreakdown: one entry per
+     * hit with min/max damage, the item tooltip's numbers), as "label min-max" lines; empty when it has none.
+     */
+    static List<String> breakdown(String itemId) {
+        List<String> out = new ArrayList<>();
+        var item = itemId == null ? null : com.hypixel.hytale.server.core.asset.type.item.config.Item.getAssetMap().getAsset(itemId);
+        var weapon = item != null ? item.getWeapon() : null;
+        var basic = weapon != null ? weapon.getBasicDamageBreakdown() : null;
+        if (basic != null && basic.entries() != null) {
+            for (var e : basic.entries()) out.add(e.labelKey() + " " + e.min() + "-" + e.max());
+        }
+        return out;
+    }
+
+    /** A bare hand's power: mobs without a role weapon, and items with no basic hit (tools, torches, shields). */
+    static final float FIST_POWER = 15f;
+    static final float MIN_FACTOR = 0.25f, MAX_FACTOR = 3f;
+    private static final Map<String, Float> POWER = new ConcurrentHashMap<>();
+    private static final Map<String, String> ROLE_WEAPON = new ConcurrentHashMap<>();
+
+    /**
+     * A weapon's power: the average of its basic hit (the first breakdown entry without a label, else the first
+     * one), e.g. rusty iron axe 19, adamantite sword 27.5, crude sword 11, Trork stone battleaxe 30.5, adamantite
+     * battleaxe 43 (test equip power, 2026-10-16). -1 = no basic hit. Cached per item id.
+     */
+    static float power(String itemId) {
+        if (itemId == null) return -1f;
+        return POWER.computeIfAbsent(itemId, id -> {
+            var item = com.hypixel.hytale.server.core.asset.type.item.config.Item.getAssetMap().getAsset(id);
+            var weapon = item != null ? item.getWeapon() : null;
+            var basic = weapon != null ? weapon.getBasicDamageBreakdown() : null;
+            if (basic == null || basic.entries() == null || basic.entries().isEmpty()) return -1f;
+            var pick = basic.entries().get(0);
+            for (var e : basic.entries()) {
+                if (e.labelKey() == null) {
+                    pick = e;
+                    break;
+                }
+            }
+            return (pick.min() + pick.max()) / 2f;
+        });
+    }
+
+    /** Staffs, wands and spellbooks: their basic hit (about 5) says nothing about their spells, so no bonus. */
+    private static boolean casterItem(String id) {
+        if (id == null) return false;
+        String low = id.toLowerCase(java.util.Locale.ROOT);
+        return low.contains("staff") || low.contains("wand") || low.contains("spellbook");
+    }
+
+    /**
+     * equipWeaponDamage: the held weapon's power over the role's own weapon's (its first hotbar item), clamped to
+     * MIN_FACTOR..MAX_FACTOR. A missing or hitless item counts as a fist (FIST_POWER); the role's own weapon, or a
+     * caster item on either side, gives 1.
+     */
+    static float weaponFactor(NPCEntity npc) {
+        Inventory inv = npc.getInventory();
+        if (inv == null) return 1f;
+        String held = idOf(inv.getActiveHotbarItem());
+        String base = roleWeapon(npc);
+        if (java.util.Objects.equals(held, base) || casterItem(held) || casterItem(base)) return 1f;
+        float h = power(held), b = power(base);
+        if (h <= 0) h = FIST_POWER;
+        if (b <= 0) b = FIST_POWER;
+        return Math.max(MIN_FACTOR, Math.min(MAX_FACTOR, h / b));
+    }
+
+    /** The role's first hotbar item (Role.hotbarItems), cached per role name; null = none. */
+    private static String roleWeapon(NPCEntity npc) {
+        String role = npc.getRoleName();
+        if (role == null) return null;
+        String w = ROLE_WEAPON.computeIfAbsent(role, r -> {
+            try {
+                if (hotbarF == null) {
+                    java.lang.reflect.Field h = com.hypixel.hytale.server.npc.role.Role.class.getDeclaredField("hotbarItems");
+                    h.setAccessible(true);
+                    hotbarF = h;
+                }
+                String[] items = npc.getRole() != null ? (String[]) hotbarF.get(npc.getRole()) : null;
+                return items != null && items.length > 0 && items[0] != null ? items[0] : "";
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                return "";
+            }
+        });
+        return w.isEmpty() ? null : w;
+    }
+
     // ---- the role's own gear ----
 
     private static volatile java.lang.reflect.Field hotbarF, offHandF, armorF, defaultOffF;
@@ -219,7 +309,7 @@ final class EquipWand {
         String[] hotbar, off, armorIds;
         byte defaultOff;
         try {
-            if (hotbarF == null) {
+            if (offHandF == null) {
                 Class<?> c = com.hypixel.hytale.server.npc.role.Role.class;
                 java.lang.reflect.Field h = c.getDeclaredField("hotbarItems"), o = c.getDeclaredField("offHandItems"),
                         a = c.getDeclaredField("armor"), d = c.getDeclaredField("defaultOffHandSlot");
@@ -295,6 +385,8 @@ final class EquipWand {
 
     static void rolesChanged() {
         NEEDED.clear();
+        ROLE_WEAPON.clear();
+        POWER.clear();
     }
 
     private static void walk(com.google.gson.JsonElement e, List<String> main, List<String> off, java.util.ArrayDeque<String> todo) {
@@ -382,7 +474,9 @@ final class EquipWand {
     static String dump(Ref<EntityStore> mob, ComponentAccessor<EntityStore> acc) {
         Inventory inv = inventory(mob, acc);
         if (inv == null) return "no inventory";
-        return "hotbar " + slots(inv.getHotbar(), inv.getActiveHotbarSlot()) + " | off " + slots(inv.getUtility(), inv.getActiveUtilitySlot());
+        NPCEntity npc = acc.getComponent(mob, NPCEntity.getComponentType());
+        return "hotbar " + slots(inv.getHotbar(), inv.getActiveHotbarSlot()) + " | off " + slots(inv.getUtility(), inv.getActiveUtilitySlot())
+                + " | role weapon " + (npc != null ? roleWeapon(npc) : null) + ", weapon factor x" + (npc != null ? weaponFactor(npc) : 1f);
     }
 
     private static String slots(com.hypixel.hytale.server.core.inventory.container.ItemContainer box, int active) {

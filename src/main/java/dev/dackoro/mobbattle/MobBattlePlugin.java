@@ -99,6 +99,7 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new ArmyPlayerDamageSystem());
         getEntityStoreRegistry().registerSystem(new PlayerBattleDamageSystem());
         getEntityStoreRegistry().registerSystem(new BuffDamageSystem());
+        getEntityStoreRegistry().registerSystem(new WeaponDamageSystem());
         getEntityStoreRegistry().registerSystem(new DebugHitSystem());
         getEntityStoreRegistry().registerSystem(new PlayerDeathSystem());
         getEntityStoreRegistry().registerSystem(new KillTracker());

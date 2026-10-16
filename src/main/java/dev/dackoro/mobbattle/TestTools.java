@@ -629,6 +629,13 @@ final class TestTools {
                             + (key == null ? null : i18n.getMessage("es-ES", key)) + "' / '" + (short_ == null ? null : i18n.getMessage("es-ES", short_)) + "'", OK);
                 }
             }
+            case "power" -> {
+                // test equip power <item...>: the damage breakdown the game gives each weapon (calibration).
+                for (int i = 2; i < a.length; i++) {
+                    String id = ApplyCommand.findItem(a[i]);
+                    say(to, a[i] + (id == null ? ": unknown" : ": " + EquipWand.breakdown(id)), OK);
+                }
+            }
             case "needs" -> {
                 // test equip needs [role ...]: the hand items each role's own sensors check (none given = every role).
                 List<String> roles = new ArrayList<>();

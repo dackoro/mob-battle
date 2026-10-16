@@ -182,6 +182,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.battles.71",
                 "help.battles.72",
                 "help.battles.73",
+                "help.battles.74",
                 "help.battles.70",
         });
         HELP.put("teams", new String[] {
@@ -1095,6 +1096,9 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("on", I18n.id("cmd.desc.tinted_army")),
                 new Sub("off", I18n.id("cmd.desc.no_tint_default"))));
         addSubCommand(new Sub("armytintcolor", I18n.id("cmd.desc.color_of_the_army_tint_a_pal")));
+        addSubCommand(new Sub("equipweapondamage", I18n.id("cmd.desc.equip_weapon_damage"),
+                new Sub("on", I18n.id("cmd.desc.equip_weapon_damage_on")),
+                new Sub("off", I18n.id("cmd.desc.equip_weapon_damage_off"))));
         addSubCommand(new Sub("armyfriendlyfire", I18n.id("cmd.desc.army_friendly_fire"),
                 new Sub("on", I18n.id("cmd.desc.army_friendly_fire_on")),
                 new Sub("off", I18n.id("cmd.desc.army_friendly_fire_off"))));
@@ -1935,6 +1939,14 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.armyTint = on;
+            }
+            case "equipweapondamage" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    usage(ctx, "/mobbattle equipWeaponDamage on|off", defaultNote("off"));
+                    return;
+                }
+                FxSettings.equipWeaponDamage = on;
             }
             case "armyfriendlyfire" -> {
                 Boolean on = parseOnOff(val);

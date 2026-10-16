@@ -1706,3 +1706,10 @@ mobbattle.equip.editing.hands = Choosing for: Hands
 mobbattle.equip.editing.legs = Choosing for: Legs
 mobbattle.equip.count = {total} items
 mobbattle.equip.count.more = Showing {shown} of {total}: search or filter to see the rest.
+
+mobbattle.help.battles.74 = equipWeaponDamage on|off - a mob's weapon changes its damage: its hits are scaled by the weapon's power against its role's own weapon, x0.25 to x3 (default off)
+mobbattle.cmd.desc.equip_weapon_damage = A mob's weapon changes its damage (default off)
+mobbattle.cmd.desc.equip_weapon_damage_on = Hits scaled by the weapon's power
+mobbattle.cmd.desc.equip_weapon_damage_off = Weapons are only a look (default)
+mobbattle.panel.field.equip.weapon.damage.label = Weapon damage bonus
+mobbattle.panel.field.equip.weapon.damage.tip = A mob's hits are scaled by its weapon's power against its role's own weapon (Equipment Wand), x0.25 to x3. Off: weapons are only a look (default off).

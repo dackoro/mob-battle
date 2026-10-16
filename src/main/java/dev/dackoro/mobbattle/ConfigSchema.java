@@ -486,6 +486,7 @@ final class ConfigSchema {
                 section("everybattle"),
                 toggle("battle.pvp"),
                 toggle("army.friendlyfire"),
+                toggle("equip.weapon.damage"),
                 toggle("battle.unstick"),
                 number("battle.standoff", 0, FxSettings.MAX_STANDOFF_SECONDS),
                 number("battle.passivewin", 0, FxSettings.MAX_PASSIVE_WIN_SECONDS),

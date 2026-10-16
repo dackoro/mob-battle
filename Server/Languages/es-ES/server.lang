@@ -1706,3 +1706,10 @@ mobbattle.equip.editing.hands = Eligiendo para: Manos
 mobbattle.equip.editing.legs = Eligiendo para: Piernas
 mobbattle.equip.count = {total} objetos
 mobbattle.equip.count.more = Mostrando {shown} de {total}: busca o filtra para ver el resto.
+
+mobbattle.help.battles.74 = equipWeaponDamage on|off - el arma de un mob cambia su daño: sus golpes se escalan por el poder del arma frente al arma de su rol, de x0.25 a x3 (por defecto off)
+mobbattle.cmd.desc.equip_weapon_damage = El arma de un mob cambia su daño (por defecto off)
+mobbattle.cmd.desc.equip_weapon_damage_on = Golpes escalados por el poder del arma
+mobbattle.cmd.desc.equip_weapon_damage_off = Las armas son solo apariencia (por defecto)
+mobbattle.panel.field.equip.weapon.damage.label = Bono de daño por arma
+mobbattle.panel.field.equip.weapon.damage.tip = Los golpes de un mob se escalan por el poder de su arma frente al arma de su rol (Varita de Equipo), de x0.25 a x3. Off: las armas son solo apariencia (por defecto off).
