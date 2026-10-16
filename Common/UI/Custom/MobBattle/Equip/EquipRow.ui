@@ -1,0 +1,73 @@
+$C = "../../Common.ui";
+
+// One slot of the mob: a button with the item drawn as the game draws it (ItemSlot), the slot name and the item
+// name; #Mark shows which slot the gallery edits. #Clear empties it.
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 70, Bottom: 4);
+
+  Group #Mark {
+    Anchor: (Width: 4);
+    Background: #ffd23e;
+    Visible: false;
+  }
+
+  ItemSlotButton #Pick {
+    FlexWeight: 1;
+    LayoutMode: Full;
+    Padding: 2;
+    Style: (
+      Default: (
+        Background: #1c2835,
+      ),
+      Hovered: (
+        Background: #2c3c4c,
+      ),
+      Pressed: (
+        Background: #a08040,
+      ),
+      Disabled: (
+        Background: #14181d,
+      ),
+      Sounds: $C.@ButtonSounds,
+    );
+
+    Group {
+      Anchor: (Full: 0);
+      LayoutMode: Left;
+
+      Group {
+        Anchor: (Width: 66, Height: 66);
+        Background: #1a2530;
+        Padding: 1;
+
+        ItemSlot #Icon {
+          Anchor: (Full: 0);
+          ShowQualityBackground: true;
+          Visible: false;
+        }
+      }
+
+      Group {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Padding: (Left: 8);
+
+        Label #Label {
+          Anchor: (Height: 24);
+          Style: (FontSize: 13, TextColor: #96a9be, VerticalAlignment: Center);
+        }
+
+        Label #Item {
+          Anchor: (Height: 40);
+          Style: (FontSize: 14, TextColor: #ffffff, Wrap: true);
+        }
+      }
+    }
+  }
+
+  $C.@SmallSecondaryTextButton #Clear {
+    @Anchor = (Width: 92, Top: 18, Left: 4);
+    @Text = %server.mobbattle.equip.empty;
+  }
+}

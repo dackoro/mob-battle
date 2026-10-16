@@ -524,18 +524,17 @@ final class ApplyCommand {
      * its hand), or with item null empties its hand and armor. World thread.
      */
     private static String equip(Ref<EntityStore> t, NPCEntity mob, String item, Store<EntityStore> store) {
-        var inv = mob.getInventory();
+        // The Equipment Wand's slots (every slot of a hand, so a role switching slots keeps showing it).
         if (item == null) {
-            com.hypixel.hytale.server.npc.util.InventoryHelper.useItem(t, null, store);
-            var armor = inv.getArmor();
-            for (short s = 0; s < armor.getCapacity(); s++) armor.setItemStackForSlot(s, null);
+            for (int i = 0; i < EquipWand.SLOTS.length; i++) {
+                if (i != 1 || EquipWand.hasOffHand(t, store)) EquipWand.set(t, i, null, store);
+            }
             return null;
         }
         var asset = com.hypixel.hytale.server.core.asset.type.item.config.Item.getAssetMap().getAsset(item);
-        boolean ok = asset != null && asset.getArmor() != null
-                ? com.hypixel.hytale.server.npc.util.InventoryHelper.useArmor(inv.getArmor(), item)
-                : com.hypixel.hytale.server.npc.util.InventoryHelper.useItem(t, item, store);
-        return ok ? null : "can't hold it";
+        int slot = asset != null && asset.getArmor() != null && asset.getArmor().getArmorSlot() != null
+                ? 2 + asset.getArmor().getArmorSlot().ordinal() : 0;
+        return EquipWand.set(t, slot, item, store) == null ? null : "can't hold it";
     }
 
     /** The chat text of a skip reason (apply() returns it in English, which the log keeps). */

@@ -1,0 +1,23 @@
+$C = "../../Common.ui";
+
+// Gallery filters of the Equipment Wand panel: mod, type and group, sized for its right column. Type and group are
+// hidden when they have nothing to choose, and while an armor slot is edited.
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 40, Bottom: 2);
+
+  // No search box on the short lists: with one, the list opened beside the box, over the next filter
+  // (2026-10-16 screenshot).
+  $C.@DropdownBox #Mod {
+    Anchor: (Width: 200, Top: 4, Height: 32, Right: 8);
+  }
+
+  $C.@DropdownBox #Type {
+    Anchor: (Width: 180, Top: 4, Height: 32, Right: 8);
+  }
+
+  $C.@DropdownBox #Group {
+    Anchor: (Width: 180, Top: 4, Height: 32);
+    ShowSearchInput: true;
+  }
+}

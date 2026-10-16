@@ -1654,3 +1654,55 @@ mobbattle.panel.note.buffwand.stack = Cada clic suma sobre el valor base del mob
 
 mobbattle.cmd.apply.unknownitem = Objeto desconocido: {value}.
 mobbattle.cmd.apply.why.canthold = no lo puede llevar
+
+items.MobBattle_EquipWand.name = Varita de Equipo
+items.MobBattle_EquipWand.description = Clic derecho en un mob: su equipo (agachado: lo copia). Clic izquierdo: pone el equipo copiado. Mantén izquierdo: a todos los mobs cerca.
+mobbattle.chat.equip.notmob = Haz clic en un mob.
+mobbattle.chat.equip.nothingcopied = Aún no copiaste nada: agáchate + clic derecho en un mob, o pulsa Copiar en su panel.
+mobbattle.chat.equip.pasted = Equipo puesto a {name}.
+mobbattle.chat.equip.area = Equipo puesto a {n, plural, one {# mob} other {# mobs}}.
+mobbattle.equip.title = Equipo
+mobbattle.equip.hint = Las armas son solo apariencia: el mob sigue atacando como su rol. La armadura sí lo protege.
+mobbattle.equip.slot.hand = Mano
+mobbattle.equip.slot.offhand = Otra mano
+mobbattle.equip.slot.head = Cabeza
+mobbattle.equip.slot.chest = Pecho
+mobbattle.equip.slot.hands = Manos
+mobbattle.equip.slot.legs = Piernas
+mobbattle.equip.empty = Quitar
+mobbattle.equip.copy = Copiar
+mobbattle.equip.paste = Pegar
+mobbattle.equip.clearall = Vaciar todo
+mobbattle.equip.copied = Copiado. Clic izquierdo con la varita en un mob para ponérselo.
+mobbattle.equip.pastedhere = Equipo copiado puesto.
+mobbattle.equip.nooffhand = Este mob no tiene otra mano.
+mobbattle.equip.why.cant_hold_it = No puede llevar eso.
+mobbattle.equip.why.no_off_hand = Este mob no tiene otra mano.
+mobbattle.equip.why.wrong_slot = Esa pieza va en otra casilla.
+mobbattle.equip.why.not_a_mob = No es un mob.
+
+mobbattle.chat.equip.copiedfrom = Copiado el equipo de {name}: {set}. Clic izquierdo en un mob para ponérselo, mantén izquierdo para todos los de alrededor.
+
+mobbattle.chat.equip.kept = {name} conservó su arma: sus ataques solo funcionan con ella en la mano.
+mobbattle.chat.equip.areakept = {n, plural, one {# mob conservó su arma} other {# mobs conservaron su arma}}: sus ataques solo funcionan con ella en la mano.
+mobbattle.equip.needs = Este mob solo ataca con {items} en la mano: si se lo cambias deja de atacar. Pegar lo conserva.
+mobbattle.equip.breaks = Cambiado. Necesita {items} en la mano para atacar, así que ya no atacará.
+mobbattle.equip.pastedkept = Equipo copiado puesto. Conservó su arma, que sus ataques necesitan.
+
+mobbattle.equip.twohanded = Objeto a dos manos en la mano: la otra mano queda vacía.
+mobbattle.equip.why.two_handed = La mano lleva un objeto a dos manos: vacíala o elige uno de una mano primero.
+
+mobbattle.equip.restore = Restaurar
+mobbattle.equip.restored = De vuelta al equipo que le da su rol.
+mobbattle.equip.norestore = No se pudo leer el equipo original de este mob.
+mobbattle.equip.clearedkept = Vaciado. Conservó su arma, que sus ataques necesitan.
+mobbattle.equip.locked = Sus ataques solo funcionan con {items} en la mano: esas manos están bloqueadas para que siga peleando.
+mobbattle.equip.search = Buscar objetos...
+mobbattle.equip.editing.hand = Eligiendo para: Mano
+mobbattle.equip.editing.offhand = Eligiendo para: Otra mano
+mobbattle.equip.editing.head = Eligiendo para: Cabeza
+mobbattle.equip.editing.chest = Eligiendo para: Pecho
+mobbattle.equip.editing.hands = Eligiendo para: Manos
+mobbattle.equip.editing.legs = Eligiendo para: Piernas
+mobbattle.equip.count = {total} objetos
+mobbattle.equip.count.more = Mostrando {shown} de {total}: busca o filtra para ver el resto.

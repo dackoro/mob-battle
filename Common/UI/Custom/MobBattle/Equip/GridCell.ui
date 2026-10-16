@@ -1,0 +1,54 @@
+$C = "../../Common.ui";
+
+// One item of the gallery: drawn by the game (ItemSlot, quality background) with its name under it.
+Group {
+  Anchor: (Width: 100, Height: 120);
+  Padding: (Horizontal: 3, Vertical: 3);
+
+  ItemSlotButton #Button {
+    Anchor: (Full: 0);
+    LayoutMode: Full;
+    Padding: 3;
+    Style: (
+      Default: (
+        Background: #1c2835,
+      ),
+      Hovered: (
+        Background: #c9a050,
+      ),
+      Pressed: (
+        Background: #a08040,
+      ),
+      Disabled: (
+        Background: #14181d,
+      ),
+      Sounds: $C.@ButtonSounds,
+    );
+
+    Group {
+      Anchor: (Full: 0);
+      LayoutMode: Top;
+
+      Group {
+        Anchor: (Height: 70);
+        LayoutMode: CenterMiddle;
+
+        Group {
+          Anchor: (Width: 66, Height: 66);
+          Background: #1a2530;
+          Padding: 1;
+
+          ItemSlot #Slot {
+            Anchor: (Full: 0);
+            ShowQualityBackground: true;
+          }
+        }
+      }
+
+      Label #Name {
+        Anchor: (Height: 38);
+        Style: (FontSize: 11, TextColor: #d6e2ee, Wrap: true, HorizontalAlignment: Center);
+      }
+    }
+  }
+}

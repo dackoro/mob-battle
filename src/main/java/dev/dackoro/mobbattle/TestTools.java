@@ -117,6 +117,7 @@ final class TestTools {
                 case "speed" -> speedCommand(ctx, a);
                 case "hit" -> hitCommand(ctx, a);
                 case "wand" -> wandCommand(ctx, a);
+                case "equip" -> equipCommand(ctx, a);
                 case "tick" -> {
                     // test tick [world]: the world's tick time over the last 10 s (to read during a running battle).
                     World w = a.length > 1 ? Universe.get().getWorld(a[1]) : Universe.get().getDefaultWorld();
@@ -589,10 +590,109 @@ final class TestTools {
      * focus/kill one, brawl and snap a target or none (around the owner). Players still need playerFights for the
      * battle kind (and not Creative), Kill needs killPlayers; their refusals are the wand's own chat lines.
      */
+    /**
+     * test equip lists [mod:<m>|mod:hytale] [type:<t>] [group:<g>]: how many items each Equipment Wand slot lists with
+     * those filters, plus the mods/types/groups the filter rows offer. test equip read <id|last>: what a mob wears and
+     * whether it has an off hand. test equip set <id|last> <slot 0-5> <item|none>: one slot, as the panel does.
+     */
+    private static void equipCommand(CommandContext ctx, String[] a) {
+        CommandSender to = ctx.sender();
+        String what = a.length > 1 ? a[1].toLowerCase(Locale.ROOT) : "";
+        switch (what) {
+            case "lists" -> {
+                String mod = "", type = "", group = "";
+                for (int i = 2; i < a.length; i++) {
+                    String w = a[i];
+                    if (w.startsWith("mod:")) mod = w.substring(4);
+                    else if (w.startsWith("type:")) type = w.substring(5);
+                    else if (w.startsWith("group:")) group = w.substring(6);
+                }
+                long t0 = System.nanoTime();
+                int total = EquipWand.catalog().size();
+                long ms = (System.nanoTime() - t0) / 1_000_000;
+                say(to, "Items: " + total + " (catalog " + ms + " ms). Mods: " + EquipWand.mods(), OK);
+                say(to, "Types for mod '" + mod + "': " + EquipWand.typesFor(mod), OK);
+                say(to, "Groups for '" + mod + "'/'" + type + "': " + EquipWand.groupsFor(mod, type), OK);
+                for (int s = 0; s < EquipWand.SLOTS.length; s++) {
+                    var l = EquipWand.listFor(s, mod, type, group);
+                    String sample = l.stream().limit(4).map(EquipWand.ItemInfo::id).reduce((x, y) -> x + ", " + y).orElse("");
+                    say(to, EquipWand.SLOTS[s] + ": " + l.size() + " items, e.g. " + sample, OK);
+                }
+                // Translated names as the panel shows them (en-US and es-ES).
+                var i18n = com.hypixel.hytale.server.core.modules.i18n.I18nModule.get();
+                for (String id : List.of("Weapon_Sword_Adamantite", "Armor_Iron_Head", "Weapon_Shield_Scrap_Spiked")) {
+                    var item = com.hypixel.hytale.server.core.asset.type.item.config.Item.getAssetMap().getAsset(id);
+                    String key = item != null ? item.getTranslationKey() : null;
+                    String short_ = key != null && key.startsWith("server.") ? key.substring(7) : key;
+                    say(to, id + " key " + key + ": en '" + (key == null ? null : i18n.getMessage("en-US", key)) + "' / '"
+                            + (short_ == null ? null : i18n.getMessage("en-US", short_)) + "', es '"
+                            + (key == null ? null : i18n.getMessage("es-ES", key)) + "' / '" + (short_ == null ? null : i18n.getMessage("es-ES", short_)) + "'", OK);
+                }
+            }
+            case "needs" -> {
+                // test equip needs [role ...]: the hand items each role's own sensors check (none given = every role).
+                List<String> roles = new ArrayList<>();
+                for (int i = 2; i < a.length; i++) roles.add(a[i]);
+                if (roles.isEmpty()) {
+                    for (PickLists.Entry e : PickLists.roles()) roles.add(e.value());
+                }
+                int found = 0;
+                for (String r : roles) {
+                    List<String>[] need = EquipWand.needed(r);
+                    if (need[0].isEmpty() && need[1].isEmpty()) {
+                        if (a.length > 2) say(to, r + ": no hand item needed.", OK);
+                        continue;
+                    }
+                    found++;
+                    say(to, r + ": main " + need[0] + ", off " + need[1], OK);
+                }
+                say(to, found + " of " + roles.size() + " roles need items in hand.", OK);
+            }
+            case "read", "set", "restore" -> {
+                if (a.length < 3 || what.equals("set") && a.length < 5) {
+                    say(to, "Usage: /mobbattle test equip read <id|last> | set <id|last> <slot 0-5> <item|none>", ERR);
+                    return;
+                }
+                Ref<EntityStore> mob = resolve(a[2]);
+                if (mob == null || !mob.isValid()) {
+                    say(to, "No entity " + a[2] + ".", ERR);
+                    return;
+                }
+                Store<EntityStore> store = mob.getStore();
+                store.getExternalData().getWorld().execute(() -> {
+                    if (!mob.isValid()) return;
+                    if (what.equals("restore")) say(to, "restore: " + (EquipWand.restore(mob, store) ? "ok" : "failed"), OK);
+                    if (what.equals("set")) {
+                        int slot;
+                        try {
+                            slot = Integer.parseInt(a[3]);
+                        } catch (NumberFormatException e) {
+                            slot = -1;
+                        }
+                        if (slot < 0 || slot >= EquipWand.SLOTS.length) {
+                            say(to, "Slot 0-5: " + String.join(", ", EquipWand.SLOTS) + ".", ERR);
+                            return;
+                        }
+                        String item = a[4].equalsIgnoreCase("none") ? null : ApplyCommand.findItem(a[4]);
+                        if (item == null && !a[4].equalsIgnoreCase("none")) {
+                            say(to, "Unknown item " + a[4] + ".", ERR);
+                            return;
+                        }
+                        String why = EquipWand.set(mob, slot, item, store);
+                        say(to, "set " + EquipWand.SLOTS[slot] + " = " + (item == null ? "-" : item) + ": " + (why == null ? "ok" : why), why == null ? OK : ERR);
+                    }
+                    say(to, EquipWand.nameOf(mob, store) + " wears: " + EquipWand.describe(EquipWand.read(mob, store))
+                            + " | off hand: " + (EquipWand.hasOffHand(mob, store) ? "yes" : "no") + " | " + EquipWand.dump(mob, store), OK);
+                });
+            }
+            default -> say(to, "Usage: /mobbattle test equip lists [mod:..] [type:..] [group:..] | read <id|last> | set <id|last> <slot 0-5> <item|none>", ERR);
+        }
+    }
+
     private static void wandCommand(CommandContext ctx, String[] a) {
         CommandSender to = ctx.sender();
         if (a.length < 3) {
-            say(to, "Usage: /mobbattle test wand <owner> <duel|focus|brawl|kill|snap|army|armypick|armydisband> [target] [target2]  (target = player name, last, id:<uuid>)", ERR);
+            say(to, "Usage: /mobbattle test wand <owner> <duel|focus|brawl|kill|snap|army|armypick|armydisband|equipcopy|equippaste|equiparea> [target] [target2]  (target = player name, last, id:<uuid>)", ERR);
             return;
         }
         PlayerRef owner = ApplyCommand.onlinePlayer(a[1]);
@@ -606,7 +706,8 @@ final class TestTools {
             case "duel" -> 2;
             case "focus", "kill" -> 1;
             case "brawl", "snap", "armypick", "armydisband" -> 0;
-            case "army" -> 1;
+            case "army", "equipcopy", "equippaste" -> 1;
+            case "equiparea" -> 0;
             default -> -1;
         };
         if (need < 0) {
@@ -675,6 +776,14 @@ final class TestTools {
                 case "army" -> ArmyToggleInteraction.click(owner, ownerRef, t0, false, store);
                 case "armypick" -> ArmyToggleInteraction.click(owner, ownerRef, t0, true, store);
                 case "armydisband" -> ArmyDisbandInteraction.disband(owner, ownerRef, store);
+                // Equipment Wand clicks (crouch + right, left, held left), then what the mob wears.
+                case "equipcopy" -> {
+                    if (EquipWand.copyFrom(owner, t0, store)) say(to, "Copied from " + names + ": " + EquipWand.describe(EquipWand.read(t0, store)), OK);
+                }
+                case "equippaste" -> {
+                    if (EquipWand.pasteOn(owner, t0, store)) say(to, names + " now wears: " + EquipWand.describe(EquipWand.read(t0, store)), OK);
+                }
+                case "equiparea" -> say(to, "Area paste reached " + EquipWand.pasteArea(owner, ownerRef, store) + " mobs.", OK);
                 default -> {
                 }
             }

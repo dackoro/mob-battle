@@ -31,7 +31,7 @@ public class MobBattleCommand extends CommandBase {
     private static final String ERR = "#ffcc55";
     private static final String[] WAND_IDS = {
             "MobBattle_Wand", "MobBattle_ChaosWand", "MobBattle_TeamWand",
-            "MobBattle_SummonWand", "MobBattle_MorphWand", "MobBattle_HealWand",
+            "MobBattle_SummonWand", "MobBattle_MorphWand", "MobBattle_HealWand", "MobBattle_EquipWand",
             "MobBattle_KillWand", "MobBattle_EffectWand", "MobBattle_CleanseWand", "MobBattle_ArmyWand",
             "MobBattle_SnapWand", "MobBattle_BuffWand", "MobBattle_DebugWand"
     };
