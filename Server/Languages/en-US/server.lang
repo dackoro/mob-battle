@@ -302,6 +302,7 @@ mobbattle.hud.vs.red = Red team
 mobbattle.hud.vs.blue = Blue team
 mobbattle.hud.vs.champion = Champion
 mobbattle.hud.vs.side = Side {n}
+mobbattle.hud.vs.royale = Battle royale
 # --- cmd ---
 mobbattle.cmd.usage = Usage: {usage}
 mobbattle.cmd.usage.player = Usage (player): {usage}
@@ -495,6 +496,7 @@ mobbattle.help.titles.20 = cameraBars off|slim|classic|wide - black film bands a
 mobbattle.help.titles.21 = cameraBlur off|soft|strong - blurs what is in front of and behind what each shot films (default soft)
 mobbattle.help.titles.22 = autoFilm on|off - the camera viewers get the battle film (see film) from the battle start, after the intro, until it ends; it wins over autoWatch (default off)
 mobbattle.help.titles.30 = vsScreen on|off - a Smash-like VS screen (both sides, their strongest fighters, a big VS) opens the countdown for 2.5 s, then the intro camera; needs a countdown of 2 s or more (default on)
+mobbattle.help.titles.31 = vsTeamReps 1|2 - VS screen with 3 or more teams: fighters shown per team (one column each) when there are 4 teams or fewer (default 2)
 mobbattle.help.titles.23 = filmPlayerShots <0-100> - % of film shots that show you watching (default 20); filmShotTime <3-60> - seconds per shot (default 8)
 mobbattle.help.titles.24 = filmShotVariation <0-90> - each shot that % longer or shorter at random (default 25); filmPace <25-300> - how far the camera moves in a shot, % (default 100)
 mobbattle.help.titles.25 = filmTransition cut|glide - jump to the next shot or glide to it (default cut); filmShots all|battle|<list> - shots used: wide, track, arc, pushIn, closeUp, landscape, playerBack, playerClose
@@ -933,6 +935,7 @@ mobbattle.cmd.desc.film = Film the nearest running battle (yours first) with slo
 mobbattle.cmd.desc.film_exit = Stop the battle film: back to your own camera
 mobbattle.cmd.desc.film_auto = The camera viewers get the battle film from the battle start (after the intro) until it ends; wins over autoWatch
 mobbattle.cmd.desc.vs_screen = A Smash-like VS screen opens the countdown, before the intro camera
+mobbattle.cmd.desc.vs_team_reps = VS screen: fighters shown per team with 3-4 teams (default 2)
 mobbattle.cmd.desc.film_player_shots = Percent of battle film shots that show you watching (0 = only the battle)
 mobbattle.cmd.desc.camera_face = Close-ups in front of the mob's face (default on)
 mobbattle.cmd.desc.film_wide_shots = Battle film: percent of far wide shots (default 30)
@@ -1147,6 +1150,9 @@ mobbattle.panel.field.camera.autofilm.label = Auto film
 mobbattle.panel.field.camera.autofilm.tip = Camera viewers get the battle film (/mobbattle film) from the battle start, after the intro, until it ends. Wins over Auto watch (default off).
 mobbattle.panel.field.camera.vsscreen.label = VS screen
 mobbattle.panel.field.camera.vsscreen.tip = A Smash-like VS screen opens the countdown for 2.5 s: both sides, their strongest fighters and a big VS. The intro camera follows with the time left. Needs a countdown of 2 s or more. The first time a mob shows, players may notice a short hitch while its picture loads (default on).
+mobbattle.panel.field.camera.vs.teamreps.label = VS fighters per team
+mobbattle.panel.field.camera.vs.teamreps.tip = With 3 or 4 teams the VS screen can show two fighters of each team side by side in its color; 1 = only one per team. 5 teams or more always show one (default 2).
+mobbattle.panel.field.camera.vs.teamreps.hint = 1 or 2
 mobbattle.panel.field.camera.film.player.label = Shots of you
 mobbattle.panel.field.camera.film.player.tip = Share of film shots that show you watching the battle: over your shoulder, or close on you with the battle blurred behind (default 20).
 mobbattle.panel.field.camera.film.player.hint = percent, 0 = only the battle

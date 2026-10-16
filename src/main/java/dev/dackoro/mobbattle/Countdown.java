@@ -40,6 +40,11 @@ final class Countdown {
         final Consumer<ComponentAccessor<EntityStore>> start;
         final Consumer<MobBattleApi.EndReason> onEnd;
         volatile boolean cancelled;
+        /**
+         * The big countdown title shows only from this many seconds left (2026-10-16, user: the "BATTLE ROYALE / 12"
+         * title covered the VS screen; it comes after it): the seconds the VS added are counted in chat only.
+         */
+        int titleFrom = Integer.MAX_VALUE;
 
         Pending(BattleManager.Kind kind, long dueAt, Store<EntityStore> store, UUID owner,
                 BattleManager.Battle.Anchor anchor, Label label, Set<Ref<EntityStore>> mobs,
@@ -142,10 +147,12 @@ final class Countdown {
             return;
         }
         // The VS screen comes first and adds its seconds (2026-10-16, user: it must not eat the intro's time).
+        int titleFrom = seconds;
         seconds += (int) (VsScreen.countdownMs(kind) / 1000);
         Store<EntityStore> store = buffer.getExternalData().getWorld().getEntityStore().getStore();
         Pending p = new Pending(kind, System.currentTimeMillis() + seconds * 1000L, store,
                 player != null ? player.getUuid() : null, anchor, label, set, start, onEnd);
+        p.titleFrom = titleFrom;
         synchronized (Countdown.class) {
             // With recomputeNextDue: an add on one world thread is never lost by a recompute on another.
             // TITLE_OWNER first: a finish from another thread can't run in between and leave it pointing here.
@@ -169,18 +176,67 @@ final class Countdown {
         if (p.mobs.size() >= 2 && !p.store.isShutdown()) {
             p.store.getExternalData().getWorld().execute(() -> {
                 if (p.cancelled) return;
-                int alive = 0;
+                List<Ref<EntityStore>> alive = new java.util.ArrayList<>();
                 for (Ref<EntityStore> r : p.mobs) {
                     if (!BattleManager.isAlive(r, p.store)) continue;
-                    alive++;
+                    alive.add(r);
                     MajorDungeonsCompat.keepBoss(r, p.store);   // a boss waiting for its fight is not reset either
                 }
-                if (alive < 2) fell(p, player);
-                else announce(p, player, left);
+                if (alive.size() < 2) {
+                    fell(p, player);
+                } else {
+                    truce(alive, p.store);
+                    announce(p, player, left);
+                }
             });
             return;
         }
         announce(p, player, left);
+    }
+
+    /** Seconds each truce lasts: renewed every second, so it runs out TRUCE_SECONDS - 1 s after the start at most. */
+    private static final double TRUCE_SECONDS = 1.6;
+    /** Above this many mobs a mob only makes peace with the ones within TRUCE_RANGE (n² attitude writes). */
+    private static final int TRUCE_ALL_MAX = 120;
+    private static final double TRUCE_RANGE = 32;
+
+    /**
+     * The fighters wait for the start (2026-10-16, user: a royale's mobs started fighting each other before the
+     * countdown ended; nothing held wild hostile mobs such as bosses of two mods). Every second each NPC ignores the
+     * others for TRUCE_SECONDS and lets go of one of them as its target; FightDamageSystem also cancels their hits on
+     * each other ({@link #waitingTogether}). The battle start sets its own HOSTILE overrides over these.
+     */
+    private static void truce(List<Ref<EntityStore>> alive, Store<EntityStore> store) {
+        if (alive.size() <= TRUCE_ALL_MAX) {
+            for (Ref<EntityStore> r : alive) FightManager.truce(r, alive, TRUCE_SECONDS, store);
+            return;
+        }
+        double[][] at = new double[alive.size()][];
+        for (int i = 0; i < at.length; i++) {
+            var v = ChaosWand.positionOf(alive.get(i), store);
+            at[i] = v != null ? new double[]{v.x, v.y, v.z} : null;
+        }
+        double range2 = TRUCE_RANGE * TRUCE_RANGE;
+        List<Ref<EntityStore>> near = new java.util.ArrayList<>();
+        for (int i = 0; i < at.length; i++) {
+            if (at[i] == null) continue;
+            near.clear();
+            for (int j = 0; j < at.length; j++) {
+                if (j == i || at[j] == null) continue;
+                double dx = at[i][0] - at[j][0], dy = at[i][1] - at[j][1], dz = at[i][2] - at[j][2];
+                if (dx * dx + dy * dy + dz * dz <= range2) near.add(alive.get(j));
+            }
+            FightManager.truce(alive.get(i), near, TRUCE_SECONDS, store);
+        }
+    }
+
+    /** True if both are fighters of the same countdown still running (no hits between them yet). */
+    static boolean waitingTogether(Ref<EntityStore> a, Ref<EntityStore> b) {
+        if (a == null || b == null || a == b) return false;
+        for (Pending p : PENDING) {
+            if (!p.cancelled && p.mobs.contains(a) && p.mobs.contains(b)) return true;
+        }
+        return false;
     }
 
     /** Fewer than two fighters standing before the start: no battle, the intro camera is cut. */
@@ -194,11 +250,12 @@ final class Countdown {
     }
 
     private static void announce(Pending p, PlayerRef player, int left) {
+        boolean title = left <= p.titleFrom;
         if (player != null) {
             player.sendMessage(I18n.tr("battle.countdown.tick").param("label", p.label.text()).param("left", left)
                     .color("#ffd23e"));
-            if (TITLE_OWNER.get(p.owner) == p) FightFx.countdownTitle(player, left, p.label.text());
-        } else {
+            if (title && TITLE_OWNER.get(p.owner) == p) FightFx.countdownTitle(player, left, p.label.text());
+        } else if (title) {
             FightFx.countdownTitle(p.anchor, left, p.label.text());
         }
     }

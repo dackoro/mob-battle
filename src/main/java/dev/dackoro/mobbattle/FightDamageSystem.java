@@ -109,6 +109,13 @@ public class FightDamageSystem extends DamageEventSystem {
             // A calm summon that is hit may fight back that attacker (/mobbattle summonCalm).
             SummonCalm.hurt(chunk.getReferenceTo(index), calmSource.getRef(), buffer);
         }
+        // Countdown truce: two mobs waiting for the same start don't hurt each other yet (Countdown.truce).
+        if (Countdown.hasPending() && !damage.isCancelled() && damage.getSource() instanceof Damage.EntitySource waiting
+                && Countdown.waitingTogether(waiting.getRef(), chunk.getReferenceTo(index))
+                && waiting.getRef().isValid() && buffer.getComponent(waiting.getRef(), NPCEntity.getComponentType()) != null) {
+            damage.setCancelled(true);
+            return;
+        }
         // Every NPC hit in every world passes here: nothing to do while no battle or wand fight exists.
         if (!BattleManager.hasBattles() && !FightManager.hasFights()
                 || !(damage.getSource() instanceof Damage.EntitySource source)) {

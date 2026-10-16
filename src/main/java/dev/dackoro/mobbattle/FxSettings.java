@@ -519,6 +519,8 @@ public final class FxSettings {
     public static boolean autoFilm = false;
     /** Smash-like VS screen over the first seconds of the countdown, before the intro camera (VsScreen, /mobbattle vsScreen, KindFx). */
     public static boolean vsScreen = true;
+    /** VS screen, 3+ teams: columns per team with 4 teams or fewer, 1 or 2 (/mobbattle vsTeamReps, camera.vs.teamreps). */
+    public static int vsTeamReps = 2;
     /** Battle film: share of shots that show the player watching (percent, /mobbattle filmPlayerShots). */
     public static int filmPlayerShots = 20;
     /** Battle film: share of battle shots that are far wide shots (percent, /mobbattle filmWideShots; +15 with a big mob). */
@@ -987,6 +989,7 @@ public final class FxSettings {
             cameraBlur = blur != null ? blur : "soft";
             autoFilm = Boolean.parseBoolean(p.getProperty("camera.autofilm", String.valueOf(autoFilm)));
             vsScreen = Boolean.parseBoolean(p.getProperty("camera.vsscreen", String.valueOf(vsScreen)));
+            vsTeamReps = Math.max(1, Math.min(2, intOr(p, "camera.vs.teamreps", vsTeamReps)));
             filmPlayerShots = Math.max(0, Math.min(100, intOr(p, "camera.film.player", filmPlayerShots)));
             filmWideShots = Math.max(0, Math.min(100, intOr(p, "camera.film.wide", filmWideShots)));
             filmShotSeconds = Math.max(MIN_FILM_SHOT, Math.min(MAX_FILM_SHOT, intOr(p, "camera.film.shot", filmShotSeconds)));
@@ -1152,6 +1155,7 @@ public final class FxSettings {
         p.setProperty("camera.blur", cameraBlur);
         p.setProperty("camera.autofilm", String.valueOf(autoFilm));
         p.setProperty("camera.vsscreen", String.valueOf(vsScreen));
+        p.setProperty("camera.vs.teamreps", String.valueOf(vsTeamReps));
         p.setProperty("camera.film.player", String.valueOf(filmPlayerShots));
         p.setProperty("camera.film.wide", String.valueOf(filmWideShots));
         p.setProperty("camera.film.shot", String.valueOf(filmShotSeconds));
@@ -1288,7 +1292,7 @@ public final class FxSettings {
                         + ", runes " + onOff(runes) + " | cameraStyle " + cameraStyle + ", cameraTime " + (cameraSeconds > 0 ? cameraSeconds + " s" : "countdown")
                         + ", cameraShots " + cameraShots + ", endCamera " + endCamera + ", endCameraTime " + endCameraSeconds + " s, cameraScope " + cameraScope + ", autoWatch " + onOff(autoWatch)
                         + ", cameraBars " + cameraBars + ", cameraBlur " + cameraBlur + ", cameraHud " + cameraHud + ", cameraFace " + onOff(cameraFace)
-                        + ", vsScreen " + onOff(vsScreen) + ", autoFilm " + onOff(autoFilm) + ", filmPlayerShots " + filmPlayerShots + "%, filmWideShots " + filmWideShots + "%, filmShotTime " + filmShotSeconds + " s, filmShotVariation " + filmShotVariation + "%, filmPace " + filmPace + "%, filmTransition " + filmTransition + ", filmShot " + filmWeightsText()
+                        + ", vsScreen " + onOff(vsScreen) + ", vsTeamReps " + vsTeamReps + ", autoFilm " + onOff(autoFilm) + ", filmPlayerShots " + filmPlayerShots + "%, filmWideShots " + filmWideShots + "%, filmShotTime " + filmShotSeconds + " s, filmShotVariation " + filmShotVariation + "%, filmPace " + filmPace + "%, filmTransition " + filmTransition + ", filmShot " + filmWeightsText()
                         + " | per kind: " + KindFx.describeOverrides(),
                 "Fighter laser: fightLaser " + onOff(laserEnabled) + ", fightLaserColor " + laserColorName(),
                 "Battles: duelMode " + (accumulateDuels ? "accumulate" : "exclusive")
@@ -1318,7 +1322,7 @@ public final class FxSettings {
     /** Which describeLines() line a setting key belongs to. */
     public static int groupOf(String key) {
         return switch (key) {
-            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch", "camerabars", "camerablur", "camerahud", "cameraface", "vsscreen", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "film" -> 0;
+            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch", "camerabars", "camerablur", "camerahud", "cameraface", "vsscreen", "vsteamreps", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "film" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "battlebelow", "battleabove", "arenavertical", "passivewin", "passivewinignore", "idleend", "battlemaxtime", "duelcard", "focuscard", "timerstyle", "tiebreak", "killtiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;

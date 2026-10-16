@@ -1704,7 +1704,7 @@ public final class BattleManager {
     }
 
     /** The name of the army {@code member} fights for (its chain's top: a player or a leader mob), or null. */
-    private static String armyName(Ref<EntityStore> member, ComponentAccessor<EntityStore> buffer) {
+    static String armyName(Ref<EntityStore> member, ComponentAccessor<EntityStore> buffer) {
         if (member == null || !member.isValid()) return null;
         java.util.UUID top = Army.topOf(member, Army.keyOf(member, buffer));
         if (top == null) return null;

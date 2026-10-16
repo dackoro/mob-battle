@@ -58,17 +58,51 @@ final class MorphHologram {
 
     private static final String OK = "#7dff8a";
     private static final String ERR = "#ff6b6b";
-    static final String HOLO_MODEL = "Items/MobBattle/MorphWand/MobBattle_Hologram.blockymodel";
+    /**
+     * The panel model, one per yaw of the panel around the wand (2026-10-16, user: in first person the panel was seen at
+     * an angle). The first one shipped copied the wand's own 34 degree turn; MobBattle_Hologram_Y{m90,m60,m56,m30,0,34}
+     * (m = minus) turn the panel quad that many degrees about Y. Default {@link #DEFAULT_YAW}; `test hologram yaw <deg>`
+     * tries the others live (per player, memory only). ❓ Which one faces the first-person camera is a guess.
+     */
+    static final String HOLO_PREFIX = "Items/MobBattle/MorphWand/MobBattle_Hologram";
+    static final int[] YAWS = {-90, -60, -56, -30, 0, 34};
+    static final int DEFAULT_YAW = -30;   // user, 2026-10-16: -30 faces the first-person camera
+    static final String HOLO_MODEL = modelForYaw(DEFAULT_YAW);
+    private static final Map<UUID, Integer> YAW = new ConcurrentHashMap<>();
+    /**
+     * Player -> {when the panel was last put by the 1 s check because it had gone from the model, wanted texture}
+     * (2026-10-16: every ModelComponent put on a player makes vanilla reset and re-send their MovementSettings, so the
+     * model is never re-put on a loop: a panel that keeps vanishing with nothing changed is put back at most once per
+     * REPUT_MS).
+     */
+    private static final Map<UUID, Object[]> LAST_PUT = new ConcurrentHashMap<>();
+    private static final long REPUT_MS = 5000;
+
+    static String modelForYaw(int deg) {
+        return HOLO_PREFIX + "_Y" + (deg < 0 ? "m" + -deg : String.valueOf(deg)) + ".blockymodel";
+    }
+
+    /** Any of our panel models (the old single one included). */
+    static boolean isHoloModel(String model) {
+        return model != null && model.startsWith(HOLO_PREFIX);
+    }
+
+    private static String holoModelOf(UUID player) {
+        Integer deg = player != null ? YAW.get(player) : null;
+        return deg != null ? modelForYaw(deg) : HOLO_MODEL;
+    }
     static final String HOLO_FOLDER = "Items/MobBattle/MorphWand/Hologram/";
     static final String WAND = "MobBattle_MorphWand";
     /** A texture Mob Battle ships, to learn whether the registry names common files with a "Common/" prefix. */
     private static final String KNOWN_TEXTURE = "Items/MobBattle/MorphWand/MobBattle_MorphWand_Texture.png";
-    static final int TEX = 128;
+    /** Hologram texture size (256 since 2026-10-16: 128 looked blocky on the panel; the panel quad is 256 units). */
+    static final int TEX = 256;
     private static final long LIVE_APPLY_DELAY_MS = 1500;
     private static final long CHECK_MS = 1000;
 
     /** Players who turned the hologram on (memory only). */
-    private static final Set<UUID> ENABLED = ConcurrentHashMap.newKeySet();
+    /** Players who turned it off (memory only; on by default since 2026-10-16: an "on" list was lost at every restart). */
+    private static final Set<UUID> DISABLED = ConcurrentHashMap.newKeySet();
     /** Player -> texture of the panel they wear now. */
     private static final Map<UUID, String> SHOWN = new ConcurrentHashMap<>();
     /** Live-registered textures this session (a model the boot cache did not have). */
@@ -107,7 +141,7 @@ final class MorphHologram {
                     TestTools.say(ctx.sender(), "Usage: /mobbattle test hologram on [wand|hud] | off", ERR);
                     return;
                 }
-                ENABLED.add(id);
+                DISABLED.remove(id);
                 STYLE.put(id, style);
                 startChecks();
                 TestTools.say(ctx.sender(), "Hologram on (" + style + "): " + (HUD.equals(style)
@@ -115,11 +149,27 @@ final class MorphHologram {
                         : "a panel over the Morph Wand while you hold it, your clothes rebuilt on the server. Look in third person."), OK);
             }
             case "off" -> {
-                ENABLED.remove(id);
+                DISABLED.add(id);
                 TestTools.say(ctx.sender(), "Hologram off.", OK);
             }
+            case "yaw" -> {
+                int deg;
+                try {
+                    deg = Integer.parseInt(style);
+                } catch (NumberFormatException e) {
+                    deg = Integer.MIN_VALUE;
+                }
+                final int want = deg;
+                if (java.util.Arrays.stream(YAWS).noneMatch(y -> y == want)) {
+                    TestTools.say(ctx.sender(), "Usage: /mobbattle test hologram yaw <-90|-60|-56|-30|0|34> (now "
+                            + YAW.getOrDefault(id, DEFAULT_YAW) + ", default " + DEFAULT_YAW + ")", ERR);
+                    return;
+                }
+                YAW.put(id, deg);
+                TestTools.say(ctx.sender(), "Hologram panel turned " + deg + " degrees. Hold the Morph Wand and compare first and third person.", OK);
+            }
             default -> {
-                TestTools.say(ctx.sender(), "Usage: /mobbattle test hologram on [wand|hud] | off", ERR);
+                TestTools.say(ctx.sender(), "Usage: /mobbattle test hologram on [wand|hud] | off | yaw <degrees>", ERR);
                 return;
             }
         }
@@ -130,7 +180,12 @@ final class MorphHologram {
 
     /** Whatever changed for this player (turned on/off, new copy, item in hand): shows or hides the panel. */
     static void refresh(UUID player) {
-        if (!ENABLED.contains(player) && !SHOWN.containsKey(player)) return;
+        if (DISABLED.contains(player) && !SHOWN.containsKey(player)) return;
+        startChecks();
+        refreshNow(player);
+    }
+
+    private static void refreshNow(UUID player) {
         PlayerRef pr = Universe.get().getPlayer(player);
         Ref<EntityStore> ref = pr != null ? pr.getReference() : null;
         if (ref == null || !ref.isValid()) {
@@ -149,17 +204,17 @@ final class MorphHologram {
         }
         String want = null;
         String modelId = null;
-        if (ENABLED.contains(player) && holdsWand(ref, store)) {
+        if (!DISABLED.contains(player) && holdsWand(ref, store)) {
             MorphWand.Copy copy = MorphWand.copyOf(player);
             modelId = copy != null && copy.skin() == null ? copy.modelId() : null;
             want = modelId != null ? ThumbnailCache.hologramTexture(modelId) : null;
         }
-        if (want == null && modelId != null && ENABLED.contains(player)) {
+        if (want == null && modelId != null && !DISABLED.contains(player)) {
             liveTexture(player, modelId);   // not in the boot cache: made now, put on when ready
         }
         String style = STYLE.getOrDefault(player, PANEL);
         PlayerRef pr = store.getComponent(ref, PlayerRef.getComponentType());
-        String now = panelOf(ref, store);
+        String now = panelOf(ref, store, player);
         if (HUD.equals(style)) {
             if (now != null) setPanel(ref, store, null, style);
             showHud(pr, ref, store, want, modelId);
@@ -173,18 +228,32 @@ final class MorphHologram {
             if (want == null) SHOWN.remove(player);
             return;
         }
+        // nothing changed on our side (same wanted texture, already put) but the panel is gone or stale: something
+        // rebuilt the model; put it back, but never more often than REPUT_MS
+        boolean same = want != null && want.equals(SHOWN.get(player));
+        Object[] last = LAST_PUT.get(player);
+        long t = System.currentTimeMillis();
+        if (same && last != null && want.equals(last[1]) && t - (long) last[0] < REPUT_MS) return;
+        if (MobBattlePlugin.debugging()) {
+            MobBattlePlugin.debug("hologram: " + (want == null ? "panel off" : same ? "panel re-put (gone from the model: " + now + ")"
+                    : "panel on " + want) + " for " + (pr != null ? pr.getUsername() : player));
+        }
+        LAST_PUT.put(player, new Object[] {t, want});
         setPanel(ref, store, want, style);
         if (want == null) SHOWN.remove(player);
         else SHOWN.put(player, want);
     }
 
     /** The texture of the panel on the player's model now, or null. */
-    private static String panelOf(Ref<EntityStore> ref, Store<EntityStore> store) {
+    /** The panel's texture, prefixed with "~" when it hangs on another yaw's model than the player's (re-put then). */
+    private static String panelOf(Ref<EntityStore> ref, Store<EntityStore> store, UUID player) {
         ModelComponent mc = store.getComponent(ref, ModelComponent.getComponentType());
         Model m = mc != null ? mc.getModel() : null;
         if (m == null || m.getAttachments() == null) return null;
         for (ModelAttachment att : m.getAttachments()) {
-            if (att != null && HOLO_MODEL.equals(att.getModel())) return att.getTexture();
+            if (att != null && isHoloModel(att.getModel())) {
+                return holoModelOf(player).equals(att.getModel()) ? att.getTexture() : "~" + att.getTexture();
+            }
         }
         return null;
     }
@@ -202,13 +271,24 @@ final class MorphHologram {
         HytaleServer.SCHEDULED_EXECUTOR.schedule(MorphHologram::check, CHECK_MS, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * Every online player once a second (cheap: one hotbar read each), from the plugin start on: a player who joins with
+     * the wand already in hand gets the panel without a hotbar change. Stops on plugin shutdown ({@link #clear}).
+     */
+    static void startAtBoot() {
+        startChecks();
+    }
+
     private static void check() {
+        if (!checking) return;
         Set<UUID> ids = new java.util.HashSet<>(SHOWN.keySet());
-        ids.addAll(ENABLED);
-        for (UUID id : ids) refresh(id);
-        if (SHOWN.isEmpty() && ENABLED.isEmpty()) {
-            checking = false;
-            return;
+        for (PlayerRef p : Universe.get().getPlayers()) if (!DISABLED.contains(p.getUuid())) ids.add(p.getUuid());
+        for (UUID id : ids) {
+            try {
+                refreshNow(id);
+            } catch (RuntimeException e) {
+                MobBattlePlugin.log("Hologram check failed: " + e);
+            }
         }
         HytaleServer.SCHEDULED_EXECUTOR.schedule(MorphHologram::check, CHECK_MS, TimeUnit.MILLISECONDS);
     }
@@ -238,10 +318,13 @@ final class MorphHologram {
             if (texture != null) next.addAll(PlayerLook.attachments(skin.getPlayerSkin()));
         } else if (base.getAttachments() != null) {
             for (ModelAttachment att : base.getAttachments()) {
-                if (att != null && !HOLO_MODEL.equals(att.getModel())) next.add(att);
+                if (att != null && !isHoloModel(att.getModel())) next.add(att);
             }
         }
-        if (texture != null) next.add(new ModelAttachment(HOLO_MODEL, texture, null, null, 1.0));
+        if (texture != null) {
+            PlayerRef owner = store.getComponent(me, PlayerRef.getComponentType());
+            next.add(new ModelAttachment(holoModelOf(owner != null ? owner.getUuid() : null), texture, null, null, 1.0));
+        }
         Model model = new Model(base.getModelAssetId(), base.getScale(), base.getRandomAttachmentIds(),
                 next.toArray(new ModelAttachment[0]), base.getBoundingBox(), base.getModel(), base.getTexture(),
                 base.getGradientSet(), base.getGradientId(), base.getEyeHeight(), base.getCrouchOffset(),
@@ -326,7 +409,7 @@ final class MorphHologram {
         if (!LIVE.add(modelId)) return;
         ModelAsset asset = ModelAsset.getAssetMap().getAsset(modelId);
         if (asset == null) return;
-        Model model = Model.createScaledModel(asset, 1f, Map.of());
+        Model model = ThumbnailCache.modelOf(asset);
         List<ThumbnailCache.Piece> pieces = ThumbnailCache.piecesOf(model);
         ThumbnailCache.PoseChoice pose = ThumbnailCache.poseOf(model, "auto", null);
         CompletableFuture.runAsync(() -> {
@@ -345,10 +428,10 @@ final class MorphHologram {
     /** 128x128: the picture fitted at the bottom, tinted green by its brightness, scanlines, outline, corner brackets. */
     static BufferedImage hologram(BufferedImage shot) {
         BufferedImage out = new BufferedImage(TEX, TEX, BufferedImage.TYPE_INT_ARGB);
-        int max = TEX - 16;
+        int max = TEX - 24;
         double k = Math.min((double) max / shot.getWidth(), (double) max / shot.getHeight());
         int w = Math.max(1, (int) Math.round(shot.getWidth() * k)), h = Math.max(1, (int) Math.round(shot.getHeight() * k));
-        int ox = (TEX - w) / 2, oy = TEX - 8 - h;
+        int ox = (TEX - w) / 2, oy = TEX - 12 - h;
         if (k < 1) {
             // area average (a 384 thumbnail sampled one pixel in three lost its details)
             shot = shrink(shot, w, h);
@@ -368,39 +451,56 @@ final class MorphHologram {
             }
         }
         double span = Math.max(0.05, hi - lo);
+        // soft glow around the silhouette first (GLOW_PX, lime fading out), then the body over it
+        for (int y = -GLOW_PX; y < h + GLOW_PX; y++) {
+            for (int x = -GLOW_PX; x < w + GLOW_PX; x++) {
+                if (y >= 0 && y < h && x >= 0 && x < w && solid[y][x]) continue;
+                double d = nearestSolid(solid, x, y, GLOW_PX);
+                if (d > GLOW_PX) continue;
+                int a = (int) Math.round(GLOW_ALPHA * Math.pow(1 - d / (GLOW_PX + 0.5), 1.5));
+                int tx = ox + x, ty = oy + y;
+                if (a > 0 && tx >= 0 && ty >= 0 && tx < TEX && ty < TEX) out.setRGB(tx, ty, a << 24 | GLOW_RGB);
+            }
+        }
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 if (!solid[y][x]) continue;
-                // brightness stretched over the picture's own range, so dark mobs still show their details
-                double v = Math.pow((lum[y][x] - lo) / span, 0.8);
+                // green-scale (user, 2026-10-16: like the Omnitrix hologram, not old-TV lines): the picture's own
+                // brightness range mapped from deep green to bright lime
+                double v = Math.pow((lum[y][x] - lo) / span, 0.85);
                 boolean edge = x == 0 || y == 0 || x == w - 1 || y == h - 1
                         || !solid[y - 1][x] || !solid[y + 1][x] || !solid[y][x - 1] || !solid[y][x + 1];
-                double line = ((oy + y) % 3 == 0) ? 0.72 : 1.0;
-                int r, g, b;
-                if (edge) {
-                    r = 190; g = 255; b = 210;
-                } else {
-                    r = clamp((10 + 120 * v) * line);
-                    g = clamp((90 + 165 * v) * line);
-                    b = clamp((55 + 130 * v) * line);
-                }
-                out.setRGB(ox + x, oy + y, 0xFF000000 | (r << 16) | (g << 8) | b);
-            }
-        }
-        int frame = 0xFF7DFF8A;
-        for (int i = 0; i < 14; i++) {
-            for (int t = 0; t < 2; t++) {
-                out.setRGB(i, t, frame);
-                out.setRGB(t, i, frame);
-                out.setRGB(TEX - 1 - i, t, frame);
-                out.setRGB(TEX - 1 - t, i, frame);
-                out.setRGB(i, TEX - 1 - t, frame);
-                out.setRGB(t, TEX - 1 - i, frame);
-                out.setRGB(TEX - 1 - i, TEX - 1 - t, frame);
-                out.setRGB(TEX - 1 - t, TEX - 1 - i, frame);
+                if (edge) v = 1.08;   // rim light, past the lime toward white
+                double line = (oy + y) % SCANLINE_EVERY == 0 ? SCANLINE_DIM : 1.0;   // faint, wide apart
+                int r = clamp((DARK[0] + (LIME[0] - DARK[0]) * v) * line);
+                int g = clamp((DARK[1] + (LIME[1] - DARK[1]) * v) * line);
+                int b = clamp((DARK[2] + (LIME[2] - DARK[2]) * v) * line);
+                out.setRGB(ox + x, oy + y, BODY_ALPHA << 24 | r << 16 | g << 8 | b);
             }
         }
         return out;
+    }
+
+    // brighter than the first green-scale (user, 2026-10-16: glow like the wand's gem): bright colors on the fullbright
+    // panel are what makes it glow
+    private static final int[] DARK = {26, 124, 34}, LIME = {214, 255, 128};
+    private static final int GLOW_RGB = 0xB4FF6E, GLOW_ALPHA = 150, BODY_ALPHA = 240, GLOW_PX = 5;
+    private static final int SCANLINE_EVERY = 8;
+    private static final double SCANLINE_DIM = 0.9;
+
+    /** Distance to the nearest solid pixel within {@code r} (r + 1 when none). */
+    private static double nearestSolid(boolean[][] solid, int x, int y, int r) {
+        double best = r + 1;
+        for (int dy = -r; dy <= r; dy++) {
+            int yy = y + dy;
+            if (yy < 0 || yy >= solid.length) continue;
+            for (int dx = -r; dx <= r; dx++) {
+                int xx = x + dx;
+                if (xx < 0 || xx >= solid[0].length || !solid[yy][xx]) continue;
+                best = Math.min(best, Math.sqrt(dx * dx + dy * dy));
+            }
+        }
+        return best;
     }
 
     /** Box-filter downscale (alpha-weighted colors), no AWT toolkit: the server is headless. */
@@ -434,10 +534,9 @@ final class MorphHologram {
         return (int) Math.max(0, Math.min(255, Math.round(v)));
     }
 
+    /** Palette PNG (IndexedPng, as the VS pictures): ~3x smaller than ImageIO's full-color one for every joining client. */
     static byte[] encode(BufferedImage img) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ImageIO.write(img, "png", out);
-        return out.toByteArray();
+        return IndexedPng.encode(img);
     }
 
     private static String safe(String id) {
@@ -446,11 +545,13 @@ final class MorphHologram {
 
     /** Plugin shutdown: forget who had it on. */
     static void clear() {
-        ENABLED.clear();
+        DISABLED.clear();
+        checking = false;
         SHOWN.clear();
         LIVE.clear();
         STYLE.clear();
         HUD_SHOWN.clear();
+        LAST_PUT.clear();
     }
 
     /** Runtime PNG. The base class keeps only a WeakReference to the future, so the bytes stay here (as EyeRecolor). */

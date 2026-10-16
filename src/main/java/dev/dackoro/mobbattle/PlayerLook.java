@@ -63,22 +63,25 @@ final class PlayerLook {
         return built;
     }
 
-    private static List<ModelAttachment> build(PlayerSkin skin) {
+    static List<ModelAttachment> build(PlayerSkin skin) {
         CosmeticRegistry reg = CosmeticsModule.get().getRegistry();
         List<ModelAttachment> out = new ArrayList<>();
-        add(out, reg.getBodyCharacteristics(), skin.bodyCharacteristic);
-        add(out, reg.getUnderwear(), skin.underwear);
-        add(out, reg.getFaces(), skin.face);
-        add(out, reg.getEyes(), skin.eyes);
-        add(out, reg.getMouths(), skin.mouth);
-        add(out, reg.getEyebrows(), skin.eyebrows);
-        add(out, reg.getFacialHairs(), skin.facialHair);
-        add(out, reg.getSkinFeatures(), skin.skinFeature);
+        // Face, mouth and ears are just an id in the skin (no color) and use the Skin gradient: they take the body's
+        // skin tone (user, 2026-10-16: the face came out white). Hair-tinted parts without a color take the haircut's.
+        Tones tones = new Tones(colorOf(skin.bodyCharacteristic), colorOf(skin.haircut));
+        add(out, tones, reg.getBodyCharacteristics(), skin.bodyCharacteristic);
+        add(out, tones, reg.getUnderwear(), skin.underwear);
+        add(out, tones, reg.getFaces(), skin.face);
+        add(out, tones, reg.getEyes(), skin.eyes);
+        add(out, tones, reg.getMouths(), skin.mouth);
+        add(out, tones, reg.getEyebrows(), skin.eyebrows);
+        add(out, tones, reg.getFacialHairs(), skin.facialHair);
+        add(out, tones, reg.getSkinFeatures(), skin.skinFeature);
 
         PlayerSkinPart hat = partOf(reg.getHeadAccessories(), skin.headAccessory);
         PlayerSkinPart.HeadAccessoryType hatType = hat != null ? hat.getHeadAccessoryType() : null;
         if (hatType != PlayerSkinPart.HeadAccessoryType.FullyCovering) {
-            add(out, reg.getEars(), skin.ears);
+            add(out, tones, reg.getEars(), skin.ears);
             String haircut = skin.haircut;
             PlayerSkinPart hair = partOf(reg.getHaircuts(), haircut);
             if (hair != null && hatType == PlayerSkinPart.HeadAccessoryType.HalfCovering && hair.doesRequireGenericHaircut()
@@ -88,18 +91,18 @@ final class PlayerLook {
                 String generic = "Generic" + hair.getHairType().name();
                 if (reg.getHaircuts().containsKey(generic)) haircut = generic + (bits.length > 1 ? "." + bits[1] : "");
             }
-            add(out, reg.getHaircuts(), haircut);
-            add(out, reg.getEarAccessories(), skin.earAccessory);
+            add(out, tones, reg.getHaircuts(), haircut);
+            add(out, tones, reg.getEarAccessories(), skin.earAccessory);
         }
-        add(out, reg.getHeadAccessories(), skin.headAccessory);
-        add(out, reg.getFaceAccessories(), skin.faceAccessory);
-        add(out, reg.getUndertops(), skin.undertop);
-        add(out, reg.getOvertops(), skin.overtop);
-        add(out, reg.getPants(), skin.pants);
-        add(out, reg.getOverpants(), skin.overpants);
-        add(out, reg.getShoes(), skin.shoes);
-        add(out, reg.getGloves(), skin.gloves);
-        add(out, reg.getCapes(), skin.cape);
+        add(out, tones, reg.getHeadAccessories(), skin.headAccessory);
+        add(out, tones, reg.getFaceAccessories(), skin.faceAccessory);
+        add(out, tones, reg.getUndertops(), skin.undertop);
+        add(out, tones, reg.getOvertops(), skin.overtop);
+        add(out, tones, reg.getPants(), skin.pants);
+        add(out, tones, reg.getOverpants(), skin.overpants);
+        add(out, tones, reg.getShoes(), skin.shoes);
+        add(out, tones, reg.getGloves(), skin.gloves);
+        add(out, tones, reg.getCapes(), skin.cape);
         return out;
     }
 
@@ -109,11 +112,26 @@ final class PlayerLook {
     }
 
     /** One part as an attachment; nothing when it is empty or unknown. */
-    private static void add(List<ModelAttachment> out, Map<String, PlayerSkinPart> parts, String value) {
+    /** Default gradient ids for parts whose skin value has no color: the body's skin tone, the haircut's color. */
+    record Tones(String skin, String hair) {
+        String forSet(String gradientSet) {
+            if (CosmeticRegistry.SKIN_GRADIENTSET_ID.equals(gradientSet)) return skin;
+            if ("Hair".equals(gradientSet)) return hair;
+            return null;
+        }
+    }
+
+    private static String colorOf(String value) {
+        if (value == null) return null;
+        String[] bits = value.split("\\.");
+        return bits.length > 1 && !bits[1].isEmpty() ? bits[1] : null;
+    }
+
+    private static void add(List<ModelAttachment> out, Tones tones, Map<String, PlayerSkinPart> parts, String value) {
         PlayerSkinPart part = partOf(parts, value);
         if (part == null) return;
         String[] bits = value.split("\\.");
-        String color = bits.length > 1 ? bits[1] : null;
+        String color = bits.length > 1 && !bits[1].isEmpty() ? bits[1] : null;
         String model = part.getModel();
         String greyscale = part.getGreyscaleTexture();
         Map<String, PlayerSkinPartTexture> textures = part.getTextures();
@@ -134,6 +152,7 @@ final class PlayerLook {
         if (model == null || model.isEmpty()) return;
         String gradientSet = part.getGradientSet();
         if (gradientSet != null && greyscale != null) {
+            if (color == null) color = tones.forSet(gradientSet);
             out.add(new ModelAttachment(model, greyscale, gradientSet, color, 1.0));
             return;
         }

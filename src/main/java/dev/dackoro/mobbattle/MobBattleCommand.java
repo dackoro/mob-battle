@@ -97,6 +97,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.titles.21",
                 "help.titles.22",
                 "help.titles.30",
+                "help.titles.31",
                 "help.titles.23",
                 "help.titles.24",
                 "help.titles.25",
@@ -1040,6 +1041,8 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(kindFxSub("vsscreen", I18n.id("cmd.desc.vs_screen"), "on", "off"));
         addSubCommand(new Sub("filmplayershots", I18n.id("cmd.desc.film_player_shots"),
                 words(I18n.id("cmd.desc.film_player_shots"), "0", "15", "30", "50", "100")));
+        addSubCommand(new Sub("vsteamreps", I18n.id("cmd.desc.vs_team_reps"),
+                words(I18n.id("cmd.desc.vs_team_reps"), "1", "2")));
         addSubCommand(new Sub("filmwideshots", I18n.id("cmd.desc.film_wide_shots"),
                 words(I18n.id("cmd.desc.film_wide_shots"), "0", "15", "30", "50", "100")));
         addSubCommand(new Sub("filmshot", I18n.id("cmd.desc.film_shot"),
@@ -1762,6 +1765,13 @@ public class MobBattleCommand extends CommandBase {
                     case "filmwideshots" -> FxSettings.filmWideShots = n;
                     default -> FxSettings.filmPlayerShots = n;
                 }
+            }
+            case "vsteamreps" -> {
+                if (!"1".equals(val) && !"2".equals(val)) {
+                    usage(ctx, "/mobbattle vsTeamReps 1|2");
+                    return;
+                }
+                FxSettings.vsTeamReps = Integer.parseInt(val);
             }
             case "filmtransition" -> {
                 if (!"cut".equalsIgnoreCase(val) && !"glide".equalsIgnoreCase(val)) {

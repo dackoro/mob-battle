@@ -302,6 +302,7 @@ mobbattle.hud.vs.red = Equipo rojo
 mobbattle.hud.vs.blue = Equipo azul
 mobbattle.hud.vs.champion = Campeón
 mobbattle.hud.vs.side = Lado {n}
+mobbattle.hud.vs.royale = Battle royale
 # --- cmd ---
 mobbattle.cmd.usage = Uso: {usage}
 mobbattle.cmd.usage.player = Uso (jugador): {usage}
@@ -495,6 +496,7 @@ mobbattle.help.titles.20 = cameraBars off|slim|classic|wide - bandas negras de p
 mobbattle.help.titles.21 = cameraBlur off|soft|strong - desenfoca lo que queda delante y detrás de lo que filma cada plano (por defecto soft)
 mobbattle.help.titles.22 = autoFilm on|off - quienes ven las cámaras reciben la película de la batalla (ver film) desde que empieza, tras la intro, hasta que termina; gana a autoWatch (por defecto off)
 mobbattle.help.titles.30 = vsScreen on|off - una pantalla VS estilo Smash (los dos lados, sus luchadores más fuertes y un VS grande) abre la cuenta atrás durante 2,5 s y luego va la cámara de intro; necesita una cuenta atrás de 2 s o más (por defecto on)
+mobbattle.help.titles.31 = vsTeamReps 1|2 - pantalla VS con 3 equipos o más: luchadores por equipo (una columna cada uno) cuando hay 4 equipos o menos (por defecto 2)
 mobbattle.help.titles.23 = filmPlayerShots <0-100> - % de planos de la película que te muestran mirando (por defecto 20); filmShotTime <3-60> - segundos por plano (por defecto 8)
 mobbattle.help.titles.24 = filmShotVariation <0-90> - cada plano dura ese % más o menos al azar (por defecto 25); filmPace <25-300> - cuánto se mueve la cámara en un plano, % (por defecto 100)
 mobbattle.help.titles.25 = filmTransition cut|glide - saltar al siguiente plano o deslizarse hasta él (por defecto cut); filmShots all|battle|<lista> - planos usados: wide, track, arc, pushIn, closeUp, landscape, playerBack, playerClose
@@ -933,6 +935,7 @@ mobbattle.cmd.desc.film = Filma la batalla en curso más cercana (la tuya primer
 mobbattle.cmd.desc.film_exit = Para la película de la batalla: vuelves a tu cámara
 mobbattle.cmd.desc.film_auto = Quienes ven las cámaras reciben la película de la batalla desde que empieza (tras la intro) hasta que termina; gana a autoWatch
 mobbattle.cmd.desc.vs_screen = Una pantalla VS estilo Smash abre la cuenta atrás, antes de la cámara de intro
+mobbattle.cmd.desc.vs_team_reps = Pantalla VS: luchadores por equipo con 3-4 equipos (por defecto 2)
 mobbattle.cmd.desc.film_player_shots = Porcentaje de planos de la película que te muestran mirando (0 = solo la batalla)
 mobbattle.cmd.desc.camera_face = Primeros planos delante de la cara del mob (por defecto on)
 mobbattle.cmd.desc.film_wide_shots = Película de batalla: porcentaje de planos generales lejanos (por defecto 30)
@@ -1147,6 +1150,9 @@ mobbattle.panel.field.camera.autofilm.label = Filmar automáticamente
 mobbattle.panel.field.camera.autofilm.tip = Quienes ven las cámaras reciben la película de la batalla (/mobbattle film) desde que empieza, tras la intro, hasta que termina. Gana a Ver automáticamente (por defecto off).
 mobbattle.panel.field.camera.vsscreen.label = Pantalla VS
 mobbattle.panel.field.camera.vsscreen.tip = Una pantalla VS estilo Smash abre la cuenta atrás durante 2,5 s: los dos lados, sus luchadores más fuertes y un VS grande. La cámara de intro sigue con el tiempo que quede. Necesita una cuenta atrás de 2 s o más. La primera vez que sale un mob puede notarse un pequeño tirón mientras carga su imagen (por defecto encendido).
+mobbattle.panel.field.camera.vs.teamreps.label = Luchadores VS por equipo
+mobbattle.panel.field.camera.vs.teamreps.tip = Con 3 o 4 equipos la pantalla VS puede mostrar dos luchadores de cada equipo, juntos y en su color; 1 = solo uno por equipo. Con 5 equipos o más siempre muestra uno (por defecto 2).
+mobbattle.panel.field.camera.vs.teamreps.hint = 1 o 2
 mobbattle.panel.field.camera.film.player.label = Planos tuyos
 mobbattle.panel.field.camera.film.player.tip = Parte de los planos que te muestran mirando la batalla: por encima de tu hombro, o cerca de ti con la batalla desenfocada detrás (por defecto 20).
 mobbattle.panel.field.camera.film.player.hint = porcentaje, 0 = solo la batalla

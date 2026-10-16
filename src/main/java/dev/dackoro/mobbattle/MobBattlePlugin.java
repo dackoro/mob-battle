@@ -124,6 +124,8 @@ public class MobBattlePlugin extends JavaPlugin {
                     BattleWatch.onReady(event.getPlayerRef());
                     // Came back with a size buff's leftovers (scale and health modifier are saved, our state isn't).
                     Buffs.onPlayerReady(event.getPlayerRef());
+                    // Their own skin in the VS screen: saved, drawn and registered in the background when new.
+                    VsScreen.onPlayerReady(event.getPlayerRef());
                     var player = event.getPlayer();
                     if (player == null || player.getGameMode() != com.hypixel.hytale.protocol.GameMode.Creative) {
                         return;

@@ -471,6 +471,7 @@ final class ConfigSchema {
                 section("introcamera"),
                 toggle("fight.camera"),
                 toggle("camera.vsscreen"),
+                number("camera.vs.teamreps", 1, 2),
                 choice("camera.style", KindFx.CAMERA_STYLES),
                 number("camera.time", 0, KindFx.MAX_CAMERA_TIME),
                 number("camera.shots", 1, FxSettings.MAX_MOBS_LIMIT),

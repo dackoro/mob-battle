@@ -93,6 +93,10 @@ final class FilmCamera {
     private static final long WAIT_POLL_MS = 250;
     /** Angles tried around the battle for a shot with a clear view (30 degrees apart). */
     private static final int ANGLE_TRIES = 12;
+    /** Shots FilmPicker may offer for one cut when the earlier ones have no clear view. */
+    private static final int PICK_TRIES = 4;
+    /** roofed(): how high above the fighters a roof is looked for. */
+    private static final int ROOF_LOOK = 48;
     private static final String WARN = "#ffcc55";
 
     /** Shot types; {@code word}: its name in /mobbattle filmShots; {@code player}: shows the viewer watching. */
@@ -111,6 +115,11 @@ final class FilmCamera {
         Type(String word, boolean player) {
             this.word = word;
             this.player = player;
+        }
+
+        static Type of(String word) {
+            for (Type t : values()) if (t.word.equals(word)) return t;
+            return WIDE_PAN;
         }
     }
 
@@ -195,7 +204,7 @@ final class FilmCamera {
         long t;
         Type last;
         int shots;
-        boolean playerNext;
+        final FilmPicker picker = new FilmPicker(rnd);
         double camY = Double.NaN;
         final double[] roof = {Double.NaN};
         long overAt;
@@ -591,81 +600,37 @@ final class FilmCamera {
         if (!"glide".equals(FxSettings.filmTransition)) f.camY = Double.NaN;
         double vary = FxSettings.filmShotVariation / 100.0;
         long ms = Math.max(1000, (long) (FxSettings.filmShotSeconds * 1000L * (1 + vary * (f.rnd.nextDouble() * 2 - 1))));
-        java.util.Set<Type> ok = allowed();
-        boolean back = ok.contains(Type.PLAYER_BACK), close = ok.contains(Type.PLAYER_CLOSE);
-        boolean anyBattle = ok.stream().anyMatch(t -> !t.player);
-        int share = anyBattle ? FxSettings.filmPlayerShots : 100;
-        boolean player = (back || close) && share > 0 && (share >= 100 || (f.shots > 0 && f.rnd.nextInt(100) < share))
-                && playerPos(f) != null;
         double base = f.rnd.nextDouble() * Math.PI * 2;
         double side = f.rnd.nextBoolean() ? 1 : -1;
+        // FilmPicker chooses (no shot twice, no family three times, shares kept over the fight); a shot whose view is
+        // blocked from every angle is skipped and another one asked for, up to PICK_TRIES.
+        boolean roofed = roofed(f);
+        int wideShare = Math.min(100, FxSettings.filmWideShots + (f.tall > BIG_MOB ? BIG_MOB_WIDE_BONUS : 0));
+        FilmPicker.Scene scene = new FilmPicker.Scene(f.count, f.spread, f.tall, roofed, playerPos(f) != null, f.shots == 0);
+        java.util.Set<String> skip = new java.util.HashSet<>();
         Plan plan = null;
-        if (player) {
-            Type type = back && close ? (f.playerNext ? Type.PLAYER_CLOSE : Type.PLAYER_BACK) : back ? Type.PLAYER_BACK : Type.PLAYER_CLOSE;
-            for (double s : new double[] {side, -side}) {
-                Plan p = new Plan(type, type == Type.PLAYER_CLOSE ? ms * 4 / 5 : ms, 0, s, false);
-                if (clearShot(f, p)) {
-                    plan = p;
-                    break;
-                }
+        FilmPicker.Choice chosen = null;
+        for (int tries = 0; tries < PICK_TRIES && plan == null; tries++) {
+            FilmPicker.Choice c = f.picker.next(scene, FxSettings::filmWeight, FxSettings.filmPlayerShots, wideShare, skip);
+            if (c == null) break;
+            Type type = Type.of(c.shot());
+            f.far = c.far();
+            plan = c.player() ? playerPlan(f, type, ms, side) : battlePlan(f, type, ms, base, side);
+            if (plan != null) {
+                chosen = c;
+            } else {
+                skip.add(c.shot());
+                if (c.player()) skip.addAll(FilmPicker.PLAYER);
             }
-            if (plan != null) f.playerNext = !f.playerNext;
         }
-        f.far = false;
         if (plan == null) {
-            Type type = pickBattleShot(f, ok);
-            // filmWideShots (2026-10-16, user: big attacks, a Nightlord's, look best from far away): that share of the
-            // battle shots is a wide pan or a landscape filmed from further back; more of them with a big mob in it.
-            java.util.List<Type> wides = new ArrayList<>();
-            for (Type w : new Type[] {Type.WIDE_PAN, Type.LANDSCAPE}) if (ok.contains(w) && w != f.last) wides.add(w);
-            int wideShare = Math.min(100, FxSettings.filmWideShots + (f.tall > BIG_MOB ? BIG_MOB_WIDE_BONUS : 0));
-            if (f.shots > 0 && !wides.isEmpty() && f.rnd.nextInt(100) < wideShare) {
-                type = wides.get(f.rnd.nextInt(wides.size()));
-                f.far = true;
-            }
-            if (type == Type.PROFILE) {
-                // Two fighters side by side: the star and its nearest enemy.
-                f.star = pickStar(f);
-                f.partner = f.star != null ? BattleManager.nearestEnemy(f.battle, f.star, f.store) : null;
-                Vector3d a = f.star != null ? ChaosWand.positionOf(f.star, f.store) : null;
-                Vector3d b = f.partner != null ? ChaosWand.positionOf(f.partner, f.store) : null;
-                if (a == null || b == null) {
-                    f.star = null;
-                    f.partner = null;
-                    java.util.Set<Type> rest = java.util.EnumSet.copyOf(ok);
-                    rest.remove(Type.PROFILE);
-                    type = pickBattleShot(f, rest);
-                } else {
-                    f.starPos = a;
-                    f.partnerPos = b;
-                    f.starHeight = heightOf(f.star, f.store);
-                }
-            }
-            if (type == Type.CLOSE_UP) {
-                f.star = pickStar(f);
-                Vector3d at = f.star != null ? ChaosWand.positionOf(f.star, f.store) : null;
-                if (at == null) {
-                    f.star = null;
-                    java.util.Set<Type> rest = java.util.EnumSet.copyOf(ok);
-                    rest.remove(Type.CLOSE_UP);
-                    type = pickBattleShot(f, rest);
-                } else {
-                    f.starPos = at;
-                    f.starAim.reset();
-                    f.starHeight = heightOf(f.star, f.store);
-                }
-            }
-            for (int i = 0; i < ANGLE_TRIES && plan == null; i++) {
-                double a = base + i * Math.PI * 2 / ANGLE_TRIES;
-                Plan p = new Plan(type, ms, a, side, false);
-                if (clearShot(f, p)) plan = p;
-            }
-            if (plan == null) {
-                Type wide = type == Type.TRACK || type == Type.PUSH_IN || type == Type.CLOSE_UP || type == Type.PROFILE
-                        || type == Type.GROUNDRISE ? Type.WIDE_PAN : type;
-                plan = new Plan(wide, ms, base, side, true);
-            }
+            // Nothing clear: a wide pan anyway, raised over the obstacles outdoors; under a roof it stays below it (the
+            // raised one flew over a colosseum's dome) and the blocked-view pull brings it in.
+            f.far = false;
+            chosen = new FilmPicker.Choice("wide", false);
+            plan = new Plan(Type.WIDE_PAN, ms, base, side, !roofed);
         }
+        f.picker.commit(chosen);
         f.plan = plan;
         f.last = plan.type();
         f.shots++;
@@ -673,40 +638,68 @@ final class FilmCamera {
         CinemaBars.shotName(f.player, "Film: " + plan.type().word + (f.far ? " (far)" : "") + (plan.high() ? " (raised)" : ""));
     }
 
+    /** A player shot with a clear view from either side, or null (back and close-to-the-head alternate in FilmPicker). */
+    private static Plan playerPlan(Film f, Type type, long ms, double side) {
+        for (double s : new double[] {side, -side}) {
+            Plan p = new Plan(type, type == Type.PLAYER_CLOSE ? ms * 4 / 5 : ms, 0, s, false);
+            if (clearShot(f, p)) return p;
+        }
+        return null;
+    }
+
     /**
-     * A battle shot filmShots allows, other than the last one, at random by weight (user, 2026-10-16: mostly wide
-     * shots, now and then a close-up): wide 3 (+1.5 for a spread past 12 blocks, +1 past 20 fighters), arc 2,
-     * landscape 1.2 (0.6 for a small battle), track 1, push-in 1, close-up 3 for 2 fighters or fewer, 2 up to 4,
-     * 1 up to 10, else 0.5. The film opens on a wide pan when allowed. None allowed: a wide pan anyway.
+     * A battle shot of {@code type} with a clear view from one of ANGLE_TRIES angles, or null. Close-up and profile
+     * pick their fighters first (null when there are none).
      */
-    private static Type pickBattleShot(Film f, java.util.Set<Type> ok) {
-        List<Type> pool = new ArrayList<>();
-        for (Type t : Type.values()) if (!t.player && ok.contains(t)) pool.add(t);
-        if (pool.isEmpty()) return Type.WIDE_PAN;
-        if (f.shots == 0 && pool.contains(Type.WIDE_PAN)) return Type.WIDE_PAN;
-        if (pool.size() > 1) pool.remove(f.last);
-        double[] w = new double[pool.size()];
-        double sum = 0;
-        for (int i = 0; i < w.length; i++) {
-            w[i] = switch (pool.get(i)) {
-                case WIDE_PAN -> 3 + (f.spread > 12 ? 1.5 : 0) + (f.count > 20 ? 1 : 0);
-                case ARC -> 2;
-                case LANDSCAPE -> f.spread > 10 ? 0.5 : 0.25;   // was 1.2 / 0.6 (user: the worst shot)
-                case CLOSE_UP -> f.count <= 2 ? 3 : f.count <= 4 ? 2 : f.count <= 10 ? 1 : 0.5;
-                case ZENITH -> 0.8;
-                case SPIRAL, PROFILE -> f.count >= 2 ? 1.2 : 0;
-                default -> 1;
-            };
-            // filmWeight: each shot's percent of its usual weight (0 = never, 200 = twice as often).
-            w[i] *= FxSettings.filmWeight(pool.get(i).word) / 100.0;
-            sum += w[i];
+    private static Plan battlePlan(Film f, Type type, long ms, double base, double side) {
+        if (type == Type.PROFILE) {
+            // Two fighters side by side: the star and its nearest enemy.
+            f.star = pickStar(f);
+            f.partner = f.star != null ? BattleManager.nearestEnemy(f.battle, f.star, f.store) : null;
+            Vector3d a = f.star != null ? ChaosWand.positionOf(f.star, f.store) : null;
+            Vector3d b = f.partner != null ? ChaosWand.positionOf(f.partner, f.store) : null;
+            if (a == null || b == null) {
+                f.star = null;
+                f.partner = null;
+                return null;
+            }
+            f.starPos = a;
+            f.partnerPos = b;
+            f.starHeight = heightOf(f.star, f.store);
         }
-        double roll = f.rnd.nextDouble() * sum;
-        for (int i = 0; i < w.length; i++) {
-            roll -= w[i];
-            if (roll <= 0) return pool.get(i);
+        if (type == Type.CLOSE_UP) {
+            f.star = pickStar(f);
+            Vector3d at = f.star != null ? ChaosWand.positionOf(f.star, f.store) : null;
+            if (at == null) {
+                f.star = null;
+                return null;
+            }
+            f.starPos = at;
+            f.starAim.reset();
+            f.starHeight = heightOf(f.star, f.store);
         }
-        return pool.get(pool.size() - 1);
+        for (int i = 0; i < ANGLE_TRIES; i++) {
+            Plan p = new Plan(type, ms, base + i * Math.PI * 2 / ANGLE_TRIES, side, false);
+            if (clearShot(f, p)) return p;
+        }
+        return null;
+    }
+
+    /**
+     * The fight is under a roof (2026-10-16, user: a far landscape, raised, filmed the top of a colosseum's dome): at
+     * least two of the center and four points around it at the spread have a solid block within ROOF_LOOK above. Then
+     * there are no far shots and no raised fallback. A dome with an open middle still counts.
+     */
+    private static boolean roofed(Film f) {
+        double r = Math.max(6, f.spread);
+        int roofs = 0;
+        for (int i = 0; i < 5; i++) {
+            double x = f.focus.x + (i == 0 ? 0 : Math.cos(i * Math.PI / 2) * r);
+            double z = f.focus.z + (i == 0 ? 0 : Math.sin(i * Math.PI / 2) * r);
+            double roof = FightFx.roofAbove(x, z, f.focus.y + 2, ROOF_LOOK, f.store);
+            if (!Double.isNaN(roof) && !Double.isInfinite(roof) && ++roofs >= 2) return true;
+        }
+        return false;
     }
 
     /** A clear view at the shot's start, middle and end (camera not in a block, nothing solid or leafy in the way). */
@@ -773,12 +766,15 @@ final class FilmCamera {
         // PULL_EVERY frames the line to the look point is checked, and a blocked camera slides along it toward the
         // fight until it sees (eased, so it does not jump).
         Vector3d look = pose.look();
-        if (f.frame % PULL_EVERY == 0) {
+        if (cut || f.frame % PULL_EVERY == 0) {
             double pullTo = 0;
             while (pullTo < PULL_MAX && !clearView(along(at, look, pullTo), look, f.store)) pullTo += PULL_STEP;
             f.pullWant = pullTo;
         }
-        f.pull += (f.pullWant - f.pull) * PULL_EASE;
+        // A cut starts at its own pull (2026-10-16, user: in cut mode the camera still settled for about a second after
+        // each cut): the last shot's pull used to ease out over ~15 frames, and the new one's waited for PULL_EVERY.
+        if (cut) f.pull = f.pullWant;
+        else f.pull += (f.pullWant - f.pull) * PULL_EASE;
         if (f.pull > 0.01) at = along(at, look, f.pull);
         // filmTransition glide: the first second of a shot glides slowly from the last one, then the usual follow.
         float lerp = cut ? CUT : "glide".equals(FxSettings.filmTransition) && f.t < GLIDE_MS ? GLIDE_LERP : LERP;

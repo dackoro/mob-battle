@@ -150,6 +150,7 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 |---|---|---|---|---|---|
 | Intro camera | `/mobbattle camera on\|off` | `fight.camera` | true, false | on | cameras |
 | VS screen | `/mobbattle vsScreen on\|off` | `camera.vsscreen` | true, false | on | cameras |
+| VS fighters per team | `/mobbattle vsTeamReps 1\|2` | `camera.vs.teamreps` | 1, 2 (3-4 teams; 5+ always 1) | 2 | cameras |
 | Camera style | `/mobbattle cameraStyle <style>` | `camera.style` | auto, orbit, duel, showcase, teams, focus, drone, spotlight | auto | cameras |
 | Camera time | `/mobbattle cameraTime <seconds>` | `camera.time` | 0-600, 0 = as long as the countdown (above 30 warns: viewers have no controls meanwhile) | 0 | cameras |
 | Close-up shots (showcase, spotlight) | `/mobbattle cameraShots <n>` | `camera.shots` | 1 to maxMobs | 4 | cameras |

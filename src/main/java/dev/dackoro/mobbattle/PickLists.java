@@ -468,6 +468,22 @@ final class PickLists {
         });
     }
 
+    private static final Map<String, Boolean> FLIES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Whether the role moves by flying: a "Fly" entry in its MotionControllerList (role JSON chain), cached. */
+    static boolean flies(String role) {
+        if (role == null) return false;
+        return FLIES.computeIfAbsent(role, r -> {
+            JsonElement v = lookup(chain(r, new HashMap<>()), "MotionControllerList");
+            if (v == null || !v.isJsonArray()) return false;
+            for (JsonElement e : v.getAsJsonArray()) {
+                if (e.isJsonObject() && e.getAsJsonObject().has("Type")
+                        && "Fly".equals(e.getAsJsonObject().get("Type").getAsString())) return true;
+            }
+            return false;
+        });
+    }
+
     private static List<JsonObject> chain(String role, Map<String, JsonObject> files) {
         List<JsonObject> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();

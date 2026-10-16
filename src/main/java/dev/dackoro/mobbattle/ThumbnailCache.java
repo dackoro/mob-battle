@@ -57,8 +57,20 @@ import java.util.function.Predicate;
  */
 final class ThumbnailCache {
 
-    /** Bump when the renderer's output changes, so every cached picture is made again (2 = posed). */
-    static final int RENDER_VERSION = 2;
+    /**
+     * Bump when the renderer's output changes, so every cached picture is made again (2 = posed, 3 = pieces not animated
+     * twice, 4 = gradient tints and the standard-unwrap faces a layout leaves out: the Outlanders' faces, 5 = a Head bone
+     * without boxes uses its subtree, fliers framed on the body only when spread wide, 6 = drawn at SUPERSAMPLE times the
+     * size and averaged down: no texture noise, 7 = an inherited model gradient only on a mostly grey texture).
+     */
+    static final int RENDER_VERSION = 7;
+    /**
+     * Pictures are drawn this many times bigger and box-averaged down (2026-10-16, user: the VS pictures and the
+     * hologram looked dithered: a big model's texels are smaller than a pixel, so nearest-texel sampling picked noise).
+     */
+    static final int SUPERSAMPLE = 2;
+    /** Bump when MorphHologram.hologram's look changes (2 = green-scale, no corner brackets, faint scanlines, 3 = 256 px, brighter, 4 = palette PNG). */
+    static final int HOLO_VERSION = 4;
     /** Longest side of a cached thumbnail (px). */
     static final int SIZE = 384;
     /** Decoded textures kept between models (an LRU: big ones are 1024x1024, 4 MB each). */
@@ -74,7 +86,8 @@ final class ThumbnailCache {
     private static volatile Future<?> current;
     /** Settings panel icons (2026-10-16, user: every mob without a game icon gets one): side in px. */
     static final int ICON = 64;
-    static final String ICON_FOLDER = "UI/Custom/MobBattle/Icons/";
+    /** Not under UI/Custom: the client packs that folder into one UI atlas, which these filled (2026-10-16). */
+    static final String ICON_FOLDER = "Icons/MobBattle/Panel/";
     /** Model id -> plain path of its registered icon. */
     private static final Map<String, String> ICONS = new ConcurrentHashMap<>();
     /** Model id -> plain path of its registered hologram texture. */
@@ -86,8 +99,22 @@ final class ThumbnailCache {
         }
     };
 
-    /** One model file and its texture, as the Model holds them. */
-    record Piece(String model, String texture) {
+    /**
+     * One model file and its texture, as the Model holds them; {@code gradientSet}/{@code gradientId} (both or none) tint
+     * a greyscale texture (player skins, some mob clothes: ModelThumbnail.tint).
+     */
+    record Piece(String model, String texture, String gradientSet, String gradientId, boolean modelLevel) {
+        Piece(String model, String texture) {
+            this(model, texture, null, null, false);
+        }
+
+        Piece(String model, String texture, String gradientSet, String gradientId) {
+            this(model, texture, gradientSet, gradientId, false);
+        }
+
+        boolean tinted() {
+            return gradientSet != null && gradientId != null;
+        }
     }
 
     /** The animation frame a thumbnail is drawn in: the set's name, its file, the time (0-1). */
@@ -152,11 +179,72 @@ final class ThumbnailCache {
         registerHolograms(all);
         registerIcons(all);
         VsScreen.registerAtBoot();
+        MorphHologram.startAtBoot();
+        // holograms first, from the thumbnails already on disk (a few seconds), and registered before players join:
+        // after a hologram look change (HOLO_VERSION) the long thumbnail run below made them one by one, and a player
+        // who joined meanwhile got each copied mob live, with an asset reload for everyone (user, 2026-10-16)
+        EXEC.submit(() -> {
+            quickHolograms(all);
+            registerHolograms(all);
+        });
         rebuild(id -> true, false, report -> {
             MobBattlePlugin.log("Thumbnails: " + describe(report));
+            // every hologram of this look is on disk now: older looks' folders go (they were the stand-ins until now)
+            deleteOtherFolders(folder(), "holo", "holo" + HOLO_VERSION);
             registerHolograms(all);
             registerIcons(all);
+            VsScreen.prepareInBackground();
         });
+    }
+
+    /**
+     * Cache clean-up after a look or render change (2026-10-16, user: a server that already had pictures cached must
+     * redraw them with the new rules, and the old ones should go): deletes the folders in {@code dir} named {@code prefix}
+     * plus anything (holo, holo2, p384, p384r5...) except {@code keep}. Only our own cache folders, only called once the
+     * current version's files are all on disk; a folder in use by another process is left for the next boot.
+     */
+    static void deleteOtherFolders(Path dir, String prefix, String keep) {
+        if (dir == null || !Files.isDirectory(dir)) return;
+        try (var list = Files.list(dir)) {
+            for (Path p : (Iterable<Path>) list::iterator) {
+                String n = p.getFileName().toString();
+                if (!Files.isDirectory(p) || n.equals(keep) || !n.startsWith(prefix)
+                        || !n.substring(prefix.length()).matches("r?[0-9]*(r[0-9]+)?")) continue;
+                long files = 0;
+                try (var walk = Files.walk(p)) {
+                    for (Path f : (Iterable<Path>) walk.sorted(java.util.Comparator.reverseOrder())::iterator) {
+                        if (Files.isRegularFile(f)) files++;
+                        Files.deleteIfExists(f);
+                    }
+                } catch (IOException e) {
+                    MobBattlePlugin.log("Cache folder " + n + " not fully deleted: " + e);
+                    continue;
+                }
+                MobBattlePlugin.log("Cache: old folder " + n + " deleted (" + files + " files).");
+            }
+        } catch (IOException e) {
+            MobBattlePlugin.log("Cache clean-up skipped: " + e);
+        }
+    }
+
+    /** Writes the missing hologram textures from the thumbnails on disk (any render version: only the look matters). */
+    private static void quickHolograms(List<String> ids) {
+        long t0 = System.nanoTime();
+        int n = 0;
+        for (String id : ids) {
+            if (Thread.currentThread().isInterrupted()) return;
+            Path holo = holoFileOf(id), thumb = fileOf(id);
+            if (holo == null || Files.exists(holo) || thumb == null || !Files.exists(thumb)) continue;
+            try {
+                BufferedImage img = ImageIO.read(thumb.toFile());
+                if (img == null) continue;
+                writeHologram(id, img);
+                n++;
+            } catch (Exception e) {
+                MobBattlePlugin.log("Hologram texture of " + id + " not made: " + e);
+            }
+        }
+        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures made from the cache in " + (System.nanoTime() - t0) / 1_000_000 + " ms.");
     }
 
     /** The registered hologram texture of a model (plain path, as a ModelAttachment takes it), or null. */
@@ -244,16 +332,18 @@ final class ThumbnailCache {
 
     private static Path holoFileOf(String modelId) {
         Path dir = folder();
-        return dir == null ? null : dir.resolve("holo").resolve(safe(modelId) + ".png");
+        // own folder per hologram look: a new look (HOLO_VERSION) draws them all again at the next boot
+        return dir == null ? null : dir.resolve("holo" + HOLO_VERSION).resolve(safe(modelId) + ".png");
     }
 
-    /** Writes a model's hologram texture next to its thumbnail; a newer one drops the registration (next boot). */
+    /** Writes a model's hologram texture next to its thumbnail (registered at the next boot if one is registered now). */
     private static void writeHologram(String id, BufferedImage thumb) throws IOException {
         Path f = holoFileOf(id);
         if (f == null) return;
         Files.createDirectories(f.getParent());
         Files.write(f, MorphHologram.encode(MorphHologram.hologram(thumb)));
-        HOLOGRAMS.remove(id);
+        // a registered texture stays in use (the new file is registered at the next boot): dropping it here made
+        // MorphHologram make that model's texture live, with an asset reload for every client, during the boot run
     }
 
     /**
@@ -317,7 +407,7 @@ final class ThumbnailCache {
             try {
                 ModelAsset asset = ModelAsset.getAssetMap().getAsset(id);
                 if (asset == null) continue;
-                Model model = Model.createScaledModel(asset, 1f, Map.of());
+                Model model = ThumbnailCache.modelOf(asset);
                 List<Piece> pieces = piecesOf(model);
                 if (pieces.isEmpty()) continue;
                 PoseChoice pose = poseOf(model, "auto", null);
@@ -360,18 +450,42 @@ final class ThumbnailCache {
         return new Report(ids.size(), rendered, cached, failed, (System.nanoTime() - t0) / 1_000_000, failures);
     }
 
+    /**
+     * A model as a thumbnail draws it: unit scale, and for each random attachment set (goblin hats, trork gear,
+     * kweebec leaves, animal coats: 56 vanilla models) its first option by name, so the picture always has the gear and
+     * is the same every time (user, 2026-10-16: an empty map drew them without any of it).
+     */
+    static Model modelOf(ModelAsset asset) {
+        Map<String, String> ids = new java.util.TreeMap<>();
+        try {
+            Map<String, Map<String, ModelAttachment>> sets = asset.getRandomAttachmentSets();
+            if (sets != null) {
+                for (Map.Entry<String, Map<String, ModelAttachment>> e : sets.entrySet()) {
+                    if (e.getValue() == null || e.getValue().isEmpty()) continue;
+                    ids.put(e.getKey(), new java.util.TreeSet<>(e.getValue().keySet()).first());
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // no sets: the plain model
+        }
+        return Model.createScaledModel(asset, 1f, ids);
+    }
+
     /** The files a model draws: its own model and texture, then each attachment's (empty ones skipped). */
     static List<Piece> piecesOf(Model model) {
         List<Piece> pieces = new ArrayList<>();
         if (model == null || model.getModel() == null || model.getModel().isBlank()) return pieces;
-        pieces.add(new Piece(model.getModel(), model.getTexture()));
+        pieces.add(new Piece(model.getModel(), model.getTexture(), model.getGradientSet(), model.getGradientId(), true));
         ModelAttachment[] atts = model.getAttachments();
-        if (atts != null) {
-            for (ModelAttachment a : atts) {
-                if (a != null && a.getModel() != null && !a.getModel().isBlank()) pieces.add(new Piece(a.getModel(), a.getTexture()));
-            }
-        }
+        if (atts != null) for (ModelAttachment a : atts) addPiece(pieces, a);
         return pieces;
+    }
+
+    /** An attachment as a piece (skipped when it has no model). */
+    static void addPiece(List<Piece> pieces, ModelAttachment a) {
+        if (a != null && a.getModel() != null && !a.getModel().isBlank()) {
+            pieces.add(new Piece(a.getModel(), a.getTexture(), a.getGradientSet(), a.getGradientId()));
+        }
     }
 
     /** Renders the pieces (base first) in the bind pose, three-quarter view. */
@@ -385,12 +499,17 @@ final class ThumbnailCache {
         for (Piece p : pieces) {
             try {
                 String json = new String(load(p.model()), StandardCharsets.UTF_8);
-                parts.add(new ModelThumbnail.Part(json, p.texture() == null ? null : texture(p.texture())));
+                parts.add(new ModelThumbnail.Part(json, p.texture() == null ? null : texture(p)));
             } catch (IOException | RuntimeException e) {
                 if (parts.isEmpty()) throw e;
             }
         }
-        return ModelThumbnail.render(parts, pose, size, view, shade);
+        BufferedImage big = ModelThumbnail.render(parts, pose, size * SUPERSAMPLE, view, shade);
+        if (big == null || SUPERSAMPLE == 1) return big;
+        int w = Math.max(1, (big.getWidth() + SUPERSAMPLE - 1) / SUPERSAMPLE), h = Math.max(1, (big.getHeight() + SUPERSAMPLE - 1) / SUPERSAMPLE);
+        double[] head = ModelThumbnail.LAST_HEAD.get();
+        if (head != null) ModelThumbnail.LAST_HEAD.set(new double[] {head[0] / SUPERSAMPLE, head[1] / SUPERSAMPLE});
+        return MorphHologram.shrink(big, w, h);
     }
 
     // ---- keys and files ----
@@ -404,6 +523,7 @@ final class ThumbnailCache {
         for (Piece p : pieces) {
             sha.update(("|" + p.model() + "=" + hashOf(p.model()) + "|" + p.texture() + "=" + hashOf(p.texture()))
                     .getBytes(StandardCharsets.UTF_8));
+            if (p.tinted()) sha.update(("@" + p.gradientSet() + "/" + p.gradientId()).getBytes(StandardCharsets.UTF_8));
         }
         return HexFormat.of().formatHex(sha.digest());
     }
@@ -428,6 +548,59 @@ final class ThumbnailCache {
             return asset.getBlob().get(5, TimeUnit.SECONDS);
         } catch (Exception e) {
             throw new IOException("could not read " + asset.getName() + ": " + e, e);
+        }
+    }
+
+    /**
+     * A piece's texture, tinted by its gradient when it has one (the gradient strip from the cosmetics registry's
+     * GradientSets; an unknown set or id leaves it grey). Cached per texture + gradient.
+     */
+    static BufferedImage texture(Piece p) throws IOException {
+        if (!p.tinted()) return texture(p.texture());
+        String key = p.texture() + "@" + p.gradientSet() + "/" + p.gradientId() + (p.modelLevel() ? "#model" : "");
+        synchronized (TEXTURES) {
+            BufferedImage cached = TEXTURES.get(key);
+            if (cached != null) return cached;
+        }
+        BufferedImage grey = texture(p.texture());
+        // a model's own gradient can be inherited (MajorDungeons' Baron has Parent Player, so Skin/02 came with it) on
+        // a colored texture the game does not tint (user, 2026-10-16: the silver Baron came out gold): only a mostly
+        // grey texture takes it (the player body 94 %, the Baron 25 %). Attachment gradients are always applied.
+        if (p.modelLevel() && greyShare(grey) < MODEL_TINT_GREY) return grey;
+        String strip = gradientTexture(p.gradientSet(), p.gradientId());
+        BufferedImage out = strip != null ? ModelThumbnail.tint(grey, texture(strip)) : grey;
+        synchronized (TEXTURES) {
+            TEXTURES.put(key, out);
+        }
+        return out;
+    }
+
+    private static final double MODEL_TINT_GREY = 0.8;
+
+    /** Share of the opaque pixels that are grey (r, g, b within 6 of each other). */
+    static double greyShare(BufferedImage img) {
+        long grey = 0, all = 0;
+        for (int y = 0; y < img.getHeight(); y++) {
+            for (int x = 0; x < img.getWidth(); x++) {
+                int c = img.getRGB(x, y);
+                if ((c >>> 24) < 128) continue;
+                int r = c >> 16 & 255, g = c >> 8 & 255, b = c & 255;
+                all++;
+                if (Math.abs(r - g) <= 6 && Math.abs(g - b) <= 6) grey++;
+            }
+        }
+        return all == 0 ? 0 : (double) grey / all;
+    }
+
+    /** The strip of a gradient (e.g. Hair/Black -> TintGradients/Hair/Black.png), or null when unknown. */
+    static String gradientTexture(String set, String id) {
+        try {
+            var sets = com.hypixel.hytale.server.core.cosmetics.CosmeticsModule.get().getRegistry().getGradientSets();
+            var gs = sets != null ? sets.get(set) : null;
+            var g = gs != null && gs.getGradients() != null ? gs.getGradients().get(id) : null;
+            return g != null ? g.getTexture() : null;
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 

@@ -124,6 +124,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             // Managed mobs too (audit 2026-10-14): a mob stays managed after its battle, and an army fight it had later
             // left its HOME entry for good, which kept this system busy on every NPC.
             if (homes && ChaseSupport.hasHome(self)) ChaseSupport.restoreLeash(self, buffer);
+            if (DamageGroups.any()) DamageGroups.restore(self, buffer);
             return;
         }
         if (!due(self, now, CHECK_INTERVAL_MS, t -> t.check, (t, v) -> t.check = v)) {
@@ -131,6 +132,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         }
         Ref<EntityStore> enemy = FightManager.enemyOf(self);
         MajorDungeonsCompat.keepBoss(self, buffer);
+        DamageGroups.open(self, buffer);
         if (enemy != null) {
             relock(self, enemy, buffer);
             // Army fights too: no soft leash back mid-fight, and a far enemy is still walked to (ChaseSupport).
@@ -255,6 +257,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             return;
         }
         MajorDungeonsCompat.keepBoss(self, buffer);   // its arena must not reset (remove) it mid-battle
+        DamageGroups.open(self, buffer);              // e.g. a Feastmaster may hit a goblin enemy (DisableDamageGroups)
         if (battle.killAll && battle.team(self) != battle.survivorTeam) {
             if (!WandFx.isDying(self)) WandFx.kill(self, null, true, buffer);
             return;

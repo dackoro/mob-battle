@@ -129,6 +129,7 @@ final class TestTools {
                 case "thumbnail" -> ThumbnailTest.command(ctx, a);
                 case "thumbnails" -> thumbnailsCommand(to, a);
                 case "vs" -> VsScreen.command(ctx, a);
+                case "playerlook" -> PlayerLookTest.command(ctx, a);
                 case "hologram" -> MorphHologram.command(ctx, a);
                 case "snapshot" -> snapshot(to, a.length > 1 ? a[1] : "default");
                 case "restore" -> restore(to, a.length > 1 ? a[1] : "default");

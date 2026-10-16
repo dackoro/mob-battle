@@ -66,6 +66,8 @@ final class ModelThumbnail {
         double[] animPos = {0, 0, 0};        // a move in the parent's space,
         double[] animStretch = {1, 1, 1};    // its own boxes stretched,
         boolean animHidden;                  // and hidden (with everything under it)
+        /** An attachment piece hung on the base bone of its name: it follows that bone, never animated itself. */
+        boolean piece;
 
         Group(String name, double[] origin, double[] quat, Group parent, boolean visible) {
             this.name = name;
@@ -138,6 +140,7 @@ final class ModelThumbnail {
         Group group = null;
         if (!staticBox) {
             group = new Group(name, origin, attachedRoot ? new double[] {0, 0, 0, 1} : quat, parentGroup, visible);
+            group.piece = attachedRoot;
             m.groups.add(group);
         }
         String type = shape.has("type") ? shape.get("type").getAsString() : "none";
@@ -178,6 +181,7 @@ final class ModelThumbnail {
                     ? shape.getAsJsonObject("textureLayout") : new JsonObject();
             double[] rawSize = vec(settings.get("size"), 0);
             double[] uvSize3 = "quad".equals(type) ? size : rawSize;
+            if (normalFace == null) layout = withDefaultFaces(layout, rawSize);
             for (int f = 0; f < 6; f++) {
                 String face = BB_FACES[f];
                 String key = HYTALE_OF.get(face);
@@ -194,6 +198,39 @@ final class ModelThumbnail {
                 parseNode(m, c.getAsJsonObject(), true, group, childOffset, texture, attachment, existing);
             }
         }
+    }
+
+    /**
+     * A box whose listed faces all sit at the standard box unwrap (top (d,0), bottom (d+w,0), left (0,d), right (d+w,d),
+     * back (2d+w,d), front (d,d); w, h, d = size x, y, z) gets its missing faces at their standard spots too
+     * (2026-10-16, user: the Outlanders came out faceless): Player_With_Face's head lists no front, and the Outlander
+     * texture paints the face exactly there (with holes for the Eyes attachment), so the game draws it. A box with any
+     * face off the pattern keeps its missing faces hidden. ❓ Inferred from the textures, not from the client.
+     */
+    private static JsonObject withDefaultFaces(JsonObject layout, double[] size) {
+        if (layout.size() == 0 || layout.size() >= 6) return layout;
+        double w = size[0], h = size[1], d = size[2];
+        java.util.Map<String, double[]> std = java.util.Map.of("top", new double[] {d, 0}, "bottom", new double[] {d + w, 0},
+                "left", new double[] {0, d}, "right", new double[] {d + w, d}, "back", new double[] {2 * d + w, d},
+                "front", new double[] {d, d});
+        for (String key : layout.keySet()) {
+            double[] at = std.get(key);
+            JsonElement f = layout.get(key);
+            if (at == null || !f.isJsonObject()) return layout;
+            double[] off = vec2(f.getAsJsonObject().get("offset"));
+            if (Math.abs(off[0] - at[0]) > 0.01 || Math.abs(off[1] - at[1]) > 0.01) return layout;
+        }
+        JsonObject out = layout.deepCopy();
+        for (java.util.Map.Entry<String, double[]> e : std.entrySet()) {
+            if (out.has(e.getKey())) continue;
+            JsonObject face = new JsonObject();
+            JsonObject off = new JsonObject();
+            off.addProperty("x", e.getValue()[0]);
+            off.addProperty("y", e.getValue()[1]);
+            face.add("offset", off);
+            out.add(e.getKey(), face);
+        }
+        return out;
     }
 
     /** The 4 corner UVs (texture pixels) of a face, in BB vertex order, from the Hytale layout (hytale_plugin.js). */
@@ -283,6 +320,9 @@ final class ModelThumbnail {
         JsonObject nodes = anim.has("nodeAnimations") && anim.get("nodeAnimations").isJsonObject()
                 ? anim.getAsJsonObject("nodeAnimations") : new JsonObject();
         for (Group g : m.groups) {
+            // an attachment piece (a hood on "Head") already moves with its bone: animating it too turned it twice as
+            // far, so hoods and helmets covered the face in every animated pose (user, 2026-10-16)
+            if (g.piece) continue;
             if (!nodes.has(g.name) || !nodes.get(g.name).isJsonObject()) continue;
             JsonObject n = nodes.getAsJsonObject(g.name);
             double[] q = sample(n, "orientation", time, true);
@@ -344,6 +384,19 @@ final class ModelThumbnail {
         return l < 1e-9 ? new double[] {0, 0, 0, 1} : new double[] {q[0] / l, q[1] / l, q[2] / l, q[3] / l};
     }
 
+    private static boolean isHead(Group g) {
+        return !g.piece && "head".equalsIgnoreCase(g.name);
+    }
+
+    /** A group under a "Head" bone (or the bone itself), with no attachment piece on the way. */
+    private static boolean underHead(Group g) {
+        for (; g != null; g = g.parent) {
+            if (g.piece) return false;
+            if ("head".equalsIgnoreCase(g.name)) return true;
+        }
+        return false;
+    }
+
     private static boolean hiddenByPose(Box b) {
         for (Group g = b.group; g != null; g = g.parent) if (g.animHidden) return true;
         return false;
@@ -368,6 +421,45 @@ final class ModelThumbnail {
     }
 
     /** Same, posed with one animation frame ({@code pose} null = bind pose). */
+    /**
+     * The head's position (x, y in the picture's pixels) in the last render() of this thread, or null (no "Head" bone).
+     */
+    static final ThreadLocal<double[]> LAST_HEAD = new ThreadLocal<>();
+
+    /**
+     * What the model really draws, bind pose, in model units: {minX, minY, minZ, maxX, maxY, maxZ} over every box
+     * corner of the main mass (the same boxes render() keeps), or null with no boxes (2026-10-16: the 3D preview
+     * framed a mob by its hitbox, and a Gobliterator's crane and arm stuck out far above and to one side).
+     */
+    static double[] bounds(List<Part> parts) {
+        Model m = new Model();
+        for (int i = 0; i < parts.size(); i++) parse(m, parts.get(i).modelJson(), i, i > 0);
+        if (m.boxes.isEmpty()) return null;
+        List<double[]> centers = new ArrayList<>();
+        for (Box b : m.boxes) {
+            centers.add(world(b, new double[] {(b.from[0] + b.to[0]) / 2, (b.from[1] + b.to[1]) / 2, (b.from[2] + b.to[2]) / 2}));
+        }
+        boolean[] keep = keepMainMass(centers);
+        double[] r = {Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
+        boolean any = false;
+        for (int bi = 0; bi < m.boxes.size(); bi++) {
+            if (!keep[bi]) continue;
+            Box b = m.boxes.get(bi);
+            for (int f = 0; f < 6; f++) {
+                if (b.uv[f] == null) continue;
+                for (double[] c : corners(f, b.from, b.to)) {
+                    double[] p = world(b, c);
+                    for (int k = 0; k < 3; k++) {
+                        r[k] = Math.min(r[k], p[k]);
+                        r[k + 3] = Math.max(r[k + 3], p[k]);
+                    }
+                    any = true;
+                }
+            }
+        }
+        return any ? r : null;
+    }
+
     static BufferedImage render(List<Part> parts, Pose pose, int size, double[] dir, boolean shade) {
         Model m = new Model();
         for (int i = 0; i < parts.size(); i++) parse(m, parts.get(i).modelJson(), i, i > 0);
@@ -419,6 +511,20 @@ final class ModelThumbnail {
         double scale = (size - 4) / Math.max(spanX, spanY);
         int w = Math.max(1, (int) Math.ceil(spanX * scale) + 4), h = Math.max(1, (int) Math.ceil(spanY * scale) + 4);
         double ox = -minX * scale + 2, oy = maxY * scale + 2;   // screen y grows downward
+        // where the head lands in the picture (centers of the "Head" bone's boxes), for framing on the face
+        // A Head bone with no box of its own (Dragon_Frost: forehead and jaws hang under it) takes its whole subtree,
+        // attachment pieces left out (user, 2026-10-16: the dragon's face was not in its team column)
+        double hx = 0, hy = 0;
+        int hn = 0;
+        for (int pass = 0; pass < 2 && hn == 0; pass++) {
+            for (Box b : m.boxes) {
+                if (b.group == null || b.center == null || !(pass == 0 ? isHead(b.group) : underHead(b.group))) continue;
+                hx += dot(b.center, x) * scale + ox;
+                hy += oy - dot(b.center, y) * scale;
+                hn++;
+            }
+        }
+        LAST_HEAD.set(hn > 0 ? new double[] {hx / hn, hy / hn} : null);
 
         int[] pix = new int[w * h];
         double[] zbuf = new double[w * h];
@@ -617,8 +723,33 @@ final class ModelThumbnail {
 
     /**
      * Offline check: java ModelThumbnail out.png size [anim=path.blockyanim] [t=0.35] [view=left|right|front|profileLeft|profileRight]
-     * model.blockymodel texture.png [attachment.blockymodel texture.png]...
+     * model.blockymodel texture.png[@gradient.png] [attachment.blockymodel texture.png[@gradient.png]]...
      */
+    /**
+     * A greyscale texture tinted by a gradient strip (2026-10-16, player skins in the VS screen): the game's skin, hair
+     * and clothes textures are grey and take their color from a GradientSet entry, a 256-wide strip
+     * (Cosmetics/CharacterCreator/GradientSets.json, TintGradients/...): each grey pixel takes the strip's color at its
+     * grey level (middle row); colored pixels (not grey) and alpha stay. ❓ Read from the data, not the client's shader:
+     * the in-game tint may differ slightly.
+     */
+    static BufferedImage tint(BufferedImage grey, BufferedImage gradient) {
+        if (grey == null || gradient == null) return grey;
+        int gw = gradient.getWidth(), row = gradient.getHeight() / 2;
+        int[] strip = new int[256];
+        for (int i = 0; i < 256; i++) strip[i] = gradient.getRGB(Math.min(gw - 1, i * gw / 256), row) & 0xffffff;
+        int w = grey.getWidth(), h = grey.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int c = grey.getRGB(x, y);
+                int a = c >>> 24, r = c >> 16 & 255, g = c >> 8 & 255, b = c & 255;
+                boolean isGrey = Math.abs(r - g) <= 6 && Math.abs(g - b) <= 6;
+                out.setRGB(x, y, a == 0 || !isGrey ? c : a << 24 | strip[(r + g + b) / 3]);
+            }
+        }
+        return out;
+    }
+
     public static void main(String[] args) throws Exception {
         List<Part> parts = new ArrayList<>();
         String animPath = null;
@@ -637,8 +768,11 @@ final class ModelThumbnail {
         }
         Pose pose = animPath == null ? null : new Pose(java.nio.file.Files.readString(java.nio.file.Path.of(animPath)), t);
         for (int i = first; i + 1 < args.length; i += 2) {
-            parts.add(new Part(java.nio.file.Files.readString(java.nio.file.Path.of(args[i])),
-                    javax.imageio.ImageIO.read(new java.io.File(args[i + 1]))));
+            // "texture.png@gradient.png" = a greyscale texture tinted by that gradient strip
+            String[] tex = args[i + 1].split("@", 2);
+            BufferedImage img = javax.imageio.ImageIO.read(new java.io.File(tex[0]));
+            if (tex.length > 1) img = tint(img, javax.imageio.ImageIO.read(new java.io.File(tex[1])));
+            parts.add(new Part(java.nio.file.Files.readString(java.nio.file.Path.of(args[i])), img));
         }
         BufferedImage img = null;
         long best = Long.MAX_VALUE;
@@ -649,6 +783,8 @@ final class ModelThumbnail {
         }
         if (img == null) throw new IllegalStateException("nothing visible");
         javax.imageio.ImageIO.write(img, "png", new java.io.File(args[0]));
-        System.out.println(args[0] + " " + img.getWidth() + "x" + img.getHeight() + " in " + best / 1_000_000.0 + " ms");
+        double[] head = LAST_HEAD.get();
+        System.out.println(args[0] + " " + img.getWidth() + "x" + img.getHeight() + " in " + best / 1_000_000.0 + " ms"
+                + (head != null ? " head=" + Math.round(head[0]) + "," + Math.round(head[1]) : ""));
     }
 }

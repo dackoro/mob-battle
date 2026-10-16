@@ -55,13 +55,27 @@ final class CameraHud {
         });
     }
 
+    /** Players whose restore came while a VS screen covered them: the VS gives the HUD back when it ends. */
+    private static final Set<UUID> DEFERRED = ConcurrentHashMap.newKeySet();
+
     /** Puts back what hide took away; no-op when nothing is hidden. Any thread. */
     static void restore(PlayerRef player) {
         if (player == null || !SAVED.containsKey(player.getUuid())) return;
+        // a camera ending under a VS screen (another battle's intro, 2026-10-16: the HUD came back over the VS)
+        if (VsScreen.showing(player)) {
+            DEFERRED.add(player.getUuid());
+            return;
+        }
+        DEFERRED.remove(player.getUuid());
         onWorld(player, p -> {
             Set<HudComponent> saved = SAVED.remove(player.getUuid());
             if (saved != null) p.getHudManager().setVisibleHudComponents(player, saved);
         });
+    }
+
+    /** Whether a restore was held back while a VS screen showed (then the VS restores at its end). Clears the mark. */
+    static boolean takeDeferred(PlayerRef player) {
+        return player != null && DEFERRED.remove(player.getUuid());
     }
 
     private static Set<HudComponent> copy(Set<HudComponent> s) {

@@ -638,6 +638,23 @@ public final class FightManager {
         if (marked != null && marked.getMarkedEntityRef(TARGET_SLOT) == target) marked.setMarkedEntity(TARGET_SLOT, null);
     }
 
+    /**
+     * Countdown truce: IGNORE toward each of {@code others} for {@code seconds}, and a LockedTarget that is one of
+     * them is let go. False if {@code self} has no NPC attitude support (a player).
+     */
+    static boolean truce(Ref<EntityStore> self, java.util.List<Ref<EntityStore>> others, double seconds,
+                         ComponentAccessor<EntityStore> accessor) {
+        WorldSupport world = WorldSupport.get(self, accessor);
+        if (world == null) return false;
+        for (Ref<EntityStore> other : others) {
+            if (other != self) tryOverride(world, other, Attitude.IGNORE, seconds, true);
+        }
+        MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
+        Ref<EntityStore> locked = marked != null ? marked.getMarkedEntityRef(TARGET_SLOT) : null;
+        if (locked != null && others.contains(locked)) marked.setMarkedEntity(TARGET_SLOT, null);
+        return true;
+    }
+
     /** IGNORE toward {@code other} for {@code seconds}, creating the override memory if needed (SummonCalm). */
     static void ignore(WorldSupport world, Ref<EntityStore> other, double seconds) {
         tryOverride(world, other, Attitude.IGNORE, seconds, true);
