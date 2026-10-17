@@ -723,7 +723,7 @@ final class Arena {
 
     /** Role ids read better in the box without underscores: "Test_Dummy" -> "Test Dummy". */
     private static String pretty(String name) {
-        return name == null ? "?" : name.replace('_', ' ');
+        return MobNames.shared(name);
     }
 
     /** Removes the timer box (portal: an UpdatePortal with no state and no definition, as PortalTrackerSystems does). */

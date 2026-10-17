@@ -406,6 +406,9 @@ final class MorphHologram {
      * their assets once), then refreshes the player. One per model per session.
      */
     private static void liveTexture(UUID player, String modelId) {
+        // never in game (user, 2026-10-16: no "Reloaded assets" toast, ever): the boot run writes every model's
+        // hologram to disk and the next boot registers it; until then this copy shows no panel
+        if (!ThumbnailCache.mayRegister()) return;
         if (!LIVE.add(modelId)) return;
         ModelAsset asset = ModelAsset.getAssetMap().getAsset(modelId);
         if (asset == null) return;

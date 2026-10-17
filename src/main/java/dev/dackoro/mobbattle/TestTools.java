@@ -699,7 +699,7 @@ final class TestTools {
                         }
                     }
                     Countdown.run(BattleManager.Kind.DUEL, owner, store, new Countdown.Label("DUEL: " + names,
-                                    I18n.tr("battle.label.duel").param("a", ChaosWand.nameOf(first, store)).param("b", ChaosWand.nameOf(second, store))),
+                                    I18n.tr("battle.label.duel").param("a", MobNames.message(ChaosWand.nameOf(first, store))).param("b", MobNames.message(ChaosWand.nameOf(second, store)))),
                             List.of(first, second), acc -> SelectFighterInteraction.duel(owner, ownerRef, first, second, acc));
                 }
                 case "focus" -> {

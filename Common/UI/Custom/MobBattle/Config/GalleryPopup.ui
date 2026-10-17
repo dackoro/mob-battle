@@ -1,0 +1,80 @@
+$C = "../../Common.ui";
+
+// Mob gallery as a popup over the settings panel (2026-10-16, user: not inside the page, not another window; a popup).
+// Appended at the page root after ConfigPage.ui, as the game's own pickers (TriggerVolumeInspectorPage
+// #AssetPickerPage: a second hidden @PageOverlay over the main one). Search, the Summon list's Show filters and a grid
+// of Config/SummonCell.ui tiles; a tile puts its mob in the "Add a mob" row and closes the popup.
+$C.@PageOverlay #GalleryPopup {
+  LayoutMode: Middle;
+  Visible: false;
+
+  $C.@DecoratedContainer {
+    Anchor: (Width: 900, Height: 720);
+
+    #Title {
+      Group {
+        LayoutMode: Left;
+        $C.@Title {
+          @Text = %server.mobbattle.gallery.title;
+        }
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Full: 12);
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 42);
+
+        $C.@TextField #GallerySearch {
+          @Anchor = (Width: 300, Top: 4, Right: 12);
+          PlaceholderText: %server.mobbattle.gallery.search;
+        }
+
+        Label #GalleryCount {
+          FlexWeight: 1;
+          Text: "";
+          Style: (FontSize: 13, TextColor: #96a9be, VerticalAlignment: Center, Wrap: true);
+        }
+
+        $C.@SecondaryTextButton #GalleryClose {
+          @Anchor = (Width: 150, Top: 2);
+          @Text = %server.mobbattle.gallery.close;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 42, Bottom: 6);
+
+        $C.@DropdownBox #GMod {
+          Anchor: (Width: 240, Top: 4, Height: 32, Right: 12);
+        }
+
+        $C.@DropdownBox #GType {
+          Anchor: (Width: 220, Top: 4, Height: 32, Right: 12);
+        }
+
+        $C.@DropdownBox #GGroup {
+          Anchor: (Width: 220, Top: 4, Height: 32);
+          ShowSearchInput: true;
+        }
+      }
+
+      // The grid stays 22 short of the right edge: the scrollbar draws over its box, and with the full width the last
+      // column sat under it (2026-10-16 screenshot).
+      Group #GalleryBox {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Group #GalleryGrid {
+          LayoutMode: LeftCenterWrap;
+          Anchor: (Right: 22);
+        }
+      }
+    }
+  }
+}

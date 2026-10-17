@@ -390,6 +390,7 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 | `filmTransition cut\|glide` | cut | Cut to the next shot at once, or glide there. |
 | `filmShot <shot> <0-300>` | 100; spiral 80, telephoto and descent 70, landscape and groundrise 50, zenith 40 | How often each shot comes up, percent of normal: 0 = never, 200 = twice as often. Shots: `wide`, `track`, `arc`, `pushin`, `closeup` (fewer with many fighters), `landscape` (rare, turns quickly to the fight), `playerback`, `playerclose`, and the showier `zenith` (straight down from above), `spiral` (circles while rising), `telephoto` (far away with a long lens), `descent` (crane down), `groundrise` (from the grass up), `profile` (two fighters from the side). |
 | `filmShots all\|battle\|<list>` | | Shortcut: the listed shots on, the rest off (`battle` = every shot but the two of you). |
+| `filmStyle default\|battle\|action\|cinematic` | | Every film setting at once. `battle`: the fight always in view, few shots of you. `action`: close on the fighters and their attacks, no landscapes. `cinematic`: open, slow, gliding shots, longer and wider. `default`: back to the defaults. Each value can still be changed after (panel: Cameras, film shots section). |
 
 **autoFilm** (`autoFilm on|off`, global or per kind, default off): the players who get a battle's cameras (`cameraScope`) get its film from the start of the battle, once their intro is over, until it ends. Players fighting, watching or spectating are left alone. With `autoWatch` on too, the film wins.
 

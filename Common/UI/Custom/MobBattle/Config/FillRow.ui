@@ -1,0 +1,51 @@
+$C = "../../Common.ui";
+
+// Summon list random fill in one row (2026-10-16, user: the two Fill buttons did the same; let me choose how many mob
+// types, how many of each and into how many teams). ConfigPage sets the labels and the last values used.
+Group {
+  LayoutMode: Top;
+  Anchor: (Bottom: 8);
+
+  Label #Label {
+    Anchor: (Left: 6, Right: 8, Height: 24);
+    Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center, Wrap: true);
+  }
+
+  Group #Line {
+    LayoutMode: Left;
+    Anchor: (Height: 48, Left: 6);
+
+    Label #TypesLabel {
+      Anchor: (Width: 70, Right: 6);
+      Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center);
+    }
+
+    $C.@TextField #Types {
+      @Anchor = (Width: 70, Right: 18, Top: 6);
+    }
+
+    Label #EachLabel {
+      Anchor: (Width: 90, Right: 6);
+      Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center);
+    }
+
+    $C.@TextField #Each {
+      @Anchor = (Width: 70, Right: 18, Top: 6);
+    }
+
+    Label #TeamsLabel {
+      Anchor: (Width: 150, Right: 6);
+      Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center);
+    }
+
+    $C.@TextField #Teams {
+      @Anchor = (Width: 70, Right: 18, Top: 6);
+    }
+
+    Group { FlexWeight: 1; }
+
+    $C.@SmallSecondaryTextButton #Button {
+      @Anchor = (Width: 160, Top: 7);
+    }
+  }
+}

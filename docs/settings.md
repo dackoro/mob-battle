@@ -170,6 +170,7 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Camera pace | `/mobbattle filmPace <25-300>` | `camera.film.pace` | 25-300 (percent) | 100 | cameras |
 | Between shots | `/mobbattle filmTransition cut\|glide` | `camera.film.transition` | cut, glide | cut | cameras |
 | Film shots | `/mobbattle filmShot <shot> <0-300>` (`filmShots <list>` = those on, the rest off; `filmShots default` = all back to default; panel: Defaults button) | `camera.film.weight.<shot>` | 0-300 percent of normal per shot: wide, track, arc, pushin, closeup, landscape, playerback, playerclose, zenith, spiral, telephoto, descent, groundrise, profile | 100; spiral 80, telephoto and descent 70, landscape and groundrise 50, zenith 40 | cameras |
+| Film style | `/mobbattle filmStyle default\|battle\|action\|cinematic` (panel: the four buttons above the film shots) | (sets every `camera.film.*` key) | battle = fight always in view; action = close on the fighters; cinematic = open, slow, gliding shots | default | cameras |
 | Duel card | `/mobbattle duelCard on\|off` | `battle.duelCard` | true, false | off | arenas |
 | All vs one card | `/mobbattle focusCard on\|off` | `battle.focusCard` | true, false | off | arenas |
 

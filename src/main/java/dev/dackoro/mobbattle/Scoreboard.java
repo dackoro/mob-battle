@@ -58,7 +58,7 @@ final class Scoreboard extends CustomUIHud {
      * A 1v1 duel with the duel card, or an all vs one with the focus card: the card takes the board's place on the right
      * and says the same and more, so the board is not shown (user, 2026-10-13).
      */
-    private static boolean cardShown(BattleManager.Battle b) {
+    static boolean cardShown(BattleManager.Battle b) {
         return (b.kind == BattleManager.Kind.DUEL && FxSettings.duelCard && b.teamOf.size() <= 2)
                 || (b.kind == BattleManager.Kind.ALL_VS_ONE && FxSettings.focusCard);
     }
@@ -70,7 +70,8 @@ final class Scoreboard extends CustomUIHud {
         for (BattleManager.Battle b : BattleManager.battles()) {
             if (b.over || b.store != store || !FxSettings.scoreboard(b.kind) || cardShown(b)) continue;
             for (PlayerRef p : FightFx.titleViewers(b)) {
-                if (p.isValid()) want.put(p.getUuid(), b);
+                // One card per player on the right: the nearest battle's (RightSlot).
+                if (p.isValid() && RightSlot.owns(p, b, store)) want.put(p.getUuid(), b);
             }
         }
         // Boards of battles that ended (or of players who left their range): removed.
@@ -222,6 +223,6 @@ final class Scoreboard extends CustomUIHud {
     }
 
     private static String pretty(String name) {
-        return name == null ? "?" : name.replace('_', ' ');
+        return MobNames.shared(name);
     }
 }

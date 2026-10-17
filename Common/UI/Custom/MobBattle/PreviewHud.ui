@@ -1,0 +1,21 @@
+// /mobbattle test preview ... hud (experiment, 2026-10-16, user: "can the 3D canvas live inside a HUD, like the VS?"):
+// the vanilla PrefabPreviewComponent of PreviewTest.ui, but in a CustomUIHud on the right of the screen, so it shows
+// over the game without a page (no mouse, no input). PreviewTest.java sends it the same preview packet(s).
+Group #PreviewHud {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+  LayoutMode: Right;
+
+  Group #Box {
+    Anchor: (Width: 520, Right: 40, Top: 120, Bottom: 160);
+    Background: #0b1118(0.55);
+    LayoutMode: Full;
+
+    PrefabPreviewComponent #Preview {
+      AllowDragYaw: false;
+      AllowDragPitch: false;
+      AllowZoom: false;
+      AllowPan: false;
+      ShowAnchor: false;
+    }
+  }
+}

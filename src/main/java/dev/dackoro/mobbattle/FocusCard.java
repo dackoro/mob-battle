@@ -58,7 +58,7 @@ final class FocusCard extends CustomUIHud {
             for (BattleManager.Battle b : BattleManager.battles()) {
                 if (b.over || b.store != store || b.kind != BattleManager.Kind.ALL_VS_ONE) continue;
                 for (PlayerRef p : FightFx.titleViewers(b)) {
-                    if (p.isValid() && !BattleWatch.isWatching(p)) want.put(p.getUuid(), b);
+                    if (p.isValid() && !BattleWatch.isWatching(p) && RightSlot.owns(p, b, store)) want.put(p.getUuid(), b);
                 }
             }
         }
@@ -128,7 +128,7 @@ final class FocusCard extends CustomUIHud {
         UICommandBuilder b = new UICommandBuilder();
         boolean up = lone != null && lone.isValid() && BattleManager.isAlive(lone, store);
         String name = lone != null && lone.isValid() ? ChaosWand.nameOf(lone, store) : battle.focusName;
-        line(b, "#Name", DuelCard.shorten(name == null ? "?" : name.replace('_', ' ')), up ? "#ffd23e" : "#888888");
+        line(b, "#Name", DuelCard.shorten(MobNames.shared(name)), up ? "#ffd23e" : "#888888");
         if (lone != null) {
             line(b, "#Health", DuelCard.healthText(lone, store, up), up ? "#ff6b5e" : "#888888");
             line(b, "#Attack", I18n.tr("hud.attack").param("v", DuelCard.stat(lone, Buffs.Stat.DAMAGE)), DuelCard.color(lone, Buffs.Stat.DAMAGE));
@@ -144,7 +144,7 @@ final class FocusCard extends CustomUIHud {
                 : I18n.tr("hud.health.none"), attackers > 0 ? "#ff6b5e" : "#888888");
         if (top != null && topDamage > 0) {
             String topName = ChaosWand.nameOf(top, store);
-            line(b, "#TopName", I18n.tr("hud.focus.top").param("name", DuelCard.shorten(topName == null ? "?" : topName.replace('_', ' '))), "#7dff8a");
+            line(b, "#TopName", I18n.tr("hud.focus.top").param("name", DuelCard.shorten(MobNames.shared(topName))), "#7dff8a");
             line(b, "#TopLine", I18n.tr("hud.focus.damage").param("n", Math.round(topDamage)), PLAIN);
         } else {
             line(b, "#TopName", I18n.tr("hud.focus.top.none"), PLAIN);

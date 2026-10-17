@@ -61,7 +61,7 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         MorphWand.Copy now = MorphWand.read(target, buffer);
         if (copy.sameLook(now)) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            player.sendMessage(I18n.tr("chat.morph.already").param("name", name).param("model", copy.label()).color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.morph.already").param("name", MobNames.message(name)).param("model", copy.label()).color("#ffcc55"));
             return;
         }
         if (!MorphWand.apply(target, copy, buffer)) {
@@ -77,6 +77,6 @@ public class MorphApplyInteraction extends SimpleInstantInteraction {
         // does not replay its sound.
         WandFx.burst(null, "SFX_MobBattle_OmnitrixTransform", ChaosWand.positionOf(target, buffer), buffer);
         player.sendMessage(I18n.tr(isPlayer ? "chat.morph.appliedPlayer" : "chat.morph.applied")
-                .param("name", name).param("model", copy.label()).color("#7dff8a"));
+                .param("name", MobNames.message(name)).param("model", copy.label()).color("#7dff8a"));
     }
 }

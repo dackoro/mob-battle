@@ -317,6 +317,8 @@ final class ModelThumbnail {
         JsonObject anim = JsonParser.parseString(pose.animJson()).getAsJsonObject();
         double duration = anim.has("duration") ? anim.get("duration").getAsDouble() : FPS;
         double time = Math.max(0, Math.min(1, pose.t())) * duration;
+        // a looping animation (holdLastKeyframe false) goes from its last keyframe back to its first, as in game
+        double loop = anim.has("holdLastKeyframe") && anim.get("holdLastKeyframe").getAsBoolean() ? 0 : duration;
         JsonObject nodes = anim.has("nodeAnimations") && anim.get("nodeAnimations").isJsonObject()
                 ? anim.getAsJsonObject("nodeAnimations") : new JsonObject();
         for (Group g : m.groups) {
@@ -325,19 +327,95 @@ final class ModelThumbnail {
             if (g.piece) continue;
             if (!nodes.has(g.name) || !nodes.get(g.name).isJsonObject()) continue;
             JsonObject n = nodes.getAsJsonObject(g.name);
-            double[] q = sample(n, "orientation", time, true);
+            double[] q = sample(n, "orientation", time, true, loop);
             if (q != null) g.animQuat = normQ(q);
-            double[] p = sample(n, "position", time, false);
+            double[] p = sample(n, "position", time, false, loop);
             if (p != null) g.animPos = p;
-            double[] st = sample(n, "shapeStretch", time, false);
+            double[] st = sample(n, "shapeStretch", time, false, loop);
             if (st != null) g.animStretch = st;
             Boolean vis = sampleVisible(n, time);
             if (vis != null) g.animHidden = !vis;
         }
     }
 
+    /**
+     * A copy of a .blockymodel with one animation frame baked into its nodes (2026-10-16, user: the 3D preview never
+     * animates, so a pose has to live in the model itself): orientation = own x frame delta (the order world() uses),
+     * position + frame delta, shape stretch x frame stretch, and a node the frame hides is drawn invisible with its
+     * subtree. Pieces of an attachment (isPiece) are left alone, as applyPose does: they follow their bone.
+     */
+    static String bake(String modelJson, Pose pose, boolean attachment) {
+        JsonObject root = JsonParser.parseString(modelJson).getAsJsonObject();
+        JsonObject anim = JsonParser.parseString(pose.animJson()).getAsJsonObject();
+        double duration = anim.has("duration") ? anim.get("duration").getAsDouble() : FPS;
+        double time = Math.max(0, Math.min(1, pose.t())) * duration;
+        // a looping animation (holdLastKeyframe false) goes from its last keyframe back to its first, as in game
+        double loop = anim.has("holdLastKeyframe") && anim.get("holdLastKeyframe").getAsBoolean() ? 0 : duration;
+        JsonObject nodes = anim.has("nodeAnimations") && anim.get("nodeAnimations").isJsonObject()
+                ? anim.getAsJsonObject("nodeAnimations") : new JsonObject();
+        if (root.has("nodes") && root.get("nodes").isJsonArray()) {
+            for (JsonElement n : root.getAsJsonArray("nodes")) {
+                if (n.isJsonObject()) bakeNode(n.getAsJsonObject(), nodes, time, loop, attachment, false);
+            }
+        }
+        return root.toString();
+    }
+
+    private static void bakeNode(JsonObject node, JsonObject anims, double time, double loop, boolean attachment, boolean hidden) {
+        JsonObject shape = node.has("shape") && node.get("shape").isJsonObject() ? node.getAsJsonObject("shape") : null;
+        JsonObject settings = shape != null && shape.has("settings") && shape.get("settings").isJsonObject()
+                ? shape.getAsJsonObject("settings") : null;
+        boolean piece = attachment && settings != null && settings.has("isPiece") && settings.get("isPiece").getAsBoolean();
+        String name = node.has("name") ? node.get("name").getAsString() : "";
+        if (!piece && anims.has(name) && anims.get(name).isJsonObject()) {
+            JsonObject a = anims.getAsJsonObject(name);
+            double[] q = sample(a, "orientation", time, true, loop);
+            if (q != null) {
+                double[] o = mulQ(quat(node.get("orientation")), normQ(q));
+                JsonObject oj = new JsonObject();
+                oj.addProperty("x", o[0]);
+                oj.addProperty("y", o[1]);
+                oj.addProperty("z", o[2]);
+                oj.addProperty("w", o[3]);
+                node.add("orientation", oj);
+            }
+            double[] p = sample(a, "position", time, false, loop);
+            if (p != null) node.add("position", vecJson(add(vec(node.get("position"), 0), p)));
+            double[] st = sample(a, "shapeStretch", time, false, loop);
+            if (st != null && shape != null) {
+                double[] s = vec(shape.get("stretch"), 1);
+                shape.add("stretch", vecJson(new double[] {s[0] * st[0], s[1] * st[1], s[2] * st[2]}));
+            }
+            Boolean vis = sampleVisible(a, time);
+            if (vis != null && !vis) hidden = true;
+        }
+        if (hidden && shape != null) shape.addProperty("visible", false);
+        if (node.has("children") && node.get("children").isJsonArray()) {
+            for (JsonElement c : node.getAsJsonArray("children")) {
+                if (c.isJsonObject()) bakeNode(c.getAsJsonObject(), anims, time, loop, attachment, hidden);
+            }
+        }
+    }
+
+    private static JsonObject vecJson(double[] v) {
+        JsonObject o = new JsonObject();
+        o.addProperty("x", v[0]);
+        o.addProperty("y", v[1]);
+        o.addProperty("z", v[2]);
+        return o;
+    }
+
+    /** Hamilton product a x b (rotate by b first, then a). */
+    private static double[] mulQ(double[] a, double[] b) {
+        return new double[] {
+                a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+                a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+                a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+                a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]};
+    }
+
     /** A vector channel ({x,y,z} or {x,y,z,w}) at {@code time} frames, or null if it has no keyframe. */
-    private static double[] sample(JsonObject node, String channel, double time, boolean quaternion) {
+    private static double[] sample(JsonObject node, String channel, double time, boolean quaternion, double loop) {
         if (!node.has(channel) || !node.get(channel).isJsonArray()) return null;
         JsonArray kfs = node.getAsJsonArray(channel);
         if (kfs.isEmpty()) return null;
@@ -347,10 +425,28 @@ final class ModelThumbnail {
             if (k.get("time").getAsDouble() <= time) a = k;
             else if (b == null) b = k;
         }
-        if (a == null) return vecOf(b.getAsJsonObject("delta"), quaternion);
-        if (b == null) return vecOf(a.getAsJsonObject("delta"), quaternion);
-        double ta = a.get("time").getAsDouble(), tb = b.get("time").getAsDouble();
-        double f = tb > ta ? (time - ta) / (tb - ta) : 0;
+        double ta, tb;
+        if (a != null && b != null) {
+            ta = a.get("time").getAsDouble();
+            tb = b.get("time").getAsDouble();
+        } else if (loop > 0 && kfs.size() > 1) {
+            // past the last keyframe (or before the first) of a looping animation: on its way from the last back to the
+            // first (2026-10-16, user: the flipbook's punch restarted before the arm came back)
+            JsonObject first = kfs.get(0).getAsJsonObject(), last = kfs.get(kfs.size() - 1).getAsJsonObject();
+            double tf = first.get("time").getAsDouble(), tl = last.get("time").getAsDouble();
+            a = last;
+            b = first;
+            if (time >= tl) {
+                ta = tl;
+                tb = tf + loop;
+            } else {
+                ta = tl - loop;
+                tb = tf;
+            }
+        } else {
+            return vecOf((a != null ? a : b).getAsJsonObject("delta"), quaternion);
+        }
+        double f = tb > ta ? Math.max(0, Math.min(1, (time - ta) / (tb - ta))) : 0;
         if (a.has("interpolationType") && "smooth".equals(a.get("interpolationType").getAsString())) f = f * f * (3 - 2 * f);
         double[] va = vecOf(a.getAsJsonObject("delta"), quaternion), vb = vecOf(b.getAsJsonObject("delta"), quaternion);
         if (quaternion) return nlerp(va, vb, f);

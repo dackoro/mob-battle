@@ -169,7 +169,7 @@ def half(S):
     medium = "".join(slot(S, f"{S}M{i}", *MEDIUM[i], ind) for i in MEDIUM_DRAW)
     side_mode = "Left" if S == "L" else "Right"
     return f"""    Group #{S}Half {{
-      FlexWeight: 0;
+      FlexWeight: 1;
 
       // the half's background (Bg_<Color>_{S}.png: glow, streaks, particles, the slanted edge), stretched to the box
       AssetImage #{S}Bg {{ Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0); }}
@@ -236,63 +236,86 @@ COLUMN_CLIP = True
 
 # VsScreen.COLUMN_CROP / columnVariant: the pictures come pre-cut to this share of their square's width (the clip
 # below did not clip in game, user 2026-10-16), so each image is drawn exactly that wide, never stretched
-COLUMN_CROP = [0.415, 0.304, 0.228]   # 5 % narrower than the column: no pixel spills at any UI scale
+# one per column count (VsScreen.columnVariant): exactly the column's share (1920 / n) of column_size(n). The image is
+# anchored to the column's own edges (Left 0, Right 0), so it ends exactly where the column does at any screen width
+# (user, 2026-10-16: a fixed width 5 % narrower left a hard edge inside the column; a wider screen stretches it ~2 %)
+COLUMN_CROP = {n: round(1920 / n / column_size(n), 3) for n in range(3, 9)}
 
 
 def column_crop(n):
-    return COLUMN_CROP[0 if n <= 4 else 1 if n <= 6 else 2]
+    return COLUMN_CROP[n]
 
 
-def columns():
+def columns(counts=COLUMN_COUNTS):
     out = []
-    for n in COLUMN_COUNTS:
+    for n in counts:
         size = column_size(n)
         name_font = max(24, min(44, round(1920 / n / 11)))
         panels = []
         for i in range(n):
             p = f"C{n}P{i}"   # ids are letters and digits only (an underscore broke the parse)
-            tiers = "".join(f"""                Group {{
-                  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                  LayoutMode: Bottom;
-                  Group {{
-                    Anchor: (Height: {round(size * f)});
-                    LayoutMode: Center;
-                    AssetImage #{p}T{t} {{ Anchor: (Width: {round(size * f * column_crop(n))}, Height: {round(size * f)}); Visible: false; }}
+            # each tier: picture standing on the bottom of the 1080 column content (spacer above it; a picture taller
+            # than 1080 is cut at the bottom), centered across
+            tiers = "".join(f"""                  Group {{
+                    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+                    LayoutMode: Top;
+                    Group {{ Anchor: (Height: {max(0, 1080 - round(size * f))}); }}
+                    Group {{
+                      Anchor: (Height: {round(size * f)});
+                      AssetImage #{p}T{t} {{ Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0); Visible: false; }}
+                    }}
                   }}
-                }}
 """ for t, f in enumerate(TIERS))
             panels.append(f"""      Group #{p} {{
         FlexWeight: 1;
+        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
+        // body's top, so it moves up with it (below the screen = unseen)
         Group #{p}In {{
           Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
           Visible: false;
-          Background: #000000;
-          // the picture, already cut to the column's width by VsScreen (COLUMN_CROP). No scrolling group: it never
-          // clipped in game and its scrollbar room pushed every picture ~15 px left onto the column before (user,
-          // 2026-10-16)
-          Group {{
-            Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+          LayoutMode: Top;
+          Group #{p}Pad {{ FlexWeight: 1000; }}
+          Group #{p}Body {{
+            FlexWeight: 1;
+            Background: #000000;
             Group {{
-              Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-{tiers}            }}
-          }}
-          AssetImage #{p}Over {{ Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0); }}
-          Group {{
-            Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-            LayoutMode: Top;
-            Group {{
-              Anchor: (Height: 130);
-              LayoutMode: Top;
-              Padding: (Left: 16, Top: 14, Right: 8);
-              Label #{p}Tag {{
-                Anchor: (Height: 32);
-                Style: (FontSize: 24, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
-                        HorizontalAlignment: Start, VerticalAlignment: Center);
+              Anchor: (Left: 0, Right: 0, Top: 0, Height: 1080);
+              // the picture, already cut to the column's width by VsScreen (COLUMN_CROP)
+              Group {{
+                Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+{tiers}              }}
+              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // column's height): square, as wide as the column, standing on its bottom
+              Group {{
+                Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+                LayoutMode: Top;
+                Group {{ Anchor: (Height: {1080 - round(1920 / n)}); }}
+                Group {{
+                  Anchor: (Height: {round(1920 / n)});
+                  LayoutMode: Center;
+                  AssetImage #{p}Sq {{ Anchor: (Width: {round(1920 / n)}, Height: {round(1920 / n)}); Visible: false; }}
+                }}
               }}
-              Label #{p}Name {{
-                Anchor: (Height: 60);
-                Style: (FontSize: {name_font}, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
-                        HorizontalAlignment: Start, VerticalAlignment: Center);
+              AssetImage #{p}Over {{ Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0); }}
+              Group {{
+                Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+                LayoutMode: Top;
+                Group {{
+                  Anchor: (Height: 130);
+                  LayoutMode: Top;
+                  Padding: (Left: 16, Top: 14, Right: 8);
+                  Label #{p}Tag {{
+                    Anchor: (Height: 32);
+                    Style: (FontSize: 24, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                            HorizontalAlignment: Start, VerticalAlignment: Center);
+                  }}
+                  Label #{p}Name {{
+                    Anchor: (Height: 60);
+                    Style: (FontSize: {name_font}, FontName: "Secondary", TextColor: #ffffff, RenderBold: true, RenderUppercase: true,
+                            HorizontalAlignment: Start, VerticalAlignment: Center);
+                  }}
+                }}
               }}
             }}
           }}
@@ -319,6 +342,30 @@ def back_first():
     medium = sorted(range(len(MEDIUM)), key=lambda i: (MEDIUM[i][1], i))
     ground = sorted(range(GROUND_COUNT), key=lambda i: (CROWD[i][1], i))
     return medium, ground
+
+
+# The column screens moved to VsCols<n>.ui (2026-10-16), but a server already running the older code still appends
+# VsScreen.ui and sets #Cols/#ColTitle in it: with dev mode the .ui goes live at once, and a missing id disconnects the
+# player ("Failed to apply CustomUI HUD commands", user 2026-10-16). Keep them here until every server runs the new
+# code, then set this to False and run the script again.
+LEGACY_COLUMNS_IN_MAIN = True
+
+
+def legacy_columns():
+    if not LEGACY_COLUMNS_IN_MAIN:
+        return ""
+    return columns() + f"""  Group #ColTitle {{
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    LayoutMode: Top;
+    Visible: false;
+    Group {{
+      Anchor: (Height: {round(TITLE_BOX[1] * 0.8)}, Top: 136);
+      LayoutMode: Center;
+      AssetImage #ColKindTitle {{ Anchor: (Width: {round(TITLE_BOX[0] * 0.8)}, Height: {round(TITLE_BOX[1] * 0.8)}); }}
+    }}
+  }}
+
+"""
 
 
 def main():
@@ -353,26 +400,13 @@ Group #Vs {{
 
 {half("R")}  }}
 
-{columns()}  Group #Flash {{
+{legacy_columns()}  Group #Flash {{
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
     Background: #ffffff(0.7);
     Visible: false;
   }}
 
   // the battle kind in the VS's own style, right under it (Kind_<kind>_<lang>.png, set by the code; user 2026-10-16)
-  // 3+ team columns: the kind's title right under the column headers, over the space above the faces (user, 2026-10-16:
-  // in the middle it covered them)
-  Group #ColTitle {{
-    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-    LayoutMode: Top;
-    Visible: false;
-    Group {{
-      Anchor: (Height: {round(TITLE_BOX[1] * 0.8)}, Top: 136);
-      LayoutMode: Center;
-      AssetImage #ColKindTitle {{ Anchor: (Width: {round(TITLE_BOX[0] * 0.8)}, Height: {round(TITLE_BOX[1] * 0.8)}); }}
-    }}
-  }}
-
   Group #Title {{
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
     LayoutMode: Top;
@@ -395,6 +429,37 @@ Group #Vs {{
 """
     OUT.write_text(ui, encoding="utf-8", newline="\n")
     print(OUT, len(ui.splitlines()), "lines")
+    # 3+ teams: one small document per column count (VsScreen appends only the one it shows; user 2026-10-16: with
+    # everything in one file the client built ~570 pictures' worth of elements for every VS and froze)
+    for n in COLUMN_COUNTS:
+        cols = f"""// Mob Battle VS screen, {n} team columns (VsScreen.java). GENERATED by scripts/gen-vs-ui.py: edit that and run it
+// again. The halves screen is VsScreen.ui; only one of them is appended.
+Group #Vs {{
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+
+{columns([n])}  Group #Flash {{
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    Background: #ffffff(0.7);
+    Visible: false;
+  }}
+
+  // the kind's title right under the column headers, over the space above the faces (user, 2026-10-16: in the middle
+  // it covered them)
+  Group #ColTitle {{
+    Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+    LayoutMode: Top;
+    Visible: false;
+    Group {{
+      Anchor: (Height: {round(TITLE_BOX[1] * 0.8)}, Top: 136);
+      LayoutMode: Center;
+      AssetImage #ColKindTitle {{ Anchor: (Width: {round(TITLE_BOX[0] * 0.8)}, Height: {round(TITLE_BOX[1] * 0.8)}); }}
+    }}
+  }}
+}}
+"""
+        out = OUT.with_name(f"VsCols{n}.ui")
+        out.write_text(cols, encoding="utf-8", newline="\n")
+        print(out, len(cols.splitlines()), "lines")
 
 
 if __name__ == "__main__":

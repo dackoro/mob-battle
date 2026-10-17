@@ -63,9 +63,9 @@ public class TeamSelectInteraction extends SimpleInstantInteraction {
         if (team < 0) {
             TeamFx.clear(target);
             player.sendMessage((more > 0
-                    ? I18n.tr("chat.team.removedMore").param("name", name).param("team", Teams.name(draft.currentTeam()))
-                            .param("more", more).param("role", role)
-                    : I18n.tr("chat.team.removed").param("name", name).param("team", Teams.name(draft.currentTeam())))
+                    ? I18n.tr("chat.team.removedMore").param("name", MobNames.message(name)).param("team", Teams.name(draft.currentTeam()))
+                            .param("more", more).param("role", MobNames.message(role))
+                    : I18n.tr("chat.team.removed").param("name", MobNames.message(name)).param("team", Teams.name(draft.currentTeam())))
                     .color("#aaaaaa"));
             return;
         }
@@ -74,9 +74,9 @@ public class TeamSelectInteraction extends SimpleInstantInteraction {
         WandFx.swirl(target, Teams.color(team), buffer);
         int size = draft.teams().get(team).size();
         player.sendMessage((more > 0
-                ? I18n.tr("chat.team.joinsMore").param("name", name).param("team", Teams.name(team))
-                        .param("count", size).param("more", more).param("role", role)
-                : I18n.tr("chat.team.joins").param("name", name).param("team", Teams.name(team)).param("count", size))
+                ? I18n.tr("chat.team.joinsMore").param("name", MobNames.message(name)).param("team", Teams.name(team))
+                        .param("count", size).param("more", more).param("role", MobNames.message(role))
+                : I18n.tr("chat.team.joins").param("name", MobNames.message(name)).param("team", Teams.name(team)).param("count", size))
                 .color(Teams.color(team)));
         FightFx.teamRing(player, target, Teams.color(team), buffer);
     }

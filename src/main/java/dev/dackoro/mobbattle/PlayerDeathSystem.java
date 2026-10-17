@@ -53,7 +53,7 @@ public class PlayerDeathSystem extends RefChangeSystem<EntityStore, DeathCompone
             player.sendMessage(I18n.tr("chat.death.self").color("#ff6b5e"));
         }
         if (battle.owner() != null && battle.owner().isValid() && battle.owner() != player) {
-            battle.owner().sendMessage((player != null ? I18n.tr("chat.death.other").param("name", name)
+            battle.owner().sendMessage((player != null ? I18n.tr("chat.death.other").param("name", MobNames.message(name))
                     : I18n.tr("chat.death.someone")).color("#aaaaaa"));
         }
     }

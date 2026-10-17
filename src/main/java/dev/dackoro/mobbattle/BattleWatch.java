@@ -564,7 +564,7 @@ final class BattleWatch extends CustomUIHud {
         boolean up = BattleManager.isAlive(mob, store);
         String name = ChaosWand.nameOf(mob, store);
         int team = b.team(mob);
-        line(ui, "#Name", DuelCard.shorten(name == null ? "?" : name.replace('_', ' ')),
+        line(ui, "#Name", DuelCard.shorten(MobNames.text(name, player)),
                 b.isTeams() ? b.color(team) : up ? "#ffd23e" : "#888888");
         line(ui, "#Side", sideText(b, team), b.isTeams() ? b.color(team) : "#96a9be");
         line(ui, "#Health", DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
@@ -603,7 +603,7 @@ final class BattleWatch extends CustomUIHud {
             boolean up = mob.isValid() && BattleManager.isAlive(mob, store);
             boolean on = mob == watched;
             String name = mob.isValid() ? ChaosWand.nameOf(mob, store) : null;
-            line(ui, "#Name" + side, DuelCard.shorten(name == null ? "?" : name.replace('_', ' ')),
+            line(ui, "#Name" + side, DuelCard.shorten(MobNames.text(name, hud.getPlayerRef())),
                     up ? (on ? "#ffd23e" : "#e8eef5") : "#888888");
             line(ui, "#Tag" + side, on ? I18n.tr("hud.watching.tag") : Message.empty(), "#ffd23e");
             line(ui, "#Health" + side, DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");

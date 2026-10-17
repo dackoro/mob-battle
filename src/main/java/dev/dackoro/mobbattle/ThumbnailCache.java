@@ -174,7 +174,27 @@ final class ThumbnailCache {
     // ---- entry points ----
 
     /** BootEvent: makes the missing or outdated thumbnails of every model, in the background. */
+    /** Set by PlayerSetupConnectEvent: a client started connecting this session. */
+    private static volatile boolean CLIENT_CAME;
+
+    /** MobBattlePlugin: a client started connecting (before it is in the player list or has its asset list). */
+    static void clientConnecting() {
+        CLIENT_CAME = true;
+    }
+
+    /**
+     * Whether runtime assets (holograms, mob icons, VS pictures) may be registered now: only before any client has
+     * started connecting this session. A registration with someone online showed a "Reloaded assets for Common" toast
+     * per file (user, 2026-10-16), and one a few seconds before a join finished never reached that client (a skeleton's
+     * icon drew a red X): the player list alone does not show a client still connecting. Anything made later is
+     * registered at the next boot.
+     */
+    static boolean mayRegister() {
+        return !CLIENT_CAME && Universe.get().getPlayers().isEmpty();
+    }
+
     static void startup() {
+        long boot = System.nanoTime();
         List<String> all = new ArrayList<>(ModelAsset.getAssetMap().getAssetMap().keySet());
         registerHolograms(all);
         registerIcons(all);
@@ -194,8 +214,31 @@ final class ThumbnailCache {
             registerHolograms(all);
             registerIcons(all);
             VsScreen.prepareInBackground();
+            // a framed block like the server's own "Hytale Server Booted!" one (user, 2026-10-16: the numbers got lost
+            // among the boot log)
+            Path dir = folder();
+            long vs = VsScreen.registeredBytes(), holo = HOLO_BYTES.get(), icons = ICON_BYTES.get();
+            String rule = "=".repeat(96);
+            MobBattlePlugin.log(rule);
+            MobBattlePlugin.log("        Dackoro's Mob Battle: pictures ready in " + MobBattlePlugin.took(boot));
+            MobBattlePlugin.log("        Thumbnails:  " + report.total() + " models, "
+                    + MobBattlePlugin.onDisk(dir == null ? null : dir.resolve("models")));
+            MobBattlePlugin.log("        VS pictures: " + VsScreen.cacheSummary());
+            MobBattlePlugin.log("        Holograms:   " + HOLOGRAMS.size() + ", "
+                    + MobBattlePlugin.onDisk(dir == null ? null : dir.resolve("holo" + HOLO_VERSION)));
+            MobBattlePlugin.log("        Each joining player downloads " + MobBattlePlugin.size(vs + holo + icons)
+                    + " (VS " + MobBattlePlugin.size(vs) + ", holograms " + MobBattlePlugin.size(holo)
+                    + ", mob icons " + MobBattlePlugin.size(icons) + ")");
+            if (!mayRegister()) {
+                MobBattlePlugin.log("        A player connected while they were being drawn: the new ones are registered at the next restart");
+            }
+            MobBattlePlugin.log(rule);
         });
     }
+
+    /** Bytes of the holograms / mob icons registered so far (sent to every client that joins), for the boot summary. */
+    private static final java.util.concurrent.atomic.AtomicLong HOLO_BYTES = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong ICON_BYTES = new java.util.concurrent.atomic.AtomicLong();
 
     /**
      * Cache clean-up after a look or render change (2026-10-16, user: a server that already had pictures cached must
@@ -244,7 +287,7 @@ final class ThumbnailCache {
                 MobBattlePlugin.log("Hologram texture of " + id + " not made: " + e);
             }
         }
-        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures made from the cache in " + (System.nanoTime() - t0) / 1_000_000 + " ms.");
+        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures made from the cache in " + MobBattlePlugin.took(t0) + ".");
     }
 
     /** The registered hologram texture of a model (plain path, as a ModelAttachment takes it), or null. */
@@ -263,20 +306,25 @@ final class ThumbnailCache {
      * live one for a model it needs).
      */
     static void registerHolograms(List<String> ids) {
-        if (!Universe.get().getPlayers().isEmpty()) return;
+        if (!mayRegister()) return;
+        long t0 = System.nanoTime(), bytes = 0;
         int n = 0;
         for (String id : ids) {
             if (HOLOGRAMS.containsKey(id)) continue;
             Path f = holoFileOf(id);
             if (f == null || !Files.exists(f)) continue;
             try {
-                HOLOGRAMS.put(id, MorphHologram.register(id, Files.readAllBytes(f), false));
+                byte[] png = Files.readAllBytes(f);
+                HOLOGRAMS.put(id, MorphHologram.register(id, png, false));
+                bytes += png.length;
+                HOLO_BYTES.addAndGet(png.length);
                 n++;
             } catch (Exception e) {
                 MobBattlePlugin.log("Hologram texture of " + id + " not registered: " + e);
             }
         }
-        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures registered.");
+        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures registered (" + MobBattlePlugin.size(bytes)
+                + ") in " + MobBattlePlugin.took(t0) + ".");
     }
 
     /**
@@ -296,8 +344,9 @@ final class ThumbnailCache {
      * as the holograms: a connected client would need an asset rebuild). ~2 KB each at 64 px.
      */
     static void registerIcons(List<String> ids) {
-        if (!Universe.get().getPlayers().isEmpty()) return;
+        if (!mayRegister()) return;
         String prefix = MorphHologram.registryPrefix();
+        long t0 = System.nanoTime(), bytes = 0;
         int n = 0;
         for (String id : ids) {
             if (ICONS.containsKey(id) || ConfigPage.hasGameIcon(id)) continue;
@@ -305,15 +354,19 @@ final class ThumbnailCache {
             if (f == null || !Files.exists(f)) continue;
             try {
                 String plain = ICON_FOLDER + "MobBattle_Icon_" + safe(id) + ".png";
+                byte[] png = Files.readAllBytes(f);
                 com.hypixel.hytale.server.core.asset.common.CommonAssetModule.get().addCommonAsset(EyeRecolor.PACK,
-                        new RuntimeCommonAsset(prefix + plain, Files.readAllBytes(f)), false);
+                        new RuntimeCommonAsset(prefix + plain, png), false);
                 ICONS.put(id, plain);
+                bytes += png.length;
+                ICON_BYTES.addAndGet(png.length);
                 n++;
             } catch (Exception e) {
                 MobBattlePlugin.log("Icon of " + id + " not registered: " + e);
             }
         }
-        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " mob icons registered (models with no game icon).");
+        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " mob icons registered (" + MobBattlePlugin.size(bytes)
+                + ", models with no game icon) in " + MobBattlePlugin.took(t0) + ".");
     }
 
     private static Path iconFileOf(String modelId) {
@@ -380,7 +433,8 @@ final class ThumbnailCache {
 
     static String describe(Report r) {
         return r.total() + " models, " + r.rendered() + " drawn, " + r.cached() + " up to date, " + r.failed()
-                + " failed, " + r.millis() + " ms" + (r.failures().isEmpty() ? "" : " (first failures: "
+                + " failed, " + MobBattlePlugin.millis(r.millis())
+                + (folder() != null ? ", thumbnails " + MobBattlePlugin.onDisk(folder().resolve("models")) : "") + (r.failures().isEmpty() ? "" : " (first failures: "
                 + String.join("; ", r.failures().subList(0, Math.min(3, r.failures().size()))) + ")");
     }
 

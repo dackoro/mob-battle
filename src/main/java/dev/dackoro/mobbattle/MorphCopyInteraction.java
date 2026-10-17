@@ -58,7 +58,7 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
         // The omnitrix "recalibrated" sound, played here and not by the effect: a re-applied effect (quick clicks)
         // does not replay its sound.
         WandFx.burst(null, "SFX_MobBattle_OmnitrixCopy", ChaosWand.positionOf(target, buffer), buffer);
-        player.sendMessage(I18n.tr("chat.morph.copied").param("name", ChaosWand.nameOf(target, buffer))
+        player.sendMessage(I18n.tr("chat.morph.copied").param("name", MobNames.message(ChaosWand.nameOf(target, buffer)))
                 .param("model", copy.label()).color("#7dff8a"));
     }
 }

@@ -1,0 +1,22 @@
+// /mobbattle test preview scene (experiment, 2026-10-16, user: "a VS in 3D? let's try it"): the mobs around the player
+// in two sides facing each other, in ONE 3D viewer inside a HUD across the screen. PreviewTest.scene fills it.
+// Same layout pattern as PreviewHud.ui (a Right layout and a box with a fixed width): a Top layout with only margins
+// gave the box no height and nothing showed (user, 2026-10-16).
+Group #Scene {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+  LayoutMode: Right;
+
+  Group #SceneBox {
+    Anchor: (Width: 1800, Right: 60, Top: 90, Bottom: 150);
+    Background: #0b1118(0.55);
+    LayoutMode: Full;
+
+    PrefabPreviewComponent #Preview {
+      AllowDragYaw: false;
+      AllowDragPitch: false;
+      AllowZoom: false;
+      AllowPan: false;
+      ShowAnchor: false;
+    }
+  }
+}

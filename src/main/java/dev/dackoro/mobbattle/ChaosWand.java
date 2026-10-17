@@ -173,7 +173,7 @@ public final class ChaosWand {
         String targetName = nameOf(target, buffer);
         if (around.isEmpty()) {
             // Only the cast animation and this message: no area, no effects.
-            player.sendMessage(I18n.tr("chat.chaos.nomobs").param("radius", FxSettings.radius).param("name", targetName).color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.nomobs").param("radius", FxSettings.radius).param("name", MobNames.message(targetName)).color(WARN));
             return;
         }
         BattleManager.Kind kind = BattleManager.Kind.ALL_VS_ONE;
@@ -198,7 +198,7 @@ public final class ChaosWand {
         }
         FightFx.summonRune(kind, center, buffer);
         FightCamera.intro(kind, player, center, List.of(List.of(target), new ArrayList<>(around)), buffer);
-        Countdown.run(kind, player, buffer, new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", targetName)), withTarget(around, target),
+        Countdown.run(kind, player, buffer, new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", MobNames.message(targetName))), withTarget(around, target),
                 acc -> focusNow(player, playerEntity, target, targetName, around, center, acc),
                 reason -> Buffs.cancelPreLone(target));
         // The lone buff from the countdown on (after Countdown.run: a replaced countdown of this target cancels
@@ -212,7 +212,7 @@ public final class ChaosWand {
         around.removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
         if (!BattleManager.isAlive(target, buffer) || !PlayerFighters.canStart(target, buffer) || around.isEmpty()) {
             Buffs.cancelPreLone(target);
-            player.sendMessage(I18n.tr("chat.chaos.focuscancelled").param("name", targetName).color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.focuscancelled").param("name", MobNames.message(targetName)).color(WARN));
             return;
         }
 
@@ -248,9 +248,9 @@ public final class ChaosWand {
             FightManager.turnAgainst(target, firstAttacker, buffer);
         }
         MobBattlePlugin.log("Chaos focus on " + targetName + ": " + around.size() + " mobs, " + attackers + " aggressive");
-        player.sendMessage(I18n.tr("chat.chaos.focusstart").param("name", targetName).param("attackers", attackers)
+        player.sendMessage(I18n.tr("chat.chaos.focusstart").param("name", MobNames.message(targetName)).param("attackers", attackers)
                 .param("total", around.size()).param("radius", FxSettings.radius).color(FIGHT));
-        FightFx.title(BattleManager.Kind.ALL_VS_ONE, player, I18n.tr("battle.label.everyone").param("name", targetName),
+        FightFx.title(BattleManager.Kind.ALL_VS_ONE, player, I18n.tr("battle.label.everyone").param("name", MobNames.message(targetName)),
                 I18n.tr("battle.sub.attackers").param("count", attackers));
     }
 

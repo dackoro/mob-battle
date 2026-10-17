@@ -120,6 +120,8 @@ final class PickLists {
     static void rolesChanged() {
         roles = null;
         MAX_HEALTH.clear();
+        NAME_KEYS.clear();
+        MobNames.clear();
         RoleAttack.clear();
         ChaseSupport.clear();
         Medium.rolesChanged();
@@ -203,6 +205,15 @@ final class PickLists {
 
     /** Same, also kept to one group ({@link #groupOf}; {@link #OTHER} = entries with none; null / ALL = every group). */
     static List<ConfigSchema.Opt> filter(List<Entry> all, String mod, String kind, String group) {
+        return filter(all, mod, kind, group, null);
+    }
+
+    /**
+     * Same; with {@code lang}, mob labels get the game's name in that language when it differs from the ID
+     * ("Dungeon Goblin Burner (Quemador Goblin)"), made per viewer: a label built once kept the first player's language
+     * after a language change (2026-10-16, user).
+     */
+    static List<ConfigSchema.Opt> filter(List<Entry> all, String mod, String kind, String group, String lang) {
         List<ConfigSchema.Opt> out = new ArrayList<>();
         boolean every = mod == null || ALL.equals(mod);
         // One group picked: the "Group - " part would say it again on every line (user, 2026-10-13), so it goes.
@@ -211,6 +222,7 @@ final class PickLists {
             if (!keeps(e, mod, kind) || !inGroup(e, group)) continue;
             String g = oneGroup ? groupOf(e) : null;
             String label = g != null ? e.label().substring(g.length() + 3) : e.label();
+            if (lang != null && e.kind() != null) label += MobNames.alsoKnownAs(e.value(), lang);
             out.add(new ConfigSchema.Opt(e.value(), every && e.mod() != null ? MOD_MARK + label : label));
         }
         return out;
@@ -457,6 +469,24 @@ final class PickLists {
      * A role's MaxHealth from its JSON chain (summon fill matches mobs of similar strength), cached; -1 if the role does
      * not say (a mod's role built in code, a computed value).
      */
+    private static final Map<String, String> NAME_KEYS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The role's NameTranslationKey as its JSON chain sets it (e.g. "server.npcRoles.Goblin_Burner.name"; variants
+     * such as Dungeon_Goblin_Burner point to their template's), "" if none. Cached until the roles change.
+     */
+    static String nameKeyOf(String role) {
+        if (role == null) return "";
+        return NAME_KEYS.computeIfAbsent(role, r -> {
+            try {
+                JsonElement v = lookup(chain(r, new HashMap<>()), "NameTranslationKey");
+                return v != null && v.isJsonPrimitive() ? v.getAsString() : "";
+            } catch (RuntimeException e) {
+                return "";
+            }
+        });
+    }
+
     static double maxHealthOf(String role) {
         return MAX_HEALTH.computeIfAbsent(role, r -> {
             JsonElement v = lookup(chain(r, new HashMap<>()), "MaxHealth");

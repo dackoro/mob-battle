@@ -49,8 +49,8 @@ public class EffectGiveInteraction extends SimpleInstantInteraction {
         }
         String name = ChaosWand.nameOf(target, buffer);
         boolean ok = give(target, chain, effects, buffer);
-        player.sendMessage((ok ? I18n.tr("chat.effect.gave").param("effect", FxSettings.effect).param("name", name)
-                : I18n.tr("chat.effect.rejected").param("name", name).param("effect", chain.get(0).getId()))
+        player.sendMessage((ok ? I18n.tr("chat.effect.gave").param("effect", FxSettings.effect).param("name", MobNames.message(name))
+                : I18n.tr("chat.effect.rejected").param("name", MobNames.message(name)).param("effect", chain.get(0).getId()))
                 .color(ok ? EffectWand.colorOf(FxSettings.effect) : "#ffcc55"));
     }
 

@@ -70,19 +70,19 @@ public class ArmyToggleInteraction extends SimpleInstantInteraction {
             WandFx.onTarget(target, added ? WandFx.ARMY_ADD : WandFx.ARMY_REMOVE, buffer);
             int size = Army.members(player.getUuid()).size();
             player.sendMessage((added
-                    ? I18n.tr("chat.army.joined").param("name", name).param("size", size)
-                    : I18n.tr("chat.army.left").param("name", name).param("size", size)).color(added ? "#4bff6a" : "#aaaaaa"));
+                    ? I18n.tr("chat.army.joined").param("name", MobNames.message(name)).param("size", size)
+                    : I18n.tr("chat.army.left").param("name", MobNames.message(name)).param("size", size)).color(added ? "#4bff6a" : "#aaaaaa"));
             return;
         }
         // Recruiting for another player or a leader mob (crouch click).
         if (target == pick.leader()) {
-            player.sendMessage(I18n.tr("chat.army.self").param("name", name).color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.army.self").param("name", MobNames.message(name)).color("#ffcc55"));
             return;
         }
         if (Army.isMember(pick.owner(), target)) {
             Army.remove(target, buffer);
             WandFx.onTarget(target, WandFx.ARMY_REMOVE, buffer);
-            player.sendMessage(I18n.tr("chat.army.left.other").param("name", name).param("owner", pick.name())
+            player.sendMessage(I18n.tr("chat.army.left.other").param("name", MobNames.message(name)).param("owner", pick.name())
                     .param("size", Army.members(pick.owner()).size()).color("#aaaaaa"));
             return;
         }
@@ -92,11 +92,11 @@ public class ArmyToggleInteraction extends SimpleInstantInteraction {
             return;
         }
         if (!Army.add(pick.owner(), ownerEntity, pick.leader() != null, target, buffer)) {
-            player.sendMessage(I18n.tr("chat.army.loop").param("name", name).param("owner", pick.name()).color("#ffcc55"));
+            player.sendMessage(I18n.tr("chat.army.loop").param("name", MobNames.message(name)).param("owner", pick.name()).color("#ffcc55"));
             return;
         }
         WandFx.onTarget(target, WandFx.ARMY_ADD, buffer);
-        player.sendMessage(I18n.tr("chat.army.joined.other").param("name", name).param("owner", pick.name())
+        player.sendMessage(I18n.tr("chat.army.joined.other").param("name", MobNames.message(name)).param("owner", pick.name())
                 .param("size", Army.members(pick.owner()).size()).color("#4bff6a"));
     }
 
@@ -131,6 +131,6 @@ public class ArmyToggleInteraction extends SimpleInstantInteraction {
         }
         Army.setPick(player.getUuid(), new Army.Pick(uuid.getUuid(), target, name));
         WandFx.onTarget(target, WandFx.CHARM, buffer);
-        player.sendMessage(I18n.tr("chat.army.leader.picked").param("name", name).color("#ffd23e"));
+        player.sendMessage(I18n.tr("chat.army.leader.picked").param("name", MobNames.message(name)).color("#ffd23e"));
     }
 }

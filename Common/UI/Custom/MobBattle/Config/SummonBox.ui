@@ -1,7 +1,8 @@
 $C = "../../Common.ui";
 
 // The Summon Wand list when it is long: its rows (SummonRow.ui) go into #List, which scrolls on its own, so the
-// Add a mob row and the settings below stay close (user, 2026-10-13). Seven rows high (50 each).
+// Add a mob row and the settings below stay close (user, 2026-10-13). Eight rows high (50 each; user 2026-10-16: 8
+// before scrolling).
 Group {
   LayoutMode: Top;
   Anchor: (Bottom: 6);
@@ -9,6 +10,6 @@ Group {
   Group #List {
     LayoutMode: TopScrolling;
     ScrollbarStyle: $C.@DefaultScrollbarStyle;
-    Anchor: (Height: 350);
+    Anchor: (Height: 400);
   }
 }

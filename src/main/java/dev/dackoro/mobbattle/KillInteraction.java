@@ -67,7 +67,7 @@ public class KillInteraction extends SimpleInstantInteraction {
         if (npc == null && PlayerFighters.cantDie(target, buffer)) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
             if (player != null) {
-                player.sendMessage(I18n.tr("chat.kill.cantDie").param("name", ChaosWand.nameOf(target, buffer)).color("#ffcc55"));
+                player.sendMessage(I18n.tr("chat.kill.cantDie").param("name", MobNames.message(ChaosWand.nameOf(target, buffer))).color("#ffcc55"));
             }
             return;
         }
@@ -92,7 +92,7 @@ public class KillInteraction extends SimpleInstantInteraction {
                                String name, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         WandFx.kill(target, killer, npc, buffer);
         if (player != null && player.isValid()) {
-            player.sendMessage(I18n.tr("chat.kill.done").param("name", name).color("#ff5555"));
+            player.sendMessage(I18n.tr("chat.kill.done").param("name", MobNames.message(name)).color("#ff5555"));
         }
     }
 

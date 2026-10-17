@@ -1,0 +1,24 @@
+{
+  "Quality": "Developer",
+  "BlockType": {
+    "Material": "Solid",
+    "DrawType": "Cube",
+    "Opacity": "Transparent",
+    "VariantRotation": "None",
+    "Flags": {},
+    "Gathering": {},
+    "Textures": [
+      {
+        "All": "BlockTextures/MobBattle/PreviewFrame.png"
+      }
+    ],
+    "RequiresAlphaBlending": true
+  },
+  "PlayerAnimationsId": "Block",
+  "Tags": {
+    "Type": [
+      "Editor"
+    ]
+  },
+  "Icon": "Icons/Items/MobBattle/SnapWand.png"
+}

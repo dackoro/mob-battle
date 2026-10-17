@@ -1,0 +1,94 @@
+// /mobbattle test preview compare (experiment, 2026-10-16, user: "the PNG beside the 3D, same size, to compare
+// quality"): a HUD with the mob's VS picture (#Pic, the PNG every client downloads) and the 3D viewer showing the same
+// mob twice, still in the picture's pose and animating that pose's animation. PreviewTest.java fills both.
+Group #Compare {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+  LayoutMode: Right;
+
+  Group #Row {
+    Anchor: (Width: 1500, Right: 30, Top: 120, Bottom: 200);
+    LayoutMode: Left;
+
+    Group #PicBox {
+      Anchor: (Width: 580);
+      Background: #0b1118(0.55);
+      LayoutMode: Top;
+      Padding: (Full: 10);
+
+      Label #PicLabel {
+        Anchor: (Height: 26);
+        Text: "PNG (VS picture)";
+        Style: (FontSize: 15, TextColor: #ffd23e, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+
+      Group {
+        FlexWeight: 1;
+        LayoutMode: CenterMiddle;
+
+        // The old single picture, kept hidden: code from before the sizes still sets #Pic (a missing id disconnects).
+        AssetImage #Pic {
+          Anchor: (Width: 1, Height: 1);
+          Visible: false;
+        }
+        AssetImage #Pic200 {
+          Anchor: (Width: 200, Height: 200);
+          Visible: false;
+          FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        }
+        AssetImage #Pic260 {
+          Anchor: (Width: 260, Height: 260);
+          Visible: false;
+          FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        }
+        AssetImage #Pic320 {
+          Anchor: (Width: 320, Height: 320);
+          Visible: false;
+          FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        }
+        AssetImage #Pic400 {
+          Anchor: (Width: 400, Height: 400);
+          Visible: true;
+          FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        }
+        AssetImage #Pic480 {
+          Anchor: (Width: 480, Height: 480);
+          Visible: false;
+          FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        }
+        AssetImage #Pic560 {
+          Anchor: (Width: 560, Height: 560);
+          Visible: false;
+          FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        }
+      }
+    }
+
+    Group { Anchor: (Width: 16); }
+
+    Group #ViewBox {
+      FlexWeight: 1;
+      Background: #0b1118(0.55);
+      LayoutMode: Top;
+      Padding: (Full: 10);
+
+      Label #ViewLabel {
+        Anchor: (Height: 26);
+        Text: "3D: same pose (left) | animated (right)";
+        Style: (FontSize: 15, TextColor: #7dff8a, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+
+      Group {
+        FlexWeight: 1;
+        LayoutMode: Full;
+
+        PrefabPreviewComponent #Preview {
+          AllowDragYaw: false;
+          AllowDragPitch: false;
+          AllowZoom: false;
+          AllowPan: false;
+          ShowAnchor: false;
+        }
+      }
+    }
+  }
+}

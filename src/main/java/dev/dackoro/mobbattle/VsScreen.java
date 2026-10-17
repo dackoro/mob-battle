@@ -123,13 +123,15 @@ final class VsScreen extends CustomUIHud {
     private static final int[] MEDIUM_BACK_FIRST = {8, 7, 3, 4, 5, 6, 0, 1, 2};
     private static final int[] GROUND_BACK_FIRST = {23, 22, 21, 16, 20, 19, 18, 12, 13, 17, 15, 9, 14, 8, 11, 10, 1, 5, 4, 7, 0, 2, 3, 6};
     /** The name bar fits about this many characters at its font size; past it, kinds go into "+N". */
-    private static final int NAMES_CHARS = 28;
+    private static final int NAMES_CHARS = 24;   // 28 still ran over the slant on the right half (user, 2026-10-16)
     private static final String LEFT_COLOR = "#e03030";
     private static final String RIGHT_COLOR = "#3070e0";
 
-    private static final long STEP_MS = 50;
-    private static final long SLIDE_IN_MS = 350;
-    private static final long SLIDE_OUT_MS = 350;
+    // a frame every 20 ms (50 per second) over a 450 ms slide (user video, 2026-10-16: 6 frames at 50 ms arrived 33-67 ms
+    // apart and the slide looked jerky); each frame is one tiny HUD packet to that viewer
+    private static final long STEP_MS = 20;
+    private static final long SLIDE_IN_MS = 450;
+    private static final long SLIDE_OUT_MS = 400;
     private static final long FLASH_MS = 120;
     /** A half's width at rest, in the thousandths the halves' FlexWeights use (they overlap at the slant). */
     private static final int HALF = 580;
@@ -154,7 +156,7 @@ final class VsScreen extends CustomUIHud {
      * game's icons face any way (user, 2026-10-16: a Scarak looked away from the VS). In order: the summon list's mobs
      * (every pose), the poses VS screens wanted (used.txt), then the epic pose of the other mob models.
      */
-    static final int MAX_PAIRS = 2400;   // keys: each mob model = its pose pair + 3 column crops (2026-10-16)
+    static final int MAX_PAIRS = 3600;   // keys: each mob model = its pose pair + 6 column crops (2026-10-16)
     /** Threads drawing the boot pictures (fewer when the machine has fewer cores). */
     private static final int MAX_THREADS = 4;
 
@@ -212,8 +214,14 @@ final class VsScreen extends CustomUIHud {
 
     /** The 3+ team screen shows at most this many columns (VsScreen.ui #Cols3..#Cols8), the strongest teams. */
     private static final int MAX_COLUMNS = 8;
-    /** Columns are revealed one by one, this far apart. */
-    private static final long COLUMN_GAP_MS = 90;
+    /** Column blocks (a team's columns, or neighbouring teams) rise this far apart. */
+    private static final long BLOCK_GAP_MS = 140;
+    /** At most this many blocks rise one after another; more teams share a block. */
+    private static final int MAX_RISE_BLOCKS = 4;
+    /** A column's rise from the bottom of the screen. */
+    private static final long RISE_MS = 300;
+    /** One update for all rising columns every this many ms (30 a second; 20 ms per column froze 8 columns). */
+    private static final long COLUMN_STEP_MS = 33;
     private static final Side NO_SIDE = new Side(Message.raw(""), LEFT_COLOR, List.of(), 0, NAMED, "", List.of());
 
     private final Plan plan;
@@ -225,7 +233,9 @@ final class VsScreen extends CustomUIHud {
 
     @Override
     protected void build(UICommandBuilder b) {
-        b.append(UI);
+        // only the document this plan shows (user, 2026-10-16: one file with the halves and all six column screens was
+        // ~570 pictures' worth of elements built for every VS, and the client froze through the animation)
+        b.append(plan.columns() != null ? "MobBattle/VsCols" + plan.columns().size() + ".ui" : UI);
         if (plan.columns() != null) {
             fillColumns(b, plan.columns());
             // the kind's title under the column headers (no VS logo: it covered the columns; user 2026-10-16)
@@ -258,8 +268,6 @@ final class VsScreen extends CustomUIHud {
      */
     private void fillColumns(UICommandBuilder b, List<Column> columns) {
         int n = columns.size();
-        b.set("#LeftLayer.Visible", false);
-        b.set("#RightLayer.Visible", false);
         b.set("#Cols.Visible", true);
         b.set("#Cols" + n + ".Visible", true);
         int font = Math.max(24, Math.min(44, Math.round(1920f / n / 11)));
@@ -267,7 +275,10 @@ final class VsScreen extends CustomUIHud {
         for (int i = 0; i < n; i++) {
             Column c = columns.get(i);
             String p = "#C" + n + "P" + i;
-            b.setObject(p + "In.Background", new com.hypixel.hytale.server.core.ui.PatchStyle()
+            // shown from the start, still below the screen (Body at weight 1): the client loads every picture before
+            // the columns rise (user, 2026-10-16: with 8 columns the game froze and the rise was never seen)
+            b.set(p + "In.Visible", true);
+            b.setObject(p + "Body.Background", new com.hypixel.hytale.server.core.ui.PatchStyle()
                     .setColor(com.hypixel.hytale.server.core.ui.Value.of(darken(c.color(), 0.7))));
             b.set(p + "Over.AssetPath", FOLDER + "ColumnOverlay.png");
             // the label may be a translation ("Red team", "Everyone else"): joined as a Message, never its key. A raw
@@ -287,13 +298,19 @@ final class VsScreen extends CustomUIHud {
             }
             b.set(p + "Tag.TextSpans", tag);
             b.set(p + "Name.Text", shortName(c.rep().name(), chars));
+            // shown when the column lands (runColumns), with its picture
+            b.set(p + "Tag.Visible", false);
+            b.set(p + "Name.Visible", false);
             // every portrait the same size, so the faces sit on one line (user, 2026-10-16: small ones sat low)
             int tier = 0;
             boolean right = i >= (n + 1) / 2;
+            String crop = columnPicture(c.rep(), n);
             for (int t = 0; t < TIERS; t++) {
-                b.set(p + "T" + t + ".Visible", t == tier);
-                if (t == tier) b.set(p + "T" + t + ".AssetPath", columnPicture(c.rep(), right, n));
+                b.set(p + "T" + t + ".Visible", crop != null && t == tier);
+                if (crop != null && t == tier) b.set(p + "T" + t + ".AssetPath", crop);
             }
+            b.set(p + "Sq.Visible", crop == null);
+            if (crop == null) b.set(p + "Sq.AssetPath", picture(c.rep(), right));
         }
     }
 
@@ -326,13 +343,17 @@ final class VsScreen extends CustomUIHud {
         b.set("#" + s + "Bg.Visible", !oneBg);
         b.set("#" + s + "Team.TextSpans", side.label().color(side.color()));
         b.set("#" + s + "Names.Text", side.names());
+        // the texts come in at the clash, with the pictures (user, 2026-10-16: they showed long before the pictures
+        // had loaded); shown in the impact step, so no extra update
+        b.set("#" + s + "Team.Visible", false);
+        b.set("#" + s + "Names.Visible", false);
         b.set("#" + s + "Named.Visible", side.layout() == NAMED);
         b.set("#" + s + "Medium.Visible", side.layout() == MEDIUM);
         b.set("#" + s + "Crowd.Visible", side.layout() == MOUND);
         slots(b, "#" + s + "N", SHOWN, side.layout() == NAMED ? side.shown() : List.of(), right, tallest);
         slots(b, "#" + s + "M", MEDIUM_SLOTS, side.layout() == MEDIUM ? side.shown() : List.of(), right, tallest);
         slots(b, "#" + s + "C", CROWD, side.layout() == MOUND ? side.shown() : List.of(), right, tallest);
-        b.set("#" + s + "MoreBox.Visible", side.more() > 0);
+        b.set("#" + s + "MoreBox.Visible", false);
         if (side.more() > 0) {
             b.set("#" + s + "More.Text", "+" + side.more());
             b.set("#" + s + "MoreBadge.AssetPath", FOLDER + "MoreBadge.png");
@@ -366,30 +387,36 @@ final class VsScreen extends CustomUIHud {
      * every client reload its assets (user: no hitch, ever). A wanted pose that is missing is remembered, and the next
      * boot registers it.
      */
-    /** A team column's picture: the face-framed one when registered, else the halves' picture. */
-    private static String columnPicture(Fighter f, boolean right, int n) {
-        if (f.model() != null) {
-            int want = columnVariant(n);
-            if (REGISTERED.contains(key(f.model(), want))) return pathOf(f.model(), want, false);
-            // another width (slightly stretched) beats the square halves' picture (very stretched)
-            for (int v = -1; v >= -COLUMN_CROP.length; v--) {
-                if (REGISTERED.contains(key(f.model(), v))) return pathOf(f.model(), v, false);
-            }
+    /**
+     * A team column's picture: the crop for this column count when registered, else another count's crop (slightly
+     * stretched), else null: the column then shows the square fallback (columnSquare) instead of stretching it to the
+     * column's height (user, 2026-10-16: a mob added after the boot showed its icon as a tall stretched strip). The
+     * missing crop is remembered and drawn at the next boot.
+     */
+    private static String columnPicture(Fighter f, int n) {
+        if (f.model() == null) return null;
+        int want = columnVariant(n);
+        if (usable(key(f.model(), want))) return pathOf(f.model(), want, false);
+        WANTED.add(key(f.model(), want));
+        for (int v = -1; v >= -COLUMN_CROP.length; v--) {
+            if (usable(key(f.model(), v))) return pathOf(f.model(), v, false);
         }
-        return picture(f, right);
+        return null;
     }
 
     private static String picture(Fighter f, boolean right) {
         if (f.model() == null) return MISSING;
-        if (REGISTERED.contains(key(f.model(), f.variant()))) return pathOf(f.model(), f.variant(), right);
+        if (usable(key(f.model(), f.variant()))) return pathOf(f.model(), f.variant(), right);
         WANTED.add(key(f.model(), f.variant()));
-        if (REGISTERED.contains(key(f.model(), 0))) return pathOf(f.model(), 0, right);
+        if (usable(key(f.model(), 0))) return pathOf(f.model(), 0, right);
         String icon = ConfigPage.iconOf(f.model());
         return icon != null ? icon : MISSING;
     }
 
     private static void weights(UICommandBuilder b, int half) {
-        int h = Math.max(0, Math.min(HALF, half));
+        // never 0: a FlexWeight of 0 does not collapse a group, it takes its content's size (user video, 2026-10-16:
+        // the halves showed half open for 130 ms, jumped back and then slid in)
+        int h = Math.max(1, Math.min(HALF, half));
         b.set("#LHalf.FlexWeight", h);
         b.set("#LRest.FlexWeight", 1000 - h);
         b.set("#RHalf.FlexWeight", h);
@@ -617,7 +644,13 @@ final class VsScreen extends CustomUIHud {
         List<Fighter> order = varietyFirst(all);
         // the small label would repeat the names line (a duel: "SKELETON" over "SKELETON"): left empty then
         String names = namesOf(all);
-        if (label.getRawText() != null && label.getRawText().equalsIgnoreCase(names)) label = Message.raw("");
+        // also when the names line holds a shortened copy of it (user, 2026-10-16: a duel of a long-named mob showed
+        // "ARCANEPOWER SKELETON THUNDER WRAITH" over "... THUNDER WR")
+        String raw = label.getRawText();
+        boolean oneKind = all.stream().map(Fighter::name).distinct().count() == 1;
+        if (raw != null && (raw.equalsIgnoreCase(names) || oneKind && raw.equalsIgnoreCase(all.get(0).name()))) {
+            label = Message.raw("");
+        }
         return laidOut(new Side(label, color, List.of(), 0, NAMED, names, order), layoutFor(order.size()));
     }
 
@@ -720,7 +753,11 @@ final class VsScreen extends CustomUIHud {
         Map<String, Integer> kinds = new LinkedHashMap<>();
         for (Fighter f : all) kinds.merge(f.name(), 1, Integer::sum);
         List<String> parts = new ArrayList<>();
-        for (Map.Entry<String, Integer> e : kinds.entrySet()) parts.add(e.getKey() + (e.getValue() > 1 ? " x" + e.getValue() : ""));
+        for (Map.Entry<String, Integer> e : kinds.entrySet()) {
+            // a long name loses its leading words before it is cut ("SKELETON THUNDER WRAITH", not "ARCANEPOWER SKE...")
+            String count = e.getValue() > 1 ? " x" + e.getValue() : "";
+            parts.add(shortName(e.getKey(), NAMES_CHARS - count.length()) + count);
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.size(); i++) {
             String sep = i == 0 ? "" : " \u00b7 ";
@@ -859,7 +896,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     static String pretty(String role) {
-        return role == null ? "?" : role.replace('_', ' ').trim();
+        return MobNames.shared(role).trim();
     }
 
     // ---- in the countdown ----
@@ -1010,13 +1047,30 @@ final class VsScreen extends CustomUIHud {
             // the animation is timed from here, once the screen exists on the client (a busy world thread added it
             // late and the steps queued behind it arrived all at once: no slide, user 2026-10-16), START_DELAY_MS later:
             // a client still loading the battle's freshly spawned models froze through the whole slide
-            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> animate(player, id, plan, totalMs), START_DELAY_MS, TimeUnit.MILLISECONDS);
+            long delay = startDelay(plan);
+            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> animate(player, id, plan, Math.max(SLIDE_IN_MS + SLIDE_OUT_MS + 300,
+                    totalMs - (delay - START_DELAY_MS))), delay, TimeUnit.MILLISECONDS);
         });
     }
 
     /** The VS screen each player sees now (its updates are packets, sent from the timer thread, not the world's). */
     private static final Map<UUID, VsScreen> LIVE = new ConcurrentHashMap<>();
     private static final long START_DELAY_MS = 300;
+    /** Extra wait per picture the client has to load before the slide (user, 2026-10-16: a royale froze through it). */
+    private static final long DELAY_PER_PICTURE_MS = 25;
+    private static final long MAX_START_DELAY_MS = 1100;
+
+    /** START_DELAY_MS plus DELAY_PER_PICTURE_MS for every distinct picture past the fourth, at most MAX_START_DELAY_MS. */
+    private static long startDelay(Plan plan) {
+        java.util.Set<String> pictures = new java.util.HashSet<>();
+        if (plan.columns() != null) {
+            for (Column c : plan.columns()) pictures.add(String.valueOf(c.rep().model()));
+        } else {
+            for (Fighter f : plan.left().shown()) if (f != null) pictures.add("L" + f.model() + f.variant());
+            for (Fighter f : plan.right().shown()) if (f != null) pictures.add("R" + f.model() + f.variant());
+        }
+        return Math.min(MAX_START_DELAY_MS, START_DELAY_MS + DELAY_PER_PICTURE_MS * Math.max(0, pictures.size() - 4));
+    }
 
     /** Whether a VS screen covers this player now. */
     static boolean showing(PlayerRef player) {
@@ -1043,6 +1097,13 @@ final class VsScreen extends CustomUIHud {
             b.set("#Flash.Visible", true);
             b.set("#Center.Visible", true);
             b.set("#Title.Visible", plan.kind() != null);
+            // names and "+N" with the clash (hidden in fill)
+            for (String s : List.of("L", "R")) {
+                b.set("#" + s + "Team.Visible", true);
+                b.set("#" + s + "Names.Visible", true);
+            }
+            b.set("#LMoreBox.Visible", plan.left().more() > 0);
+            b.set("#RMoreBox.Visible", plan.right().more() > 0);
         });
         step(player, id, hit + FLASH_MS, b -> b.set("#Flash.Visible", false));
         long outAt = Math.max(hit + FLASH_MS + STEP_MS, totalMs - SLIDE_OUT_MS);
@@ -1072,12 +1133,56 @@ final class VsScreen extends CustomUIHud {
     /** 3+ teams: the columns appear one by one from the left, then a flash with the VS and the title, hold, all go. */
     private static void runColumns(PlayerRef player, long id, Plan plan, long totalMs) {
         int n = plan.columns().size();
+        // columns rise in blocks, not one by one (user, 2026-10-16: with many columns animate each team as one block):
+        // a team's columns together, and with more than MAX_RISE_BLOCKS teams neighbouring teams share a block
+        int[] block = new int[n];
+        int teams = 0;
         for (int i = 0; i < n; i++) {
-            String p = "#C" + n + "P" + i + "In.Visible";
-            step(player, id, STEP_MS + i * COLUMN_GAP_MS, b -> b.set(p, true));
-            sound(player, id, STEP_MS + i * COLUMN_GAP_MS, CLICK_SOUND, 1f, 1f + 0.05f * i);   // a click per column, rising
+            if (i > 0 && plan.columns().get(i).team() != plan.columns().get(i - 1).team()) teams++;
+            block[i] = teams;
         }
-        long hit = STEP_MS + n * COLUMN_GAP_MS;
+        teams++;
+        int per = (teams + MAX_RISE_BLOCKS - 1) / MAX_RISE_BLOCKS;
+        int blocks = 0;
+        for (int i = 0; i < n; i++) {
+            block[i] /= per;
+            blocks = Math.max(blocks, block[i] + 1);
+        }
+        for (int k = 0; k < blocks; k++) {
+            // each block thumps as it lands, a little higher each time; the mace clash comes when the title shows
+            // (user, 2026-10-16: with several columns one sound each, "tum-tum-tum" then the impact)
+            sound(player, id, STEP_MS + k * BLOCK_GAP_MS + RISE_MS, LAND_SOUND, 0.7f, 1f + 0.08f * k);
+        }
+        // the columns rise from the bottom (user, 2026-10-16: they popped in): body grows, pad shrinks, never 0. ONE
+        // update per frame for every column moving (user, 2026-10-16: 8 columns sent ~4 updates per 20 ms and the game
+        // froze), at COLUMN_STEP_MS
+        long riseEnd = STEP_MS + (blocks - 1) * BLOCK_GAP_MS + RISE_MS;
+        for (long t = STEP_MS + COLUMN_STEP_MS; t < riseEnd + COLUMN_STEP_MS; t += COLUMN_STEP_MS) {
+            long at = Math.min(t, riseEnd);
+            int[] bodies = new int[n];
+            boolean any = false;
+            for (int i = 0; i < n; i++) {
+                double f = Math.max(0, Math.min(1, (at - STEP_MS - block[i] * BLOCK_GAP_MS) / (double) RISE_MS));
+                double prev = Math.max(0, Math.min(1, (at - COLUMN_STEP_MS - STEP_MS - block[i] * BLOCK_GAP_MS) / (double) RISE_MS));
+                double eased = 1 - (1 - f) * (1 - f) * (1 - f);   // ease out
+                bodies[i] = f <= 0 || prev >= 1 ? -1 : (int) Math.max(1, Math.round(1000 * eased));
+                any |= bodies[i] > 0;
+            }
+            if (!any) continue;
+            step(player, id, at, b -> {
+                for (int i = 0; i < n; i++) {
+                    if (bodies[i] < 0) continue;
+                    String p = "#C" + n + "P" + i;
+                    b.set(p + "Body.FlexWeight", bodies[i]);
+                    b.set(p + "Pad.FlexWeight", Math.max(1, 1000 - bodies[i]));
+                    if (bodies[i] >= 1000) {   // landed: its header texts come in
+                        b.set(p + "Tag.Visible", true);
+                        b.set(p + "Name.Visible", true);
+                    }
+                }
+            });
+        }
+        long hit = riseEnd + STEP_MS;
         sound(player, id, hit, IMPACT_SOUND, 1f, 1f);
         step(player, id, hit, b -> {
             b.set("#Flash.Visible", true);
@@ -1107,6 +1212,7 @@ final class VsScreen extends CustomUIHud {
     private static final String CLICK_SOUND = "SFX_Creative_Play_Selection_Place";
     private static final String IMPACT_SOUND = "SFX_Gobliterator_Club_Slam_Impact";
     private static final long CLICK_GAP_MS = 90;
+    private static final String LAND_SOUND = "SFX_Golem_Earth_Stomp_Impact";
 
     /** A 2D (UI) sound for this viewer only, at {@code at} ms into the run, sent from the timer thread like the steps. */
     private static void sound(PlayerRef player, long id, long at, String sound, float volume, float pitch) {
@@ -1181,7 +1287,7 @@ final class VsScreen extends CustomUIHud {
     static String iconFor(String name) {
         if (name == null) return null;
         for (String model : new String[] {name, RoleAppearance.of(name)}) {
-            if (model != null && REGISTERED.contains(key(model, 0))) return pathOf(model, 0, false);
+            if (model != null && usable(key(model, 0))) return pathOf(model, 0, false);
         }
         return null;
     }
@@ -1196,16 +1302,28 @@ final class VsScreen extends CustomUIHud {
      * in game, pictures spilled into the next columns): variants -1..-3 keep this share of the face-framed square's
      * width, centered on the face. gen-vs-ui.py COLUMN_CROP shows each one at that width, so it never stretches.
      */
-    static final double[] COLUMN_CROP = {0.415, 0.304, 0.228};
+    static final double[] COLUMN_CROP = {0.436, 0.32, 0.24, 0.582, 0.384, 0.274};
     /**
      * The crops before 2026-10-16 (exactly the column's width: UI scaling let a few pixels spill onto the next column,
      * user screenshot), still on disk as "_crop<k>.png": the narrower ones are cut from them until drawn again.
      */
     private static final double[] OLD_COLUMN_CROP = {0.436, 0.32, 0.24};
 
-    /** The crop variant for an n-column screen: 3-4 -> -1, 5-6 -> -2, 7-8 -> -3 (3 columns: a margin each side). */
+    /**
+     * The crop variant for an n-column screen, each exactly its column (1920 / n over the picture size, 1100 up to 4
+     * columns, else 1000): 4 -> -1, 6 -> -2, 8 -> -3, 3 -> -4, 5 -> -5, 7 -> -6 (2026-10-16, user: 3 and 5 and 7
+     * columns had the narrower crop of 4/6/8, cut well inside the column). VsScreen.ui anchors the image to the
+     * column's edges, so it never spills or leaves a margin; a screen wider than 16:9 stretches it a little.
+     */
     static int columnVariant(int n) {
-        return n <= 4 ? -1 : n <= 6 ? -2 : -3;
+        return switch (n) {
+            case 3 -> -4;
+            case 4 -> -1;
+            case 5 -> -5;
+            case 6 -> -2;
+            case 7 -> -6;
+            default -> n < 3 ? -4 : -3;
+        };
     }
 
     static String pathOf(String model, int variant, boolean right) {
@@ -1221,8 +1339,8 @@ final class VsScreen extends CustomUIHud {
         Path dir = used.getParent().resolve("p" + PICTURE + "r" + ThumbnailCache.RENDER_VERSION);
         // column crops have their own names: "_v-1_L.png" was the old full-square column picture, and registered as a
         // crop it came out squashed (user, 2026-10-16)
-        // "_cut": 5 % narrower than the column (see COLUMN_CROP); the old full-width "_crop" files are not reused
-        if (variant < 0) return dir.resolve(safe(model) + "_cut" + (-variant) + ".png");
+        // "_fit": exactly the column, drawn edge to edge (see COLUMN_CROP); the older "_crop"/"_cut" files are not reused
+        if (variant < 0) return dir.resolve(safe(model) + "_fit" + (-variant) + ".png");
         return dir.resolve(safe(model) + "_v" + variant + (right ? "_R" : "_L") + ".png");
     }
 
@@ -1285,8 +1403,8 @@ final class VsScreen extends CustomUIHud {
      * (no asset rebuild: nobody is connected). Skipped when someone is online already.
      */
     static void registerAtBoot() {
-        if (!Universe.get().getPlayers().isEmpty()) return;
-        long t0 = System.nanoTime();
+        if (!ThumbnailCache.mayRegister()) return;
+        long t0 = System.nanoTime(), bytes0 = REGISTERED_BYTES.get();
         int n = 0;
         for (String k : bootKeys()) {
             try {
@@ -1295,7 +1413,9 @@ final class VsScreen extends CustomUIHud {
                 MobBattlePlugin.log("VS screen: picture " + k + " not registered: " + e);
             }
         }
-        if (n > 0) MobBattlePlugin.log("VS screen: " + n + " picture pairs registered in " + (System.nanoTime() - t0) / 1_000_000 + " ms.");
+        long sent = REGISTERED_BYTES.get() - bytes0;
+        if (n > 0) MobBattlePlugin.log("VS screen: " + n + " pictures registered (" + MobBattlePlugin.size(sent)
+                + ", what each joining client downloads) in " + MobBattlePlugin.took(t0) + ".");
     }
 
     /**
@@ -1306,6 +1426,12 @@ final class VsScreen extends CustomUIHud {
         long t0 = System.nanoTime();
         List<String> missing = new ArrayList<>();
         for (String k : bootKeys()) if (!onDisk(k)) missing.add(k);
+        // every boot (user, 2026-10-16: also when nothing is drawn, to know when they were last generated)
+        Path picturesDir = usedFile() == null ? null
+                : usedFile().getParent().resolve("p" + PICTURE + "r" + ThumbnailCache.RENDER_VERSION);
+        if (missing.isEmpty()) {
+            MobBattlePlugin.log("VS screen: all pictures up to date, " + MobBattlePlugin.onDisk(picturesDir) + ".");
+        }
         if (!missing.isEmpty()) {
             // several low-priority threads (the server keeps the rest of the cores); each render + encode is independent
             int threads = Math.max(1, Math.min(MAX_THREADS, Runtime.getRuntime().availableProcessors() - 2));
@@ -1316,12 +1442,16 @@ final class VsScreen extends CustomUIHud {
                 return t;
             });
             java.util.concurrent.atomic.AtomicInteger made = new java.util.concurrent.atomic.AtomicInteger();
+            java.util.concurrent.atomic.AtomicLong written = new java.util.concurrent.atomic.AtomicLong();
             try {
                 List<java.util.concurrent.Future<?>> jobs = new ArrayList<>();
                 for (String k : missing) {
                     jobs.add(pool.submit(() -> {
                         try {
-                            if (make(k)) made.incrementAndGet();
+                            if (make(k)) {
+                                made.incrementAndGet();
+                                written.addAndGet(bytesOnDisk(k));
+                            }
                         } catch (Exception e) {
                             MobBattlePlugin.log("VS screen: picture " + k + " not drawn: " + e);
                         }
@@ -1336,8 +1466,8 @@ final class VsScreen extends CustomUIHud {
             } finally {
                 pool.shutdownNow();
             }
-            MobBattlePlugin.log("VS screen: " + made.get() + " picture pairs drawn on " + threads + " threads in "
-                    + (System.nanoTime() - t0) / 1_000_000 + " ms.");
+            MobBattlePlugin.log("VS screen: " + made.get() + " pictures drawn (" + MobBattlePlugin.size(written.get())
+                    + ") on " + threads + " threads in " + MobBattlePlugin.took(t0) + "; " + MobBattlePlugin.onDisk(picturesDir) + ".");
         }
         registerAtBoot();
         // every boot picture of this render version is on disk: older versions' folders (stand-ins until now) go
@@ -1349,7 +1479,34 @@ final class VsScreen extends CustomUIHud {
                 break;
             }
         }
-        if (complete && used != null) ThumbnailCache.deleteOtherFolders(used.getParent(), "p", "p" + PICTURE + "r" + ThumbnailCache.RENDER_VERSION);
+        if (complete && used != null) {
+            ThumbnailCache.deleteOtherFolders(used.getParent(), "p", "p" + PICTURE + "r" + ThumbnailCache.RENDER_VERSION);
+            deleteOldCrops(used.getParent().resolve("p" + PICTURE + "r" + ThumbnailCache.RENDER_VERSION));
+        }
+    }
+
+    /**
+     * Column crops of earlier crop rules in this version's folder ("_crop<k>", "_cut<k>"; now "_fit<k>"), never registered
+     * any more (2026-10-16, user: 123 MB on disk for 59 MB sent, 53 MB of them old crops). Only once every boot picture
+     * is on disk, so the new crops no longer need cutting from them.
+     */
+    private static void deleteOldCrops(Path dir) {
+        if (!Files.isDirectory(dir)) return;
+        long files = 0, bytes = 0;
+        try (var list = Files.list(dir)) {
+            for (Path f : (Iterable<Path>) list::iterator) {
+                if (!f.getFileName().toString().matches(".*_(crop|cut)[0-9]+\\.png")) continue;
+                long size = f.toFile().length();
+                if (Files.deleteIfExists(f)) {
+                    files++;
+                    bytes += size;
+                }
+            }
+        } catch (IOException e) {
+            MobBattlePlugin.log("VS screen: old column crops not cleaned: " + e);
+            return;
+        }
+        if (files > 0) MobBattlePlugin.log("VS screen: " + files + " old column crops deleted (" + MobBattlePlugin.size(bytes) + ").");
     }
 
     private static boolean onDisk(String key) {
@@ -1380,6 +1537,10 @@ final class VsScreen extends CustomUIHud {
     /** Registers both files of a key when they are on disk (an older render version's as a stand-in). */
     private static synchronized boolean register(String key) throws IOException {
         if (REGISTERED.contains(key)) return false;
+        // never with anyone online: each registered file showed a "Reloaded assets for Common" toast on their screen,
+        // even without an asset rebuild (user screenshot, 2026-10-16). Pictures made after someone joined (boot run
+        // still drawing, a new player's skin) wait for the next boot; the fallback shows until then.
+        if (!ThumbnailCache.mayRegister()) return false;
         int bar = key.lastIndexOf('|');
         String model = key.substring(0, bar);
         int variant = Integer.parseInt(key.substring(bar + 1));
@@ -1394,7 +1555,42 @@ final class VsScreen extends CustomUIHud {
             CommonAssetModule.get().addCommonAsset(EyeRecolor.PACK, new RuntimeCommonAsset(prefix + pathOf(model, variant, true), Files.readAllBytes(right)), false);
         }
         REGISTERED.add(key);
+        REGISTERED_BYTES.addAndGet(leftBytes.length + (variant >= 0 ? Files.size(right) : 0));
         return true;
+    }
+
+    /** Registered (at a boot, before anyone joined: every client has it). */
+    private static boolean usable(String key) {
+        return REGISTERED.contains(key);
+    }
+
+    /** Bytes of the VS pictures registered so far (what every joining client downloads). */
+    static long registeredBytes() {
+        return REGISTERED_BYTES.get();
+    }
+
+    /** "1612 registered, 122.4 MB on disk, last drawn ..." for ThumbnailCache's boot summary. */
+    static String cacheSummary() {
+        Path used = usedFile();
+        Path dir = used == null ? null : used.getParent().resolve("p" + PICTURE + "r" + ThumbnailCache.RENDER_VERSION);
+        return REGISTERED.size() + " registered, " + MobBattlePlugin.onDisk(dir);
+    }
+
+    /** Bytes of everything registered so far (pictures sent to every client that joins), for the boot log lines. */
+    private static final java.util.concurrent.atomic.AtomicLong REGISTERED_BYTES = new java.util.concurrent.atomic.AtomicLong();
+
+    /** Bytes on disk of one key's files (both sides of a pose picture, or one column crop). */
+    private static long bytesOnDisk(String key) {
+        int bar = key.lastIndexOf('|');
+        String model = key.substring(0, bar);
+        int variant = Integer.parseInt(key.substring(bar + 1));
+        long n = 0;
+        Path[] files = variant >= 0 ? new Path[] {fileOf(model, variant, false), fileOf(model, variant, true)}
+                : new Path[] {fileOf(model, variant, false)};
+        for (Path f : files) {
+            if (f != null && Files.exists(f)) n += f.toFile().length();
+        }
+        return n;
     }
 
     /**
@@ -1433,6 +1629,7 @@ final class VsScreen extends CustomUIHud {
             try {
                 BufferedImage old = ImageIO.read(f.toFile());
                 if (old == null) continue;
+                if (k > OLD_COLUMN_CROP.length) return null;
                 int w = old.getWidth(), cw = Math.max(1, (int) Math.round(w * COLUMN_CROP[k - 1] / OLD_COLUMN_CROP[k - 1]));
                 return IndexedPng.encode(old.getSubimage((w - cw) / 2, 0, cw, old.getHeight()));
             } catch (IOException e) {

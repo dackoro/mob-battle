@@ -59,7 +59,7 @@ public class HealInteraction extends SimpleInstantInteraction {
             }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
         if (player != null) {
-            player.sendMessage(I18n.tr("chat.heal.done").param("name", name).color("#55ff77"));
+            player.sendMessage(I18n.tr("chat.heal.done").param("name", MobNames.message(name)).color("#55ff77"));
         }
     }
 

@@ -103,6 +103,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.titles.25",
                 "help.titles.26",
                 "help.titles.27",
+                "help.titles.32",
                 "help.titles.28",
                 "help.titles.29",
                 "help.titles.17",
@@ -232,6 +233,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.summon.16",
                 "help.summon.17",
                 "help.summon.18",
+                "help.summon.19",
         });
         HELP.put("morph", new String[] {
                 "help.morph.1",
@@ -1055,6 +1057,8 @@ public class MobBattleCommand extends CommandBase {
                 words(I18n.id("cmd.desc.film_pace"), "50", "100", "150", "200")));
         addSubCommand(new Sub("filmtransition", I18n.id("cmd.desc.film_transition"),
                 words(I18n.id("cmd.desc.film_transition"), "cut", "glide")));
+        addSubCommand(new Sub("filmstyle", I18n.id("cmd.desc.film_style"),
+                words(I18n.id("cmd.desc.film_style"), FilmStyles.NAMES)));
         addSubCommand(new Sub("filmshots", I18n.id("cmd.desc.film_shots"),
                 words(I18n.id("cmd.desc.film_shots"), "default", "all", "battle", "wide,arc,landscape", "playerback,playerclose")));
         addSubCommand(kindFxSub("runes", I18n.id("cmd.desc.summoning_runes_and_fighter"), "on", "off"));
@@ -1177,7 +1181,11 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("clear", I18n.id("cmd.desc.empty_the_list")),
                 new Sub("team", I18n.id("cmd.desc.team_rule_role_team_none")),
                 new Sub("random", I18n.id("cmd.desc.range_for_random_counts_min")),
-                new Sub("atleastone", I18n.id("cmd.desc.random_types_spawn_at_least"), words(I18n.id("cmd.desc.at_least_one"), "true", "false"))));
+                new Sub("atleastone", I18n.id("cmd.desc.random_types_spawn_at_least"), words(I18n.id("cmd.desc.at_least_one"), "true", "false")),
+                new Sub("lists", I18n.id("cmd.desc.summon_lists")),
+                new Sub("save", I18n.id("cmd.desc.summon_save")),
+                new Sub("load", I18n.id("cmd.desc.summon_load")),
+                new Sub("delete", I18n.id("cmd.desc.summon_delete"))));
         addSubCommand(new Sub("morph", I18n.id("cmd.desc.morph_wand_model_model_id_li"),
                 new Sub("list", I18n.id("cmd.desc.search_model_ids_text")),
                 new Sub("reset", I18n.id("cmd.desc.give_every_morphed_mob_its_o"))));
@@ -1235,7 +1243,7 @@ public class MobBattleCommand extends CommandBase {
             };
         }
         if (command.equals("summon")) {
-            if (sub.equals("list")) return null;
+            if (sub.equals("list") || sub.equals("lists")) return null;
             if (sub.isEmpty() || sub.equals("spawn") || sub.equals("go")) return Perms.USE;
             return Perms.CONFIG;
         }
@@ -1779,6 +1787,13 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.filmTransition = val.toLowerCase(java.util.Locale.ROOT);
+            }
+            case "filmstyle" -> {
+                // filmStyle <default|battle|action|cinematic>: every film setting at once (FilmStyles).
+                if (val == null || !FilmStyles.apply(val)) {
+                    usage(ctx, "/mobbattle filmStyle " + String.join("|", FilmStyles.NAMES));
+                    return;
+                }
             }
             case "filmshots" -> {
                 if ("default".equalsIgnoreCase(val)) {
@@ -2569,20 +2584,10 @@ public class MobBattleCommand extends CommandBase {
                         return;
                     }
                 }
-                // Same mob and team as a listed entry: the counts add up (user, 2026-10-13: Add replacing 10 with 1
-                // was a surprise); a random count on either side makes a new entry. Another team: one more entry
-                // (e.g. 10 archers in red and 10 in green). summon modify sets an exact count.
-                String key = SummonList.entryOf(role, team);
-                String now = key != null ? SummonList.ENTRIES.get(key) : null;
-                count = SummonList.normalCount(count);
-                if (now != null && now.matches("\\d+") && count.matches("\\d+")) {
-                    count = String.valueOf(Math.min(FxSettings.MAX_MOBS_LIMIT, Long.parseLong(now) + Long.parseLong(count)));
-                    reply(ctx, I18n.tr("cmd.summon.added").param("name", role.replace('_', ' ') + (team >= 0 ? " (" + Teams.name(team) + ")" : ""))
-                            .param("count", count), OK);
-                } else if (key != null) {
-                    key = null;
-                }
-                if (key == null) key = SummonList.newKey(role);
+                // Every Add is an entry of its own, even the same mob and team (user, 2026-10-16: add the same mob N
+                // times; before, the counts of the same mob and team added up into one row). summon modify sets an
+                // exact count on one entry.
+                String key = SummonList.newKey(role);
                 SummonList.ENTRIES.put(key, SummonList.normalCount(count));
                 if (team >= 0) {
                     SummonList.TEAMS.put(key, team);
@@ -2696,9 +2701,36 @@ public class MobBattleCommand extends CommandBase {
                 }
                 SummonList.atLeastOne = on;
             }
+            case "lists" -> {
+                // Saved lists (SummonLists, 2026-10-16, user: save my list 1, 2 with counts, colors and teams).
+                java.util.List<String> names = SummonLists.saved();
+                reply(ctx, names.isEmpty() ? I18n.tr("cmd.summon.saved.empty")
+                        : I18n.tr("cmd.summon.saved.list").param("names", String.join(", ", names)), OK);
+                return;
+            }
+            case "save", "load", "delete" -> {
+                if (a.length != 2) {
+                    usage(ctx, "/mobbattle summon " + sub + " <name>");
+                    return;
+                }
+                String err = switch (sub) {
+                    case "save" -> SummonLists.save(a[1]);
+                    case "load" -> SummonLists.load(a[1]);
+                    default -> SummonLists.delete(a[1]);
+                };
+                if (err != null) {
+                    reply(ctx, I18n.tr(err).param("name", a[1]), ERR);
+                    return;
+                }
+                reply(ctx, I18n.tr("cmd.summon.saved.did" + sub).param("name", a[1]), OK);
+                if (sub.equals("delete") || sub.equals("save")) return;
+                // load: restoreLists already saved fx.properties; show the list it put back.
+                reply(ctx, SummonList.describeMessage(), OK);
+                return;
+            }
             default -> {
                 usage(ctx, "/mobbattle summon [list | add <role> [count|random] [team] | fill <types> [each:<n>] [teams:<n>] [mod:..] [type:..] [group:..] [add] | modify <role> [team] <count|random> | team <role> <color|none> | remove <role> | clear"
-                        + " | random <min> <max> | atLeastOne true|false]");
+                        + " | random <min> <max> | atLeastOne true|false | lists | save <name> | load <name> | delete <name>]");
                 return;
             }
         }

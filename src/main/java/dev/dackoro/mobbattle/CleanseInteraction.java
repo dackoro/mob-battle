@@ -102,6 +102,6 @@ public class CleanseInteraction extends SimpleInstantInteraction {
             return;
         }
         landLater(java.util.List.of(target), java.util.List.of(start(target, true, buffer)));
-        player.sendMessage(I18n.tr("chat.cleanse.done").param("name", ChaosWand.nameOf(target, buffer)).color("#7fd3ff"));
+        player.sendMessage(I18n.tr("chat.cleanse.done").param("name", MobNames.message(ChaosWand.nameOf(target, buffer))).color("#7fd3ff"));
     }
 }

@@ -53,7 +53,7 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
         if (before >= Buffs.wandMax) {
             // Already at the top: the error look and a message, no buff look (nothing changed).
             WandFx.onTarget(target, WandFx.FAIL, buffer);
-            player.sendMessage(I18n.tr("chat.buff.atMax").param("name", name).param("stacks", before)
+            player.sendMessage(I18n.tr("chat.buff.atMax").param("name", MobNames.message(name)).param("stacks", before)
                     .param("max", Buffs.wandMax).param("desc", Buffs.describeWand(before)).color("#ffcc55"));
             return;
         }
@@ -73,7 +73,7 @@ public class BuffGiveInteraction extends SimpleInstantInteraction {
                     store -> WandFx.onTarget(target, WandFx.MARK + FxSettings.buffColor, store));
         }
         player.sendMessage(I18n.tr(stacks == Buffs.wandMax ? "chat.buff.givenMax" : "chat.buff.given")
-                .param("name", name).param("stacks", stacks).param("max", Buffs.wandMax)
+                .param("name", MobNames.message(name)).param("stacks", stacks).param("max", Buffs.wandMax)
                 .param("desc", Buffs.describeWand(stacks)).color("#ffd23e"));
     }
 }

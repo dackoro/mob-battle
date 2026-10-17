@@ -54,7 +54,7 @@ final class DuelCard extends CustomUIHud {
     }
 
     /** A duel and who sees its card (the owner's title viewers; for an ownerless server event, its audience). */
-    private record Duel(List<PlayerRef> viewers, List<Ref<EntityStore>> fighters) {
+    private record Duel(List<PlayerRef> viewers, List<Ref<EntityStore>> fighters, BattleManager.Battle battle) {
     }
 
     /** Once per second per world (BattleLifecycleSystem, world thread). */
@@ -63,18 +63,22 @@ final class DuelCard extends CustomUIHud {
         Map<UUID, Duel> want = new HashMap<>();
         if (FxSettings.duelCard) {
             List<Duel> duels = new ArrayList<>();
+            // A duel still counting down has no battle yet: its card only goes where no running battle has the spot.
             for (Countdown.PendingDuel d : Countdown.pendingDuels()) {
-                if (d.store() == store) duels.add(new Duel(FightFx.titleViewers(d.player()), d.mobs()));
+                if (d.store() == store) duels.add(new Duel(FightFx.titleViewers(d.player()), d.mobs(), null));
             }
             for (BattleManager.Battle b : BattleManager.battles()) {
                 if (b.over || b.store != store || b.kind != BattleManager.Kind.DUEL) continue;
                 List<Ref<EntityStore>> members = new ArrayList<>(b.members());
-                if (members.size() == 2) duels.add(new Duel(FightFx.titleViewers(b), members));
+                if (members.size() == 2) duels.add(new Duel(FightFx.titleViewers(b), members, b));
             }
             for (Duel d : duels) {
                 for (PlayerRef p : d.viewers()) {
-                    // A /mobbattle watch spectator has the watch card in the same spot.
-                    if (p.isValid() && !BattleWatch.isWatching(p)) want.put(p.getUuid(), d);
+                    // A /mobbattle watch spectator has the watch card in the same spot; a nearer battle's card or
+                    // board takes it from a farther one (RightSlot).
+                    if (!p.isValid() || BattleWatch.isWatching(p)) continue;
+                    boolean mine = d.battle() != null ? RightSlot.owns(p, d.battle(), store) : !RightSlot.taken(p, store);
+                    if (mine) want.put(p.getUuid(), d);
                 }
             }
         }
@@ -125,15 +129,15 @@ final class DuelCard extends CustomUIHud {
             huds.addCustomHud(player, hud);
         }
         UICommandBuilder b = new UICommandBuilder();
-        fill(b, "A", duel.fighters().get(0), store);
-        fill(b, "B", duel.fighters().get(1), store);
+        fill(b, "A", duel.fighters().get(0), store, player);
+        fill(b, "B", duel.fighters().get(1), store, player);
         hud.update(false, b);
     }
 
-    private static void fill(UICommandBuilder b, String side, Ref<EntityStore> mob, Store<EntityStore> store) {
+    private static void fill(UICommandBuilder b, String side, Ref<EntityStore> mob, Store<EntityStore> store, PlayerRef viewer) {
         boolean up = mob.isValid() && BattleManager.isAlive(mob, store);
         String name = mob.isValid() ? ChaosWand.nameOf(mob, store) : null;
-        line(b, "#Name" + side, shorten(name == null ? "?" : name.replace('_', ' ')), up ? "#ffd23e" : "#888888");
+        line(b, "#Name" + side, shorten(MobNames.text(name, viewer)), up ? "#ffd23e" : "#888888");
         line(b, "#Health" + side, healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
         line(b, "#Attack" + side, I18n.tr("hud.attack").param("v", stat(mob, Buffs.Stat.DAMAGE)), color(mob, Buffs.Stat.DAMAGE));
         line(b, "#Defense" + side, I18n.tr("hud.defense").param("v", stat(mob, Buffs.Stat.DEFENSE)), color(mob, Buffs.Stat.DEFENSE));
