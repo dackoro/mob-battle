@@ -66,6 +66,20 @@
       ]
     }
   },
+  "Particles": [
+    {
+      "SystemId": "MobBattle_EquipWand_Sparkles",
+      "TargetNodeName": "Star"
+    },
+    {
+      "SystemId": "MobBattle_EquipWand_Sparkles_Small",
+      "TargetNodeName": "Pommel_Star"
+    }
+  ],
+  "Light": {
+    "Radius": 1,
+    "Color": "#a83"
+  },
   "IconProperties": {
     "Scale": 0.6,
     "Translation": [
