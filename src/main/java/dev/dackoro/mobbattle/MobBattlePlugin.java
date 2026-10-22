@@ -219,6 +219,7 @@ public class MobBattlePlugin extends JavaPlugin {
         TestTools.stopAll();
         FightCamera.stopAll();
         BattleMusic.stopAll();
+        SlowMo.stopAll();
         DuelCard.clearAll();
         FocusCard.clearAll();
         MobBattleApi.shutdown();

@@ -512,6 +512,8 @@ final class ConfigSchema {
                 toggle("camera.autowatch"),
                 choice("camera.watch.transition", FxSettings.WATCH_TRANSITIONS),
                 number("camera.watch.autoswitch", 0, FxSettings.MAX_WATCH_AUTO_SWITCH),
+                number("camera.slowmo", 0, 99),
+                number("camera.slowmo.time", 1, FxSettings.MAX_SLOW_MO_SECONDS),
                 toggle("battle.duelCard"),
                 toggle("battle.focusCard"),
                 note("cameras")

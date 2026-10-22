@@ -163,6 +163,8 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Auto watch | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
 | Watch: changing fighter | `/mobbattle watchTransition cut\|glide` | `camera.watch.transition` | cut, glide | glide | cameras |
 | Watch: next fighter every | `/mobbattle watchAutoSwitch <seconds>\|off` | `camera.watch.autoswitch` | 0 (off), 3-600 | 0 | cameras |
+| Slow motion after the final blow | `/mobbattle endSlowMo <percent>\|off` | `camera.slowmo` | 0 (off), 5-99 | 0 | cameras |
+| Slow motion lasts | `/mobbattle endSlowMoTime <seconds>` | `camera.slowmo.time` | 1-20 | 3 | cameras |
 | Film bands | `/mobbattle cameraBars off\|slim\|classic\|wide` | `camera.bars` | off, slim, classic, wide | classic | cameras |
 | Background blur | `/mobbattle cameraBlur off\|soft\|strong` | `camera.blur` | off, soft, strong | soft | cameras |
 | Auto film | `/mobbattle autoFilm on\|off` | `camera.autofilm` | true, false | off | cameras |

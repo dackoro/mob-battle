@@ -551,7 +551,7 @@ mobbattle.help.titles.24 = filmShotVariation <0-90> - each shot that % longer or
 mobbattle.help.titles.25 = filmTransition cut|glide - jump to the next shot or glide to it (default cut); filmShots all|battle|<list> - shortcut for filmShot: the listed shots on, every other one at 0 (battle = all but the shots of you); the 14 shots: wide, track, arc, pushin, closeup, landscape, playerback, playerclose, zenith, spiral, telephoto, descent, groundrise, profile
 mobbattle.help.titles.26 = cameraHud hide|show - hide the game's HUD (hotbar, compass, boss bar...) while a camera films, keeping chat and titles (default hide)
 mobbattle.help.titles.29 = cameraFace on|off - close-ups stand in front of the mob's face wherever it looks; off = toward the battle or the opponent (default on)
-mobbattle.help.titles.33 = watchTransition cut|glide - how the watch camera goes to another fighter: at once, or travelling there through blocks (default glide); watchAutoSwitch <3-600>|off - seconds on each fighter before the watch goes on to the next by itself, as a right click (default off)
+mobbattle.help.titles.33 = watchTransition cut|glide - how the watch camera goes to another fighter: at once, or travelling there through blocks (default glide); watchAutoSwitch <3-600>|off - seconds on each fighter before the watch goes on to the next by itself, as a right click (default off); endSlowMo <5-99>|off - slow motion after a battle's final blow, world speed in percent; it slows the whole world, skipped while another battle runs there (default off); endSlowMoTime <1-20> - its seconds (default 3)
 mobbattle.help.titles.28 = filmShot <shot> <0-300> - how often the battle film uses that shot, % of normal: 0 = never, 200 = twice as often (defaults: 100, landscape and groundrise 50, zenith 40, spiral 80, telephoto and descent 70; filmShots <list> = those on, the rest off; filmShots default = every shot back to its default)
 mobbattle.help.titles.27 = filmWideShots <0-100> - % of battle film shots that are far wide shots, for big attacks seen from afar; +15 with a mob over 4 blocks tall (default 30)
 mobbattle.help.titles.32 = filmStyle default|battle|action|cinematic - every film setting at once: battle = the fight in view all the time, little of you; action = close on the fighters and their attacks; cinematic = open, slow, gliding shots; default = as it comes (each value can still be changed after)
@@ -1915,3 +1915,11 @@ mobbattle.limits.cameratime = Warning: cameras longer than {warn} s keep the vie
 mobbattle.limits.speed = Warning: a speed buff above +{warn}% (x4) makes players rubber-band (the client corrects them) and mobs can slip through corners.
 mobbattle.panel.note.buffwand.stack = Each click adds to the mob's base value, it never multiplies what it already has. With x2 (+100%) per click, a mob with 10 health has 20 after one click, 30 after two and 60 after five (not 20, 40, 80). Every buff source adds up the same way. Defense is the share of damage blocked: x2 = takes half; two x2 clicks would block it all, so it stops at x100 (takes 1/100).
 mobbattle.music.battle.name = Mob Battle: goblin boss battle (louder, loops)
+mobbattle.cmd.desc.end_slow_mo = World speed in percent right after a battle's final blow (slow motion), off = normal
+mobbattle.cmd.desc.end_slow_mo_time = How many seconds the end slow motion lasts
+mobbattle.panel.field.camera.slowmo.label = Slow motion after the final blow
+mobbattle.panel.field.camera.slowmo.tip = World speed in percent when a battle is won (25 = four times slower). It slows the whole world, so it is skipped while another battle runs there (default 0 = off).
+mobbattle.panel.field.camera.slowmo.hint = percent speed, 0 = off
+mobbattle.panel.field.camera.slowmo.time.label = Slow motion lasts
+mobbattle.panel.field.camera.slowmo.time.tip = Real seconds before the world goes back to normal speed (default 3).
+mobbattle.panel.field.camera.slowmo.time.hint = seconds

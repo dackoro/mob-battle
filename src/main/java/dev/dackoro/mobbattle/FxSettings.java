@@ -522,6 +522,11 @@ public final class FxSettings {
     static final String[] WATCH_TRANSITIONS = {"cut", "glide"};
     /** Watch: seconds on each fighter before the camera goes to the next by itself, 0 = off (/mobbattle watchAutoSwitch). */
     public static int watchAutoSwitch = 0;
+    /** Slow motion after a battle's final blow: world speed in percent (5-99), 0 = off (/mobbattle endSlowMo, SlowMo). */
+    public static int endSlowMo = 0;
+    /** How long endSlowMo lasts, real seconds (/mobbattle endSlowMoTime). */
+    public static int endSlowMoSeconds = 3;
+    static final int MAX_SLOW_MO_SECONDS = 20;
     static final int MIN_WATCH_AUTO_SWITCH = 3;
     static final int MAX_WATCH_AUTO_SWITCH = 600;
     /** Black cinema bars over the intro and end cameras (/mobbattle cameraBars): off, slim, classic or wide (KindFx). */
@@ -1035,6 +1040,9 @@ public final class FxSettings {
             vsTeamReps = Math.max(1, Math.min(2, intOr(p, "camera.vs.teamreps", vsTeamReps)));
             filmPlayerShots = Math.max(0, Math.min(100, intOr(p, "camera.film.player", filmPlayerShots)));
             filmWideShots = Math.max(0, Math.min(100, intOr(p, "camera.film.wide", filmWideShots)));
+            int slow = intOr(p, "camera.slowmo", endSlowMo);
+            endSlowMo = slow <= 0 || slow >= 100 ? 0 : Math.max(5, slow);
+            endSlowMoSeconds = Math.max(1, Math.min(MAX_SLOW_MO_SECONDS, intOr(p, "camera.slowmo.time", endSlowMoSeconds)));
             filmShotSeconds = Math.max(MIN_FILM_SHOT, Math.min(MAX_FILM_SHOT, intOr(p, "camera.film.shot", filmShotSeconds)));
             filmPace = Math.max(MIN_FILM_PACE, Math.min(MAX_FILM_PACE, intOr(p, "camera.film.pace", filmPace)));
             filmShotVariation = Math.max(0, Math.min(90, intOr(p, "camera.film.variation", filmShotVariation)));
@@ -1239,6 +1247,8 @@ public final class FxSettings {
         p.setProperty("camera.vs.teamreps", String.valueOf(vsTeamReps));
         p.setProperty("camera.film.player", String.valueOf(filmPlayerShots));
         p.setProperty("camera.film.wide", String.valueOf(filmWideShots));
+        p.setProperty("camera.slowmo", String.valueOf(endSlowMo));
+        p.setProperty("camera.slowmo.time", String.valueOf(endSlowMoSeconds));
         p.setProperty("camera.film.shot", String.valueOf(filmShotSeconds));
         p.setProperty("camera.film.pace", String.valueOf(filmPace));
         p.setProperty("camera.film.variation", String.valueOf(filmShotVariation));
@@ -1375,7 +1385,7 @@ public final class FxSettings {
                 "Titles: countdown " + countdownSeconds + " s, readyTime " + readySeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope + ", camera " + onOff(fightCamera) + ", music " + (battleMusic ? musicTrack : "off")
                         + ", runes " + onOff(runes) + " | cameraStyle " + cameraStyle + ", cameraTime " + (cameraSeconds > 0 ? cameraSeconds + " s" : "countdown")
                         + ", cameraShots " + cameraShots + ", endCamera " + endCamera + ", endCameraTime " + endCameraSeconds + " s, cameraScope " + cameraScope + ", autoWatch " + onOff(autoWatch)
-                        + ", watchTransition " + watchTransition + ", watchAutoSwitch " + (watchAutoSwitch > 0 ? watchAutoSwitch + " s" : "off")
+                        + ", watchTransition " + watchTransition + ", watchAutoSwitch " + (watchAutoSwitch > 0 ? watchAutoSwitch + " s" : "off") + ", endSlowMo " + (endSlowMo > 0 ? endSlowMo + "% for " + endSlowMoSeconds + " s" : "off")
                         + ", cameraBars " + cameraBars + ", cameraBlur " + cameraBlur + ", cameraHud " + cameraHud + ", cameraFace " + onOff(cameraFace)
                         + ", vsScreen " + onOff(vsScreen) + ", vsTeamReps " + vsTeamReps + ", autoFilm " + onOff(autoFilm) + ", filmPlayerShots " + filmPlayerShots + "%, filmWideShots " + filmWideShots + "%, filmShotTime " + filmShotSeconds + " s, filmShotVariation " + filmShotVariation + "%, filmPace " + filmPace + "%, filmTransition " + filmTransition + ", filmShot " + filmWeightsText()
                         + " | per kind: " + KindFx.describeOverrides(),
@@ -1408,7 +1418,7 @@ public final class FxSettings {
     /** Which describeLines() line a setting key belongs to. */
     public static int groupOf(String key) {
         return switch (key) {
-            case "title", "wintitle", "style", "countdown", "readytime", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch", "watchtransition", "watchautoswitch", "camerabars", "camerablur", "camerahud", "cameraface", "vsscreen", "vsteamreps", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "filmstyle", "film" -> 0;
+            case "title", "wintitle", "style", "countdown", "readytime", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch", "watchtransition", "watchautoswitch", "endslowmo", "endslowmotime", "camerabars", "camerablur", "camerahud", "cameraface", "vsscreen", "vsteamreps", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "filmstyle", "film" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "battlebelow", "battleabove", "arenavertical", "passivewin", "passivewinignore", "idleend", "battlemaxtime", "duelcard", "focuscard", "timerstyle", "tiebreak", "killtiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;

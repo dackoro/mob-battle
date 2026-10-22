@@ -1070,6 +1070,10 @@ public class MobBattleCommand extends CommandBase {
                 words(I18n.id("cmd.desc.film_transition"), "cut", "glide")));
         addSubCommand(new Sub("watchtransition", I18n.id("cmd.desc.watch_transition"),
                 words(I18n.id("cmd.desc.watch_transition"), "glide", "cut")));
+        addSubCommand(new Sub("endslowmo", I18n.id("cmd.desc.end_slow_mo"),
+                words(I18n.id("cmd.desc.end_slow_mo"), "off", "25", "40", "60")));
+        addSubCommand(new Sub("endslowmotime", I18n.id("cmd.desc.end_slow_mo_time"),
+                words(I18n.id("cmd.desc.end_slow_mo_time"), "2", "3", "5")));
         addSubCommand(new Sub("watchautoswitch", I18n.id("cmd.desc.watch_auto_switch"),
                 words(I18n.id("cmd.desc.watch_auto_switch"), "off", "5", "10", "20", "30")));
         addSubCommand(new Sub("filmstyle", I18n.id("cmd.desc.film_style"),
@@ -1823,6 +1827,29 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.watchTransition = val.toLowerCase(java.util.Locale.ROOT);
+            }
+            case "endslowmo" -> {
+                int n;
+                if (val != null && "off".equalsIgnoreCase(val.trim())) {
+                    n = 0;
+                } else {
+                    try {
+                        n = Integer.parseInt(val == null ? "" : val.replace("%", "").trim());
+                    } catch (NumberFormatException e) {
+                        usage(ctx, "/mobbattle endSlowMo <speed percent 5-99>|off");
+                        return;
+                    }
+                }
+                FxSettings.endSlowMo = n <= 0 || n >= 100 ? 0 : Math.max(5, n);
+            }
+            case "endslowmotime" -> {
+                try {
+                    FxSettings.endSlowMoSeconds = Math.max(1, Math.min(FxSettings.MAX_SLOW_MO_SECONDS,
+                            Integer.parseInt(val == null ? "" : val.replace("s", "").trim())));
+                } catch (NumberFormatException e) {
+                    usage(ctx, "/mobbattle endSlowMoTime <1-" + FxSettings.MAX_SLOW_MO_SECONDS + " seconds>");
+                    return;
+                }
             }
             case "watchautoswitch" -> {
                 int n;
@@ -3042,6 +3069,7 @@ public class MobBattleCommand extends CommandBase {
             Snap.clearAll();
             int shots = FightCamera.stopAll();
             BattleMusic.stopAll();
+            SlowMo.stopAll();
             Scoreboard.clearAll();
             DuelCard.clearAll();
             FocusCard.clearAll();

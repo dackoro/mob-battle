@@ -1497,6 +1497,7 @@ public final class BattleManager {
         }
         FightFx.winnerTitle(battle, main.msg(), sub.msg());
         if (focus != null) FightCamera.ending(battle, focus, buffer);
+        if (outcome == BattleOutcome.WIN) SlowMo.afterLastHit(battle);
     }
 
     /**
