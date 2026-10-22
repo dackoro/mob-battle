@@ -20,10 +20,14 @@ Group {
     @Anchor = (Width: 90, Right: 60, Top: 3);
   }
 
-  // The team's color, as on the Teams page; hidden for no team.
-  Group #Swatch {
+  // The team's color, as on the Teams page; hidden for no team. Its place stays taken, so a row with no team keeps its
+  // team picker and Remove button in line with the others (user screenshot, 2026-10-17).
+  Group {
     Anchor: (Width: 26, Height: 26, Top: 9, Right: 8);
-    Background: #808080;
+    Group #Swatch {
+      Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+      Background: #808080;
+    }
   }
 
   $C.@DropdownBox #Team {

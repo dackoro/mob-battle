@@ -174,28 +174,155 @@ final class ThumbnailCache {
     // ---- entry points ----
 
     /** BootEvent: makes the missing or outdated thumbnails of every model, in the background. */
+    /** Set by PlayerSetupConnectEvent: a client started connecting this session. */
+    private static volatile boolean CLIENT_CAME;
+
+    /** MobBattlePlugin: a client started connecting (before it is in the player list or has its asset list). */
+    static void clientConnecting() {
+        CLIENT_CAME = true;
+    }
+
+    /**
+     * Whether runtime assets (holograms, mob icons, VS pictures) may be registered now: only before any client has
+     * started connecting this session. A registration with someone online showed a "Reloaded assets for Common" toast
+     * per file (user, 2026-10-16), and one a few seconds before a join finished never reached that client (a skeleton's
+     * icon drew a red X): the player list alone does not show a client still connecting. Anything made later is
+     * registered at the next boot.
+     */
+    static boolean mayRegister() {
+        return !CLIENT_CAME && Universe.get().getPlayers().isEmpty();
+    }
+
+    /**
+     * Registration rule for one file: always before any client connects; after that only when {@code late} (the boot
+     * run finished after someone joined, a player picked for a battle): {@link #addAsset} then holds it for
+     * {@link #lateDone}. User, 2026-10-16: a player opening a new world connects before the pictures exist and must
+     * not see fallbacks the whole session, so those are registered anyway.
+     */
+    static boolean mayRegister(boolean late) {
+        return late || mayRegister();
+    }
+
+    /** Files made after a client started connecting, waiting for {@link #lateDone} (sent together). */
+    private static final List<com.hypixel.hytale.server.core.asset.common.CommonAsset> LATE = new ArrayList<>();
+
+    /**
+     * Registers one runtime file (hologram, mob icon, VS picture). Before any client connects: at once, nobody to tell.
+     * After that: held for {@link #lateDone}. The game's own call shows every player online a "Reloaded assets" toast
+     * and pushes the file to them, per file (javap 0.7.2: its boolean only drops the log line), so a late batch of
+     * thousands of pictures meant thousands of toasts (audit 2026-10-17).
+     */
+    static void addAsset(com.hypixel.hytale.server.core.asset.common.CommonAsset asset) {
+        if (mayRegister()) {
+            com.hypixel.hytale.server.core.asset.common.CommonAssetModule.get().addCommonAsset(EyeRecolor.PACK, asset, false);
+            return;
+        }
+        synchronized (LATE) {
+            LATE.add(asset);
+        }
+    }
+
+    /**
+     * After late registrations: the held files go into the game's registry without a toast each, one of them through the
+     * module (that refreshes the asset list clients joining later get; one toast), and the rest reach everyone online
+     * in one go with one asset rebuild request (as the server's asset monitor does; one hitch).
+     */
+    static void lateDone(String what) {
+        List<com.hypixel.hytale.server.core.asset.common.CommonAsset> batch;
+        synchronized (LATE) {
+            if (LATE.isEmpty()) return;
+            batch = new ArrayList<>(LATE);
+            LATE.clear();
+        }
+        try {
+            var module = com.hypixel.hytale.server.core.asset.common.CommonAssetModule.get();
+            var last = batch.remove(batch.size() - 1);
+            for (var a : batch) com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry.addCommonAsset(EyeRecolor.PACK, a);
+            module.addCommonAsset(EyeRecolor.PACK, last, false);
+            if (!Universe.get().getPlayers().isEmpty()) {
+                if (batch.isEmpty()) {
+                    Universe.get().broadcastPacketNoCache(new com.hypixel.hytale.protocol.packets.setup.RequestCommonAssetsRebuild());
+                } else {
+                    module.sendAssets(batch, true);
+                }
+            }
+            MobBattlePlugin.log("Mob Battle: " + (batch.size() + 1) + " " + what + " registered with players online; sent to them at once.");
+        } catch (RuntimeException e) {
+            MobBattlePlugin.log("Mob Battle: late " + what + " not registered: " + e);
+        }
+    }
+
     static void startup() {
+        long boot = System.nanoTime();
         List<String> all = new ArrayList<>(ModelAsset.getAssetMap().getAssetMap().keySet());
-        registerHolograms(all);
+        // holograms only for models a mob wears (the Morph Wand copies mobs): projectiles, VFX and debug models were
+        // sent to every joining client for nothing (audit 2026-10-17); every model if the role list is not ready
+        List<String> mobs = VsScreen.fighterModels();
+        List<String> holoIds = mobs.isEmpty() ? all : mobs;
+        registerHolograms(holoIds);
         registerIcons(all);
         VsScreen.registerAtBoot();
         MorphHologram.startAtBoot();
+        // every picture feature off on this server (/mobbattle serverVs|serverHolograms|serverIcons): nothing to draw
+        if (!FxSettings.serverVs && !FxSettings.serverHolograms && !FxSettings.serverIcons) {
+            MobBattlePlugin.log("Pictures: VS screen, Morph Wand hologram and panel mob pictures are off on this server: nothing drawn or sent.");
+            return;
+        }
         // holograms first, from the thumbnails already on disk (a few seconds), and registered before players join:
         // after a hologram look change (HOLO_VERSION) the long thumbnail run below made them one by one, and a player
         // who joined meanwhile got each copied mob live, with an asset reload for everyone (user, 2026-10-16)
         EXEC.submit(() -> {
-            quickHolograms(all);
-            registerHolograms(all);
+            try {
+                if (FxSettings.serverHolograms) {
+                    quickHolograms(holoIds);
+                    registerHolograms(holoIds);
+                }
+            } catch (Throwable e) {   // a game API change (LinkageError) must not vanish into the Future
+                MobBattlePlugin.log("Holograms failed: " + e);
+            }
         });
         rebuild(id -> true, false, report -> {
             MobBattlePlugin.log("Thumbnails: " + describe(report));
             // every hologram of this look is on disk now: older looks' folders go (they were the stand-ins until now)
             deleteOtherFolders(folder(), "holo", "holo" + HOLO_VERSION);
-            registerHolograms(all);
-            registerIcons(all);
+            boolean someoneCame = !mayRegister();
+            // shared cache upkeep (user, 2026-10-16): mark this world's models as used now, drop what no world used in
+            // UNUSED_DAYS (never because THIS world lacks a mod: another world may still have it)
+            int[] upkeep = markUsedAndClean(all);
+            registerHolograms(holoIds, true);
+            registerIcons(all, true);
             VsScreen.prepareInBackground();
+            PictureProgress.end();
+            lateDone("pictures (holograms, icons, VS)");
+            // a framed block like the server's own "Hytale Server Booted!" one (user, 2026-10-16: the numbers got lost
+            // among the boot log)
+            Path dir = folder();
+            long vs = VsScreen.registeredBytes(), holo = HOLO_BYTES.get(), icons = ICON_BYTES.get();
+            // green like the server's own "Hytale Server Booted!" block (user, 2026-10-16: not obvious enough)
+            String green = "\u001b[0;32m", plain = "\u001b[m";
+            String rule = green + "=".repeat(96) + plain;
+            MobBattlePlugin.log(rule);
+            MobBattlePlugin.log(green + "        Dackoro's Mob Battle: all pictures ready! took " + MobBattlePlugin.took(boot) + plain);
+            MobBattlePlugin.log("        Thumbnails:  " + report.total() + " models, "
+                    + MobBattlePlugin.onDisk(dir == null ? null : dir.resolve("models")));
+            MobBattlePlugin.log("        VS pictures: " + VsScreen.cacheSummary());
+            MobBattlePlugin.log("        Holograms:   " + HOLOGRAMS.size() + ", "
+                    + MobBattlePlugin.onDisk(dir == null ? null : dir.resolve("holo" + HOLO_VERSION)));
+            MobBattlePlugin.log("        Each joining player downloads " + MobBattlePlugin.size(vs + holo + icons)
+                    + " (VS " + MobBattlePlugin.size(vs) + ", holograms " + MobBattlePlugin.size(holo)
+                    + ", mob icons " + MobBattlePlugin.size(icons) + ")");
+            MobBattlePlugin.log("        Shared cache: " + upkeep[0] + " models kept for other worlds, " + upkeep[1]
+                    + " removed after " + UNUSED_DAYS + " days unused" + (upkeep[2] > 0 ? ", " + upkeep[2] + " old player skins removed" : ""));
+            if (someoneCame) {
+                MobBattlePlugin.log("        A player connected while they were being drawn: registered anyway, clients reloaded their assets");
+            }
+            MobBattlePlugin.log(rule);
         });
     }
+
+    /** Bytes of the holograms / mob icons registered so far (sent to every client that joins), for the boot summary. */
+    private static final java.util.concurrent.atomic.AtomicLong HOLO_BYTES = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong ICON_BYTES = new java.util.concurrent.atomic.AtomicLong();
 
     /**
      * Cache clean-up after a look or render change (2026-10-16, user: a server that already had pictures cached must
@@ -203,13 +330,127 @@ final class ThumbnailCache {
      * plus anything (holo, holo2, p384, p384r5...) except {@code keep}. Only our own cache folders, only called once the
      * current version's files are all on disk; a folder in use by another process is left for the next boot.
      */
+    /** A model's pictures are deleted from the shared cache when no world or server has loaded it for this long. */
+    static final int UNUSED_DAYS = 30;
+
+    /**
+     * Touches {@code used/<model>} for every model this world has loaded (a world that has the mod uses its pictures),
+     * then deletes every picture of a model whose marker (or, with none yet, its thumbnail) is older than UNUSED_DAYS
+     * and that this world does not have; also player skins nobody joined with in that time. Returns {models in the
+     * cache this world does not have and kept, models removed, player skins removed}.
+     */
+    private static int[] markUsedAndClean(List<String> loaded) {
+        int[] out = new int[3];
+        Path dir = folder();
+        if (dir == null) return out;
+        long now = System.currentTimeMillis(), limit = now - UNUSED_DAYS * 86_400_000L;
+        java.nio.file.attribute.FileTime stamp = java.nio.file.attribute.FileTime.fromMillis(now);
+        java.util.Set<String> here = new java.util.HashSet<>();
+        Path usedDir = dir.resolve("used");
+        int temps = PictureCache.cleanTemps(dir);
+        if (temps > 0) MobBattlePlugin.log("Picture cache: " + temps + " leftover temp files deleted.");
+        try {
+            Files.createDirectories(usedDir);
+            for (String id : loaded) {
+                String safe = safe(id);
+                here.add(safe);
+                Path m = usedDir.resolve(safe);
+                if (Files.exists(m)) Files.setLastModifiedTime(m, stamp);
+                else Files.createFile(m);
+            }
+        } catch (IOException e) {
+            MobBattlePlugin.log("Picture cache: use markers not written: " + e);
+            return out;
+        }
+        Path models = dir.resolve("models");
+        if (!Files.isDirectory(models)) return out;
+        List<String> gone = new ArrayList<>();
+        try (var list = Files.list(models)) {
+            for (Path f : (Iterable<Path>) list::iterator) {
+                String n = f.getFileName().toString();
+                if (!n.endsWith(".png")) continue;
+                String safe = n.substring(0, n.length() - 4);
+                if (here.contains(safe)) continue;
+                Path m = usedDir.resolve(safe);
+                long last = Files.exists(m) ? Files.getLastModifiedTime(m).toMillis() : f.toFile().lastModified();
+                if (last < limit) gone.add(safe);
+                else out[0]++;
+            }
+        } catch (IOException e) {
+            MobBattlePlugin.log("Picture cache: clean-up skipped: " + e);
+            return out;
+        }
+        for (String safe : gone) {
+            deleteQuietly(models.resolve(safe + ".png"));
+            deleteQuietly(models.resolve(safe + ".key"));
+            deleteQuietly(dir.resolve("icons").resolve(safe + ".png"));
+            deleteQuietly(usedDir.resolve(safe));
+            deleteMatching(dir, "holo[0-9]*", java.util.regex.Pattern.quote(safe) + "\\.png");
+            deleteMatching(dir.resolve("vs"), "p[0-9rs]*", vsFiles(safe));
+            out[1]++;
+        }
+        // player skins: the skin file is touched on every join (PlayerSkins.touch), on any world of this machine
+        Path players = VsScreen.playersDir();
+        if (players != null && Files.isDirectory(players)) {
+            try (var list = Files.list(players)) {
+                for (Path f : (Iterable<Path>) list::iterator) {
+                    String n = f.getFileName().toString();
+                    if (!n.endsWith(".properties") || f.toFile().lastModified() >= limit) continue;
+                    String id = VsScreen.PLAYER_PREFIX + n.substring(0, n.length() - ".properties".length());
+                    deleteQuietly(f);
+                    deleteMatching(dir.resolve("vs"), "p[0-9rs]*", vsFiles(safe(id)));
+                    out[2]++;
+                }
+            } catch (IOException e) {
+                MobBattlePlugin.log("Picture cache: player skins not cleaned: " + e);
+            }
+        }
+        return out;
+    }
+
+    /** A model's VS files: pose pairs, column crops (every rule so far) and the face-framed square. */
+    private static String vsFiles(String safe) {
+        return java.util.regex.Pattern.quote(safe) + "_(v-?[0-9]+_[LR]|k[0-9]+|fit[0-9]+|cut[0-9]+|crop[0-9]+|col|sq)\\.png";
+    }
+
+    /** Deletes the files named {@code fileRegex} in every subfolder of {@code dir} named {@code folderRegex}. */
+    private static void deleteMatching(Path dir, String folderRegex, String fileRegex) {
+        if (!Files.isDirectory(dir)) return;
+        try (var folders = Files.list(dir)) {
+            for (Path sub : (Iterable<Path>) folders::iterator) {
+                if (!Files.isDirectory(sub) || !sub.getFileName().toString().matches(folderRegex)) continue;
+                try (var files = Files.list(sub)) {
+                    for (Path f : (Iterable<Path>) files::iterator) {
+                        if (f.getFileName().toString().matches(fileRegex)) deleteQuietly(f);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            MobBattlePlugin.log("Picture cache: " + dir.getFileName() + " not cleaned: " + e);
+        }
+    }
+
+    private static void deleteQuietly(Path f) {
+        try {
+            Files.deleteIfExists(f);
+        } catch (IOException ignored) {
+            // in use by another process: next time
+        }
+    }
+
+    /** An old version's cache folder is deleted only after this many days without a new file in it. */
+    private static final int OLD_FOLDER_DAYS = 3;
+
     static void deleteOtherFolders(Path dir, String prefix, String keep) {
         if (dir == null || !Files.isDirectory(dir)) return;
         try (var list = Files.list(dir)) {
             for (Path p : (Iterable<Path>) list::iterator) {
                 String n = p.getFileName().toString();
                 if (!Files.isDirectory(p) || n.equals(keep) || !n.startsWith(prefix)
-                        || !n.substring(prefix.length()).matches("r?[0-9]*(r[0-9]+)?")) continue;
+                        || !n.substring(prefix.length()).matches("r?[0-9]*(r[0-9]+)?(s[0-9]+)?")) continue;
+                // the cache is shared by every world and server on the machine: a folder another version of the mod
+                // still draws into (written in the last OLD_FOLDER_DAYS) is left alone
+                if (System.currentTimeMillis() - MobBattlePlugin.newestFile(p) < OLD_FOLDER_DAYS * 86_400_000L) continue;
                 long files = 0;
                 try (var walk = Files.walk(p)) {
                     for (Path f : (Iterable<Path>) walk.sorted(java.util.Comparator.reverseOrder())::iterator) {
@@ -244,7 +485,7 @@ final class ThumbnailCache {
                 MobBattlePlugin.log("Hologram texture of " + id + " not made: " + e);
             }
         }
-        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures made from the cache in " + (System.nanoTime() - t0) / 1_000_000 + " ms.");
+        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures made from the cache in " + MobBattlePlugin.took(t0) + ".");
     }
 
     /** The registered hologram texture of a model (plain path, as a ModelAttachment takes it), or null. */
@@ -263,20 +504,31 @@ final class ThumbnailCache {
      * live one for a model it needs).
      */
     static void registerHolograms(List<String> ids) {
-        if (!Universe.get().getPlayers().isEmpty()) return;
+        registerHolograms(ids, false);
+    }
+
+    static void registerHolograms(List<String> ids, boolean late) {
+        if (!FxSettings.serverHolograms) return;   // server feature off (/mobbattle serverHolograms)
+        if (!mayRegister() && !late) return;
+        long t0 = System.nanoTime(), bytes = 0;
         int n = 0;
         for (String id : ids) {
             if (HOLOGRAMS.containsKey(id)) continue;
             Path f = holoFileOf(id);
             if (f == null || !Files.exists(f)) continue;
             try {
-                HOLOGRAMS.put(id, MorphHologram.register(id, Files.readAllBytes(f), false));
+                byte[] png = Files.readAllBytes(f);
+                if (!mayRegister(late)) continue;
+                HOLOGRAMS.put(id, MorphHologram.register(id, png, false));
+                bytes += png.length;
+                HOLO_BYTES.addAndGet(png.length);
                 n++;
             } catch (Exception e) {
                 MobBattlePlugin.log("Hologram texture of " + id + " not registered: " + e);
             }
         }
-        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures registered.");
+        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures registered (" + MobBattlePlugin.size(bytes)
+                + ") in " + MobBattlePlugin.took(t0) + ".");
     }
 
     /**
@@ -296,8 +548,14 @@ final class ThumbnailCache {
      * as the holograms: a connected client would need an asset rebuild). ~2 KB each at 64 px.
      */
     static void registerIcons(List<String> ids) {
-        if (!Universe.get().getPlayers().isEmpty()) return;
+        registerIcons(ids, false);
+    }
+
+    static void registerIcons(List<String> ids, boolean late) {
+        if (!FxSettings.serverIcons) return;   // server feature off (/mobbattle serverIcons)
+        if (!mayRegister() && !late) return;
         String prefix = MorphHologram.registryPrefix();
+        long t0 = System.nanoTime(), bytes = 0;
         int n = 0;
         for (String id : ids) {
             if (ICONS.containsKey(id) || ConfigPage.hasGameIcon(id)) continue;
@@ -305,15 +563,19 @@ final class ThumbnailCache {
             if (f == null || !Files.exists(f)) continue;
             try {
                 String plain = ICON_FOLDER + "MobBattle_Icon_" + safe(id) + ".png";
-                com.hypixel.hytale.server.core.asset.common.CommonAssetModule.get().addCommonAsset(EyeRecolor.PACK,
-                        new RuntimeCommonAsset(prefix + plain, Files.readAllBytes(f)), false);
+                byte[] png = Files.readAllBytes(f);
+                if (!mayRegister(late)) continue;
+                addAsset(new RuntimeCommonAsset(prefix + plain, png));
                 ICONS.put(id, plain);
+                bytes += png.length;
+                ICON_BYTES.addAndGet(png.length);
                 n++;
             } catch (Exception e) {
                 MobBattlePlugin.log("Icon of " + id + " not registered: " + e);
             }
         }
-        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " mob icons registered (models with no game icon).");
+        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " mob icons registered (" + MobBattlePlugin.size(bytes)
+                + ", models with no game icon) in " + MobBattlePlugin.took(t0) + ".");
     }
 
     private static Path iconFileOf(String modelId) {
@@ -325,9 +587,9 @@ final class ThumbnailCache {
     private static void writeIcon(String id, BufferedImage thumb) throws IOException {
         Path f = iconFileOf(id);
         if (f == null) return;
-        Files.createDirectories(f.getParent());
-        ImageIO.write(MorphHologram.shrink(VsScreen.square(thumb, false), ICON, ICON), "png", f.toFile());
-        ICONS.remove(id);
+        PictureCache.writePng(f, MorphHologram.shrink(VsScreen.square(thumb, false), ICON, ICON));
+        // the registered icon stays in use (the new file is registered at the next boot): removing it here left every
+        // redrawn model without a panel icon until then (test thumbnails rebuild; audit 2026-10-17)
     }
 
     private static Path holoFileOf(String modelId) {
@@ -340,8 +602,7 @@ final class ThumbnailCache {
     private static void writeHologram(String id, BufferedImage thumb) throws IOException {
         Path f = holoFileOf(id);
         if (f == null) return;
-        Files.createDirectories(f.getParent());
-        Files.write(f, MorphHologram.encode(MorphHologram.hologram(thumb)));
+        PictureCache.write(f, MorphHologram.encode(MorphHologram.hologram(thumb)));
         // a registered texture stays in use (the new file is registered at the next boot): dropping it here made
         // MorphHologram make that model's texture live, with an asset reload for every client, during the boot run
     }
@@ -355,8 +616,12 @@ final class ThumbnailCache {
         if (!RUNNING.compareAndSet(false, true)) return false;
         current = EXEC.submit(() -> {
             try {
-                done.accept(run(which, force));
-            } catch (RuntimeException e) {
+                Report report = run(which, force);
+                // a run stopped by the plugin's shutdown registers nothing and starts no VS drawing
+                if (!STOPPED) done.accept(report);
+            } catch (Throwable e) {
+                // Errors too (a LinkageError after a game update, OutOfMemoryError): they used to end the run without
+                // a line, no VS pictures, no clean-up, no summary (audit 2026-10-17)
                 MobBattlePlugin.log("Thumbnails failed: " + e);
             } finally {
                 synchronized (TEXTURES) {
@@ -372,15 +637,81 @@ final class ThumbnailCache {
         return RUNNING.get();
     }
 
-    /** Plugin shutdown: a run in progress stops at its next model. */
+    /** What /mobbattle pictures rebuild did: the thumbnail report, the VS pictures drawn, files sent at once. */
+    record Summary(Report thumbs, VsScreen.Prepared vs, int sent, long millis) {
+    }
+
+    /**
+     * /mobbattle pictures rebuild (2026-10-17, user: redraw everything from the game, with progress and a summary):
+     * the boot run again, in the background. Thumbnails (with their holograms and mob icons), then the VS pictures;
+     * {@code force} redraws the up-to-date ones too (the VS files of this world's models are deleted first, so they
+     * are drawn again). New files are registered at once (one asset reload for players online); a redrawn file that
+     * was already registered keeps its old bytes until the next restart. False if a run is going.
+     */
+    static boolean rebuildAll(boolean force, Consumer<Summary> done) {
+        long t0 = System.nanoTime();
+        List<String> all = new ArrayList<>(ModelAsset.getAssetMap().getAssetMap().keySet());
+        List<String> mobs = VsScreen.fighterModels();
+        List<String> holoIds = mobs.isEmpty() ? all : mobs;
+        return rebuild(id -> true, force, report -> {
+            try {
+                if (force) for (String id : all) VsScreen.dropPictures(id);
+                registerHolograms(holoIds, true);
+                registerIcons(all, true);
+                VsScreen.Prepared vs = VsScreen.prepareInBackground();
+                int sent;
+                synchronized (LATE) {
+                    sent = LATE.size();
+                }
+                lateDone("pictures (rebuild)");
+                done.accept(new Summary(report, vs, sent, (System.nanoTime() - t0) / 1_000_000));
+            } finally {
+                PictureProgress.end();
+            }
+        });
+    }
+
+    static int hologramCount() {
+        return HOLOGRAMS.size();
+    }
+
+    static int iconCount() {
+        return ICONS.size();
+    }
+
+    static long hologramBytes() {
+        return HOLO_BYTES.get();
+    }
+
+    static long iconBytes() {
+        return ICON_BYTES.get();
+    }
+
+    /** {thumbnails, holograms, icons} folders of the shared cache (null entries when it is not known). */
+    static Path[] folders() {
+        Path dir = folder();
+        return dir == null ? new Path[3]
+                : new Path[] {dir.resolve("models"), dir.resolve("holo" + HOLO_VERSION), dir.resolve("icons")};
+    }
+
+    /** Set by {@link #stop}: the run ends at its next model and its end steps (registration, VS drawing) are skipped. */
+    private static volatile boolean STOPPED;
+
+    /**
+     * Plugin shutdown: a run in progress stops at its next model, and the thread goes (an idle one kept the plugin's
+     * classes loaded after /plugin unload).
+     */
     static void stop() {
+        STOPPED = true;
         Future<?> f = current;
         if (f != null) f.cancel(true);
+        EXEC.shutdownNow();
     }
 
     static String describe(Report r) {
         return r.total() + " models, " + r.rendered() + " drawn, " + r.cached() + " up to date, " + r.failed()
-                + " failed, " + r.millis() + " ms" + (r.failures().isEmpty() ? "" : " (first failures: "
+                + " failed, " + MobBattlePlugin.millis(r.millis())
+                + (folder() != null ? ", thumbnails " + MobBattlePlugin.onDisk(folder().resolve("models")) : "") + (r.failures().isEmpty() ? "" : " (first failures: "
                 + String.join("; ", r.failures().subList(0, Math.min(3, r.failures().size()))) + ")");
     }
 
@@ -392,18 +723,32 @@ final class ThumbnailCache {
 
     // ---- the run ----
 
+    /** Key suffix of a model that drew nothing (no picture file; skipped while its key stays the same). */
+    private static final String EMPTY = "|empty";
+
+    /** Whether this model's last drawing showed nothing (VsScreen skips it instead of trying every pose each boot). */
+    static boolean drawsNothing(String id) {
+        Path dir = folder();
+        if (dir == null) return false;
+        String stored = storedKey(dir, id, new Properties());
+        return stored != null && stored.endsWith(EMPTY);
+    }
+
     private static Report run(Predicate<String> which, boolean force) {
         long t0 = System.nanoTime();
         Path dir = folder();
         if (dir == null) return new Report(0, 0, 0, 0, 0, List.of("plugin data folder not known"));
+        // the old single index.properties is only read, as a fallback for models with no key file yet
         Properties index = readIndex(dir);
         List<String> ids = new ArrayList<>();
         for (String id : ModelAsset.getAssetMap().getAssetMap().keySet()) if (which.test(id)) ids.add(id);
         ids.sort(String::compareTo);
-        int rendered = 0, cached = 0, failed = 0, sinceSave = 0;
+        int rendered = 0, cached = 0, failed = 0;
         List<String> failures = new ArrayList<>();
+        PictureProgress.start("thumbnails", ids.size());
         for (String id : ids) {
-            if (Thread.currentThread().isInterrupted()) break;
+            if (STOPPED || Thread.currentThread().isInterrupted()) break;
+            PictureProgress.step();
             try {
                 ModelAsset asset = ModelAsset.getAssetMap().getAsset(id);
                 if (asset == null) continue;
@@ -413,7 +758,13 @@ final class ThumbnailCache {
                 PoseChoice pose = poseOf(model, "auto", null);
                 String key = keyOf(id, pieces, pose);
                 Path file = dir.resolve("models").resolve(safe(id) + ".png");
-                if (!force && key.equals(index.getProperty(id)) && Files.exists(file)) {
+                String stored = storedKey(dir, id, index);
+                // a model that draws nothing (markers, VFX) is not drawn again every boot while it stays the same
+                if (!force && (key + EMPTY).equals(stored)) {
+                    cached++;
+                    continue;
+                }
+                if (!force && key.equals(stored) && Files.exists(file)) {
                     Path holo = holoFileOf(id), icon = iconFileOf(id);
                     boolean needHolo = holo != null && !Files.exists(holo), needIcon = icon != null && !Files.exists(icon);
                     if (needHolo || needIcon) {
@@ -428,25 +779,23 @@ final class ThumbnailCache {
                 if (img == null) {
                     failed++;
                     failures.add(id + ": nothing visible");
+                    PictureCache.writeText(keyFileOf(dir, id), key + EMPTY);
                     continue;
                 }
-                Files.createDirectories(file.getParent());
-                ImageIO.write(img, "png", file.toFile());
+                // the model or one of its files changed (a mod update): its VS pictures, named without a key, would
+                // stay as they were for good; they are drawn again after this run (audit 2026-10-17)
+                if (stored != null && !stored.isEmpty() && !stored.equals(key) && !stored.endsWith(EMPTY)) VsScreen.dropPictures(id);
+                PictureCache.writePng(file, img);
                 writeHologram(id, img);
                 writeIcon(id, img);
-                index.setProperty(id, key);
+                // the key next to the picture, written last: a stopped server leaves no key for a half-made set
+                PictureCache.writeText(keyFileOf(dir, id), key);
                 rendered++;
-                // save the index now and then, so a stopped server keeps what it made
-                if (++sinceSave >= 25) {
-                    writeIndex(dir, index);
-                    sinceSave = 0;
-                }
             } catch (Exception e) {
                 failed++;
                 failures.add(id + ": " + e.getMessage());
             }
         }
-        writeIndex(dir, index);
         return new Report(ids.size(), rendered, cached, failed, (System.nanoTime() - t0) / 1_000_000, failures);
     }
 
@@ -509,6 +858,8 @@ final class ThumbnailCache {
         int w = Math.max(1, (big.getWidth() + SUPERSAMPLE - 1) / SUPERSAMPLE), h = Math.max(1, (big.getHeight() + SUPERSAMPLE - 1) / SUPERSAMPLE);
         double[] head = ModelThumbnail.LAST_HEAD.get();
         if (head != null) ModelThumbnail.LAST_HEAD.set(new double[] {head[0] / SUPERSAMPLE, head[1] / SUPERSAMPLE});
+        Double sc = ModelThumbnail.LAST_SCALE.get();
+        if (sc != null) ModelThumbnail.LAST_SCALE.set(sc / SUPERSAMPLE);
         return MorphHologram.shrink(big, w, h);
     }
 
@@ -546,6 +897,10 @@ final class ThumbnailCache {
         if (asset == null) throw new IOException("not in the common asset registry: " + path);
         try {
             return asset.getBlob().get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            // plugin shutdown (stop): keep the flag, so the run notices it at its next model
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted reading " + asset.getName(), e);
         } catch (Exception e) {
             throw new IOException("could not read " + asset.getName() + ": " + e, e);
         }
@@ -610,9 +965,12 @@ final class ThumbnailCache {
             if (cached != null) return cached;
         }
         BufferedImage img;
-        try (ByteArrayInputStream in = new ByteArrayInputStream(load(path))) {
-            img = ImageIO.read(in);
-        }
+        // a memory-cached stream: ImageIO.read(InputStream) made a temp file in %TEMP% for every texture. ImageIO.read
+        // closes an ImageInputStream itself; a second close (try-with-resources) threw "closed" and no picture could be
+        // drawn after the 2026-10-17 audit (861 "not drawn" at one boot; Cult_Werewolf showed a Trork icon)
+        var in = new javax.imageio.stream.MemoryCacheImageInputStream(new ByteArrayInputStream(load(path)));
+        img = ImageIO.read(in);
+        if (img == null) in.close();   // only left open when nothing was read
         if (img == null) throw new IOException("not an image: " + path);
         synchronized (TEXTURES) {
             TEXTURES.put(path, img);
@@ -620,9 +978,9 @@ final class ThumbnailCache {
         return img;
     }
 
+    /** The shared per-machine picture cache (PictureCache), no longer one per world. */
     private static Path folder() {
-        Path d = FxSettings.dataDirectory();
-        return d == null ? null : d.resolve("thumbnails");
+        return PictureCache.root();
     }
 
     private static String safe(String id) {
@@ -642,14 +1000,23 @@ final class ThumbnailCache {
         return p;
     }
 
-    private static void writeIndex(Path dir, Properties p) {
+    /**
+     * A model's key file ({@code models/<id>.key}: renderer version + file hashes it was drawn with). One file per
+     * model, written atomically, so two servers sharing the cache never overwrite each other's keys (a single
+     * index.properties saved by both lost entries).
+     */
+    private static Path keyFileOf(Path dir, String id) {
+        return dir.resolve("models").resolve(safe(id) + ".key");
+    }
+
+    /** The key a model's picture was drawn with: its key file, else the old index's entry, else null. */
+    private static String storedKey(Path dir, String id, Properties legacy) {
+        Path f = keyFileOf(dir, id);
         try {
-            Files.createDirectories(dir);
-            try (Writer w = Files.newBufferedWriter(dir.resolve("index.properties"), StandardCharsets.UTF_8)) {
-                p.store(w, "Mob Battle model thumbnails: model id = key (renderer version + file hashes)");
-            }
+            if (Files.exists(f)) return Files.readString(f, StandardCharsets.UTF_8).trim();
         } catch (IOException e) {
-            MobBattlePlugin.log("Thumbnails: index not saved: " + e);
+            return null;
         }
+        return legacy.getProperty(id);
     }
 }

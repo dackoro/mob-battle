@@ -47,6 +47,6 @@ public class BuffTakeInteraction extends SimpleInstantInteraction {
         // After the size goes back (Buffs.set, queued): the new scale rebuilds the mob and would drop particles.
         WandFx.swirlLater(target, "Gray");
         WandFx.buffTakeLater(target);
-        player.sendMessage(I18n.tr("chat.buff.taken").param("name", ChaosWand.nameOf(target, buffer)).color("#7fd3ff"));
+        player.sendMessage(I18n.tr("chat.buff.taken").param("name", MobNames.message(ChaosWand.nameOf(target, buffer))).color("#7fd3ff"));
     }
 }

@@ -295,7 +295,10 @@ public final class BattleManager {
     private static final Map<Ref<EntityStore>, UUID> PLAYER_FIGHTERS = new ConcurrentHashMap<>();
 
     /** {@code player} fights in {@code owner}'s battle or draft; they see that owner's titles, timer and music. */
-    static void markPlayer(Ref<EntityStore> player, UUID owner) { PLAYER_FIGHTERS.put(player, owner); }
+    static void markPlayer(Ref<EntityStore> player, UUID owner) {
+        // a new fighter (not a re-mark): their VS picture now, they are about to be in one
+        if (PLAYER_FIGHTERS.put(player, owner) == null) VsScreen.playerPicked(player);
+    }
     static void unmarkPlayer(Ref<EntityStore> player) { PLAYER_FIGHTERS.remove(player); }
     static boolean isPlayerFighter(Ref<EntityStore> ref) { return !PLAYER_FIGHTERS.isEmpty() && PLAYER_FIGHTERS.containsKey(ref); }
     static boolean hasPlayerFighters() { return !PLAYER_FIGHTERS.isEmpty(); }
@@ -402,6 +405,7 @@ public final class BattleManager {
         Buffs.prune();
         SummonDespawn.maintain();
         SummonCalm.prune();
+        DamageGroups.prune();
         SkinRespawnSystem.prune();
         BattleMusic.maintain();
         for (Battle battle : BATTLES) {
@@ -433,6 +437,7 @@ public final class BattleManager {
         EyeRecolor.prune();
         FightFx.pruneTitles();
         FightFx.pruneHeldAreas();
+        FightFx.pruneTeleports();
         Countdown.prune();
         BattleDebug.prune();
         Arena.prune();
@@ -565,14 +570,19 @@ public final class BattleManager {
     private static void killSummary(Battle battle) {
         if (battle.kills.isEmpty()) return;
         StringBuilder line = new StringBuilder();
+        List<Message> parts = new ArrayList<>();
         List<Kills> top = battle.topKillers(3);
         int[] places = places(top, battle.sharedPlaces());
         for (int i = 0; i < top.size(); i++) {
             Kills k = top.get(i);
             if (i > 0) line.append(", ");
-            line.append(places[i]).append(". ").append(k.name().replace('_', ' ')).append(" (").append(k.count()).append(')');
+            line.append(places[i]).append(". ").append(k.name()).append(" (").append(k.count()).append(')');
+            // each viewer's client translates the names into their own language (not the first player's)
+            parts.add(Message.raw((i > 0 ? ", " : "") + places[i] + ". "));
+            parts.add(MobNames.message(k.name()));
+            parts.add(Message.raw(" (" + k.count() + ")"));
         }
-        Message msg = I18n.tr("battle.killsummary").param("list", line.toString()).color("#ffd23e");
+        Message msg = I18n.tr("battle.killsummary").param("list", Message.join(parts.toArray(new Message[0]))).color("#ffd23e");
         for (PlayerRef p : FightFx.titleViewers(battle)) {
             if (p.isValid()) p.sendMessage(msg);
         }
@@ -1153,12 +1163,12 @@ public final class BattleManager {
 
     /** Name of a side for the passiveWin alert: the mob in a royale, "<name> team", the lone target or "The attackers". */
     private static Message sideName(Battle battle, int side, ComponentAccessor<EntityStore> buffer) {
-        if (battle.focusName != null) return side == 1 ? Message.raw(battle.focusName) : I18n.tr("battle.side.attackers");
+        if (battle.focusName != null) return side == 1 ? MobNames.message(battle.focusName) : I18n.tr("battle.side.attackers");
         if (battle.royale) {
             for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
                 if (e.getValue() != side || !isAlive(e.getKey(), buffer)) continue;
                 String army = armyName(e.getKey(), buffer);
-                return army != null ? I18n.tr("battle.side.army").param("name", army) : Message.raw(ChaosWand.nameOf(e.getKey(), buffer));
+                return army != null ? I18n.tr("battle.side.army").param("name", MobNames.message(army)) : MobNames.message(ChaosWand.nameOf(e.getKey(), buffer));
             }
         }
         return I18n.tr("battle.side.team").param("name", battle.name(side));
@@ -1444,7 +1454,7 @@ public final class BattleManager {
         } else if (battle.focusName != null) {
             boolean targetWon = aliveTeams.contains(1);
             main = targetWon ? winTxt(battle.focusName)
-                    : new Txt(battle.focusName + " IS DEFEATED!", I18n.tr("battle.defeated").param("name", battle.focusName));
+                    : new Txt(battle.focusName + " IS DEFEATED!", I18n.tr("battle.defeated").param("name", MobNames.message(battle.focusName)));
             if (battle.passiveEnded) {
                 sub = targetWon ? Txt.tr("battle.sub.attackers.cant", "The attackers can't fight")
                         : Txt.tr("battle.sub.cant.back", "Couldn't fight back");
@@ -1474,11 +1484,11 @@ public final class BattleManager {
             if (focus != null) {
                 Kills k = battle.kills.get(focus);
                 int n = k != null ? k.count() : 0;
-                String who = ChaosWand.nameOf(focus, buffer).replace('_', ' ');
+                String who = ChaosWand.nameOf(focus, buffer);
                 boolean lasthit = "lasthit".equals(endMode);
                 sub = new Txt(sub.en() + " | " + (lasthit ? "Final blow: " : "") + who + ", " + n + (n == 1 ? " kill" : " kills"),
                         Message.join(sub.msg(), Message.raw(" | "),
-                                I18n.tr(lasthit ? "battle.sub.lasthit" : "battle.sub.kills").param("name", who).param("n", n)));
+                                I18n.tr(lasthit ? "battle.sub.lasthit" : "battle.sub.kills").param("name", MobNames.message(who)).param("n", n)));
             }
         }
         MobBattlePlugin.log("Battle over: " + main.en() + " (" + sub.en() + ")");
@@ -1690,7 +1700,7 @@ public final class BattleManager {
     /** "NAME WINS!" with a name that can be anything (mob, lone target). */
     private static Txt winTxt(String name) {
         name = String.valueOf(name);
-        return new Txt(name + " WINS!", I18n.tr("battle.win").param("name", name));
+        return new Txt(name + " WINS!", I18n.tr("battle.win").param("name", MobNames.message(name)));
     }
 
     /**
@@ -1700,7 +1710,7 @@ public final class BattleManager {
     private static Txt royaleWinTxt(Ref<EntityStore> winner, ComponentAccessor<EntityStore> buffer) {
         String army = armyName(winner, buffer);
         if (army == null) return winTxt(ChaosWand.nameOf(winner, buffer));
-        return new Txt(army + "'s ARMY WINS!", I18n.tr("battle.win.army").param("name", army));
+        return new Txt(army + "'s ARMY WINS!", I18n.tr("battle.win.army").param("name", MobNames.message(army)));
     }
 
     /** The name of the army {@code member} fights for (its chain's top: a player or a leader mob), or null. */

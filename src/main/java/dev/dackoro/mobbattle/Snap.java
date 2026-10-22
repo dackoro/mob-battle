@@ -79,10 +79,12 @@ final class Snap {
         Vector3d waveCenter = null;
         double waveReach = reach;
         BattleManager.Battle clicked = target != null ? BattleManager.battleOf(target) : null;
+        // the snapper's own army (its whole chain of command) is never in the snap (2026-10-18, user)
+        java.util.UUID snapper = player != null ? player.getUuid() : null;
         if (clicked != null) {
             // A mob in a battle: that battle, wherever its fighters are.
             for (Ref<EntityStore> m : clicked.members()) {
-                if (BattleManager.isAlive(m, buffer) && !QUEUE.containsKey(m)) {
+                if (BattleManager.isAlive(m, buffer) && !QUEUE.containsKey(m) && !Army.servesPlayer(m, snapper)) {
                     sides.computeIfAbsent(clicked.id + ":" + clicked.team(m), k -> new ArrayList<>()).add(m);
                 }
             }
@@ -109,7 +111,7 @@ final class Snap {
             }
             Set<Ref<EntityStore>> kept = new LinkedHashSet<>(WaveHit.filter(center, new ArrayList<>(around), FxSettings.battleWaveGroundOnly, buffer));
             for (Ref<EntityStore> m : kept) {
-                if (!BattleManager.isAlive(m, buffer) || QUEUE.containsKey(m)) continue;
+                if (!BattleManager.isAlive(m, buffer) || QUEUE.containsKey(m) || Army.servesPlayer(m, snapper)) continue;
                 BattleManager.Battle b = BattleManager.battleOf(m);
                 sides.computeIfAbsent(b != null ? b.id + ":" + b.team(m) : "wild", k -> new ArrayList<>()).add(m);
             }

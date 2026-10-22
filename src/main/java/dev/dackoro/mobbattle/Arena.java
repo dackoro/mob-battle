@@ -372,11 +372,10 @@ final class Arena {
                     s.edgeDist.remove(npc);
                     if (MobBattlePlugin.debugging()) s.lastAction.put(npc, String.format(java.util.Locale.ROOT, "unwedged %.1f %.1f %.1f -> %.1f %.1f %.1f",
                             p.x, p.y, p.z, to.x, to.y, to.z));
-                    store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
-                            com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
-                                    new com.hypixel.hytale.math.vector.Rotation3f(0f, 0f, 0f)));
-                    MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store)
-                            + " was inside a block, moved out");
+                    if (FightFx.teleport(npc, to, new com.hypixel.hytale.math.vector.Rotation3f(0f, 0f, 0f), store)) {
+                        MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store)
+                                + " was inside a block, moved out");
+                    }
                     continue;
                 }
             }
@@ -436,9 +435,7 @@ final class Arena {
                 s.stranded.remove(npc);
                 if (MobBattlePlugin.debugging()) s.lastAction.put(npc, String.format(java.util.Locale.ROOT, "arena teleport %.1f %.1f %.1f -> %.1f %.1f %.1f",
                         p.x, p.y, p.z, to.x, to.y, to.z));
-                store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
-                        com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
-                                new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) Math.atan2(ox, oz), 0f)));
+                if (!FightFx.teleport(npc, to, new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) Math.atan2(ox, oz), 0f), store)) continue;
                 WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
                 MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store) + " was "
                         + Math.round(d - radius) + " blocks outside, teleported back in");
@@ -559,9 +556,7 @@ final class Arena {
         s.edgeDist.remove(npc);
         if (MobBattlePlugin.debugging()) s.lastAction.put(npc, String.format(java.util.Locale.ROOT, "bring back %.1f %.1f %.1f -> %.1f %.1f %.1f",
                 p.x, p.y, p.z, to.x, to.y, to.z));
-        store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
-                com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
-                        new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) Math.atan2(ox, oz), 0f)));
+        if (!FightFx.teleport(npc, to, new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) Math.atan2(ox, oz), 0f), store)) return;
         WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
         MobBattlePlugin.debug("arena #" + s.battle.id.toString().substring(0, 8) + ": " + ChaosWand.nameOf(npc, store) + " was "
                 + why + ", teleported back in");
@@ -723,7 +718,7 @@ final class Arena {
 
     /** Role ids read better in the box without underscores: "Test_Dummy" -> "Test Dummy". */
     private static String pretty(String name) {
-        return name == null ? "?" : name.replace('_', ' ');
+        return MobNames.shared(name);
     }
 
     /** Removes the timer box (portal: an UpdatePortal with no state and no definition, as PortalTrackerSystems does). */

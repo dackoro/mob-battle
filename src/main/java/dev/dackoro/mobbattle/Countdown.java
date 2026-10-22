@@ -146,9 +146,11 @@ final class Countdown {
             start.accept(buffer);
             return;
         }
-        // The VS screen comes first and adds its seconds (2026-10-16, user: it must not eat the intro's time).
+        // The VS screen comes first and adds its seconds (2026-10-16, user: it must not eat the intro's time), only when
+        // one was really shown for these mobs (FightCamera.intro, just before this call).
         int titleFrom = seconds;
-        seconds += (int) (VsScreen.countdownMs(kind) / 1000);
+        long vsMs = VsScreen.takeShown(set);
+        if (vsMs > 0) seconds += (int) ((vsMs + 999) / 1000);
         Store<EntityStore> store = buffer.getExternalData().getWorld().getEntityStore().getStore();
         Pending p = new Pending(kind, System.currentTimeMillis() + seconds * 1000L, store,
                 player != null ? player.getUuid() : null, anchor, label, set, start, onEnd);
@@ -206,37 +208,58 @@ final class Countdown {
      * others for TRUCE_SECONDS and lets go of one of them as its target; FightDamageSystem also cancels their hits on
      * each other ({@link #waitingTogether}). The battle start sets its own HOSTILE overrides over these.
      */
-    private static void truce(List<Ref<EntityStore>> alive, Store<EntityStore> store) {
+    static void truce(List<Ref<EntityStore>> alive, Store<EntityStore> store) {
         if (alive.size() <= TRUCE_ALL_MAX) {
             for (Ref<EntityStore> r : alive) FightManager.truce(r, alive, TRUCE_SECONDS, store);
             return;
         }
         double[][] at = new double[alive.size()][];
+        // a grid of TRUCE_RANGE cells: each mob only looks at the 3x3 cells around it (audit 2026-10-17: all pairs,
+        // 1M distance checks a second with 1000 mobs)
+        Map<Long, List<Integer>> cells = new java.util.HashMap<>();
         for (int i = 0; i < at.length; i++) {
             var v = ChaosWand.positionOf(alive.get(i), store);
             at[i] = v != null ? new double[]{v.x, v.y, v.z} : null;
+            if (v != null) cells.computeIfAbsent(cell((long) Math.floor(v.x / TRUCE_RANGE), (long) Math.floor(v.z / TRUCE_RANGE)),
+                    k -> new java.util.ArrayList<>()).add(i);
         }
         double range2 = TRUCE_RANGE * TRUCE_RANGE;
         List<Ref<EntityStore>> near = new java.util.ArrayList<>();
         for (int i = 0; i < at.length; i++) {
             if (at[i] == null) continue;
             near.clear();
-            for (int j = 0; j < at.length; j++) {
-                if (j == i || at[j] == null) continue;
-                double dx = at[i][0] - at[j][0], dy = at[i][1] - at[j][1], dz = at[i][2] - at[j][2];
-                if (dx * dx + dy * dy + dz * dz <= range2) near.add(alive.get(j));
+            long cx = (long) Math.floor(at[i][0] / TRUCE_RANGE), cz = (long) Math.floor(at[i][2] / TRUCE_RANGE);
+            for (long gx = cx - 1; gx <= cx + 1; gx++) {
+                for (long gz = cz - 1; gz <= cz + 1; gz++) {
+                    List<Integer> in = cells.get(cell(gx, gz));
+                    if (in == null) continue;
+                    for (int j : in) {
+                        if (j == i) continue;
+                        double dx = at[i][0] - at[j][0], dy = at[i][1] - at[j][1], dz = at[i][2] - at[j][2];
+                        if (dx * dx + dy * dy + dz * dz <= range2) near.add(alive.get(j));
+                    }
+                }
             }
             FightManager.truce(alive.get(i), near, TRUCE_SECONDS, store);
         }
     }
 
-    /** True if both are fighters of the same countdown still running (no hits between them yet). */
+    private static long cell(long x, long z) {
+        return (x << 32) ^ (z & 0xffffffffL);
+    }
+
+    /** True if both are fighters of the same countdown (or ready time) still running (no hits between them yet). */
     static boolean waitingTogether(Ref<EntityStore> a, Ref<EntityStore> b) {
         if (a == null || b == null || a == b) return false;
         for (Pending p : PENDING) {
             if (!p.cancelled && p.mobs.contains(a) && p.mobs.contains(b)) return true;
         }
-        return false;
+        return ReadyWait.together(a, b);
+    }
+
+    /** A countdown or a ready time (ReadyWait) is running: FightDamageSystem's truce check. */
+    static boolean anyWaiting() {
+        return !PENDING.isEmpty() || ReadyWait.any();
     }
 
     /** Fewer than two fighters standing before the start: no battle, the intro camera is cut. */
@@ -260,8 +283,9 @@ final class Countdown {
         }
     }
 
-    /** A new order for these mobs: pending countdowns that include any of them are cancelled. */
-    private static void cancelSharing(Set<Ref<EntityStore>> mobs) {
+    /** A new order for these mobs: pending countdowns and ready times that include any of them are cancelled. */
+    static void cancelSharing(Set<Ref<EntityStore>> mobs) {
+        ReadyWait.cancelSharing(mobs);
         for (Pending old : PENDING) {
             if (old.mobs.stream().anyMatch(mobs::contains)) {
                 finish(old, MobBattleApi.EndReason.REPLACED);
@@ -305,6 +329,7 @@ final class Countdown {
                 mobs.addAll(p.mobs);
             }
         }
+        mobs.addAll(ReadyWait.cancelFor(player, prefix));
         return mobs;
     }
 
@@ -314,7 +339,7 @@ final class Countdown {
     }
 
     static int cancelAll(MobBattleApi.EndReason reason) {
-        int n = 0;
+        int n = ReadyWait.cancelAll();
         for (Pending p : PENDING) {
             finish(p, reason);
             n++;
@@ -338,12 +363,12 @@ final class Countdown {
         return cancelled;
     }
 
-    /** True if {@code ref} is one of the fighters of a countdown still running (a player waiting for their fight). */
+    /** True if {@code ref} is one of the fighters of a countdown or ready time still running (a player waiting for their fight). */
     static boolean involves(Ref<EntityStore> ref) {
         for (Pending p : PENDING) {
             if (!p.cancelled && p.mobs.contains(ref)) return true;
         }
-        return false;
+        return ReadyWait.involves(ref);
     }
 
     /** True if {@code player} has a countdown still running (BattleMusic keeps playing meanwhile). */
@@ -427,6 +452,7 @@ final class Countdown {
 
     /** BattleManager.maintain: a countdown keeps its Store reachable; drop it if its world or player is gone. */
     static void prune() {
+        ReadyWait.prune();
         for (Pending p : PENDING) {
             PlayerRef player = p.owner != null ? com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(p.owner) : null;
             if (p.store.isShutdown() || p.owner != null && (player == null || !player.isValid())) {

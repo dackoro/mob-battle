@@ -84,7 +84,7 @@ final class FilmCamera {
     /** After the battle ends: time for the end camera to take over before the film glides back itself. */
     private static final long END_HOLD_MS = 400;
     /** filmWideShots' far shots stand this many times further back than a normal wide shot. */
-    private static final double FAR = 1.7;
+    private static final double FAR = 1.35;   // was 1.7: a 22-mob royale became specks in the landscape (recording 2026-10-17)
     /** A fighter at least this tall (blocks) adds BIG_MOB_WIDE_BONUS percent to filmWideShots. */
     private static final double BIG_MOB = 4;
     private static final int BIG_MOB_WIDE_BONUS = 15;
@@ -196,6 +196,8 @@ final class FilmCamera {
         /** PROFILE: the star's opponent and its eased position. */
         Ref<EntityStore> partner;
         Vector3d partnerPos;
+        /** How far toward the fight the camera moves off high stands (shot(), refreshed every PULL_EVERY frames). */
+        double standsShift;
         /** Where the close-up looks at the star's face from, kept clear of walls and other mobs. */
         final FightCamera.FaceAim starAim = new FightCamera.FaceAim();
         double starHeight = 2;
@@ -320,11 +322,13 @@ final class FilmCamera {
     /** Takes the player's camera for this battle (world thread). */
     private static void begin(PlayerRef player, Ref<EntityStore> me, Store<EntityStore> store, BattleManager.Battle battle,
                               boolean tell) {
+        long id = 0;
         try {
-            long id = FightCamera.claim(player);
+            id = FightCamera.claim(player);
             Film f = new Film(battle, store, player, id);
             if (!readFocus(f)) {
-                FightCamera.release(player.getUuid(), id);
+                // claim already stopped any intro filming: give the camera, bands and HUD back, not just the id
+                FightCamera.glideBack(player, id);
                 player.sendMessage(I18n.tr("battle.film.none").color(WARN));
                 return;
             }
@@ -342,7 +346,10 @@ final class FilmCamera {
             next(f, 0);
         } catch (RuntimeException e) {
             MobBattlePlugin.log("Battle film failed: " + e);
-            FightCamera.reset(player);
+            FILMS.remove(player.getUuid());
+            // the id too (it stayed in SHOT, the player counted as busy until their next camera)
+            if (id != 0) FightCamera.glideBack(player, id);
+            else FightCamera.reset(player);
         }
     }
 
@@ -355,9 +362,10 @@ final class FilmCamera {
                 return;
             }
             if (!FightCamera.viewerIn(f.player, f.world)) {
-                FightCamera.release(uuid, f.id);
-                CinemaBars.out(f.player);
+                // moved to another world: camera, bands and HUD back where they are now (audit 2026-10-17: the HUD
+                // stayed hidden there)
                 FILMS.remove(uuid, f);
+                FightCamera.glideBack(f.player, f.id);
                 return;
             }
             boolean over = f.battle.over || f.store.isShutdown();
@@ -404,7 +412,19 @@ final class FilmCamera {
                 FightCamera.cancel(f.player);
                 return;
             }
-            f.world.execute(() -> run(f));
+            // A world that stopped (an instance closed) refuses tasks: the film ends here, not silently with its id
+            // kept, the player "busy" for good and their HUD hidden (audit 2026-10-17).
+            if (f.store.isShutdown()) {
+                FILMS.remove(f.player.getUuid(), f);
+                FightCamera.glideBack(f.player, f.id);
+                return;
+            }
+            try {
+                f.world.execute(() -> run(f));
+            } catch (RuntimeException e) {
+                FILMS.remove(f.player.getUuid(), f);
+                FightCamera.glideBack(f.player, f.id);
+            }
         });
     }
 
@@ -493,7 +513,10 @@ final class FilmCamera {
         f.spread += (f.aimSpread - f.spread) * SPREAD_EASE;
         f.tall += (f.aimTall - f.tall) * SPREAD_EASE;
         f.wide += (f.aimWide - f.wide) * SPREAD_EASE;
-        if (f.starPos != null && starAlive(f)) {
+        // Only the shots that film a fighter follow it (audit 2026-10-17: after the first close-up every later frame of
+        // the film kept reading it and ran the clear-side search every 5 frames).
+        Type now = f.plan != null ? f.plan.type() : null;
+        if ((now == Type.CLOSE_UP || now == Type.PROFILE) && f.starPos != null && starAlive(f)) {
             Vector3d p = ChaosWand.positionOf(f.star, f.store);
             if (p != null) {
                 approach(f.starPos, p, STAR_EASE);
@@ -501,9 +524,11 @@ final class FilmCamera {
                     Vector3d q = ChaosWand.positionOf(f.partner, f.store);
                     if (q != null) approach(f.partnerPos, q, STAR_EASE);
                 }
-                double h = f.starHeight;
-                f.starAim.next(f.star, p, f.focus, Math.max(2.8, h * 1.2 + 1.2) * 1.08, p.y + h * 0.7 + 0.3, p.y + h * 0.6,
-                        f.battle.members(), f.store);
+                if (now == Type.CLOSE_UP) {
+                    double h = f.starHeight;
+                    f.starAim.next(f.star, p, f.focus, Math.max(2.8, h * 1.2 + 1.2) * 1.08, p.y + h * 0.7 + 0.3, p.y + h * 0.6,
+                            f.battle.members(), f.store);
+                }
             }
         }
     }
@@ -743,18 +768,30 @@ final class FilmCamera {
         // Stands, walls and hills well above the fight (2026-10-16, user: a shot ended up on top of the colosseum's
         // stands, looking at its torches): a camera that would sit on them moves toward the fight until the ground
         // under it is near the fighters' level again. One flying well above them keeps its place.
-        if (ground > f.focus.y + STANDS_RISE && at.y < ground + STANDS_CLEAR) {
+        // The search walks the ground every STANDS_STEP toward the fight (up to ~100 canopy reads): done every
+        // PULL_EVERY frames and on cuts, the found shift kept in between (audit 2026-10-17: it ran every frame).
+        if (Double.isNaN(f.camY) || f.frame % PULL_EVERY == 0) {
+            f.standsShift = 0;
+            if (ground > f.focus.y + STANDS_RISE && at.y < ground + STANDS_CLEAR) {
+                double dx = f.focus.x - at.x, dz = f.focus.z - at.z;
+                double len = Math.hypot(dx, dz);
+                for (double step = STANDS_STEP; step < len; step += STANDS_STEP) {
+                    double x = at.x + dx / len * step, z = at.z + dz / len * step;
+                    double g = FightCamera.canopy(x, z, at.y, f.focus.y, f.roof, false, f.store);
+                    if (g <= f.focus.y + STANDS_RISE * 0.5) {
+                        f.standsShift = step;
+                        break;
+                    }
+                }
+            }
+        }
+        if (f.standsShift > 0) {
             double dx = f.focus.x - at.x, dz = f.focus.z - at.z;
             double len = Math.hypot(dx, dz);
-            for (double step = STANDS_STEP; step < len; step += STANDS_STEP) {
-                double x = at.x + dx / len * step, z = at.z + dz / len * step;
-                double g = FightCamera.canopy(x, z, at.y, f.focus.y, f.roof, false, f.store);
-                if (g <= f.focus.y + STANDS_RISE * 0.5) {
-                    at.x = x;
-                    at.z = z;
-                    ground = g;
-                    break;
-                }
+            if (len > f.standsShift) {
+                at.x += dx / len * f.standsShift;
+                at.z += dz / len * f.standsShift;
+                ground = FightCamera.canopy(at.x, at.z, at.y, f.focus.y, f.roof, false, f.store);
             }
         }
         double want = Math.max(at.y, ground + pose.clearance());

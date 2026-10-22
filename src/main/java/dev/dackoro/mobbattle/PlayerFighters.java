@@ -94,12 +94,12 @@ final class PlayerFighters {
         String name = ChaosWand.nameOf(target, accessor);
         boolean self = asker.getReference() == target;
         if (isCreative(target, accessor)) {
-            asker.sendMessage((self ? I18n.tr("chat.fighters.creative.self") : I18n.tr("chat.fighters.creative.other").param("name", name))
+            asker.sendMessage((self ? I18n.tr("chat.fighters.creative.self") : I18n.tr("chat.fighters.creative.other").param("name", MobNames.message(name)))
                     .color(WARN));
             return false;
         }
         if (!BattleManager.isAlive(target, accessor)) {
-            asker.sendMessage((self ? I18n.tr("chat.fighters.dead.self") : I18n.tr("chat.fighters.dead.other").param("name", name))
+            asker.sendMessage((self ? I18n.tr("chat.fighters.dead.self") : I18n.tr("chat.fighters.dead.other").param("name", MobNames.message(name)))
                     .color(WARN));
             return false;
         }

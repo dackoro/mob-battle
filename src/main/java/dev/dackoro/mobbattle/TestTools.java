@@ -52,7 +52,7 @@ import java.util.concurrent.TimeUnit;
  *   spawning them.</li>
  *   <li>royale &lt;role:count+...&gt; &lt;here|x y z&gt; &lt;radius&gt;: spawns the mix and starts a royale there, with a
  *   summary at the end.</li>
- *   <li>wave &lt;heal|cleanse|effect|morph|shuffle&gt; &lt;here|x y z&gt; [world] [effect|model]: a wand's held-click wave
+ *   <li>wave &lt;heal|cleanse|effect|morph|shuffle|kill&gt; &lt;here|x y z&gt; [world] [effect|model]: a wand's held-click wave
  *   from that spot with the current settings; says how many it reached and when the ring got to them.</li>
  *   <li>stats &lt;id|last&gt;: one line with health, size, buffs, effects, battle, calm, army and morph.</li>
  *   <li>expect &lt;id|last&gt; &lt;field&gt; &lt;op&gt; &lt;value&gt;: a check, ✅/❌ in the log; a script counts them.</li>
@@ -67,8 +67,8 @@ final class TestTools {
 
     static final String USAGE = "Usage: /mobbattle test spawn <role> <here|x y z> [count] [world] | list | clear | walk <id|last> <x> <z>"
             + " | chase <id|last> <here|x y z> | duel <roleA> <roleB> <distance> <here|x y z> [world] | royale <role:count+...> <here|x y z> <radius> [world]"
-            + " | wave <heal|cleanse|effect|morph|shuffle> <here|x y z> [world] [effect|model] | stats <id|last> | expect <id|last> <field> <op> <value>"
-            + " | camera <style> <player> [seconds] | preview [two] [spin N] [tilt N] [scale N] | thumbnail [pose auto|idle|run|jump|<set>] [t 0..1] [side left|right|front|profileLeft|profileRight] [size N] [flat] | hologram on|off | thumbnails <rebuild [force] [mod:<m>|<text>]|status> | snapshot [name] | restore [name] | perf <role> <count> <here|x y z> [world] | run <script> | stop";
+            + " | wave <heal|cleanse|effect|morph|shuffle|kill> <here|x y z> [world] [effect|model] | stats <id|last> | expect <id|last> <field> <op> <value>"
+            + " | camera <style> <player> [seconds] | thumbnail [pose auto|idle|run|jump|<set>] [t 0..1] [side left|right|front|profileLeft|profileRight] [size N] [flat] | hologram on|off | mask [seconds] | send [seconds] | thumbnails <rebuild [force] [mod:<m>|<text>]|status> | snapshot [name] | restore [name] | perf <role> <count> <here|x y z> [world] | run <script> | stop";
     private static final String OK = "#7dff8a";
     private static final String INFO = "#c8e6ff";
     private static final String ERR = "#ff6b6b";
@@ -125,10 +125,12 @@ final class TestTools {
                 }
                 case "expect" -> expect(to, a);
                 case "camera" -> camera(to, a);
-                case "preview" -> PreviewTest.command(ctx, a);
                 case "thumbnail" -> ThumbnailTest.command(ctx, a);
                 case "thumbnails" -> thumbnailsCommand(to, a);
+                case "vsframes" -> vsFramesCommand(to, a);
                 case "vs" -> VsScreen.command(ctx, a);
+                case "mask" -> UiTests.command(ctx, a, false);
+                case "send" -> UiTests.command(ctx, a, true);
                 case "playerlook" -> PlayerLookTest.command(ctx, a);
                 case "hologram" -> MorphHologram.command(ctx, a);
                 case "snapshot" -> snapshot(to, a.length > 1 ? a[1] : "default");
@@ -185,6 +187,57 @@ final class TestTools {
         boolean started = ThumbnailCache.rebuild(which, force, r -> say(to, "Thumbnails: " + ThumbnailCache.describe(r), OK));
         say(to, started ? "Thumbnails: making them in the background" + (force ? " (all again)" : " (missing or outdated only)") + "..."
                 : "A thumbnail run is already going.", started ? INFO : ERR);
+    }
+
+    /**
+     * test vsframes &lt;current|body&gt; [text] (2026-10-17, user: try framing the VS pictures by the body before changing
+     * the real ones): VsScreen.testFrames into &lt;picture cache&gt;/vs-test/&lt;method&gt;/, in the background. Preview it
+     * out of the game: python scripts/vs-preview.py columns 8 --folder &lt;that folder&gt;.
+     */
+    private static void vsFramesCommand(CommandSender to, String[] a) {
+        String method = a.length > 1 ? a[1].toLowerCase(Locale.ROOT) : "";
+        if (!method.equals("current") && !method.equals("body")) {
+            say(to, "Usage: /mobbattle test vsframes <current|body> [wide:<0.5-1>] [text]", ERR);
+            return;
+        }
+        // wide:<fit> (2026-10-18, user: a Glutton's arm was cut): how much of a wide mob's width the square keeps
+        double fit = -1;
+        String only = null;
+        for (int i = 2; i < a.length; i++) {
+            if (a[i].regionMatches(true, 0, "wide:", 0, 5)) {
+                try {
+                    fit = Math.max(0.5, Math.min(1.0, Double.parseDouble(a[i].substring(5))));
+                } catch (NumberFormatException e) {
+                    say(to, "wide: takes a number from 0.5 to 1.", ERR);
+                    return;
+                }
+            } else {
+                only = a[i];
+            }
+        }
+        Path root = PictureCache.root();
+        if (root == null) {
+            say(to, "No picture cache folder.", ERR);
+            return;
+        }
+        Path dir = root.resolve("vs-test").resolve(fit > 0 ? method + "-wide" + Math.round(fit * 100) : method);
+        final double useFit = fit;
+        final String onlyText = only;
+        long t0 = System.nanoTime();
+        say(to, "VS frame test (" + method + "): drawing into " + dir + " ...", INFO);
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                int[] r = (useFit > 0 ? VsScreen.testFrames(method.equals("body"), onlyText, dir, useFit, n -> {
+                    if (n % 100 == 0) say(to, "VS frame test (" + method + "): " + n + " done", INFO);
+                }) : VsScreen.testFrames(method.equals("body"), onlyText, dir, n -> {
+                    if (n % 100 == 0) say(to, "VS frame test (" + method + "): " + n + " done", INFO);
+                }));
+                say(to, "VS frame test (" + method + "): " + r[0] + " of " + r[2] + " drawn" + (r[1] > 0 ? ", " + r[1] + " failed" : "")
+                        + " in " + MobBattlePlugin.took(t0) + ". Preview: python scripts/vs-preview.py columns 8 --folder \"" + dir + "\"", OK);
+            } catch (Exception e) {
+                say(to, "VS frame test failed: " + e, ERR);
+            }
+        });
     }
 
     // ---- targets by id ----
@@ -698,8 +751,11 @@ final class TestTools {
                             BattleManager.markPlayer(r, owner.getUuid());
                         }
                     }
+                    // the VS screen and intro camera, as the Battle Wand's click (SelectFighterInteraction); the test duel
+                    // skipped them, so a duel test never showed the VS (2026-10-17)
+                    FightCamera.intro(BattleManager.Kind.DUEL, owner, null, List.of(List.of(first), List.of(second)), store);
                     Countdown.run(BattleManager.Kind.DUEL, owner, store, new Countdown.Label("DUEL: " + names,
-                                    I18n.tr("battle.label.duel").param("a", ChaosWand.nameOf(first, store)).param("b", ChaosWand.nameOf(second, store))),
+                                    I18n.tr("battle.label.duel").param("a", MobNames.message(ChaosWand.nameOf(first, store))).param("b", MobNames.message(ChaosWand.nameOf(second, store)))),
                             List.of(first, second), acc -> SelectFighterInteraction.duel(owner, ownerRef, first, second, acc));
                 }
                 case "focus" -> {
@@ -970,11 +1026,11 @@ final class TestTools {
     private static void waveCommand(CommandContext ctx, String[] a) {
         CommandSender to = ctx.sender();
         if (a.length < 3) {
-            say(to, "Usage: /mobbattle test wave <heal|cleanse|effect|morph|shuffle> <here|x y z> [world] [effect id|model]", ERR);
+            say(to, "Usage: /mobbattle test wave <heal|cleanse|effect|morph|shuffle|kill> <here|x y z> [world] [effect id|model]", ERR);
             return;
         }
         String kind = a[1].toLowerCase(Locale.ROOT);
-        if (!List.of("heal", "cleanse", "effect", "morph", "shuffle").contains(kind)) {
+        if (!List.of("heal", "cleanse", "effect", "morph", "shuffle", "kill").contains(kind)) {
             say(to, "Waves: heal, cleanse, effect, morph, shuffle.", ERR);
             return;
         }
@@ -1001,6 +1057,10 @@ final class TestTools {
                 case "heal" -> {
                     radius = FxSettings.healRadius;
                     hit = HealAreaInteraction.wave(c, null, store);
+                }
+                case "kill" -> {
+                    radius = FxSettings.killRadius;
+                    hit = KillAreaInteraction.wave(c, null, null, store);
                 }
                 case "cleanse" -> {
                     radius = FxSettings.cleanseRadius;
@@ -1230,7 +1290,7 @@ final class TestTools {
             }
             // The duel picks targets and ignores outsiders (battle isolation); verifyBlocks cancels any other hit.
             verifySample(world, pairs, System.currentTimeMillis() + seconds * 1000L);
-            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            world.scheduleAfter(() -> {
                 for (VerifyPair p : pairs) {
                     VERIFY.remove(p.mob, p);
                     VERIFY.remove(p.dummy, p);
@@ -1253,27 +1313,25 @@ final class TestTools {
                 }
                 MobBattlePlugin.log("[test] verify: " + Math.min(picks.size(), from + per) + " of " + picks.size() + " checked");
                 verifyBatch(to, world, origin, picks, from + per, per, seconds, report, wrong, startedAt);
-            }), seconds * 1000L, TimeUnit.MILLISECONDS);
+            }, seconds * 1000L, TimeUnit.MILLISECONDS);
         });
     }
 
     /** Counts, every VERIFY_SAMPLE_MS until {@code end}, the pairs where either copy is running an attack. */
     private static void verifySample(World world, List<VerifyPair> pairs, long end) {
-        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+        world.scheduleAfter(() -> {
             if (System.currentTimeMillis() >= end) return;
-            world.execute(() -> {
-                Store<EntityStore> store = world.getEntityStore().getStore();
-                for (VerifyPair p : pairs) {
-                    for (Ref<EntityStore> r : List.of(p.mob, p.dummy)) {
-                        if (!r.isValid()) continue;
-                        var combat = com.hypixel.hytale.server.npc.role.support.CombatSupport.get(r, store);
-                        if (combat != null && combat.isExecutingAttack()) {
-                            p.attacking++;
-                            break;
-                        }
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            for (VerifyPair p : pairs) {
+                for (Ref<EntityStore> r : List.of(p.mob, p.dummy)) {
+                    if (!r.isValid()) continue;
+                    var combat = com.hypixel.hytale.server.npc.role.support.CombatSupport.get(r, store);
+                    if (combat != null && combat.isExecutingAttack()) {
+                        p.attacking++;
+                        break;
                     }
                 }
-            });
+            }
             verifySample(world, pairs, end);
         }, VERIFY_SAMPLE_MS, TimeUnit.MILLISECONDS);
     }
@@ -1482,7 +1540,7 @@ final class TestTools {
             // counted as "spawned during" an earlier cell's battle and joined it.
             for (CallCell c : cells) silentDuel(world, c.at, c.a, c.b, store);
             callsSample(world, cells, System.currentTimeMillis() + seconds * 1000L);
-            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            world.scheduleAfter(() -> {
                 for (CallCell c : cells) {
                     boolean failed = !c.joined.isEmpty() || c.hits > 0 || c.distracted > 2;
                     if (c.calls > 0) calling[0]++;
@@ -1502,32 +1560,30 @@ final class TestTools {
                 }
                 MobBattlePlugin.log("[test] calls: " + Math.min(picks.size(), from + per) + " of " + picks.size() + " checked");
                 callsBatch(to, world, origin, picks, from + per, per, seconds, watchers, report, wrong, calling, startedAt);
-            }), seconds * 1000L, TimeUnit.MILLISECONDS);
+            }, seconds * 1000L, TimeUnit.MILLISECONDS);
         });
     }
 
     /** Every VERIFY_SAMPLE_MS until {@code end}: who each onlooker and fighter has in its LockedTarget slot. */
     private static void callsSample(World world, List<CallCell> cells, long end) {
-        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+        world.scheduleAfter(() -> {
             if (System.currentTimeMillis() >= end) return;
-            world.execute(() -> {
-                Store<EntityStore> store = world.getEntityStore().getStore();
-                for (CallCell c : cells) {
-                    for (Ref<EntityStore> w : c.watchers) {
-                        Ref<EntityStore> locked = lockedOf(w, store);
-                        CallCell of = locked != null ? CALLS.get(locked) : null;
-                        if (of != null && of.fighter(locked)) c.joined.add(w);
-                    }
-                    for (Ref<EntityStore> f : List.of(c.a, c.b)) {
-                        Ref<EntityStore> locked = lockedOf(f, store);
-                        // The opponent's pet or summon (joined its side) is a fair target too.
-                        if (locked != null && locked != f && !c.fighter(locked) && !BattleManager.areEnemies(f, locked)) {
-                            c.distracted++;
-                            c.offTargets.add(ChaosWand.nameOf(locked, store) + (c.watchers.contains(locked) ? " (onlooker)" : ""));
-                        }
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            for (CallCell c : cells) {
+                for (Ref<EntityStore> w : c.watchers) {
+                    Ref<EntityStore> locked = lockedOf(w, store);
+                    CallCell of = locked != null ? CALLS.get(locked) : null;
+                    if (of != null && of.fighter(locked)) c.joined.add(w);
+                }
+                for (Ref<EntityStore> f : List.of(c.a, c.b)) {
+                    Ref<EntityStore> locked = lockedOf(f, store);
+                    // The opponent's pet or summon (joined its side) is a fair target too.
+                    if (locked != null && locked != f && !c.fighter(locked) && !BattleManager.areEnemies(f, locked)) {
+                        c.distracted++;
+                        c.offTargets.add(ChaosWand.nameOf(locked, store) + (c.watchers.contains(locked) ? " (onlooker)" : ""));
                     }
                 }
-            });
+            }
             callsSample(world, cells, end);
         }, VERIFY_SAMPLE_MS, TimeUnit.MILLISECONDS);
     }
@@ -1827,7 +1883,7 @@ final class TestTools {
             say(to, String.format(Locale.ROOT, "Speed test: %s, %d lanes of %.0f blocks along +X from %.0f %.0f %.0f, sizes %s.",
                     role, n, SPEED_LANE, place.pos.x, place.pos.y, place.pos.z, sizes), INFO);
             // Give the size buff a moment (model rebuild), then go.
-            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            world.scheduleAfter(() -> {
                 for (int i = 0; i < n; i++) {
                     if (mobs[i] != null && mobs[i].isValid() && dummies[i] != null && dummies[i].isValid()) {
                         // A silent duel with its dummy (user, 2026-10-14: the zombies only walked, a mob ordered
@@ -1843,7 +1899,7 @@ final class TestTools {
                 }
                 long t0 = System.currentTimeMillis();
                 speedSample(to, world, role, sizes, mobs, dummies, ends, new double[n], new long[n], new ArrayList<>(), t0);
-            }), 600, TimeUnit.MILLISECONDS);
+            }, 600, TimeUnit.MILLISECONDS);
         });
     }
 
@@ -1856,7 +1912,7 @@ final class TestTools {
     private static void speedSample(CommandSender to, World world, String role, List<Double> sizes, Ref<EntityStore>[] mobs,
                                     Ref<EntityStore>[] dummies, Vector3d[] ends, double[] top, long[] arrived,
                                     List<Vector3d[]> history, long t0) {
-        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             Store<EntityStore> store = world.getEntityStore().getStore();
             long now = System.currentTimeMillis();
             Vector3d[] at = new Vector3d[mobs.length];
@@ -1904,7 +1960,7 @@ final class TestTools {
             speedRunning = false;
             String file = writeReport("speed", "size | time to the dummy | average | top speed over 0.5 s", report);
             say(to, chat + (file != null ? ". Full report: " + file : ""), OK);
-        }), SPEED_SAMPLE_MS, TimeUnit.MILLISECONDS);
+        }, SPEED_SAMPLE_MS, TimeUnit.MILLISECONDS);
     }
 
     // ---- jump (how high a mob climbs, per size) ----
@@ -2033,7 +2089,7 @@ final class TestTools {
     private static void jumpSample(CommandSender to, World world, String role, Vector3d origin, double groundY, List<Double> sizes,
                                    int index, int seconds, List<Ref<EntityStore>> dummies, List<SavedBlock> saved, List<String> report,
                                    List<Ref<EntityStore>> mobs, double[] best, long end) {
-        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             Store<EntityStore> store = world.getEntityStore().getStore();
             for (int i = 0; i < mobs.size(); i++) {
                 Ref<EntityStore> m = mobs.get(i);
@@ -2065,7 +2121,7 @@ final class TestTools {
             say(to, "Jump x" + fmtSize(sizes.get(index)) + " (real x" + String.format(Locale.ROOT, "%.2f", scale) + "): climbed up to step "
                     + highest + " of " + JUMP_STEPS + ".", INFO);
             jumpRound(to, world, role, origin, groundY, sizes, index + 1, seconds, dummies, saved, report);
-        }), JUMP_SAMPLE_MS, TimeUnit.MILLISECONDS);
+        }, JUMP_SAMPLE_MS, TimeUnit.MILLISECONDS);
     }
 
     private static String fmtSize(double s) {

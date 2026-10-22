@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.common.CommonAsset;
 import com.hypixel.hytale.server.core.asset.common.CommonAssetModule;
@@ -186,8 +185,7 @@ final class EyeRecolor {
                 register(plan);
                 ok(ctx, "eyeTest: " + plan.assets.size() + " texture(s) registered; the mob changes in "
                         + APPLY_DELAY_MS + " ms.");
-                HytaleServer.SCHEDULED_EXECUTOR.schedule(
-                        () -> store.getExternalData().getWorld().execute(() -> apply(job, plan)),
+                store.getExternalData().getWorld().scheduleAfter(() -> apply(job, plan),
                         APPLY_DELAY_MS, TimeUnit.MILLISECONDS);
             } catch (Throwable t) {
                 err(ctx, "eyeTest failed while generating: " + t);

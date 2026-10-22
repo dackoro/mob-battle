@@ -1,5 +1,5 @@
 {
-  "$Comment": "Kill Wand: the wand's usual poses (Parent Wand) plus KillCast, a copy of the vanilla Wand CastLeftCharging (Cast_Left_Charged/Cast_Left_Charging*.blockyanim) to edit in Blockbench: Common/Characters/Animations/Items/MobBattle/KillCast/. First person: KillCast_FPS, a copy of the vanilla sword Swing_Left_FPS (a quick slash) to edit.",
+  "$Comment": "Kill Wand: the wand's usual poses (Parent Wand) plus KillCast, a copy of the vanilla Wand CastLeftCharging (Cast_Left_Charged/Cast_Left_Charging*.blockyanim) to edit in Blockbench: Common/Characters/Animations/Items/MobBattle/KillCast/. First person: KillCast_FPS, a copy of the vanilla sword Swing_Left_FPS (a quick slash) to edit. Not looping (2026-10-21): since the tap moved under the held-click Charging, ClearAnimationOnFinish no longer stopped a looping KillCast and the swing repeated forever.",
   "Parent": "Wand",
   "UseFirstPersonOverrides": false,
   "Animations": {
@@ -9,7 +9,7 @@
       "FirstPerson": "Characters/Animations/Items/MobBattle/KillCast/KillCast_FPS.blockyanim",
       "ThirdPersonFace": "Characters/Animations/Expressions/Frown.blockyanim",
       "Speed": 1,
-      "Looping": true
+      "Looping": false
     }
   }
 }

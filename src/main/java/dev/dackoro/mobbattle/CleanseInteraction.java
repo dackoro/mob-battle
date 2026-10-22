@@ -74,7 +74,7 @@ public class CleanseInteraction extends SimpleInstantInteraction {
         if (targets.isEmpty()) return;
         var store = targets.get(0).getStore();
         var world = store.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             if (store.isShutdown()) return;
             for (int i = 0; i < targets.size(); i++) {
                 Ref<EntityStore> target = targets.get(i);
@@ -82,7 +82,7 @@ public class CleanseInteraction extends SimpleInstantInteraction {
                 cleanseNow(target, fxs.get(i), store);
                 if (MorphWand.restore(target, store)) WandFx.onTarget(target, WandFx.UNMORPH, store);
             }
-        }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -102,6 +102,6 @@ public class CleanseInteraction extends SimpleInstantInteraction {
             return;
         }
         landLater(java.util.List.of(target), java.util.List.of(start(target, true, buffer)));
-        player.sendMessage(I18n.tr("chat.cleanse.done").param("name", ChaosWand.nameOf(target, buffer)).color("#7fd3ff"));
+        player.sendMessage(I18n.tr("chat.cleanse.done").param("name", MobNames.message(ChaosWand.nameOf(target, buffer))).color("#7fd3ff"));
     }
 }

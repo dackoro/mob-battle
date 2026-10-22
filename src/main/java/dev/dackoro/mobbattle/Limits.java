@@ -31,6 +31,7 @@ final class Limits {
             new Rule("cleanse.area.radius", null, FxSettings.RADIUS_WARN, "radius"),
             new Rule("effect.area.radius", null, FxSettings.RADIUS_WARN, "radius"),
             new Rule("heal.area.radius", null, FxSettings.RADIUS_WARN, "radius"),
+            new Rule("kill.area.radius", null, FxSettings.RADIUS_WARN, "radius"),
             new Rule("battle.arena.size", null, FxSettings.ARENA_WARN, "arena"),
             new Rule("chaos.height", null, FxSettings.HEIGHT_WARN, "height"),
             new Rule("summon.radius", null, FxSettings.SUMMON_RADIUS_WARN, "summonradius"),

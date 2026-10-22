@@ -1,0 +1,83 @@
+// Dev test (UiTests.java, /mobbattle test mask; 2026-10-17): does MaskTexturePath hide what lies outside an element?
+// If it does, a team column can show one wide picture per mob instead of six pre-cut widths.
+// Row A: 300-wide groups holding a picture twice as wide (it spills over the neighbours unless the group clips it).
+// Row B: the mask on the picture itself (band = only its middle half should show).
+Group #MaskTest {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+  Background: #0b0f18(0.92);
+
+  Label #TitleA {
+    Anchor: (Left: 60, Top: 20, Width: 1800, Height: 30);
+    Text: "A: group 300 wide, picture 600 wide inside. Red/blue = no mask, green = mask full, yellow = mask band";
+    Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true);
+  }
+
+  Group #A0 {
+    Anchor: (Left: 120, Top: 70, Width: 300, Height: 360);
+    Background: #a03030(0.85);
+    AssetImage #A0Img { Anchor: (Left: -150, Top: -40, Width: 600, Height: 600); }
+  }
+
+  Group #A1 {
+    Anchor: (Left: 560, Top: 70, Width: 300, Height: 360);
+    Background: #30a040(0.85);
+    MaskTexturePath: "Masks/MaskTestFull.png";
+    AssetImage #A1Img { Anchor: (Left: -150, Top: -40, Width: 600, Height: 600); }
+  }
+
+  Group #A2 {
+    Anchor: (Left: 1000, Top: 70, Width: 300, Height: 360);
+    Background: #c0a020(0.85);
+    MaskTexturePath: "Masks/MaskTestBand.png";
+    AssetImage #A2Img { Anchor: (Left: -150, Top: -40, Width: 600, Height: 600); }
+  }
+
+  Group #A3 {
+    Anchor: (Left: 1440, Top: 70, Width: 300, Height: 360);
+    Background: #3050b0(0.85);
+    AssetImage #A3Img { Anchor: (Left: -150, Top: -40, Width: 600, Height: 600); }
+  }
+
+  Label #TitleB {
+    Anchor: (Left: 60, Top: 520, Width: 1800, Height: 30);
+    Text: "B: 360x360 pictures. 1 = no mask, 2 = band mask on the picture, 3 = full mask on the picture, 4 = band mask on a group around it";
+    Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true);
+  }
+
+  Group #B0 {
+    Anchor: (Left: 120, Top: 570, Width: 360, Height: 360);
+    Background: #303848(0.9);
+    AssetImage #B0Img { Anchor: (Left: 0, Top: 0, Width: 360, Height: 360); }
+  }
+
+  Group #B1 {
+    Anchor: (Left: 560, Top: 570, Width: 360, Height: 360);
+    Background: #303848(0.9);
+    AssetImage #B1Img {
+      Anchor: (Left: 0, Top: 0, Width: 360, Height: 360);
+      MaskTexturePath: "Masks/MaskTestBand.png";
+    }
+  }
+
+  Group #B2 {
+    Anchor: (Left: 1000, Top: 570, Width: 360, Height: 360);
+    Background: #303848(0.9);
+    AssetImage #B2Img {
+      Anchor: (Left: 0, Top: 0, Width: 360, Height: 360);
+      MaskTexturePath: "Masks/MaskTestFull.png";
+    }
+  }
+
+  Group #B3 {
+    Anchor: (Left: 1440, Top: 570, Width: 360, Height: 360);
+    Background: #303848(0.9);
+    MaskTexturePath: "Masks/MaskTestBand.png";
+    AssetImage #B3Img { Anchor: (Left: 0, Top: 0, Width: 360, Height: 360); }
+  }
+
+  Label #Info {
+    Anchor: (Left: 60, Top: 970, Width: 1800, Height: 40);
+    Text: "";
+    Style: (FontSize: 16, TextColor: #9fb3c8);
+  }
+}

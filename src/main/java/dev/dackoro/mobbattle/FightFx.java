@@ -3,6 +3,7 @@ package dev.dackoro.mobbattle;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.buildertools.BuilderToolLaserPointer;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -33,7 +34,7 @@ public final class FightFx {
                                       Ref<EntityStore> first, Ref<EntityStore> second,
                                       ComponentAccessor<EntityStore> buffer) {
         if (KindFx.startTitle(BattleManager.Kind.DUEL)) {
-            showTitle(player, I18n.tr("battle.fight"), I18n.tr("battle.fight.vs").param("a", a).param("b", b), false);
+            showTitle(player, I18n.tr("battle.fight"), I18n.tr("battle.fight.vs").param("a", MobNames.message(a)).param("b", MobNames.message(b)), false);
         }
         if (KindFx.laser(BattleManager.Kind.DUEL)) {
             laser(playerEntity, first, second, buffer);
@@ -324,11 +325,11 @@ public final class FightFx {
             disc[2] = Math.max(0, outer - ring);
             var packet = new com.hypixel.hytale.protocol.packets.player.DisplayDebug(com.hypixel.hytale.protocol.DebugShape.Disc,
                     matrix, color, last ? 0.8f : (WAVE_STEP_MS + 30) / 1000f, flags, disc, last ? 0.45f : 0.6f);
-            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            world.scheduleAfter(() -> {
                 if (!world.getEntityStore().getStore().isShutdown()) {
                     PlayerUtil.broadcastPacketToPlayers(world.getEntityStore().getStore(), packet);
                 }
-            }), (i - 1) * WAVE_STEP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }, (i - 1) * WAVE_STEP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
     }
 
@@ -444,6 +445,10 @@ public final class FightFx {
         com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection section = null;
         com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection fluidSection = null;
         int sectionY = Integer.MIN_VALUE;
+        // A loaded section without tick (NonTicking, no player near): an entity moved into it is unloaded at once
+        // (UpdateLocationSystems.updateEntityInChunk, decompiled 0.7.2), so it counts as unknown, like an unloaded one.
+        boolean sectionAsleep = false;
+        var nonTicking = com.hypixel.hytale.server.core.universe.world.storage.ChunkStore.REGISTRY.getNonTickingComponentType();
         for (int y = top; y >= bottom; y--) {
             if ((y >> 5) != sectionY) {
                 sectionY = y >> 5;
@@ -451,8 +456,9 @@ public final class FightFx {
                 boolean ok = ref != null && ref.isValid();
                 section = ok ? store.getComponent(ref, sectionType) : null;
                 fluidSection = ok ? store.getComponent(ref, fluidType) : null;
+                sectionAsleep = ok && store.getArchetype(ref).contains(nonTicking);
             }
-            if (section == null) {
+            if (section == null || sectionAsleep) {
                 cell[y - bottom] = -1;
                 continue;
             }
@@ -495,6 +501,33 @@ public final class FightFx {
         if (section == null) return true;
         var type = com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType.getAssetMap().getAsset(section.get(x & 31, y & 31, z & 31));
         return type != null && type.getMaterial() == com.hypixel.hytale.protocol.BlockMaterial.Solid;
+    }
+
+    /** World tick of each entity's last teleport (teleport), so it gets at most one per tick; pruneTeleports. */
+    private static final java.util.Map<Ref<EntityStore>, Long> TELEPORTED = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Teleports a mob to {@code to} (Teleport.createExact), at most once per world tick. Vanilla
+     * TeleportSystems.MoveSystem only moves on the component being ADDED: a second Teleport while one is still on the
+     * entity (put through a CommandBuffer) is a plain set and is ignored without a word (decompiled 0.7.2), and two
+     * in one tick (arena wall and unstick) fought over the mob. False if refused; world thread.
+     */
+    static boolean teleport(Ref<EntityStore> mob, org.joml.Vector3d to, com.hypixel.hytale.math.vector.Rotation3f rotation,
+                            Store<EntityStore> store) {
+        var teleportType = com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType();
+        long tick = store.getExternalData().getWorld().getTick();
+        Long last = TELEPORTED.get(mob);
+        if (last != null && last == tick || store.getComponent(mob, teleportType) != null) return false;
+        TELEPORTED.put(mob, tick);
+        store.putComponent(mob, teleportType, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to, rotation));
+        return true;
+    }
+
+    /** BattleManager.maintain: drops teleports of past ticks, gone entities and closed worlds. */
+    static void pruneTeleports() {
+        if (TELEPORTED.isEmpty()) return;
+        TELEPORTED.entrySet().removeIf(e -> !e.getKey().isValid() || e.getKey().getStore().isShutdown()
+                || e.getValue() < e.getKey().getStore().getExternalData().getWorld().getTick());
     }
 
     /**
@@ -704,11 +737,11 @@ public final class FightFx {
         drawLaser(ownerId, from, to, rgb, buffer);
         var world = buffer.getExternalData().getWorld();
         for (int t = LASER_STEP_MILLIS; t < LASER_MILLIS; t += LASER_STEP_MILLIS) {
-            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            world.scheduleAfter(() -> {
                 if (from.isValid() && to.isValid()) {
                     drawLaser(ownerId, from, to, rgb, world.getEntityStore().getStore());
                 }
-            }), t, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }, t, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
     }
 
@@ -900,7 +933,9 @@ public final class FightFx {
             return;
         }
         long now = System.currentTimeMillis();
-        long busyUntil = TITLE_BUSY_UNTIL.getOrDefault(id, 0L);
+        // a VS screen covers this player: the title waits for its end, as the countdown's numbers do (user,
+        // 2026-10-17: a title showed over the VS)
+        long busyUntil = Math.max(TITLE_BUSY_UNTIL.getOrDefault(id, 0L), VsScreen.endsAt(id));
         if (now >= busyUntil) {
             PendingTitle next = pending.poll();
             sendTitle(player, next, now);
@@ -922,6 +957,11 @@ public final class FightFx {
 
     static void countdownTitle(BattleManager.Battle.Anchor anchor, int left, Message label) {
         for (PlayerRef viewer : scopeViewers(anchor, FxSettings.titleScope)) countdownTitleTo(viewer, left, label);
+    }
+
+    /** The ready time's big number, only to the player who waits (ReadyWait). */
+    static void readyTitle(PlayerRef player, int left, Message sub) {
+        countdownTitleTo(player, left, sub);
     }
 
     private static synchronized void countdownTitleTo(PlayerRef player, int left, Message label) {

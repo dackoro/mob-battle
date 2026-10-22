@@ -51,10 +51,10 @@ public class MorphBurstInteraction extends SimpleInstantInteraction {
         var caster = context.getEntity();
         var store = caster.getStore();
         boolean shuffle = shuffle();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> store.getExternalData().getWorld().execute(() -> {
+        store.getExternalData().getWorld().scheduleAfter(() -> {
             if (store.isShutdown() || !caster.isValid()) return;
             land(player, caster, shuffle, store);
-        }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** When the slam hits: the wave and the morphs, and the chat summary. World thread. */

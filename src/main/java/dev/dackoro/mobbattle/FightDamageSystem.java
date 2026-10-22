@@ -9,7 +9,12 @@ import com.hypixel.hytale.component.dependency.Dependency;
 import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.IgnoreDisableNPCIncomingDamage;
+import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
+import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -21,10 +26,11 @@ import java.util.Set;
 /**
  * Lets wand-paired NPCs hurt each other even if they are the same species.
  * <p>
- * Vanilla NPCDamageSystems.FilterDamageSystem cancels NPC-to-NPC damage when the attacker's
- * role lists the victim's group in its disabled damage groups (CombatSupport.getCanCauseDamage),
- * which is how wolves of the same pack don't bite each other. This runs right after it, in the
- * same filter group, and un-cancels the damage only for an active wand fight pair.
+ * Vanilla NPCDamageSystems.FilterDamageSystem cancels a hit on an NPC when the VICTIM's role lists
+ * the attacker's group in its disabled damage groups, or the attacker is in the victim's flock
+ * (CombatSupport.getCanCauseDamage), which is how wolves of the same pack don't bite each other.
+ * This runs right after it, in the same filter group, and un-cancels the damage only for an active
+ * wand fight pair or battle enemies, and never when vanilla protects the victim (vanillaProtects).
  */
 public class FightDamageSystem extends DamageEventSystem {
 
@@ -101,6 +107,14 @@ public class FightDamageSystem extends DamageEventSystem {
                        CommandBuffer<EntityStore> buffer, Damage damage) {
         // Medium: a projectile hit tells which roles fight at range (they can reach fliers and fish at the surface).
         if (damage.getSource() instanceof Damage.ProjectileSource shot) Medium.sawProjectile(shot.getRef(), buffer);
+        // Countdown truce: two fighters waiting for the same start don't hurt each other yet (Countdown.truce). First,
+        // so a cancelled hit sends no army after the victim and wakes no calm summon; a player's hits too (the mob
+        // ignores them meanwhile, so they were free hits; audit 2026-10-17).
+        if (Countdown.anyWaiting() && !damage.isCancelled() && damage.getSource() instanceof Damage.EntitySource waiting
+                && Countdown.waitingTogether(waiting.getRef(), chunk.getReferenceTo(index))) {
+            damage.setCancelled(true);
+            return;
+        }
         if (Army.any() && damage.getSource() instanceof Damage.EntitySource armySource && armyHit(armySource.getRef(),
                 chunk.getReferenceTo(index), damage, buffer)) {
             return;
@@ -108,13 +122,6 @@ public class FightDamageSystem extends DamageEventSystem {
         if (SummonCalm.any() && !damage.isCancelled() && damage.getSource() instanceof Damage.EntitySource calmSource) {
             // A calm summon that is hit may fight back that attacker (/mobbattle summonCalm).
             SummonCalm.hurt(chunk.getReferenceTo(index), calmSource.getRef(), buffer);
-        }
-        // Countdown truce: two mobs waiting for the same start don't hurt each other yet (Countdown.truce).
-        if (Countdown.hasPending() && !damage.isCancelled() && damage.getSource() instanceof Damage.EntitySource waiting
-                && Countdown.waitingTogether(waiting.getRef(), chunk.getReferenceTo(index))
-                && waiting.getRef().isValid() && buffer.getComponent(waiting.getRef(), NPCEntity.getComponentType()) != null) {
-            damage.setCancelled(true);
-            return;
         }
         // Every NPC hit in every world passes here: nothing to do while no battle or wand fight exists.
         if (!BattleManager.hasBattles() && !FightManager.hasFights()
@@ -153,8 +160,28 @@ public class FightDamageSystem extends DamageEventSystem {
                     + damage.getAmount() + " (cancelled by vanilla: " + damage.isCancelled() + ")");
         }
         if (damage.isCancelled()) {
+            // Only what the NPC/flock filter cancelled comes back: a victim vanilla protects stays unhurt (audit 0.7.2).
+            if (vanillaProtects(index, chunk, store)) return;
             damage.setCancelled(false);
         }
         BattleManager.recordDamage(source.getRef(), victim, damage.getAmount());
+    }
+
+    /**
+     * True if vanilla would cancel this hit for the victim itself, whatever the attacker: dead, Invulnerable or
+     * Intangible, an invulnerability effect (boss interludes, dodges), or a world with NPC incoming damage off
+     * (DamageSystems.FilterUnkillable / FilterNPCWorldConfig, which have no order against this system, decompiled
+     * 0.7.2). Read only for a cancelled hit between enemies.
+     */
+    private static boolean vanillaProtects(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store) {
+        var archetype = chunk.getArchetype();
+        if (archetype.contains(DeathComponent.getComponentType()) || archetype.contains(Invulnerable.getComponentType())
+                || archetype.contains(Intangible.getComponentType())) {
+            return true;
+        }
+        EffectControllerComponent effects = chunk.getComponent(index, EffectControllerComponent.getComponentType());
+        if (effects != null && effects.isInvulnerable()) return true;
+        return store.getExternalData().getWorld().getGameplayConfig().getCombatConfig().isNpcIncomingDamageDisabled()
+                && !archetype.contains(IgnoreDisableNPCIncomingDamage.getComponentType());
     }
 }

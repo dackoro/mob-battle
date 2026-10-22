@@ -101,6 +101,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private final Map<String, String[]> summonDraft = new LinkedHashMap<>();
     /** Role -> its summon row selector in the current build. */
     private final Map<String, String> summonRowOf = new HashMap<>();
+    /** The "remove every team" row under the summon list, null when not shown (shown only while a row has a team). */
+    private String noTeamsRow;
     /** Team rows edited but not saved: slot -> {name, palette color} (null = unchanged), same as summonDraft. */
     private final Map<Integer, String[]> teamDraft = new LinkedHashMap<>();
     /** Slot -> its team row selector in the current build. */
@@ -155,12 +157,18 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     @Override
     public void build(Ref<EntityStore> ref, UICommandBuilder ui, UIEventBuilder ev, Store<EntityStore> st) {
         ui.append(UI);
+        // The mob gallery popup over the panel (hidden until "Show pictures"), as a second page overlay.
+        ui.append(DIR + "GalleryPopup.ui");
+        galleryBindings(ev);
         rowOf.clear();
         previewOf.clear();
         swatchOf.clear();
         summonRowOf.clear();
+        noTeamsRow = null;
         filterTarget.clear();
         filterRowOf.clear();
+        galleryShown = false;
+        galleryShownIds = null;
         confirmButtons.clear();
         teamRowOf.clear();
         Properties live = FxSettings.toProperties();
@@ -203,6 +211,18 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                     rows.section(s.title());
                     // Film shots: one button puts every percent back to its default (2026-10-16, user).
                     if ("filmshots".equals(s.id())) {
+                        // Film styles: every film setting at once, into the draft (2026-10-16, user).
+                        String style = FilmStyles.current();
+                        rows.note(style == null ? I18n.tr("panel.note.filmstyle.custom")
+                                : I18n.tr("panel.note.filmstyle").param("style", styleName(style)));
+                        String[] names = FilmStyles.NAMES;
+                        Message[] labels = new Message[names.length];
+                        EventData[] data = new EventData[names.length];
+                        for (int i = 0; i < names.length; i++) {
+                            labels[i] = I18n.tr("panel.button.filmstyle." + names[i]);
+                            data[i] = data("FilmStyle").append("N", names[i]);
+                        }
+                        rows.buttons(labels, data);
                         rows.action(I18n.tr("panel.filmshots.reset.label"), I18n.tr("panel.filmshots.reset.button"), data("FilmShotsDefault"));
                     }
                 }
@@ -253,6 +273,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         previewOf.clear();
         swatchOf.clear();
         summonRowOf.clear();
+        noTeamsRow = null;
         filterTarget.clear();
         filterRowOf.clear();
         confirmButtons.clear();
@@ -450,6 +471,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         previewOf.clear();
         swatchOf.clear();
         summonRowOf.clear();
+        noTeamsRow = null;
         filterTarget.clear();
         filterRowOf.clear();
         confirmButtons.clear();
@@ -531,6 +553,17 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         if (s == null) return "";
         String d = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
         return d.replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * A film style's name as its button says it, in the player's language, as a plain String (a Message param inside a
+     * .Text label showed its raw form; the English label read "Estilo de la película: Battle"; audit 2026-10-17).
+     */
+    private String styleName(String style) {
+        String key = "server.mobbattle.panel.button.filmstyle." + style;
+        String v = translated(playerRef.getLanguage(), key);
+        if (v.isEmpty()) v = translated("en-US", key);
+        return v.isEmpty() ? ConfigSchema.label(style) : v;
     }
 
     /** A translation as the game's I18nModule holds it ("" if none or unreadable). */
@@ -775,7 +808,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                     String chip = sel + " #Chips[" + k++ + "]";
                     icon(rows.ui, chip + " #Icon", e.getKey());
                     rows.ui.set(chip + " #Count.Text", "x" + e.getValue());
-                    String shortName = e.getKey().replace('_', ' ');
+                    String shortName = MobNames.text(e.getKey(), playerRef);
                     rows.ui.set(chip + " #Name.Text", shortName.length() > 12 ? shortName.substring(0, 11) + "." : shortName);
                 }
             }
@@ -793,7 +826,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     }
 
     /** More summon rows than this go into a scrolling box. */
-    private static final int SUMMON_BOX_ROWS = 7;
+    private static final int SUMMON_BOX_ROWS = 8;
 
     private void summonRows(Rows rows) {
         Map<String, String> list = SummonList.snapshot();
@@ -819,6 +852,14 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                     data("SumEdit").append("N", role).append("K", "team").append("@V", sel + " #Team.Value"), false);
             rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Remove",
                     data("Act").append("A", "summonRemove").append("N", role), false);
+        }
+        // under the list (outside its scrolling box): every row loses its team, the mobs stay (2026-10-17, user).
+        // Always there with a list, shown while a row has a team, saved or picked (2026-10-18, user: after removing
+        // the teams and picking new ones it never came back until the panel was reopened)
+        if (!list.isEmpty()) {
+            noTeamsRow = rows.action(I18n.tr("panel.row.summonnoteams.label"), I18n.tr("panel.button.summonnoteams"),
+                    data("Act").append("A", "summonNoTeams"));
+            rows.ui.set(noTeamsRow + ".Visible", anyTeam());
         }
         rows.section(I18n.tr("panel.section.addmob"));
         filterRow(rows, "summonAdd");
@@ -849,11 +890,31 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Button",
                 data("Act").append("A", "summonAdd").append("@V", sel + " #Input.Value").append("@C", sel + " #Count.Value")
                         .append("@E", sel + " #Extra.Value"), false);
+        // Mob gallery (2026-10-16, user: pictures instead of a text list, as a popup over the panel): tiles load only
+        // when it opens; a tile puts its mob in the row above.
+        rows.action(I18n.tr("panel.row.gallery.label"), I18n.tr("panel.button.gallery.show"), data("Act").append("A", "galleryOpen"));
         // summon fill (2026-10-14, user): random mobs that fight, of similar strength; replaces the list (Undo restores it).
-        rows.action(I18n.tr("panel.row.summonfill.label"), I18n.tr("panel.button.summonfill"), data("Act").append("A", "summonFill"));
-        rows.action(I18n.tr("panel.row.summonfillteams.label"), I18n.tr("panel.button.summonfill"), data("Act").append("A", "summonFillTeams"));
+        fillRow(rows);
         if (!list.isEmpty()) confirmable(rows, "summonClear", I18n.tr("panel.row.summonclear.label"), () -> I18n.tr("panel.button.summonclear"));
         rows.action(I18n.tr("panel.row.summonspawn.label"), I18n.tr("panel.button.summon"), data("Act").append("A", "summonSpawn"));
+        // Saved lists (SummonLists, 2026-10-16, user: save my list 1, 2 with counts, colors and teams), as the presets
+        // page: one row per list (name = load, Delete with confirm), then a name field + Save.
+        List<String> saved = SummonLists.saved();
+        rows.section(I18n.tr("panel.section.summonlists").param("count", saved.size()));
+        rows.note(I18n.tr(saved.isEmpty() ? "panel.note.nosummonlists" : "panel.note.summonlistclick"));
+        for (String name : saved) {
+            String row = rows.buttons(new Message[] {Message.raw(name), I18n.tr("panel.button.delete")},
+                    new EventData[] {data("Act").append("A", "summonListLoad").append("N", name),
+                            data("Act").append("A", "summonListDelete").append("N", name)});
+            confirmButtons.put("summonListDelete" + name, new Confirm(row + " #B1", () -> I18n.tr("panel.button.delete")));
+        }
+        String save = rows.add("ActionPick.ui");
+        I18n.text(rows.ui, save + " #Label.Text", I18n.tr("panel.row.summonlistsave.label"));
+        rows.ui.set(save + " #Name.Visible", true);
+        rows.ui.set(save + " #Input.Visible", false);
+        I18n.text(rows.ui, save + " #Button.Text", I18n.tr("panel.button.summonlistsave"));
+        rows.ev.addEventBinding(CustomUIEventBindingType.Activating, save + " #Button",
+                data("Act").append("A", "summonListSave").append("@N", save + " #Name.Value"), false);
     }
 
     /** The mob the panel's "Add a mob" row starts on. */
@@ -890,14 +951,33 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         String sel = summonRowOf.get(role);
         if (sel == null) return;
         boolean changed = summonDraft.containsKey(role);
-        String name = SummonList.roleOf(role).replace('_', ' ');
-        ui.set(sel + " #Role.TextSpans", changed ? Message.raw("* " + name).color(GOLD) : Message.raw(name));
+        String id = SummonList.roleOf(role);
+        String name = MobNames.text(id, playerRef);
+        // The game's name, and the ID beside it in grey when it differs (Dungeon_Goblin_Burner is also "Goblin Burner").
+        String also = name.equalsIgnoreCase(MobNames.pretty(id)) ? "" : "  " + MobNames.pretty(id);
+        Message shown = changed ? Message.raw("* " + name).color(GOLD) : Message.raw(name);
+        ui.set(sel + " #Role.TextSpans", also.isEmpty() ? shown : Message.join(shown, Message.raw(also).color("#8a9bb0")));
     }
 
     /**
      * A summon row's count or team changed: kept in the draft (gold until Save changes), no rebuild. A value equal to
      * the saved one drops that part, so a dropdown echo or typing the old count back clears the mark.
      */
+    /** A summon row has a team, saved or picked and not saved yet. */
+    private boolean anyTeam() {
+        for (String role : SummonList.snapshot().keySet()) {
+            String[] pending = summonDraft.get(role);
+            String team = pending != null && pending[1] != null ? pending[1] : summonTeam(role);
+            if (team != null && !"none".equalsIgnoreCase(team)) return true;
+        }
+        return false;
+    }
+
+    /** The "remove every team" row shown or hidden as {@link #anyTeam} says. */
+    private void noTeamsVisible(UICommandBuilder ui) {
+        if (noTeamsRow != null) ui.set(noTeamsRow + ".Visible", anyTeam());
+    }
+
     private void summonEdit(String name, String kind, String raw) {
         String role = listedRole(name);
         String sel = role != null ? summonRowOf.get(role) : null;
@@ -932,7 +1012,10 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         if (pending[0] == null && pending[1] == null) summonDraft.remove(role);
         else summonDraft.put(role, pending);
         summonLabel(ui, role);
-        if (!isCount) summonSwatch(ui, sel, pending[1] != null ? pending[1] : saved);
+        if (!isCount) {
+            summonSwatch(ui, sel, pending[1] != null ? pending[1] : saved);
+            noTeamsVisible(ui);
+        }
         status(ui);
         sendUpdate(ui);
     }
@@ -982,7 +1065,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     /** The options a list shows with this player's filter. */
     private List<ConfigSchema.Opt> filtered(String key) {
         String[] f = filterOf(key);
-        return PickLists.filter(listOf(key), f[0], typeOf(key, f), f[2]);
+        return PickLists.filter(listOf(key), f[0], typeOf(key, f), f[2], "summonAdd".equals(key) ? playerRef.getLanguage() : null);
     }
 
     /** Filter row selector per list, to refill its group choices when the mod or type changes. */
@@ -1030,6 +1113,9 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         boolean mobs = "summonAdd".equals(key);
         String kind = mobs && type != null ? type : PickLists.ALL;
         String[] before = filterOf(key);
+        // The client sends a refilled dropdown's value back: nothing changed, nothing to refill (audit 2026-10-17: each
+        // echo resent the whole list, up to ~1000 gallery tiles).
+        if (mod.equals(before[0]) && kind.equals(before[1]) && (group != null ? group : PickLists.ALL).equals(before[2])) return;
         UICommandBuilder ui = new UICommandBuilder();
         String rowSel = filterRowOf.get(key);
         // The type choices follow the mod: refilled when it changed, and a type it has no mobs of goes back to every
@@ -1079,6 +1165,190 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             noticeColor = opts.isEmpty() ? WARN : GRAY;
         }
         status(ui);
+        if (mobs && galleryShown) {
+            UIEventBuilder ev = new UIEventBuilder();
+            if (rowSel != null) ui.set(rowSel + " #Mod.Value", mod);
+            galleryFilters(ui);
+            galleryFill(ui, ev);
+            sendUpdate(ui, ev, false);
+        } else {
+            sendUpdate(ui);
+        }
+    }
+
+    // ---- Summon list random fill (Config/FillRow.ui) ----
+
+    /** Each player's last fill {types, per type, teams} (memory only); default 6 types of 3, no teams. */
+    private static final Map<java.util.UUID, int[]> LAST_FILL = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * One row instead of the old two Fill buttons (2026-10-16, user: "they do the same; let me set how many types, how
+     * many of each, and a team count"): types, per type and teams (0 = no teams); the Show filters above (mod, type,
+     * group) go with it. Runs /mobbattle summon fill, which replaces the list (Undo restores it).
+     */
+    private void fillRow(Rows rows) {
+        int[] last = LAST_FILL.getOrDefault(playerRef.getUuid(), new int[] {6, 3, 0});
+        String sel = rows.add("FillRow.ui");
+        I18n.text(rows.ui, sel + " #Label.Text", I18n.tr("panel.row.summonfill.label"));
+        I18n.text(rows.ui, sel + " #TypesLabel.Text", I18n.tr("panel.fill.types"));
+        I18n.text(rows.ui, sel + " #EachLabel.Text", I18n.tr("panel.fill.each"));
+        I18n.text(rows.ui, sel + " #TeamsLabel.Text", I18n.tr("panel.fill.teams"));
+        I18n.text(rows.ui, sel + " #Button.Text", I18n.tr("panel.button.summonfill"));
+        rows.ui.set(sel + " #Types.Value", String.valueOf(last[0]));
+        rows.ui.set(sel + " #Each.Value", String.valueOf(last[1]));
+        rows.ui.set(sel + " #Teams.Value", String.valueOf(last[2]));
+        rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Button",
+                data("Act").append("A", "summonFill").append("@V", sel + " #Types.Value").append("@C", sel + " #Each.Value")
+                        .append("@E", sel + " #Teams.Value"), false);
+    }
+
+    private void summonFill(String types, String each, String teams) {
+        int t = parseInt(types, -1), e = parseInt(each, -1), k = parseInt(teams, 0);
+        if (t < 1 || e < 1 || k < 0 || k == 1) {
+            say(I18n.tr("panel.notice.fillnumbers"), WARN);
+            return;
+        }
+        t = Math.min(t, MobBattleCommand.SUMMON_FILL_MAX);
+        k = Math.min(k, 14);
+        LAST_FILL.put(playerRef.getUuid(), new int[] {t, e, k});
+        StringBuilder cmd = new StringBuilder("summon fill " + t + " each:" + e);
+        if (k >= 2) cmd.append(" teams:").append(k);
+        // The Show filters above narrow the pool too (mod, type, group).
+        // Spaces go as '+' (mod names such as "Mob Battle" have them; the command splits words on spaces).
+        String[] f = filterOf("summonAdd");
+        if (f[0] != null && !PickLists.ALL.equals(f[0])) cmd.append(" mod:").append(f[0].replace(' ', '+'));
+        if (f[1] != null && !PickLists.ALL.equals(f[1])) cmd.append(" type:").append(f[1]);
+        if (f[2] != null && !PickLists.ALL.equals(f[2])) cmd.append(" group:").append(f[2].replace(' ', '+'));
+        // The rows the fill replaces: their unsaved count/team edits would land on the new entries of the same key.
+        summonDraft.clear();
+        runList(cmd.toString());
+    }
+
+    // ---- Summon list gallery popup (Config/GalleryPopup.ui + SummonCell.ui) ----
+
+    /** Whether the popup shows now, and its search text (kept while the panel is open). */
+    private boolean galleryShown;
+    private String gallerySearch = "";
+    /** Filter events before this time are the client's echo of a refill of the popup's dropdowns. */
+    private long galleryFilterEchoUntil;
+    /** Longest name on a tile; longer ones are cut at a word with "..." so the tile never grows. */
+    private static final int GALLERY_NAME_CHARS = 24;
+
+    private void galleryBindings(UIEventBuilder ev) {
+        ev.addEventBinding(CustomUIEventBindingType.ValueChanged, "#GallerySearch",
+                data("GallerySearch").append("@V", "#GallerySearch.Value"), false);
+        ev.addEventBinding(CustomUIEventBindingType.Activating, "#GalleryClose", data("GalleryClose"), false);
+        for (String part : new String[] {"#GMod", "#GType", "#GGroup"}) {
+            ev.addEventBinding(CustomUIEventBindingType.ValueChanged, part, data("GalleryFilter").append("@M", "#GMod.Value")
+                    .append("@Y", "#GType.Value").append("@G", "#GGroup.Value"), false);
+        }
+    }
+
+    private void galleryOpen() {
+        if (filterTarget.get("summonAdd") == null) return;
+        galleryShown = true;
+        UICommandBuilder ui = new UICommandBuilder();
+        UIEventBuilder ev = new UIEventBuilder();
+        ui.set("#GallerySearch.Value", gallerySearch);
+        galleryFilters(ui);
+        galleryFill(ui, ev);
+        ui.set("#GalleryPopup.Visible", true);
+        sendUpdate(ui, ev, false);
+    }
+
+    private void galleryClose() {
+        galleryShown = false;
+        galleryShownIds = null;
+        UICommandBuilder ui = new UICommandBuilder();
+        ui.set("#GalleryPopup.Visible", false);
+        ui.clear("#GalleryGrid");
+        sendUpdate(ui);
+    }
+
+    /** The popup's mod / type / group lists, as the Summon list's Show row (the same filter, shared). */
+    private void galleryFilters(UICommandBuilder ui) {
+        galleryFilterEchoUntil = System.currentTimeMillis() + 600;
+        List<PickLists.Entry> all = listOf("summonAdd");
+        String[] f = filterOf("summonAdd");
+        ui.set("#GMod.Entries", entries(PickLists.modChoices(all)));
+        ui.set("#GMod.Value", f[0]);
+        ui.set("#GType.Entries", entries(PickLists.kindChoices(all, f[0])));
+        ui.set("#GType.Value", f[1]);
+        ui.set("#GGroup.Entries", entries(PickLists.groupChoices(all, f[0], f[1])));
+        ui.set("#GGroup.Value", f[2]);
+    }
+
+    /** Every mob the Show filters keep and the search matches (ID, its words, the game's name), no cap (user). */
+    private void galleryFill(UICommandBuilder ui, UIEventBuilder ev) {
+        galleryFill(ui, ev, false);
+    }
+
+    /** The mobs the grid shows now (null = grid empty), so a search key that changes nothing sends nothing. */
+    private List<String> galleryShownIds;
+
+    /**
+     * {@code onlyIfChanged}: false when the result is the one already shown (each key typed in the search resent up to
+     * ~1000 tiles even when the list stayed the same; audit 2026-10-17).
+     */
+    private boolean galleryFill(UICommandBuilder ui, UIEventBuilder ev, boolean onlyIfChanged) {
+        String q = norm(gallerySearch.trim());
+        String lang = playerRef.getLanguage();
+        List<String[]> hits = new ArrayList<>();
+        for (ConfigSchema.Opt o : filtered("summonAdd")) {
+            String id = o.value();
+            String name = MobNames.text(id, lang);
+            if (!q.isEmpty() && !galleryMatches(q, id, name, o.label())) continue;
+            hits.add(new String[] {id, name});
+        }
+        List<String> ids = new ArrayList<>(hits.size());
+        for (String[] h : hits) ids.add(h[0]);
+        if (onlyIfChanged && ids.equals(galleryShownIds)) return false;
+        galleryShownIds = ids;
+        ui.clear("#GalleryGrid");
+        int n = 0;
+        for (String[] h : hits) {
+            String id = h[0], name = h[1];
+            ui.append("#GalleryGrid", DIR + "SummonCell.ui");
+            String cell = "#GalleryGrid[" + n++ + "]";
+            icon(ui, cell + " #Icon", id);
+            ui.set(cell + " #Name.Text", cut(name, GALLERY_NAME_CHARS));
+            ev.addEventBinding(CustomUIEventBindingType.Activating, cell + " #Button", data("GalleryPick").append("R", id), false);
+        }
+        // A plain String param (a Message param or an ICU plural inside .Text showed its raw form).
+        I18n.text(ui, "#GalleryCount.Text", I18n.tr("gallery.count").param("total", String.valueOf(n)));
+        return true;
+    }
+
+    private static boolean galleryMatches(String q, String id, String name, String label) {
+        String hay = norm(id) + " " + norm(MobNames.pretty(id)) + " " + norm(name) + " " + norm(label);
+        for (String w : q.split(" +")) if (!w.isEmpty() && !hay.contains(w)) return false;
+        return true;
+    }
+
+    /** "Goblin Gobliterator Phase One" -> "Goblin Gobliterator..." within {@code max} characters. */
+    private static String cut(String s, int max) {
+        if (s == null || s.length() <= max) return s;
+        int sp = s.lastIndexOf(' ', max - 3);
+        return (sp > max / 2 ? s.substring(0, sp) : s.substring(0, max - 3)) + "...";
+    }
+
+    /** A tile clicked: its mob goes into the Add a mob row (count and team as they are), in place. */
+    private void galleryPick(String picked) {
+        String role = picked != null ? SummonList.findRole(picked) : null;
+        String sel = filterTarget.get("summonAdd");
+        if (role == null || sel == null) return;
+        String[] last = LAST_SUMMON_PICK.get(playerRef.getUuid());
+        LAST_SUMMON_PICK.put(playerRef.getUuid(), new String[] {role, last != null ? last[1] : null, last != null ? last[2] : null});
+        UICommandBuilder ui = new UICommandBuilder();
+        ui.set(sel + " #Input.Value", role);
+        icon(ui, sel + " #Preview", role);
+        galleryShown = false;
+        galleryShownIds = null;
+        ui.set("#GalleryPopup.Visible", false);
+        ui.clear("#GalleryGrid");
+        notice = I18n.tr("panel.notice.gallerypick").param("name", MobNames.text(role, playerRef));
+        noticeColor = GOLD;
+        status(ui);
         sendUpdate(ui);
     }
 
@@ -1102,6 +1372,16 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
      * The game's generated icon of a mob or model (Common/Icons/ModelsGenerated/&lt;name&gt;.png, the path the
      * Memories page gives its AssetImage), or null: the AssetImage then shows its fallback.
      */
+    /** The game's or our icon of exactly this model, never a relative's guess (for the VS screen); null if none. */
+    static String ownIconOf(String name) {
+        if (name == null || !name.matches("[A-Za-z0-9_\\-]+")) return null;
+        String declared = declaredIcon(name);
+        if (declared != null) return declared;
+        if (iconNames().contains(name)) return ICON_DIR + name + ".png";
+        String own = ThumbnailCache.iconFor(name);
+        return own != null ? own : VsScreen.iconFor(name);
+    }
+
     static String iconOf(String name) {
         if (name == null || !name.matches("[A-Za-z0-9_\\-]+")) return null;
         String declared = declaredIcon(name);
@@ -1159,7 +1439,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     }
 
     private static final String ICON_DIR = "Icons/ModelsGenerated/";
-    private static final String MISSING_ICON = "UI/Custom/Pages/Memories/MissingIcon.png";
+    /** No icon of any kind: the VS screen's big "?" (2026-10-17, user: one fallback everywhere, not the small red one). */
+    private static final String MISSING_ICON = VsScreen.UNKNOWN;
     /** Preferred relatives when a model has no icon (Skeleton -> Skeleton_Soldier rather than Skeleton_Archer). */
     private static final String[] RELATIVES = {"Soldier", "Fighter", "Adult", "Male", "Female", "Default", "Warrior", "Grunt", "Scout"};
     private static volatile java.util.NavigableSet<String> iconCache;
@@ -1185,9 +1466,9 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         return out;
     }
 
-    private static void icon(UICommandBuilder ui, String selector, String name) {
+    static void icon(UICommandBuilder ui, String selector, String name) {
         String path = iconOf(name);
-        // Nothing found: the Memories page's "?" icon. setNull left an empty box in game (the fallback did not show).
+        // Nothing found: the VS screen's "?" picture. setNull left an empty box in game (the fallback did not show).
         ui.set(selector + ".AssetPath", path != null ? path : MISSING_ICON);
     }
 
@@ -1308,6 +1589,9 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         rows.action(I18n.tr("panel.row.skiptimer.label"), I18n.tr("panel.button.skiptimer"), data("Act").append("A", "skipTimer"));
         rows.action(I18n.tr("panel.row.eventroyale.label"), I18n.tr("panel.button.eventroyale"), data("Act").append("A", "eventRoyale"));
         rows.action(I18n.tr("panel.row.debugdump.label"), I18n.tr("panel.button.debugdump"), data("Act").append("A", "debugDump"));
+        // mob pictures (2026-10-17, user): what is cached and sent, and redraw them with progress in chat
+        rows.action(I18n.tr("panel.row.picturesstatus.label"), I18n.tr("panel.button.picturesstatus"), data("Act").append("A", "picturesStatus"));
+        rows.action(I18n.tr("panel.row.picturesrebuild.label"), I18n.tr("panel.button.picturesrebuild"), data("Act").append("A", "picturesRebuild"));
         rows.action(I18n.tr("panel.row.measure.label"), I18n.tr("panel.button.measure"), data("Act").append("A", "measure"));
         applyRow(rows);
         rows.section(I18n.tr("panel.section.cleanup"));
@@ -1364,7 +1648,28 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             }
             case "Set" -> set(parseInt(str(doc, "F"), -1), str(doc, "@V"));
             case "FilmShotsDefault" -> filmShotsDefault();
-            case "Filter" -> filterChanged(str(doc, "K"), str(doc, "@M"), str(doc, "@Y"), str(doc, "@G"));
+            case "FilmStyle" -> filmStyle(str(doc, "N"));
+            case "GalleryPick" -> galleryPick(str(doc, "R"));
+            case "GallerySearch" -> {
+                String v = str(doc, "@V");
+                if (v == null || v.equals(gallerySearch) || !galleryShown) return;
+                gallerySearch = v;
+                UICommandBuilder ui = new UICommandBuilder();
+                UIEventBuilder ev = new UIEventBuilder();
+                if (galleryFill(ui, ev, true)) sendUpdate(ui, ev, false);
+            }
+            case "Filter" -> {
+                // While the gallery popup covers it, the Show row only echoes the popup's refills (which set it too):
+                // an echo with its old mod switched the popup's pick straight back (audit 2026-10-17).
+                if (galleryShown && "summonAdd".equals(str(doc, "K"))) return;
+                filterChanged(str(doc, "K"), str(doc, "@M"), str(doc, "@Y"), str(doc, "@G"));
+            }
+            case "GalleryClose" -> galleryClose();
+            case "GalleryFilter" -> {
+                // Refilling the popup's dropdowns makes the client send their first entry back: not a real pick.
+                if (!galleryShown || System.currentTimeMillis() < galleryFilterEchoUntil) return;
+                filterChanged("summonAdd", str(doc, "@M"), str(doc, "@Y"), str(doc, "@G"));
+            }
             case "Save" -> save();
             case "SumEdit" -> summonEdit(str(doc, "N"), str(doc, "K"), str(doc, "@V"));
             case "TeamEdit" -> teamEdit(parseInt(str(doc, "N"), -1), str(doc, "K"), str(doc, "@V"));
@@ -1477,7 +1782,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
 
     /** Radius fields drawn around the player as soon as they change (the draft value, before Save). */
     private static final java.util.Set<String> AREA_PREVIEW = java.util.Set.of("chaos.radius", "battle.arena.size",
-            "battle.shrink.to", "summon.radius", "snap.radius", "morph.burst.radius", "cleanse.area.radius", "effect.area.radius", "heal.area.radius", "chaos.area", "chaos.area.color");
+            "battle.shrink.to", "summon.radius", "snap.radius", "morph.burst.radius", "cleanse.area.radius", "effect.area.radius", "heal.area.radius", "kill.area.radius", "chaos.area", "chaos.area.color");
 
     /**
      * Area radius, arena sizes, Snap reach, summon area, area look and color: the circle is drawn around the player
@@ -1587,6 +1892,28 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         refreshInPlace(shown, List.of(), List.of(), false);
     }
 
+    /** A film style's settings into the draft (Save applies them); other edits stay. */
+    private void filmStyle(String name) {
+        if (!canEdit()) {
+            say(I18n.tr("panel.status.readonly"), WARN);
+            return;
+        }
+        Map<String, String> style = FilmStyles.of(name);
+        if (style == null) return;
+        Properties live = FxSettings.toProperties();
+        Map<Integer, String> shown = new LinkedHashMap<>();
+        for (ConfigSchema.Field f : ConfigSchema.FIELDS) {
+            String v = style.get(f.key);
+            if (v == null) continue;
+            shown.put(f.index, "");
+            if (v.equals(saved(f, live))) draft.remove(f.index);
+            else draft.put(f.index, v);
+        }
+        notice = I18n.tr("panel.notice.filmstyle").param("style", styleName(name.toLowerCase(java.util.Locale.ROOT)));
+        noticeColor = GOLD;
+        refreshInPlace(shown, List.of(), List.of(), false);
+    }
+
     private static final String FILM_WEIGHT = "camera.film.weight.";
 
     private void refreshInPlace(Map<Integer, String> fields, java.util.Collection<String> roles, java.util.Collection<Integer> slots,
@@ -1626,6 +1953,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             }
             teamMark(ui, slot);
         }
+        noTeamsVisible(ui);
         status(ui);
         sendUpdate(ui);
     }
@@ -1659,7 +1987,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
      * Puts the team and summon lists of {@code target} back at once (they never go through the form), keeping every
      * setting as it is. A team that only exists now is removed the normal way first, so no draft keeps its slot.
      */
-    private static void restoreLists(Properties target) {
+    static void restoreLists(Properties target) {
         Properties q = FxSettings.toProperties();
         for (String k : q.stringPropertyNames()) if (Presets.isListKey(k)) q.remove(k);
         for (String k : target.stringPropertyNames()) if (Presets.isListKey(k)) q.setProperty(k, target.getProperty(k));
@@ -1798,18 +2126,16 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         sendUpdate(ui);
         // Not clicked in time: the button goes back to normal.
         int generation = ++confirmGeneration;
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
-            if (store.isShutdown()) return;
-            store.getExternalData().getWorld().execute(() -> {
-                if (generation != confirmGeneration || !action.equals(confirmAction)) return;
-                if (!entity.isValid() || store.isShutdown()) return;
-                Player p = store.getComponent(entity, Player.getComponentType());
-                if (p == null || p.getPageManager().getCustomPage() != this) return;
-                confirmAction = null;
-                UICommandBuilder back = new UICommandBuilder();
-                disarm(back, action);
-                sendUpdate(back);
-            });
+        if (store.isShutdown()) return false;
+        store.getExternalData().getWorld().scheduleAfter(() -> {
+            if (generation != confirmGeneration || !action.equals(confirmAction)) return;
+            if (!entity.isValid() || store.isShutdown()) return;
+            Player p = store.getComponent(entity, Player.getComponentType());
+            if (p == null || p.getPageManager().getCustomPage() != this) return;
+            confirmAction = null;
+            UICommandBuilder back = new UICommandBuilder();
+            disarm(back, action);
+            sendUpdate(back);
         }, CONFIRM_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         return false;
     }
@@ -1873,6 +2199,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                 if (role != null) runList("summon remove " + role);
             }
             case "measure" -> run("measure 10", true);
+            case "galleryOpen" -> galleryOpen();
             case "apply" -> {
                 String who = value != null ? value.trim() : "";
                 String act = extra != null ? extra.trim() : "";
@@ -1893,11 +2220,36 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                 runList("summon add " + role + " " + c + (team != null ? " " + team : ""));
             }
             case "summonClear" -> {
-                if (confirmed(action, I18n.tr("panel.confirm.summonclear"))) runList("summon clear");
+                if (confirmed(action, I18n.tr("panel.confirm.summonclear"))) {
+                    summonDraft.clear();
+                    runList("summon clear");
+                }
             }
-            case "summonFill" -> runList("summon fill 6 each:3");
-            case "summonFillTeams" -> runList("summon fill 8 each:3 teams:2");
+            case "summonNoTeams" -> {
+                // unsaved team picks on the rows go too (their counts stay pending)
+                summonDraft.values().forEach(p -> p[1] = null);
+                summonDraft.values().removeIf(p -> p[0] == null && p[1] == null);
+                runList("summon team all none");
+            }
+            case "summonFill" -> summonFill(value, count, extra);
             case "summonSpawn" -> run("summon spawn", true);
+            case "summonListLoad" -> {
+                if (name != null && SummonLists.validName(name)) {
+                    // Unsaved row edits belong to the list being replaced (a team slot rename/recolor too).
+                    summonDraft.clear();
+                    teamDraft.clear();
+                    runList("summon load " + name);
+                }
+            }
+            case "summonListDelete" -> {
+                if (name != null && SummonLists.validName(name)
+                        && confirmed(action + name, I18n.tr("panel.confirm.summonlistdelete").param("name", name))) run("summon delete " + name, false);
+            }
+            case "summonListSave" -> {
+                String n = text != null ? text.trim() : "";
+                if (!SummonLists.validName(n)) { say(I18n.tr("cmd.summon.saved.badname").param("name", n), WARN); return; }
+                run("summon save " + n, false);
+            }
             // Presets and resets: into the form
             case "presetLoad" -> {
                 if (name == null || !Presets.isBuiltIn(name) && !Presets.validName(name)) return;
@@ -1968,6 +2320,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             case "give" -> run("give", false, false);
             case "skipTimer" -> run("skiptimer", false, false);
             case "debugDump" -> run("debugdump", false, false);
+            case "picturesStatus" -> run("pictures status", false, false);
+            case "picturesRebuild" -> run("pictures rebuild", false, false);
             case "eventRoyale" -> {
                 TransformComponent t = store.getComponent(entity, TransformComponent.getComponentType());
                 if (t == null) return;
@@ -2054,7 +2408,7 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         });
     }
 
-    private static List<DropdownEntryInfo> entries(List<ConfigSchema.Opt> opts) {
+    static List<DropdownEntryInfo> entries(List<ConfigSchema.Opt> opts) {
         List<DropdownEntryInfo> out = new ArrayList<>(opts.size());
         for (ConfigSchema.Opt o : opts) out.add(new DropdownEntryInfo(LocalizableString.fromString(o.label()), o.value()));
         return out;

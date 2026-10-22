@@ -53,13 +53,13 @@ public class HealInteraction extends SimpleInstantInteraction {
             WandFx.onTarget(target, WandFx.BUFF_LIGHT + light + WandFx.lightHeight(target, buffer), buffer);
             var store = target.getStore();
             var world = store.getExternalData().getWorld();
-            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+            world.scheduleAfter(() -> {
                 if (store.isShutdown() || !target.isValid()) return;
                 healNow(target, store);
-            }), LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }, LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
         if (player != null) {
-            player.sendMessage(I18n.tr("chat.heal.done").param("name", name).color("#55ff77"));
+            player.sendMessage(I18n.tr("chat.heal.done").param("name", MobNames.message(name)).color("#55ff77"));
         }
     }
 

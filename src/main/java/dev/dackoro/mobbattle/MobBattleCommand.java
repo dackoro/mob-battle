@@ -79,6 +79,7 @@ public class MobBattleCommand extends CommandBase {
         HELP.put("titles", new String[] {
                 "help.titles.1",
                 "help.titles.2",
+                "help.titles.34",
                 "help.titles.3",
                 "help.titles.4",
                 "help.titles.5",
@@ -103,8 +104,10 @@ public class MobBattleCommand extends CommandBase {
                 "help.titles.25",
                 "help.titles.26",
                 "help.titles.27",
+                "help.titles.32",
                 "help.titles.28",
                 "help.titles.29",
+                "help.titles.33",
                 "help.titles.17",
                 "help.titles.18",
                 "  help.titles.19",
@@ -221,6 +224,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.summon.5",
                 "help.summon.6",
                 "help.summon.7",
+                "help.summon.7b",
                 "help.summon.8",
                 "help.summon.9",
                 "help.summon.10",
@@ -232,6 +236,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.summon.16",
                 "help.summon.17",
                 "help.summon.18",
+                "help.summon.19",
         });
         HELP.put("morph", new String[] {
                 "help.morph.1",
@@ -254,6 +259,9 @@ public class MobBattleCommand extends CommandBase {
                 "help.morph.18",
                 "help.morph.19",
                 "help.morph.20",
+                "help.morph.28",
+                "help.morph.29",
+                "help.morph.30",
                 "help.morph.21",
                 "help.morph.22",
                 "help.morph.23",
@@ -306,6 +314,9 @@ public class MobBattleCommand extends CommandBase {
                 "help.server.30",
                 "help.server.31",
                 "help.server.32",
+                "help.server.33",
+                "help.server.34",
+                "help.server.35",
         });
         HELP.put("config", new String[] {
                 "help.config.1",
@@ -744,6 +755,7 @@ public class MobBattleCommand extends CommandBase {
             case "laser" -> KindFx.Opt.LASER;
             case "area" -> KindFx.Opt.AREA_STYLE;
             case "countdown" -> KindFx.Opt.COUNTDOWN;
+            case "readytime" -> KindFx.Opt.READY_TIME;
             case "camera" -> KindFx.Opt.CAMERA;
             case "music" -> KindFx.Opt.MUSIC;
             case "camerastyle" -> KindFx.Opt.CAMERA_STYLE;
@@ -999,7 +1011,7 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("perf", I18n.id("cmd.desc.perf_role_count_here_x_y_z_w")),
                 new Sub("royale", I18n.id("cmd.desc.royale_role_count_here_x_y_z")),
                 new Sub("wave", I18n.id("cmd.desc.wave_heal_cleanse_effect_mor"),
-                        words(I18n.id("cmd.desc.wave"), "heal", "cleanse", "effect", "morph", "shuffle")),
+                        words(I18n.id("cmd.desc.wave"), "heal", "cleanse", "effect", "morph", "shuffle", "kill")),
                 new Sub("stats", I18n.id("cmd.desc.stats_id_last_health_size_bu"), words(I18n.id("cmd.desc.who"), "last")),
                 new Sub("verify", I18n.id("cmd.desc.verify_here_x_y_z_mod_type_t")),
                 new Sub("calls", I18n.id("cmd.desc.calls_here_x_y_z"), words(I18n.id("cmd.desc.where"), "here")),
@@ -1023,6 +1035,7 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("clearall", I18n.id("cmd.desc.disband_every_player_s_army"))));
         addSubCommand(kindFxSub("countdown", I18n.id("cmd.desc.seconds_of_3_2_1_titles_befo"),
                 "0", "3", "5", "10"));
+        addSubCommand(kindFxSub("readytime", I18n.id("cmd.desc.ready_time"), "off", "5", "8", "15"));
         addSubCommand(kindFxSub("camerastyle", I18n.id("cmd.desc.intro_camera_auto_orbit_area"),
                 "auto", "orbit", "duel", "showcase", "teams", "focus", "drone", "spotlight"));
         addSubCommand(kindFxSub("cameratime", I18n.id("cmd.desc.intro_camera_seconds_0_as_lo"),
@@ -1055,6 +1068,12 @@ public class MobBattleCommand extends CommandBase {
                 words(I18n.id("cmd.desc.film_pace"), "50", "100", "150", "200")));
         addSubCommand(new Sub("filmtransition", I18n.id("cmd.desc.film_transition"),
                 words(I18n.id("cmd.desc.film_transition"), "cut", "glide")));
+        addSubCommand(new Sub("watchtransition", I18n.id("cmd.desc.watch_transition"),
+                words(I18n.id("cmd.desc.watch_transition"), "glide", "cut")));
+        addSubCommand(new Sub("watchautoswitch", I18n.id("cmd.desc.watch_auto_switch"),
+                words(I18n.id("cmd.desc.watch_auto_switch"), "off", "5", "10", "20", "30")));
+        addSubCommand(new Sub("filmstyle", I18n.id("cmd.desc.film_style"),
+                words(I18n.id("cmd.desc.film_style"), FilmStyles.NAMES)));
         addSubCommand(new Sub("filmshots", I18n.id("cmd.desc.film_shots"),
                 words(I18n.id("cmd.desc.film_shots"), "default", "all", "battle", "wide,arc,landscape", "playerback,playerclose")));
         addSubCommand(kindFxSub("runes", I18n.id("cmd.desc.summoning_runes_and_fighter"), "on", "off"));
@@ -1081,6 +1100,11 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("healarea", I18n.id("cmd.desc.heal_wand_hold_left_click_a"),
                 words(I18n.id("cmd.desc.heal_area"), "on", "off")));
         addSubCommand(new Sub("healradius", I18n.id("cmd.desc.heal_wand_reach_of_the_held")));
+        addSubCommand(new Sub("killarea", I18n.id("cmd.desc.kill_area_desc"),
+                words(I18n.id("cmd.desc.kill_area"), "on", "off")));
+        addSubCommand(new Sub("killradius", I18n.id("cmd.desc.kill_radius")));
+        addSubCommand(new Sub("killareaplayers", I18n.id("cmd.desc.kill_area_players"),
+                words(I18n.id("cmd.desc.kill_area_players"), "on", "off")));
         addSubCommand(new Sub("effectarea", I18n.id("cmd.desc.effect_wand_hold_left_click"),
                 words(I18n.id("cmd.desc.effect_area"), "on", "off")));
         addSubCommand(new Sub("effectradius", I18n.id("cmd.desc.effect_wand_reach_of_the_hel")));
@@ -1109,10 +1133,16 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("debuglog", I18n.id("cmd.desc.battle_decisions_config_aren"),
                 new Sub("on", I18n.id("cmd.desc.log_them_prefixed_debug")),
                 new Sub("off", I18n.id("cmd.desc.normal_log_default"))));
+        addSubCommand(new Sub("servervs", I18n.id("cmd.desc.server_vs"), words(I18n.id("cmd.desc.server_vs"), "on", "off")));
+        addSubCommand(new Sub("serverholograms", I18n.id("cmd.desc.server_holograms"), words(I18n.id("cmd.desc.server_holograms"), "on", "off")));
+        addSubCommand(new Sub("servericons", I18n.id("cmd.desc.server_icons"), words(I18n.id("cmd.desc.server_icons"), "on", "off")));
         addSubCommand(new Sub("debugrecord", I18n.id("cmd.desc.keep_the_last_5_min_of_log_a"),
                 new Sub("on", I18n.id("cmd.desc.record_saved_stays_on")),
                 new Sub("off", I18n.id("cmd.desc.off_nothing_kept_default"))));
         addSubCommand(new Sub("debugdump", I18n.id("cmd.desc.write_what_the_debug_recorde")));
+        addSubCommand(new Sub("pictures", I18n.id("cmd.desc.pictures"),
+                new Sub("status", I18n.id("cmd.desc.pictures.status")),
+                new Sub("rebuild", I18n.id("cmd.desc.pictures.rebuild"), new Sub("force", I18n.id("cmd.desc.pictures.force")))));
         addSubCommand(new Sub("debugtrack", I18n.id("cmd.desc.debug_wand_seconds_a_left_cl")));
         addSubCommand(new Sub("killdelay", I18n.id("cmd.desc.kill_wand_seconds_of_soul_ri")));
         addSubCommand(new Sub("lookglow", I18n.id("cmd.desc.light_around_mobs_with_a_jad")));
@@ -1175,9 +1205,14 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("modify", I18n.id("cmd.desc.change_a_listed_mob_s_count")),
                 new Sub("remove", I18n.id("cmd.desc.remove_a_mob_type_role")),
                 new Sub("clear", I18n.id("cmd.desc.empty_the_list")),
-                new Sub("team", I18n.id("cmd.desc.team_rule_role_team_none")),
+                new Sub("team", I18n.id("cmd.desc.team_rule_role_team_none"),
+                        new Sub("all", I18n.id("cmd.desc.summon_team_all"), new Sub("none", I18n.id("cmd.desc.summon_team_all")))),
                 new Sub("random", I18n.id("cmd.desc.range_for_random_counts_min")),
-                new Sub("atleastone", I18n.id("cmd.desc.random_types_spawn_at_least"), words(I18n.id("cmd.desc.at_least_one"), "true", "false"))));
+                new Sub("atleastone", I18n.id("cmd.desc.random_types_spawn_at_least"), words(I18n.id("cmd.desc.at_least_one"), "true", "false")),
+                new Sub("lists", I18n.id("cmd.desc.summon_lists")),
+                new Sub("save", I18n.id("cmd.desc.summon_save")),
+                new Sub("load", I18n.id("cmd.desc.summon_load")),
+                new Sub("delete", I18n.id("cmd.desc.summon_delete"))));
         addSubCommand(new Sub("morph", I18n.id("cmd.desc.morph_wand_model_model_id_li"),
                 new Sub("list", I18n.id("cmd.desc.search_model_ids_text")),
                 new Sub("reset", I18n.id("cmd.desc.give_every_morphed_mob_its_o"))));
@@ -1235,7 +1270,7 @@ public class MobBattleCommand extends CommandBase {
             };
         }
         if (command.equals("summon")) {
-            if (sub.equals("list")) return null;
+            if (sub.equals("list") || sub.equals("lists")) return null;
             if (sub.isEmpty() || sub.equals("spawn") || sub.equals("go")) return Perms.USE;
             return Perms.CONFIG;
         }
@@ -1248,8 +1283,10 @@ public class MobBattleCommand extends CommandBase {
         if (command.equals("permissions") || command.equals("reload") || command.equals("event")
                 || command.equals("give") || command.equals("stop")
                 || command.equals("resetall") || command.equals("debuglog") || command.equals("skiptimer")
-                || command.equals("debugrecord") || command.equals("debugdump")) return Perms.ADMIN;
-        if (command.equals("army") || command.equals("apply") || command.equals("measure") || command.equals("test")) return Perms.ADMIN;
+                || command.equals("debugrecord") || command.equals("debugdump")
+                || command.equals("servervs") || command.equals("serverholograms") || command.equals("servericons")) return Perms.ADMIN;
+        if (command.equals("army") || command.equals("apply") || command.equals("measure") || command.equals("test")
+                || command.equals("pictures")) return Perms.ADMIN;
         if (command.equals("chaos")) return Perms.USE;
         if (command.equals("watch") || command.equals("film")) return sub.equals("exit") ? null : Perms.USE;
         if (command.equals("skipcamera")) return null;
@@ -1363,7 +1400,7 @@ public class MobBattleCommand extends CommandBase {
                 }
                 return;
             }
-            case "laser", "title", "wintitle", "music", "camera", "countdown", "area",
+            case "laser", "title", "wintitle", "music", "camera", "countdown", "readytime", "area",
                  "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch", "camerabars", "camerablur", "autofilm", "vsscreen", "runes",
                  "tiebreak", "killtiebreak" -> {
                 if (!setKindFx(ctx, optFor(key))) return;
@@ -1780,6 +1817,36 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.filmTransition = val.toLowerCase(java.util.Locale.ROOT);
             }
+            case "watchtransition" -> {
+                if (!"cut".equalsIgnoreCase(val) && !"glide".equalsIgnoreCase(val)) {
+                    usage(ctx, "/mobbattle watchTransition cut|glide");
+                    return;
+                }
+                FxSettings.watchTransition = val.toLowerCase(java.util.Locale.ROOT);
+            }
+            case "watchautoswitch" -> {
+                int n;
+                if (val != null && ("off".equalsIgnoreCase(val.trim()) || "0".equals(val.trim()))) {
+                    n = 0;
+                } else {
+                    try {
+                        n = Integer.parseInt(val == null ? "" : val.replace("s", "").trim());
+                    } catch (NumberFormatException e) {
+                        usage(ctx, "/mobbattle watchAutoSwitch <seconds " + FxSettings.MIN_WATCH_AUTO_SWITCH + "-"
+                                + FxSettings.MAX_WATCH_AUTO_SWITCH + ">|off");
+                        return;
+                    }
+                    n = n <= 0 ? 0 : Math.max(FxSettings.MIN_WATCH_AUTO_SWITCH, Math.min(FxSettings.MAX_WATCH_AUTO_SWITCH, n));
+                }
+                FxSettings.watchAutoSwitch = n;
+            }
+            case "filmstyle" -> {
+                // filmStyle <default|battle|action|cinematic>: every film setting at once (FilmStyles).
+                if (val == null || !FilmStyles.apply(val)) {
+                    usage(ctx, "/mobbattle filmStyle " + String.join("|", FilmStyles.NAMES));
+                    return;
+                }
+            }
             case "filmshots" -> {
                 if ("default".equalsIgnoreCase(val)) {
                     FxSettings.filmWeights.clear();   // every shot back to FILM_DEFAULT_WEIGHTS
@@ -1979,6 +2046,10 @@ public class MobBattleCommand extends CommandBase {
                 TestTools.run(ctx, argsAfter(ctx, "test"));
                 return;
             }
+            case "pictures" -> {
+                PicturesCommand.run(ctx, argsAfter(ctx, "pictures"));
+                return;
+            }
             case "measure" -> {
                 measure(ctx, argsAfter(ctx, "measure"));
                 return;
@@ -2155,6 +2226,25 @@ public class MobBattleCommand extends CommandBase {
                 if (on) {
                     for (String line : FxSettings.describeLines()) MobBattlePlugin.debug("settings: " + line);
                 }
+            }
+            case "servervs", "serverholograms", "servericons" -> {
+                Boolean on = parseOnOff(val);
+                String name = switch (key) {
+                    case "servervs" -> "serverVs";
+                    case "serverholograms" -> "serverHolograms";
+                    default -> "serverIcons";
+                };
+                if (on == null) {
+                    usage(ctx, "/mobbattle " + name + " on|off");
+                    return;
+                }
+                switch (key) {
+                    case "servervs" -> FxSettings.serverVs = on;
+                    case "serverholograms" -> FxSettings.serverHolograms = on;
+                    default -> FxSettings.serverIcons = on;
+                }
+                // the pictures follow at the next server start (drawn and sent at boot, or not)
+                ctx.sendMessage(I18n.tr("cmd.server.feature.restart").color("#ffcc55"));
             }
             case "debugrecord" -> {
                 Boolean on = parseOnOff(val);
@@ -2392,6 +2482,24 @@ public class MobBattleCommand extends CommandBase {
                 }
                 FxSettings.healArea = on;
             }
+            case "killarea", "killareaplayers" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    usage(ctx, "/mobbattle " + (key.equals("killarea") ? "killArea" : "killAreaPlayers") + " on|off");
+                    return;
+                }
+                if (key.equals("killarea")) FxSettings.killArea = on;
+                else FxSettings.killAreaPlayers = on;
+            }
+            case "killradius" -> {
+                try {
+                    FxSettings.killRadius = FxSettings.clampRadius(Integer.parseInt(val == null ? "" : val));
+                } catch (NumberFormatException e) {
+                    usage(ctx, "/mobbattle killRadius <" + FxSettings.MIN_RADIUS + "-" + FxSettings.MAX_RADIUS + ">",
+                            defaultNote(String.valueOf(FxSettings.DEFAULT_KILL_RADIUS)));
+                    return;
+                }
+            }
             case "healradius" -> {
                 try {
                     FxSettings.healRadius = FxSettings.clampRadius(Integer.parseInt(val == null ? "" : val));
@@ -2569,20 +2677,10 @@ public class MobBattleCommand extends CommandBase {
                         return;
                     }
                 }
-                // Same mob and team as a listed entry: the counts add up (user, 2026-10-13: Add replacing 10 with 1
-                // was a surprise); a random count on either side makes a new entry. Another team: one more entry
-                // (e.g. 10 archers in red and 10 in green). summon modify sets an exact count.
-                String key = SummonList.entryOf(role, team);
-                String now = key != null ? SummonList.ENTRIES.get(key) : null;
-                count = SummonList.normalCount(count);
-                if (now != null && now.matches("\\d+") && count.matches("\\d+")) {
-                    count = String.valueOf(Math.min(FxSettings.MAX_MOBS_LIMIT, Long.parseLong(now) + Long.parseLong(count)));
-                    reply(ctx, I18n.tr("cmd.summon.added").param("name", role.replace('_', ' ') + (team >= 0 ? " (" + Teams.name(team) + ")" : ""))
-                            .param("count", count), OK);
-                } else if (key != null) {
-                    key = null;
-                }
-                if (key == null) key = SummonList.newKey(role);
+                // Every Add is an entry of its own, even the same mob and team (user, 2026-10-16: add the same mob N
+                // times; before, the counts of the same mob and team added up into one row). summon modify sets an
+                // exact count on one entry.
+                String key = SummonList.newKey(role);
                 SummonList.ENTRIES.put(key, SummonList.normalCount(count));
                 if (team >= 0) {
                     SummonList.TEAMS.put(key, team);
@@ -2626,10 +2724,16 @@ public class MobBattleCommand extends CommandBase {
                 SummonList.TEAMS.clear();
             }
             case "team" -> {
+                // summon team all none: every entry loses its team, the mobs stay (2026-10-17, user: a button that
+                // clears the teams without removing the rows)
+                if (a.length > 2 && "all".equalsIgnoreCase(a[1]) && "none".equalsIgnoreCase(a[2])) {
+                    SummonList.TEAMS.clear();
+                    break;
+                }
                 String role = a.length > 2 ? SummonList.listedKey(a[1]) : null;
                 int team = a.length > 2 ? BattleManager.teamIndex(a[2]) : -1;
                 if (role == null || (team < 0 && !"none".equalsIgnoreCase(a[2]))) {
-                    usage(ctx, "/mobbattle summon team <role> <team|none>", Teams.describeMessage());
+                    usage(ctx, "/mobbattle summon team <role> <team|none> | summon team all none", Teams.describeMessage());
                     return;
                 }
                 if (team < 0) {
@@ -2650,13 +2754,13 @@ public class MobBattleCommand extends CommandBase {
                         String w = a[i], low = w.toLowerCase(java.util.Locale.ROOT);
                         if (low.startsWith("each:")) each = Math.max(1, Math.min(FxSettings.MAX_MOBS_LIMIT, Integer.parseInt(w.substring(5))));
                         else if (low.startsWith("teams:")) teams = Math.max(0, Math.min(14, Integer.parseInt(w.substring(6))));
-                        else if (low.startsWith("mod:")) mod = w.substring(4);
+                        else if (low.startsWith("mod:")) mod = w.substring(4).replace('+', ' ');
                         else if (low.startsWith("type:")) {
                             // An unknown type word used to fall back to fighters silently.
                             kind = PickLists.kindOf(w.substring(5));
                             if (kind == null) throw new NumberFormatException(w);
                         }
-                        else if (low.startsWith("group:")) group = w.substring(6);
+                        else if (low.startsWith("group:")) group = w.substring(6).replace('+', ' ');
                         else if (low.equals("add")) add = true;
                         else throw new NumberFormatException(w);
                     }
@@ -2696,9 +2800,36 @@ public class MobBattleCommand extends CommandBase {
                 }
                 SummonList.atLeastOne = on;
             }
+            case "lists" -> {
+                // Saved lists (SummonLists, 2026-10-16, user: save my list 1, 2 with counts, colors and teams).
+                java.util.List<String> names = SummonLists.saved();
+                reply(ctx, names.isEmpty() ? I18n.tr("cmd.summon.saved.empty")
+                        : I18n.tr("cmd.summon.saved.list").param("names", String.join(", ", names)), OK);
+                return;
+            }
+            case "save", "load", "delete" -> {
+                if (a.length != 2) {
+                    usage(ctx, "/mobbattle summon " + sub + " <name>");
+                    return;
+                }
+                String err = switch (sub) {
+                    case "save" -> SummonLists.save(a[1]);
+                    case "load" -> SummonLists.load(a[1]);
+                    default -> SummonLists.delete(a[1]);
+                };
+                if (err != null) {
+                    reply(ctx, I18n.tr(err).param("name", a[1]), ERR);
+                    return;
+                }
+                reply(ctx, I18n.tr("cmd.summon.saved.did" + sub).param("name", a[1]), OK);
+                if (sub.equals("delete") || sub.equals("save")) return;
+                // load: restoreLists already saved fx.properties; show the list it put back.
+                reply(ctx, SummonList.describeMessage(), OK);
+                return;
+            }
             default -> {
-                usage(ctx, "/mobbattle summon [list | add <role> [count|random] [team] | fill <types> [each:<n>] [teams:<n>] [mod:..] [type:..] [group:..] [add] | modify <role> [team] <count|random> | team <role> <color|none> | remove <role> | clear"
-                        + " | random <min> <max> | atLeastOne true|false]");
+                usage(ctx, "/mobbattle summon [list | add <role> [count|random] [team] | fill <types> [each:<n>] [teams:<n>] [mod:..] [type:..] [group:..] [add] | modify <role> [team] <count|random> | team <role> <color|none> | team all none | remove <role> | clear"
+                        + " | random <min> <max> | atLeastOne true|false | lists | save <name> | load <name> | delete <name>]");
                 return;
             }
         }

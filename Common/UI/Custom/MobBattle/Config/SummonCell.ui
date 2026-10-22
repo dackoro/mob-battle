@@ -1,0 +1,45 @@
+$C = "../../Common.ui";
+
+// One mob of the Summon list gallery (SummonGallery.ui): its picture and the game's name (cut short on the server so
+// long names never grow the tile). A Button with children, as the game's LeavePortalButton; the style shape of the
+// Equipment Wand's item cell.
+Group {
+  Anchor: (Width: 96, Height: 112);
+  Padding: (Horizontal: 2, Vertical: 2);
+
+  Button #Button {
+    Anchor: (Full: 0);
+    LayoutMode: Top;
+    Padding: 3;
+    Style: (
+      Default: (
+        Background: #1c2835,
+      ),
+      Hovered: (
+        Background: #c9a050,
+      ),
+      Pressed: (
+        Background: #a08040,
+      ),
+      Disabled: (
+        Background: #14181d,
+      ),
+      Sounds: $C.@ButtonSounds,
+    );
+
+    Group {
+      Anchor: (Height: 66);
+      LayoutMode: CenterMiddle;
+
+      AssetImage #Icon {
+        Anchor: (Width: 60, Height: 60);
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+      }
+    }
+
+    Label #Name {
+      Anchor: (Height: 36);
+      Style: (FontSize: 11, TextColor: #e8eef5, RenderBold: true, Wrap: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+    }
+  }
+}

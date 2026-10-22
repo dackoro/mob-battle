@@ -4,7 +4,6 @@ import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
-import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerFly;
@@ -164,7 +163,8 @@ final class Unstick {
             if (attempt < 6 && spot != FightFx.Spot.WATER && !FightFx.roomy(x, y, z, store)) continue;
             Vector3d to = new Vector3d(x, y, z);
             float yaw = (float) Math.atan2(them.x - x, them.z - z);
-            store.putComponent(mob, Teleport.getComponentType(), Teleport.createExact(to, new Rotation3f(0f, yaw, 0f)));
+            // Already moved this tick (the arena wall): it stays tracked and tries again later.
+            if (!FightFx.teleport(mob, to, new Rotation3f(0f, yaw, 0f), store)) return;
             WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
             MobBattlePlugin.debug("unstick: " + ChaosWand.nameOf(mob, store) + (flier ? " (flier)" : "") + " could not reach "
                     + ChaosWand.nameOf(target, store) + " (" + Math.round(Math.abs(them.y - me.y)) + " blocks up/down) for "

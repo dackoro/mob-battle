@@ -76,6 +76,17 @@ Both are off by default.
 - If mobs die during the countdown, the fight starts without them, or is cancelled if there are not enough left.
 - In all vs one, the lone target's buff (if any) is applied at the start of the countdown, so it is already big and healthy when the attackers arrive.
 
+## Time to get in position
+
+`readyTime <seconds>|off` (0-60, default off, globally or per kind: `readyTime teams 10`) gives you time to get to your spot before the VS screen and the countdown start. Every battle starts with a click on a mob, so without it you are always next to the fight; with it you can first walk or fly to an arena's stands.
+
+- A big number counts down for you only, with "Get in position - crouch to start" under it and a soft tick each second. The chat says how long you have.
+- **Crouch to start at once.** A crouch you were holding when you clicked doesn't count: let go and crouch again. Flying in Creative the crouch key flies down instead, so land first or wait for the time.
+- The fighters wait meanwhile, as in the countdown: they don't fight each other, and if fewer than two are left standing the battle is called off.
+- Never when you fight in the battle yourself (a duel against you, a royale with player fighters): you already are where it happens.
+- A new order for the same mobs, the Battle Wand's right click (for a duel) and `/mobbattle stop` cancel it, like a countdown.
+- The `cinematic` preset sets it to 8 seconds.
+
 ## How fighters pick targets
 
 Fighters use their own AI to fight; Mob Battle only tells each one who to attack.
@@ -291,7 +302,7 @@ With `/mobbattle buff unit multiplier` (or "Buff values as" in the panel), value
 
 ### Intro camera
 
-`camera on|off` (default on, global or per kind): during the countdown, or for `cameraTime` seconds, your camera films the fight, then glides back to your view as it starts. Your input does nothing meanwhile, but your physics keep running (you keep flying if you were). It is skipped when you are one of the fighters, and when you are watching (see below). With `countdown 0` it only plays if `cameraTime` is above 0.
+`camera on|off` (default on, global or per kind): during the countdown, or for `cameraTime` seconds, your camera films the fight, ends on a wide shot of the fighters and gives you your view back as it starts (with `autoFilm` the battle film takes over instead). Your input does nothing meanwhile, but your physics keep running (you keep flying if you were). It is skipped when you are one of the fighters, and when you are watching (see below). With `countdown 0` it only plays if `cameraTime` is above 0.
 
 | `cameraStyle` | Shot |
 |---|---|
@@ -304,11 +315,18 @@ With `/mobbattle buff unit multiplier` (or "Buff values as" in the panel), value
 | `focus` | A close-up of the lone target (about a third of the time), then the camera circles it about 200 degrees, low and just outside the crowd, always looking at the attacker in front of it (one after another as it turns), with the target behind. In other kinds it centers on the first fighter (royale falls back to `showcase`). |
 | `drone` | One low, smooth flight across the battle from your side to the far side, weaving past a few fighters picked at random (one every ~1.5 s of flight, up to 6; left of one, right of the next) without stopping. It flies about 4 blocks over the ground or the tree tops, climbing before hills and trees ahead, looks ahead along its path and turns toward each fighter as it comes up to it. The last third of the shot swings around the battle, looking at its center, like the orbit. In an arena with a roof it stays under the roof and out of the stands. Works in every kind. |
 
-`cameraTime <0-30>`: intro length in seconds; `0` (default) = as long as the countdown. Shots follow the fighters as they move: `orbit` uses the game's own camera sequences (like the vanilla `/tpcinematic`), and every other style sends server camera frames every 50 ms from the fighters' current positions.
+`cameraTime <0-600>`: intro length in seconds (above 30 warns: viewers have no controls meanwhile); `0` (default) = as long as the countdown. Shots follow the fighters as they move: `orbit` uses the game's own camera sequences (like the vanilla `/tpcinematic`), and every other style sends server camera frames every 50 ms from the fighters' current positions.
 
-**VS screen** (`vsScreen on|off`, global or per kind, default on): a Smash-like VS screen opens the countdown for 2.5 s. Each side slides in from its edge in its color (the team's color in team battles, else red and blue) with pictures of its three strongest fighters (max health) and "+N" for the rest, and a big VS flashes where they meet. A duel shows one fighter against the other, all vs one the target against everyone, a royale its strongest against everyone else. The game's HUD is hidden meanwhile. The intro camera follows with the time left (none when under 1.5 s), so it needs a countdown of 2 s or more. The pictures are drawn by the server from each mob's model, mods' mobs too, each in a different pose; the first time a mob shows, players may notice a short hitch while its picture loads (pictures of the summon list's mobs and of every mob shown before are loaded when the server starts).
+**VS screen** (`vsScreen on|off`, global or per kind, default on): a Smash-like VS screen before the countdown. It adds 3 s to any countdown above 0 (none with `countdown 0`), and the intro camera then plays with its full time. It goes to the players who get the cameras (`cameraScope`), except those watching a battle; the game's HUD is hidden meanwhile.
 
-`cameraBars off|slim|classic|wide` (default `classic`): black film bands at the top and the bottom of the screen while an intro or end camera plays. They slide in when the shot starts and out when the camera glides back to you.
+- Each side slides in from its edge in its color (the team's color in team battles, else red and blue), a big VS flashes where they meet, and the battle kind's title shows under it.
+- Sides of up to three fighters show them big; bigger sides show as a crowd (one of each kind first, flying mobs up in the sky) with "+N" for the rest. The bar under each side names its fighters.
+- A duel shows one fighter against the other, all vs one the target against everyone, and a battle royale one crowd split across the whole screen.
+- Team battles with 3 or more teams show Smash-like columns, one per team (the 8 strongest teams at most). With 3 or 4 teams each team gets up to two columns side by side (two different fighters); `vsTeamReps 1` keeps it to one (default 2).
+- The pictures are drawn by the server from each mob's model, mods' mobs too, each in a different pose; players show in their own skin. They are made when the server starts and kept in a picture cache (see [server-setup.md](server-setup.md#picture-cache)), so nothing loads in the middle of a battle. A mob without a picture yet shows its icon until the next start.
+- `/mobbattle skipCamera` takes the VS screen off, with the intro waiting behind it.
+
+`cameraBars off|slim|classic|wide` (default `classic`): black film bands at the top and the bottom of the screen while an intro or end camera plays. They slide in when the shot starts and out when you get your view back.
 
 `cameraBlur off|soft|strong` (default `soft`): each intro and end shot stays sharp on what it films and blurs the rest, the background most (and a shoulder in front in the duel's over-the-shoulder shots). The `orbit` style has no blur (the game plays it by itself).
 
@@ -318,7 +336,7 @@ Both can be set per battle kind, like the other camera options. If another mod a
 
 ### End camera
 
-`endCamera off|winner|lastHit` (default off): when a battle ends with a winner, your camera films one fighter in a slow half circle for `endCameraTime` (1-15 s, default 5).
+`endCamera off|winner|lastHit` (default off): when a battle ends with a winner, your camera films one fighter in a slow half circle for `endCameraTime` (1-600 s, above 15 warns; default 5).
 
 - `winner`: the last one standing (duel, royale), or the winning side's top killer still standing (all vs one, teams).
 - `lastHit`: whoever scored the final kill, if still standing; else the winner.
@@ -327,9 +345,9 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 
 ### Skipping a camera
 
-- **Q** with a Mob Battle wand in hand (or crouch) while a camera plays ends it. A crouch you were already holding when it started must be released first, so the crouch + Battle Wand that started a fight doesn't skip it. The first camera of each session tells you so in chat.
-- **Esc can't** end it: the pause menu only exists on your side, the server never learns it was opened.
-- `/mobbattle skipCamera` does the same.
+- **Crouch** while a camera plays to end it. A crouch you were already holding when it started must be released first, so the crouch + Battle Wand that started a fight doesn't skip it. The first camera of each session tells you so in chat.
+- `/mobbattle skipCamera` does the same (it also takes a VS screen off).
+- **Esc can't** end an intro or end camera: the pause menu only exists on your side, the server never learns it was opened.
 - An intro also ends by itself when its battle ends (e.g. a duel won before the intro is over).
 - If anything goes wrong, the game's `/camera reset` gives the normal camera back.
 
@@ -342,13 +360,15 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 | Control | Action |
 |---|---|
 | Right click | The fighter nearest to the one you watch, skipping fighters already shown this round (a new round starts once everyone was shown). |
-| Left click | Back to the fighter you watched before (up to 32 back). |
+| Left click | Back to the fighter you watched before (up to 32 back). With none before, the one before in team order, the first going round to the last. |
 | Q (or `/mobbattle watch exit`) | Stop watching: back to your game mode, camera and the spot where you started watching. |
 
 - The game's controls box shows these keys.
 - While you watch, held items and other ability keys do nothing (the spectator mode overrides every interaction); they come back when you stop.
 - The intro and end cameras skip you while you watch, and starting to watch ends an intro you still had playing (e.g. a `cameraTime` longer than the countdown).
 - Player fighters (`playerFights`) are fighters like the mobs, so the clicks reach them too.
+- Going to another fighter, the camera glides there (`watchTransition glide`, the default), straight through hills and walls, and ends behind it; `watchTransition cut` jumps at once.
+- `watchAutoSwitch <seconds>|off` (default off): the camera goes on to the next fighter by itself every that many seconds (3-600), as a right click would; your clicks start the count again.
 - When the watched fighter is killed, the camera moves to its killer. If it disappears another way (Kill Wand, Snap, unloaded), to the latest killer or the nearest fighter left.
 - When the battle ends, the camera stays on the winner for 5 s, then you get your game mode, camera and position back.
 - You can only watch once a battle has started (not during its countdown). A player fighting in a battle can't watch it, and a spectator is never picked as a fighter.
@@ -377,19 +397,21 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 - Mostly wide shots: wide pans and arcs come most often, more so for big or crowded battles; close-ups come more often as fewer fighters are left.
 - Each shot looks for a clear view: the camera stays out of hills, trees and roofs, and nothing solid stands between it and the battle. With no clear view low, a shot is filmed from higher up.
 - It uses the film bands (`cameraBars`) and background blur (`cameraBlur`) of the intro cameras.
-- You can't move while it films. **Q** with a Mob Battle wand in hand, crouch, or `/mobbattle film exit` to stop. Starting `watch` also ends it.
-- When the battle ends, the end camera takes over if it is on (`endCamera`); else the camera glides back to you.
+- You can't move while it films. Crouch or `/mobbattle film exit` to stop; in single player, Esc (the pause menu) stops it too. Starting `watch` also ends it.
+- When the battle ends, the end camera takes over if it is on (`endCamera`); else you get your view back.
 - You can't film a battle you fight in, or while you watch or spectate.
 
 | Setting | Default | What it does |
 |---|---|---|
 | `filmPlayerShots <0-100>` | 20 | Percent of shots that show you watching (0 = only the battle). |
+| `filmWideShots <0-100>` | 30 | Percent of battle shots filmed wide and from far away, so big attacks show whole; +15 while a mob over 4 blocks tall fights. |
 | `filmShotTime <3-60>` | 8 | Seconds each shot lasts before the next one. |
 | `filmShotVariation <0-90>` | 25 | Each shot lasts up to that percent longer or shorter, at random, so the cuts don't come like clockwork. |
 | `filmPace <25-300>` | 100 | How far the camera moves in a shot (pans, arcs, push-ins), in percent. |
 | `filmTransition cut\|glide` | cut | Cut to the next shot at once, or glide there. |
 | `filmShot <shot> <0-300>` | 100; spiral 80, telephoto and descent 70, landscape and groundrise 50, zenith 40 | How often each shot comes up, percent of normal: 0 = never, 200 = twice as often. Shots: `wide`, `track`, `arc`, `pushin`, `closeup` (fewer with many fighters), `landscape` (rare, turns quickly to the fight), `playerback`, `playerclose`, and the showier `zenith` (straight down from above), `spiral` (circles while rising), `telephoto` (far away with a long lens), `descent` (crane down), `groundrise` (from the grass up), `profile` (two fighters from the side). |
 | `filmShots all\|battle\|<list>` | | Shortcut: the listed shots on, the rest off (`battle` = every shot but the two of you). |
+| `filmStyle default\|battle\|action\|cinematic` | | Every film setting at once. `battle`: the fight always in view, few shots of you. `action`: close on the fighters and their attacks, no landscapes. `cinematic`: open, slow, gliding shots, longer and wider. `default`: back to the defaults. Each value can still be changed after (panel: Cameras, film shots section). |
 
 **autoFilm** (`autoFilm on|off`, global or per kind, default off): the players who get a battle's cameras (`cameraScope`) get its film from the start of the battle, once their intro is over, until it ends. Players fighting, watching or spectating are left alone. With `autoWatch` on too, the film wins.
 
@@ -404,7 +426,7 @@ If another mod also takes over the camera (for example an "away from keyboard" f
 
 ## Battle music
 
-`music on|off|<track>` (global or per kind): battle music from the countdown (or the start) until the battle ends, for the players who see the titles. Any music container ID works; the default is `MobBattle_Battle_Music` (the goblin boss battle song, louder and looping); the game's battle tracks are `Track_Z1D_Goblin_Boss_Battle` (default), `Track_Void_Escalation` and `Track_Void_Tension`. It works like the game's `/audio music force`. A kind with its own track keeps playing if the global music is turned off.
+`music on|off|<track>` (global or per kind): battle music from the countdown (or the start) until the battle ends, for the players who see the titles. Any music container ID works. The default is Mob Battle's own `MobBattle_Battle_Music`: the game's goblin boss battle song, louder and looping until the battle ends. The game's own version, `Track_Z1D_Goblin_Boss_Battle`, is quiet and plays only once, so a setting naming it plays `MobBattle_Battle_Music` instead. The game's other battle tracks are `Track_Void_Escalation` and `Track_Void_Tension`. It works like the game's `/audio music force`. A kind with its own track keeps playing if the global music is turned off.
 
 ## Players in battles
 

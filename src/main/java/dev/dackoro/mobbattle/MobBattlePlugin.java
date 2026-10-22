@@ -51,6 +51,60 @@ public class MobBattlePlugin extends JavaPlugin {
         else DebugRecorder.add("[debug] " + message);
     }
 
+    /** Time since {@code t0} (System.nanoTime) for log lines: "850 ms", or seconds past 1000 ms ("34.0 s"). */
+    public static String took(long t0) {
+        return millis((System.nanoTime() - t0) / 1_000_000);
+    }
+
+    /** A duration for log lines: "850 ms", or seconds past 1000 ms ("34.0 s"). */
+    public static String millis(long ms) {
+        return ms < 1000 ? ms + " ms" : String.format(java.util.Locale.ROOT, "%.1f s", ms / 1000.0);
+    }
+
+    /** A byte count for log lines: "640 B", "12.4 KB", "15.2 MB". */
+    public static String size(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format(java.util.Locale.ROOT, "%.1f KB", bytes / 1024.0);
+        return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+
+    /** Total size of the files under a folder (0 when it is missing or unreadable). */
+    public static long sizeOf(java.nio.file.Path dir) {
+        return folderStats(dir)[0];
+    }
+
+    /**
+     * A folder for log lines: "12.3 MB on disk, last drawn 2026-10-17 01:26" (size of every file under it and the
+     * newest file's time, i.e. when anything in it was last generated); "empty" when there is nothing.
+     */
+    public static String onDisk(java.nio.file.Path dir) {
+        long[] st = folderStats(dir);
+        if (st[1] == 0) return "empty";
+        return size(st[0]) + " on disk, last drawn " + java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                .format(java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(st[1]), java.time.ZoneId.systemDefault()));
+    }
+
+    /** Time (ms) of the newest file under a folder, 0 when there is none. */
+    public static long newestFile(java.nio.file.Path dir) {
+        return folderStats(dir)[1];
+    }
+
+    /** {total bytes, newest file time in ms (0 = no file)} of the files under a folder. */
+    private static long[] folderStats(java.nio.file.Path dir) {
+        long[] st = new long[2];
+        if (dir == null || !java.nio.file.Files.isDirectory(dir)) return st;
+        try (var files = java.nio.file.Files.walk(dir)) {
+            files.filter(java.nio.file.Files::isRegularFile).forEach(f -> {
+                java.io.File file = f.toFile();
+                st[0] += file.length();
+                st[1] = Math.max(st[1], file.lastModified());
+            });
+        } catch (java.io.IOException | java.io.UncheckedIOException e) {
+            return new long[2];
+        }
+        return st;
+    }
+
     /** True when [debug] lines go anywhere (debugLog or debugRecord): guard costly messages in hot paths with it. */
     public static boolean debugging() {
         return FxSettings.debug || FxSettings.debugRecord;
@@ -85,6 +139,7 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(EffectAreaInteraction.TYPE, EffectAreaInteraction.class, EffectAreaInteraction.CODEC)
                 .register(SkipCameraInteraction.TYPE, SkipCameraInteraction.class, SkipCameraInteraction.CODEC)
                 .register(HealAreaInteraction.TYPE, HealAreaInteraction.class, HealAreaInteraction.CODEC)
+                .register(KillAreaInteraction.TYPE, KillAreaInteraction.class, KillAreaInteraction.CODEC)
                 .register(ArmyToggleInteraction.TYPE, ArmyToggleInteraction.class, ArmyToggleInteraction.CODEC)
                 .register(ArmyDisbandInteraction.TYPE, ArmyDisbandInteraction.class, ArmyDisbandInteraction.CODEC)
                 .register(WatchInteraction.Prev.TYPE, WatchInteraction.Prev.class, WatchInteraction.Prev.CODEC)
@@ -117,6 +172,9 @@ public class MobBattlePlugin extends JavaPlugin {
         // only, on ThumbnailCache's own background thread.
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.BootEvent.class,
                 event -> ThumbnailCache.startup());
+        // from the first client that starts connecting, no more runtime assets this session (ThumbnailCache.mayRegister)
+        getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerSetupConnectEvent.class,
+                event -> ThumbnailCache.clientConnecting());
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent.class,
                 event -> {

@@ -5,7 +5,6 @@ import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.InteractionState;
 import com.hypixel.hytale.protocol.InteractionType;
-import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
@@ -45,9 +44,9 @@ public class SnapInteraction extends SimpleInstantInteraction {
         // The slam animation lands its hit about /mobbattle snapHitDelay ms in (default 310: frame ~30 of 60 at Speed 1.6): the snap (sound, shockwave, targets) waits for it.
         var store = self.getStore();
         var world = store.getExternalData().getWorld();
-        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             if (store.isShutdown() || !self.isValid()) return;
             Snap.snap(player, self, clicked != null && clicked.isValid() ? clicked : null, store);
-        }), FxSettings.snapHitDelayMs, TimeUnit.MILLISECONDS);
+        }, FxSettings.snapHitDelayMs, TimeUnit.MILLISECONDS);
     }
 }

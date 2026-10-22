@@ -49,20 +49,78 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                 && buffer.getComponent(target, NPCEntity.getComponentType()) != null;
 
         if (!onNpc) {
+            // crouch + right click in the air: clear every team, after two warnings (user, 2026-10-17: three clicks,
+            // a yellow then a red warning in chat before the last one)
+            if (PlayerFighters.crouching(context.getEntity(), buffer)) {
+                askClear(player, draft);
+                return;
+            }
+            CLEAR_ASK.remove(player.getUuid());
             int team = BattleManager.nextTeam(draft);
             player.sendMessage(I18n.tr("chat.team.adding").param("team", Teams.name(team))
                     .param("count", draft.teams().get(team).size())
                     .color(Teams.color(team)));
             return;
         }
+        CLEAR_ASK.remove(player.getUuid());
         start(player, context.getEntity(), draft, buffer);
+    }
+
+    /** Per player: {crouch clicks so far, time of the last one} toward clearing the teams. */
+    private static final java.util.Map<java.util.UUID, long[]> CLEAR_ASK = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Longest gap between two of the three clicks; a slower click starts over. */
+    private static final long CLEAR_WINDOW_MS = 4000;
+
+    private static void askClear(PlayerRef player, BattleManager.Draft draft) {
+        int mobs = 0;
+        for (List<Ref<EntityStore>> team : draft.teams()) for (Ref<EntityStore> r : team) if (r.isValid()) mobs++;
+        if (mobs == 0) {
+            CLEAR_ASK.remove(player.getUuid());
+            player.sendMessage(I18n.tr("chat.team.clear.none").color("#aaaaaa"));
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long[] ask = CLEAR_ASK.get(player.getUuid());
+        int step = ask != null && now - ask[1] <= CLEAR_WINDOW_MS ? (int) ask[0] + 1 : 1;
+        if (step >= 3) {
+            CLEAR_ASK.remove(player.getUuid());
+            player.sendMessage(I18n.tr("chat.team.clear.done").param("count", BattleManager.clearDraftAndFx(player)).color("#5fe35f"));
+            return;
+        }
+        CLEAR_ASK.put(player.getUuid(), new long[] {step, now});
+        player.sendMessage(I18n.tr(step == 1 ? "chat.team.clear.ask1" : "chat.team.clear.ask2").param("count", mobs)
+                .color(step == 1 ? "#ffd23e" : "#ff5555"));
     }
 
     static void start(PlayerRef player, Ref<EntityStore> playerEntity, BattleManager.Draft draft,
                               com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
-        draft.prune();
         List<List<Ref<EntityStore>>> teams = new ArrayList<>();
         List<Integer> colors = new ArrayList<>();
+        if (!teamsOf(draft, buffer, teams, colors)) {
+            player.sendMessage(I18n.tr("chat.team.need2").color("#ffcc55"));
+            return;
+        }
+        Countdown.Label label = new Countdown.Label("TEAM BATTLE", I18n.tr("battle.label.teams"));
+        // readyTime first (ReadyWait): time to get in position; the teams are read again when it ends (a mob may have
+        // died or joined meanwhile)
+        ReadyWait.then(BattleManager.Kind.TEAMS, player, teams.stream().flatMap(List::stream).toList(), label, buffer, acc -> {
+            List<List<Ref<EntityStore>>> now = new ArrayList<>();
+            List<Integer> nowColors = new ArrayList<>();
+            if (!teamsOf(draft, acc, now, nowColors)) {
+                player.sendMessage(I18n.tr("chat.team.need2").color("#ffcc55"));
+                return;
+            }
+            FightCamera.intro(BattleManager.Kind.TEAMS, player, null, now, acc);
+            Countdown.run(BattleManager.Kind.TEAMS, player, acc, label, now.stream().flatMap(List::stream).toList(),
+                    acc2 -> startNow(player, playerEntity, now, nowColors, acc2));
+        });
+    }
+
+    /** The draft's living teams and their slots into {@code teams}/{@code colors}; false with fewer than two. */
+    private static boolean teamsOf(BattleManager.Draft draft, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer,
+                                   List<List<Ref<EntityStore>>> teams, List<Integer> colors) {
+        draft.prune();
         for (int t = 0; t < draft.teams().size(); t++) {
             List<Ref<EntityStore>> members = new ArrayList<>(draft.teams().get(t));
             members.removeIf(r -> !BattleManager.isAlive(r, buffer));
@@ -71,12 +129,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                 colors.add(t);
             }
         }
-        if (teams.size() < 2) {
-            player.sendMessage(I18n.tr("chat.team.need2").color("#ffcc55"));
-            return;
-        }
-        FightCamera.intro(BattleManager.Kind.TEAMS, player, null, teams, buffer);
-        Countdown.run(BattleManager.Kind.TEAMS, player, buffer, new Countdown.Label("TEAM BATTLE", I18n.tr("battle.label.teams")), teams.stream().flatMap(List::stream).toList(), acc -> startNow(player, playerEntity, teams, colors, acc));
+        return teams.size() >= 2;
     }
 
     private static void startNow(PlayerRef player, Ref<EntityStore> playerEntity, List<List<Ref<EntityStore>>> teams,

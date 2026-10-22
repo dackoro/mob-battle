@@ -58,10 +58,10 @@ public class EffectAreaInteraction extends SimpleInstantInteraction {
         // The held click plays the ground slam: the wave and the effects go when it hits (as the Snap Wand's).
         var store = caster.getStore();
         var world = store.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             if (store.isShutdown() || !caster.isValid()) return;
             burst(player, caster, chain, store);
-        }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** The wave from where the caster stands now: every mob and player in effectRadius gets the effect. World thread. */
@@ -100,7 +100,7 @@ public class EffectAreaInteraction extends SimpleInstantInteraction {
         FightFx.shockwave(center, radius, color, buffer);
         WandFx.burst(null, "SFX_Skeleton_Mage_Spellbook_Impact", center, buffer);
         // Each one gets it as the ring reaches it; immune ones just don't take it.
-        WaveHit.hit(center, radius, hit, buffer, (group, acc) -> EffectGiveInteraction.giveAll(group, chain, acc));
+        WaveHit.hit(center, radius, hit, buffer, (group, acc) -> EffectGiveInteraction.giveAll(group, chain, caster, acc));
         return hit;
     }
 }

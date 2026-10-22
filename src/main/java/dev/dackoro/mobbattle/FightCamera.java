@@ -92,14 +92,16 @@ final class FightCamera {
         try {
             vs = VsScreen.countdownMs(kind);
             plan = vs > 0 ? VsScreen.planOf(kind, owner, sides, buffer) : null;
+            // a screen with many pictures lasts longer (they load before it slides), the countdown with it
+            if (plan != null) vs = VsScreen.timeFor(plan);
         } catch (RuntimeException e) {
             MobBattlePlugin.log("VS screen failed: " + e);
         }
         if (plan == null) {
-            // The countdown already grew by the VS time (Countdown.run): the intro takes that time too.
-            int longer = KindFx.introSeconds(kind) + (int) (vs / 1000);
+            // No VS shown: the countdown did not grow (Countdown.run asks VsScreen.takeShown), the intro starts now.
             for (PlayerRef viewer : viewers) {
-                introFor(kind, KindFx.cameraStyle(kind), longer, KindFx.cameraShots(kind), viewer, center, sides, buffer);
+                introFor(kind, KindFx.cameraStyle(kind), KindFx.introSeconds(kind), KindFx.cameraShots(kind), viewer, center,
+                        sides, buffer);
             }
             return;
         }
@@ -107,17 +109,41 @@ final class FightCamera {
         long left = KindFx.introSeconds(kind) * 1000L;
         int seconds = KindFx.introSeconds(kind);
         com.hypixel.hytale.server.core.universe.world.World world = buffer.getExternalData().getWorld();
+        java.util.Set<Ref<EntityStore>> fighters = new java.util.HashSet<>();
+        for (List<Ref<EntityStore>> side : sides) fighters.addAll(side);
+        boolean shown = false;
         for (PlayerRef viewer : viewers) {
             if (viewer == null || !viewer.isValid() || BattleWatch.isWatching(viewer)) continue;
             VsScreen.present(viewer, plan, vs);
+            shown = true;
             if (left < 1500) continue;
-            // later, on the world thread with its Store (the caller's CommandBuffer only lives for this tick)
-            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
-                if (!viewer.isValid()) return;
-                introFor(kind, KindFx.cameraStyle(kind), seconds, KindFx.cameraShots(kind), viewer, center, sides,
-                        world.getEntityStore().getStore());
-            }), vs, TimeUnit.MILLISECONDS);
+            // later, on the world thread with its Store (the caller's CommandBuffer only lives for this tick). Kept in
+            // PENDING meanwhile, so a countdown that falls, is replaced or stopped during the VS drops it (audit
+            // 2026-10-17: a fallen duel still played its whole intro after the VS).
+            Intro pending = new Intro(SEQ.incrementAndGet(), fighters);
+            PENDING.put(viewer.getUuid(), pending);
+            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+                try {
+                    world.execute(() -> {
+                        if (!PENDING.remove(viewer.getUuid(), pending) || !viewer.isValid()) return;
+                        introFor(kind, KindFx.cameraStyle(kind), seconds, KindFx.cameraShots(kind), viewer, center, sides,
+                                world.getEntityStore().getStore());
+                    });
+                } catch (RuntimeException e) {   // the world stopped meanwhile
+                    PENDING.remove(viewer.getUuid(), pending);
+                }
+            }, vs, TimeUnit.MILLISECONDS);
         }
+        // The countdown that follows in this tick grows by the VS time only when someone really got the VS.
+        if (shown) VsScreen.markShown(fighters, vs);
+    }
+
+    /** Intros waiting for their VS screen to end, per viewer (the countdown can fall, be replaced or stopped meanwhile). */
+    private static final Map<UUID, Intro> PENDING = new ConcurrentHashMap<>();
+
+    /** An intro is about to start for this player (its VS screen still shows). */
+    static boolean introComing(PlayerRef player) {
+        return player != null && PENDING.containsKey(player.getUuid());
     }
 
     private static void introFor(BattleManager.Kind kind, PlayerRef player, Vector3d center,
@@ -162,6 +188,7 @@ final class FightCamera {
             String shotLabel = "Intro: " + style + " (" + seconds + " s)";
             HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> CinemaBars.shotName(player, shotLabel), 500, TimeUnit.MILLISECONDS);
             // playShots reads who this intro films: it ends on a wide shot of them, or hands over to the film.
+            Long shotBefore = SHOT.get(player.getUuid()), orbitBefore = ORBITS.get(player.getUuid());
             INTRO_FIGHTERS.set(all);
             try {
                 switch (style) {
@@ -183,9 +210,15 @@ final class FightCamera {
                 INTRO_FIGHTERS.remove();
             }
             // Remember what this intro films, so the battle's end cuts it (battleOver); the end camera is never cut.
-            Long shot = SHOT.get(player.getUuid());
-            INTROS.put(player.getUuid(), new Intro(shot != null ? shot : ORBIT_ID, java.util.Set.copyOf(all)));
-            watchSkip(player, buffer.getExternalData().getWorld());
+            // Only a camera this call started: a style that gave up early (no position) left another battle's film or
+            // camera there, which this battle's end then cut (audit 2026-10-17).
+            Long shot = SHOT.get(player.getUuid()), orbit = ORBITS.get(player.getUuid());
+            boolean newShot = shot != null && !shot.equals(shotBefore);
+            boolean newOrbit = orbit != null && !orbit.equals(orbitBefore);
+            if (newShot || newOrbit) {
+                INTROS.put(player.getUuid(), new Intro(newShot ? shot : ORBIT_ID, java.util.Set.copyOf(all)));
+                watchSkip(player, buffer.getExternalData().getWorld());
+            }
         } catch (RuntimeException e) {
             MobBattlePlugin.log("Fight camera failed: " + e);
             reset(player);
@@ -1159,11 +1192,13 @@ final class FightCamera {
             }
             Shot shot = current;
             long local = t - start;
-            // Viewer gone or moved to another world: end the chain here, so no further frame is queued.
-            if (!viewerIn(player, world)) { SHOT.remove(uuid, id); return; }
+            // Viewer gone or moved to another world: end the chain here, so no further frame is queued, and give them
+            // their HUD, bands and camera back where they are now (reset follows the player; audit 2026-10-17: the
+            // game's HUD stayed hidden in the new world).
+            if (!viewerIn(player, world)) { if (SHOT.remove(uuid, id)) reset(player); return; }
             world.execute(() -> {
                 if (!Long.valueOf(id).equals(SHOT.get(uuid))) return;
-                if (!viewerIn(player, world)) { SHOT.remove(uuid, id); return; }
+                if (!viewerIn(player, world)) { if (SHOT.remove(uuid, id)) reset(player); return; }
                 ServerCameraSettings s = shot.frame().at(local, world.getEntityStore().getStore());
                 if (s != null) send(player, blurred(s, blur));
             });
@@ -1531,6 +1566,7 @@ final class FightCamera {
         SHOT.put(uuid, id);
         ORBITS.remove(uuid);
         INTROS.remove(uuid);
+        PENDING.remove(uuid);   // a film started during a VS: the intro after it would take the camera back
         return id;
     }
 
@@ -1589,6 +1625,8 @@ final class FightCamera {
         java.util.Set<UUID> players = new java.util.HashSet<>(SHOT.keySet());
         SHOT.clear();
         INTROS.clear();
+        PENDING.clear();
+        VsScreen.stopAll();
         ORBITS.forEach((id, end) -> { if (end > now) players.add(id); });
         java.util.Set<UUID> orbiting = new java.util.HashSet<>(ORBITS.keySet());
         ORBITS.clear();
@@ -1611,6 +1649,12 @@ final class FightCamera {
      * quick duel). The end camera (endCamera winner / lastHit) is not an intro, so it keeps playing.
      */
     static void battleOver(java.util.Collection<Ref<EntityStore>> fighters) {
+        // Still in its VS screen: the screen goes and the intro after it never starts.
+        for (Map.Entry<UUID, Intro> e : PENDING.entrySet()) {
+            if (java.util.Collections.disjoint(e.getValue().fighters(), fighters) || !PENDING.remove(e.getKey(), e.getValue())) continue;
+            PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(e.getKey());
+            if (p != null) VsScreen.cancel(p);
+        }
         if (INTROS.isEmpty()) return;
         long now = System.currentTimeMillis();
         for (Map.Entry<UUID, Intro> e : INTROS.entrySet()) {
@@ -1634,11 +1678,14 @@ final class FightCamera {
         if (player == null) return false;
         UUID id = player.getUuid();
         INTROS.remove(id);
+        // a VS screen and the intro waiting behind it go too
+        boolean vs = PENDING.remove(id) != null;
+        vs |= VsScreen.cancel(player);
         Long end = ORBITS.remove(id);
         boolean orbit = end != null && end > System.currentTimeMillis();
         boolean shot = SHOT.remove(id) != null;
         if (orbit || shot) cut(player, orbit);
-        return orbit || shot;
+        return orbit || shot || vs;
     }
 
     /** Back to the player's view: a short glide for an orbit (a new sequence replaces it), then the normal camera. */

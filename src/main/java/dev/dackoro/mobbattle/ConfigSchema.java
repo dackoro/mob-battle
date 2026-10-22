@@ -396,7 +396,7 @@ final class ConfigSchema {
         // "Only for duel battles. Global = ...": one plain translation per kind (a joined Message must not go in .Text).
         Supplier<Message> tip = () -> I18n.tr("panel.kindtip." + (tie ? "ties." : "global.") + kind.key);
         switch (opt) {
-            case COUNTDOWN, CAMERA_TIME, CAMERA_SHOTS, END_CAMERA_TIME -> {
+            case COUNTDOWN, READY_TIME, CAMERA_TIME, CAMERA_SHOTS, END_CAMERA_TIME -> {
                 Field f = new Field(key, Type.TEXT);
                 f.blankOk = true;
                 f.check = v -> KindFx.parse(opt, v);
@@ -405,6 +405,7 @@ final class ConfigSchema {
                 f.tipSupplier = tip;
                 f.params.put("max", String.valueOf(switch (opt) {
                     case COUNTDOWN -> FxSettings.MAX_COUNTDOWN;
+                    case READY_TIME -> FxSettings.MAX_READY;
                     case CAMERA_TIME -> KindFx.MAX_CAMERA_TIME;
                     case CAMERA_SHOTS -> KindFx.maxCameraShots();
                     default -> KindFx.MAX_END_CAMERA_TIME;
@@ -455,6 +456,7 @@ final class ConfigSchema {
         pages.add(new Page("presentation", List.of(
                 section("start"),
                 number("fight.countdown", 0, FxSettings.MAX_COUNTDOWN),
+                number("fight.ready", 0, FxSettings.MAX_READY),
                 toggle("title.enabled"),
                 toggle("wintitle.enabled"),
                 choice("title.style", ConfigSchema::titleStyles),
@@ -508,6 +510,8 @@ final class ConfigSchema {
                 number("camera.film.weight.profile", 0, FxSettings.MAX_FILM_WEIGHT),
                 section("watchhud"),
                 toggle("camera.autowatch"),
+                choice("camera.watch.transition", FxSettings.WATCH_TRANSITIONS),
+                number("camera.watch.autoswitch", 0, FxSettings.MAX_WATCH_AUTO_SWITCH),
                 toggle("battle.duelCard"),
                 toggle("battle.focusCard"),
                 note("cameras")
@@ -548,6 +552,7 @@ final class ConfigSchema {
             tab.add(note("kindtab"));
             tab.add(section("kindpresentation"));
             tab.add(override(k, KindFx.Opt.COUNTDOWN));
+            tab.add(override(k, KindFx.Opt.READY_TIME));
             tab.add(override(k, KindFx.Opt.START_TITLE));
             tab.add(override(k, KindFx.Opt.WIN_TITLE));
             tab.add(override(k, KindFx.Opt.MUSIC));
@@ -679,6 +684,9 @@ final class ConfigSchema {
                 toggle("kill.loot"),
                 number("fx.glow.death", 0, FxSettings.MAX_GLOW),
                 toggle("kill.players"),
+                toggle("kill.area"),
+                number("kill.area.radius", FxSettings.MIN_RADIUS, FxSettings.MAX_RADIUS).p("default", FxSettings.DEFAULT_KILL_RADIUS),
+                toggle("kill.area.players"),
                 section("snapwand"),
                 choice("snap.mode", "global", "team"),
                 number("snap.percent", 1, 100),
@@ -737,6 +745,14 @@ final class ConfigSchema {
         FieldItem record = toggle("debug.record");
         record.field().admin = true;
         admin.add(record);
+        // server features (2026-10-18): admin only, pictures follow at the next restart
+        admin.add(section("serverfeatures"));
+        admin.add(note("serverfeatures"));
+        for (String key : FxSettings.SERVER_KEYS) {
+            FieldItem f = toggle(key);
+            f.field().admin = true;
+            admin.add(f);
+        }
         pages.add(new Page("admin", admin, "admin", true));
 
         PAGES = List.copyOf(pages);

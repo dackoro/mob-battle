@@ -33,7 +33,7 @@ Changing a value does **not** apply it yet:
 
 **Undo last change** goes back to how things were right before the last change made from the panel:
 
-- It covers the last **Save changes** and the last team or summon list action (add, remove, clear, team reset) and **Reload** on the Admin tab.
+- It covers the last **Save changes** and the last team or summon list action (add, remove, clear, Fill, loading a saved list, team reset) and **Reload** on the Admin tab.
 - The team and summon lists come back **at once**. The settings go **into the form** (gold), so you can check them and then **Save changes**.
 - It is one level only and shared by everyone: the last change from any player's panel since the server started. Changes made with chat commands or wands are not tracked.
 - The button is greyed out when there is nothing to undo or the form already holds the undo. Once an undo is saved it is used up: a second Undo does not bring the change back.
@@ -47,7 +47,7 @@ Changing a value does **not** apply it yet:
 
 ### Buttons that act at once
 
-List buttons, the Tools tab, the Admin tab and the Morph Wand **Use** button run the matching `/mobbattle` command as you, with its normal permission checks and chat reply. Your unsaved draft is kept. Buttons that clear or delete something (remove a team, reset teams, clear the summon list, delete a preset, Stop all, Disband armies, Clear all teams, Undo morphs, Reset all) ask for a **second click within 5 seconds** to confirm: after the first click the button turns red and reads **Confirm?**. Watch, Stop watching, Snap, Chaos me, Debug NPCs, Start, Join and Summon close the panel first so you can see the world.
+List buttons, the Tools tab, the Admin tab and the Morph Wand **Use** button run the matching `/mobbattle` command as you, with its normal permission checks and chat reply. Your unsaved draft is kept. Buttons that clear or delete something (remove a team, reset teams, clear the summon list, delete a saved summon list, delete a preset, Stop all, Disband armies, Clear all teams, Undo morphs, Reset all) ask for a **second click within 5 seconds** to confirm: after the first click the button turns red and reads **Confirm?**. Watch, Stop watching, Snap, Chaos me, Debug NPCs, Start, Join and Summon close the panel first so you can see the world.
 
 ### Range preview
 
@@ -62,7 +62,7 @@ A value of 0 (auto) has no fixed size, so nothing is drawn.
 
 ### Searchable lists
 
-Lists with more than 15 entries (effects, music tracks, mobs, models) have a **search box**. Entries are labelled by category and mod, for example `Potion - Morph Frog` or `Undead - Skeleton [SomeMod]`. Mob and model rows show the game's own model icon; a mob without one shows a close relative's icon (Skeleton shows Skeleton Soldier) or a `?` icon.
+Lists with more than 15 entries (effects, music tracks, mobs, models) have a **search box**. Entries are labelled by group, for example `Potion - Morph Frog` or `Undead - Skeleton`; with every mod shown, entries from mods are marked `*`. A mob whose in-game name differs from its ID also shows that name in brackets, in your language. Mob and model rows show an icon: the game's own, else a picture Mob Battle draws from the model when the server starts (mods' mobs too), else a close relative's icon (Skeleton shows Skeleton Soldier) or a `?` icon.
 
 ### Presets and resets fill the form
 
@@ -89,6 +89,7 @@ How fights start and end. Each battle kind can override these on its own tab.
 | Section | Field | What it does |
 |---|---|---|
 | Start | Countdown | 3, 2, 1 titles before a fight starts (seconds, 0 = start at once). Per kind. |
+| | Time to get in position | Seconds to get to your spot before the VS screen and the countdown; crouch to start at once (0 = none). Per kind. |
 | | Start title | Big title when a fight starts (FIGHT!, BATTLE ROYALE!). Per kind. |
 | | Winner title | Big title when a battle ends (X WINS!). Per kind. |
 | | Title style | Look of the big titles: Default, Major, Goblin breach, Void eviction or Random. |
@@ -101,26 +102,33 @@ How fights start and end. Each battle kind can override these on its own tab.
 
 ### Cameras
 
-Intro camera before the fight, end camera on the winner, watch mode and the duel card.
+VS screen and intro camera before the fight, end camera on the winner, the battle film, watch mode and the stats cards.
 
 | Section | Field | What it does |
 |---|---|---|
 | Intro camera | Intro camera | Camera shots of the fighters during the countdown. Per kind. |
-| | Camera style | Auto, Orbit, Duel, Showcase, Teams, Focus or Drone. Auto = duel shots for duels, focus for all vs one, sweep for teams, orbit for royale. Per kind. |
+| | VS screen | A Smash-like VS screen before the countdown, with pictures of both sides' fighters (team columns with 3 or more teams). It adds 3 s to any countdown above 0; the intro camera keeps its full time after it (default on). Per kind. |
+| | VS fighters per team | With 3 or 4 teams, how many fighters of each team the VS screen shows side by side, one column each (1 or 2, default 2). 5 teams or more always show one. |
+| | Camera style | Auto, Orbit, Duel, Showcase, Teams, Focus, Drone or Spotlight. Auto = duel shots for duels, focus for all vs one, spotlight for teams and royale. Per kind. |
 | | Camera time | How long the intro films (seconds, 0 = as long as the countdown). Per kind. |
-| | Showcase shots | How many fighters the Showcase style shows (up to Max mobs). Per kind. |
+| | Close-up shots | How many fighters the Showcase and Spotlight styles show up close (up to Max mobs). Per kind. |
 | | Who sees the cameras | Owner, players nearby (64 blocks) or the whole world. Fighters never get an intro. |
+| | Game HUD while filming | Hide (default): the hotbar, compass, health and boss bar go away during intro, end and film cameras (chat and titles stay). Show: they stay. |
+| | Close-ups face the mob | Intro, duel and film close-ups stand in front of the mob's face, wherever it looks (default on). Off = from the battle's or the opponent's side. Either way they keep clear of walls and other mobs. |
 | | Film bands | Black bands at the top and bottom of the screen while an intro or end camera films: Off, Slim, Classic (default) or Wide. Per kind. |
 | | Background blur | Each intro or end shot stays sharp on what it films and blurs the rest: Off, Soft (default) or Strong. Per kind. |
+| End camera | End camera | Off, Winner, or Last hit (who landed the final kill). Per kind. |
+| | End camera time | How long the end camera films (seconds). Per kind. |
 | Battle film | Auto film | Camera viewers get the battle film (`/mobbattle film`) from the battle start, after the intro. Wins over Auto watch. Per kind. |
-| | Shots of you | Percent of film shots that show you watching the battle (default 30, 0 = only the battle). |
+| | Shots of you | Percent of film shots that show you watching the battle (default 20, 0 = only the battle). |
+| | Far wide shots | Percent of battle shots filmed wide and from far away, so big attacks show whole; +15 while a mob over 4 blocks tall fights (default 30). |
 | | Shot length | Seconds each film shot lasts (default 8). |
 | | Shot length variation | Each shot up to this percent longer or shorter, at random (default 25). |
 | | Camera pace | How far the camera moves in a shot, in percent (default 100). |
 | | Between shots | Cut or Glide to the next shot (default cut). |
-| | Film shots | One percent per shot type (0 = never, 100 = normal, 200 = twice as often): wide, track, arc, push-in, close-up, landscape, over your shoulder, close on you, zenith, spiral, telephoto, crane down, from the ground, profile. |
-| End camera | End camera | Off, Winner, or Last hit (who landed the final kill). Per kind. |
-| | End camera time | How long the end camera films (seconds). Per kind. |
+| Film shots | Default / Battle / Action / Cinematic | Film styles: each button puts every battle film setting except Auto film (shots of you, far wide shots, shot length and variation, pace, between shots and the shot percents) into the form at once; Save changes applies them. Battle = the fight always in view, few shots of you; Action = close on the fighters and their attacks; Cinematic = open, slow, gliding shots; Default = the defaults. The line above the buttons names the style the settings match, or says "your own mix". |
+| | Defaults | Every film shot back to its default percent (into the form). |
+| | Wide, Track, Arc, Push-in, Close-up, Landscape, Over your shoulder, Close on you, Zenith, Spiral, Telephoto, Crane down, From the ground, Profile | One percent per shot type: 0 = never, 100 = normal, 200 = twice as often (up to 300). |
 | Watch & HUD | Auto watch | Camera viewers start watching (spectator camera) as soon as a battle starts. Per kind. |
 | | Duel card | Card with both fighters' stats during 1 vs 1 duels. |
 | | All vs one card | Card with the lone target's stats and the attackers left during an all vs one. |
@@ -134,9 +142,13 @@ What every battle kind shares. Each kind has its own tab for its presentation, r
 | Section | Field | What it does |
 |---|---|---|
 | Every battle | Battle PvP | Enemy players of the same battle can hurt each other even where the world's PvP is off. |
+| | Army friendly fire | Hits between mobs of one army (and its owner or leader) do damage, but nobody fights back: they stay allies (default off). |
 | | Unstick stalled fighters | A mob stuck on another level than its target (10 s, fliers 20 s) is moved next to it. |
 | | Stand-off shove | A mob on its target's level that gets no closer, hits nothing and isn't hit for this long is shoved toward it (seconds, 0 = never). |
 | | Win against passive mobs | When only one side can still fight back, it wins after this long without a hit; if nobody can fight, it's a draw. An alert shows bottom left (seconds, 0 = never). |
+| | Battle depth (below) | A royale or all vs one takes mobs only this far below its center (blocks, default 50, 0 = no limit). |
+| | Battle height (above) | The same above its center (blocks, default 40, 0 = no limit). |
+| | Arena vertical limit | A fighter farther than this above or below the arena's center height is brought back by the arena wall; fliers never (blocks, default 0 = no limit). |
 | | Never ends against | Roles that keep Win against passive mobs from starting while one is alive (default the test dummies). |
 | | End when nobody fights | A battle where no fighter hurts an enemy for this long ends in a draw (seconds, 0 = never, default 150 = 2.5 min). |
 | | Longest battle | A battle with no winner ends anyway after this long (minutes, default 15). 0 = infinite: only a winner, End when nobody fights, the passive rule or Stop ends it. |
@@ -165,9 +177,10 @@ One tab per battle kind: **Duel** (Battle Wand), **All vs one** (Chaos Wand left
 | | Runes | Summoning runes |
 | | Area look | Area look (Chaos area tab). Range preview. |
 | Cameras | Intro camera | Intro camera |
+| | VS screen | VS screen |
 | | Camera style | Camera style |
 | | Camera time | Camera time |
-| | Showcase shots | Showcase shots |
+| | Showcase shots | Close-up shots |
 | | End camera | End camera |
 | | End camera time | End camera time |
 | | Auto watch | Auto watch |
@@ -314,7 +327,7 @@ Team Wand teams. See [teams-summon-army.md](teams-summon-army.md).
 
 ![The Summon list tab: each mob with its icon, count and team, add a mob, summon now](images/panel-summon-list.jpg)
 
-The Summon Wand list. Add, remove and clear apply at once; counts, teams and the settings need Save changes. Each mob row shows its team's color square next to the team (none for no team). A list of more than 7 mobs scrolls in its own box, so Add a mob stays close.
+The Summon Wand list. Add, remove, clear, Fill and loading a saved list apply at once; counts, teams and the settings need Save changes. Each mob row shows its team's color square next to the team (none for no team). A list of more than 8 mobs scrolls in its own box, so Add a mob stays close.
 
 | Section | Field | What it does |
 |---|---|---|
@@ -332,9 +345,12 @@ The Summon Wand list. Add, remove and clear apply at once; counts, teams and the
 
 Below the settings:
 
-- **Mobs in the list:** one row per entry with its icon, a **count** (a number 0-100000 or `random`), a **team** (or No team) and **Remove**. The same mob can have several entries, one per team (10 archers in red and 10 in green).
-- **Add a mob:** pick a mob (searchable, with an icon preview; the list opens wide so long names fit). The **Show** row above it filters the list: by mod (every mod, Hytale only, or one mod) and by type (Fighters, Defend only, No attack, Avoid: immortal, scenery and test roles), and by group (the first part of the name: Aquatic, Undead...). The group list only offers groups that the chosen mod and type still have. The type is read from each mob's definition, so a mod's unusual mob can land in the wrong one. With every mod shown, mobs from mods are marked *. Each player's filters are remembered until the server restarts. Then pick a count and a team, then **Add**. The same mob and team as a listed entry changes its count; another team adds an entry. The row starts on your last pick (else the test dummy), so adding the same mob for another team is one click.
+- **Mobs in the list:** one row per entry with its icon, the mob's in-game name (its ID in grey beside it when they differ), a **count** (a number 0-100000 or `random`), a **team** (or No team) and **Remove**. The same mob can have several entries (10 archers in red and 10 in green).
+- **Add a mob:** pick a mob (searchable, with an icon preview; the list opens wide so long names fit). The **Show** row above it filters the list: by mod (every mod, Hytale only, or one mod) and by type (Fighters, Defend only, No attack, Avoid: immortal, scenery and test roles), and by group (the first part of the name: Aquatic, Undead...). The group list only offers groups that the chosen mod and type still have. The type is read from each mob's definition, so a mod's unusual mob can land in the wrong one. With every mod shown, mobs from mods are marked *. Each player's filters are remembered until the server restarts. Then pick a count and a team, then **Add**. Every **Add** makes a new entry, even for a mob and team already listed (change a count in its row instead). The row starts on your last pick (else the test dummy), so adding the same mob for another team is one click.
+- **Show pictures** opens a gallery over the panel: a picture of every mob the Show filters keep, with its in-game name, a search box (name or ID, accents and case ignored) and the same mod, type and group filters (changing them there changes the Show row too). Click a picture to put that mob in the Add a mob row (count and team stay as they were), then **Add**. **Close** shuts the gallery.
+- **Fill** (random battle): how many mob **Types**, how many of each (**Per type**) and how many **Teams** (0 = none, else 2-14), then **Fill**. It replaces the list with random mob types that fight, of similar strength, dealt into balanced teams if you asked for teams, and it follows the Show filters (mod, type, group). Same as `/mobbattle summon fill`. Your last numbers are remembered until the server restarts.
 - **Clear list** (confirm) and **Summon** (summons the list around you now).
+- **Saved lists:** keep several summon lists. Type a name (letters, digits, `-` and `_`, up to 32) and press **Save list**: it saves the list as last saved (mobs, counts, team rules and the teams' names and colors; Save changes first if you edited rows). Each saved list has a row: click its name to load it (it replaces the list and the teams at once; **Undo last change** brings the old one back) or **Delete** it (confirm). Same as `/mobbattle summon save|load|delete <name>`.
 
 ### Presets & reset
 
@@ -379,6 +395,8 @@ Only shown to players with `dackoro.mob_battle.admin`, in every permission mode.
 | | End timers | Every running timer ends now by its time-up rule (`/mobbattle skipTimer`). |
 | | Royale event | An ownerless royale around you (area radius, max mobs). |
 | | Save debug record | Writes what the recorder kept to `debug/` in the plugin data folder (`/mobbattle debugDump`). |
+| | Pictures status | What the picture cache holds and what each joining player downloads, in chat (`/mobbattle pictures status`). |
+| | Redraw pictures | Draws the missing or outdated mob pictures now, with progress in chat (`/mobbattle pictures rebuild`). |
 | Measure | Measure | Your speed (blocks/s) and jump height for 10 s, in chat (`/mobbattle measure`). Closes the panel. |
 | Apply to players or mobs | Who / action / value, Apply | A wand action on chosen players or mobs (`/mobbattle apply`, see [server-setup.md](server-setup.md)). Who: me, what you look at, everyone within 12 blocks, every player in this world, or one online player. |
 | Clean up (asks to confirm) | Stop all | Stop every battle, countdown, camera and music. |

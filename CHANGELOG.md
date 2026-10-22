@@ -5,6 +5,7 @@ Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (
 ## Unreleased
 
 ### New: cameras
+- **VS screen before battles** (`vsScreen on|off`, default on, per kind): a Smash-like screen with both sides' fighters and a big VS before the countdown. It adds 3 s to the countdown, and the intro camera keeps its full time after it. Up to three fighters a side show big, bigger sides as a crowd, a battle royale as one crowd across the screen, and 3 or more teams as one column per team (`vsTeamReps 1|2`). The pictures are drawn by the server from each mob's model, mods' mobs too; players show in their own skin.
 - **Film look for the intro and end cameras.** Black film bands slide in at the top and the bottom of the screen while a camera films (`cameraBars off|slim|classic|wide`, default classic), and each shot stays sharp on what it films with the background blurred (`cameraBlur off|soft|strong`, default soft). Both can be set per battle kind and in the settings panel; the `cinematic` preset uses wide bands.
 - **Battle film.** `/mobbattle film` films a running battle with slow, smooth movie shots until it ends: mostly wide pans and arcs framed to fit the fight's area, low tracking shots, push-ins on the action, close-ups on the fighter worth watching (more of them as fewer are left), a landscape pan that ends on the battle, and shots of you watching (over your shoulder, or close on you with the battle blurred behind). The camera stays out of hills, trees and roofs. Everything is a setting: how many shots show you, shot length and its random variation, camera pace, cut or glide between shots, and which shots it uses. `autoFilm` gives it to the camera viewers from the battle start.
 - **Western duel intro.** The duel camera now opens on a low wide shot panning past both fighters, goes over each one's shoulder at the other, zooms in slowly on each one's eyes and ends with both from the side. Short intros keep fewer shots.
@@ -14,9 +15,31 @@ Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (
 - **Escape ends the battle film** in single player (the pause menu).
 - **The battle film frames big mobs.** Its general shots back off and aim higher for the tallest and widest fighters, so they no longer end up inside a boss; close-ups still get close to small mobs.
 - **Far wide shots in the battle film** (`filmWideShots`, default 30%): some shots are filmed wide and from far away, so big attacks show whole; more of them when a big mob fights.
+- **Film styles**: `/mobbattle filmStyle default|battle|action|cinematic` (four buttons in the panel) sets every battle film setting at once: the fight always in view, close on the fighters and their attacks, or open, slow, gliding shots.
+- **Time to get in position** (`readyTime <seconds>|off`, default off, per battle kind; 8 s in the `cinematic` preset): seconds to walk or fly to your spot (an arena's stands) before the VS screen and the countdown start. A big number counts down for you and the fighters wait; crouch to start at once.
+- **Watch glides between fighters.** Going to another fighter, the spectator camera now travels there, straight through hills and walls, and ends behind it (`watchTransition glide|cut`, default glide).
+- **Watch auto switch** (`watchAutoSwitch <seconds>|off`, default off): the watch goes on to the next fighter by itself every few seconds.
+- **Battle royale VS**: the fighters of a plain battle royale are no longer cut at the middle.
+- **VS screen sizes**: every fighter on one scale for the whole screen, measured on its own picture (a fire golem is no longer smaller than a hawk, small mobs are not blown up, giants tower over the rest with their head in view); each half uses the room it really has by the slanted split, so the left side's inner fighter is no longer cut; pictures show the whole width of wide mobs.
+- **Kill Wand: hold left click** to slam the ground and kill every mob around you (`killArea`, `killRadius` 12); your own army is spared, players only with `killAreaPlayers on` (default off).
+- **The Snap spares your own army.**
+- **Server features** (admin, Admin tab): `serverVs`, `serverHolograms`, `serverIcons on|off` turn the VS screen, the Morph Wand hologram or the panel's mob pictures off for the whole server; their pictures stop being sent to joining players from the next restart.
 
 ### New: settings panel
+- **`/mobbattle pictures status | rebuild [force]`** (admin, console too, and two buttons on the Admin tab): what the picture cache holds and what each joining player downloads, or draw the pictures again with progress in chat and a summary of times and sizes.
 - **Search box.** Click the magnifying glass in the title bar of the panel (`/mobbattle config`), type a word, and every matching setting from every tab shows up, ready to change, in English or Spanish.
+
+### New: summon list
+- **Team Wand: clear every team** with crouch + right click in the air, three times: a yellow warning, then a red one, then the teams are cleared.
+- **Mob picture gallery.** **Show pictures** on the panel's Summon list tab opens a picture of every mob, with its in-game name, a search box and the Show filters; click one to pick it.
+- **Saved summon lists.** `/mobbattle summon save|load|delete <name>` and `summon lists`, or the Saved lists section of the Summon list tab, keep several lists with their counts, teams and team colors. Loading one from the panel can be undone.
+- **One Fill row** replaces the two random battle buttons on the Summon list tab: how many mob types, how many of each and how many teams (0 = none). It follows the tab's Show filters.
+- **Clear teams.** `/mobbattle summon team all none`, or **Clear teams** under the list on the Summon list tab, takes every mob in the list out of its team and keeps the mobs.
+
+### New: wands, names and pictures
+- **Morph Wand hologram.** While you hold the Morph Wand, a green hologram of the mob it copied floats over its gem (not for a copied player look). On for everyone.
+- **Mobs go by their in-game names.** Battle titles, chat, the HUD cards, the VS screen and the settings panel show each mob's name from the game, in your language, instead of its ID (`Dungeon_Goblin_Burner` shows as "Goblin Burner"). Commands still take the ID.
+- **One picture cache per machine.** Mob pictures (VS screen, panel icons, Morph Wand hologram) are drawn once and shared by every world and server on the computer, so a new world no longer draws them all again. Pictures of mobs no world has used for 30 days are deleted. See docs/server-setup.md.
 
 ### New: spotlight intro camera
 - **`cameraStyle spotlight`**, now the default for battle royales and team battles. With few fighters and enough countdown, each one gets a close-up, building up to the strongest. With many, only the strongest get one (each team's best first), then a wide shot of everyone else. Want the old orbit back? `/mobbattle cameraStyle royale orbit`.
@@ -26,7 +49,33 @@ Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (
 - **Six new film shots**: zenith (straight down), spiral, telephoto, crane down, from the ground and profile, with defaults that keep the showy ones a surprise. "Shots of you" now defaults to 20 %.
 - The landscape shot (from the land to the battle) is rarer and turns to the fight faster.
 
+### Changes
+- **Watch mode:** a left click on the first fighter goes round to the last one instead of saying there is no earlier fighter.
+- **The chat hides while the VS screen shows** and comes back when it ends.
+- **Every `summon add` makes its own entry**, even for a mob and team already listed (`Skeleton_Archer#2`); it no longer adds to that entry's count. Change a count with `summon modify` or in the panel row.
+
 ### Fixes
+- VS screen: every fighter is drawn at one scale, so a mob with a banner, wings or a long body no longer looks smaller than a mob of the same height; wide mobs are only cut and faded on the side that does not fit. A "Preparing the battle..." notice shows while the screen loads.
+- VS screen: the two sides slide in and out smoothly, also with a big battle royale crowd (they used to pop in at once with the clash already on, after a freeze). The game's HUD stays until the screen appears.
+- The battle film's far shots no longer leave the fight as specks in the landscape.
+- VS screen: each side is cut at the slanted split instead of spilling into the other half, small mobs (a chicken, a fish) show clearly smaller next to big ones, and a big crowd fills its half as a jumbled group instead of a triangle.
+- VS screen: the smaller fighters stand in front of the bigger ones (a tall mob in the middle of a row used to cover its smaller neighbours).
+- Mobs whose model has a bone inside another of the same name (BetterMobExpansion's leopard) showed a second head in their VS picture.
+- Summon list rows with no team keep their team picker and Remove button in line with the others.
+- The grizzly bear, the marsh snake, the black wolf and some mods' mobs (MajorDungeons' cult werewolf and cult knight) showed another mob's icon in the settings panel and had no team column picture on the VS screen.
+- **Mobs wait for the start.** Fighters in a countdown no longer attack each other (or get hit by a player in it) before the fight starts.
+- **Bosses that spare their own kind can hit them in a battle.** A Dungeon Feastmaster Boss never hurt goblins, the Gobliterator included, because its role turns off damage to its own group; in battles and wand fights it now can.
+- **One card on the right per player.** With several battles running, the scoreboard, duel card and all vs one card of the nearest battle show, never one over another.
+- **The battle film repeats itself less.** Shots of the same kind no longer come one after another, and each shot shows about as often as its percent says.
+- **A countdown called off during the VS screen ends its camera too**: the VS screen goes and the intro camera after it no longer plays (a duellist killed early, a new order, `/mobbattle stop`).
+- **Battles with no VS screen keep their countdown.** The 3 extra seconds are only added when someone is shown the VS screen (the Battle Wand's "mob vs you" duel used to wait 3 silent seconds).
+- **The game's HUD comes back** when you change worlds, or the world closes, while a camera, the battle film or the VS screen covers it.
+- **Morphed mobs keep their size right.** A size-buffed mob that changed model (Morph Wand, Cleanse) now keeps its growth over the new model's own size; a cleansed goblin no longer stayed as big as the boss it had been morphed into.
+- **Battle royales with armies** show each army as a side on the VS screen.
+- **Smaller download when joining.** Team columns on the VS screen now use one picture per mob instead of six pre-cut widths: about 27 MB less for every player who joins.
+- **A big "?" instead of a broken icon.** A mob with no picture yet shows a "?" in the VS style (on the VS screen and in the settings panel), and a player shows a black silhouette, until the next server start draws theirs.
+- **Mods' mob names in titles and chat.** Names from other mods' language files (MajorDungeons' Baron) showed as a raw text key in the countdown and the FIGHT title.
+- **Battle titles wait for the VS screen** instead of showing over it, and a plain battle royale's VS has one "BATTLE ROYALE" heading instead of two lists of names.
 - **Battle music is back.** The game's goblin boss battle track plays quietly and only once on 0.7.2; Mob Battle now ships its own version of that song, louder and looping until the battle ends, and uses it by default.
 - **MajorDungeons bosses no longer reset mid-battle.** Its arenas removed and respawned a boss after 10 s with no player near, which ended Mob Battle fights at once (Baron vs Baron). Bosses fighting, or waiting in a countdown, now keep their place.
 - **Big mobs no longer shrink with a size buff or the Cleanse Wand.** Mobs whose model is made bigger than normal (for example some modded bosses) went back to normal size; now a size buff grows them from their own size and Cleanse leaves them at it.

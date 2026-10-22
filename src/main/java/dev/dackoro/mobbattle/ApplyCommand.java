@@ -414,7 +414,7 @@ final class ApplyCommand {
             case "effect", "look" -> {
                 EffectControllerComponent effects = store.getComponent(t, EffectControllerComponent.getComponentType());
                 if (effects == null) return "takes no effects";
-                if (!EffectGiveInteraction.give(t, EffectWand.chain(value), effects, store)) return "immune";
+                if (!EffectGiveInteraction.give(t, EffectWand.chain(value), effects, null, store)) return "immune";
             }
             case "morph" -> {
                 MorphWand.Copy copy = null;

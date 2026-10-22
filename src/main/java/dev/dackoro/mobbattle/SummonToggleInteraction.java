@@ -45,6 +45,6 @@ public class SummonToggleInteraction extends SimpleInstantInteraction {
         FxSettings.save();
         WandFx.onTarget(target, added ? WandFx.SUMMON_ADD : WandFx.SUMMON_REMOVE, buffer);
         player.sendMessage(I18n.tr(added ? "chat.summon.added" : "chat.summon.removed")
-                .param("role", role).param("types", SummonList.ENTRIES.size()).color(added ? "#4bff6a" : "#aaaaaa"));
+                .param("role", MobNames.message(role)).param("types", SummonList.ENTRIES.size()).color(added ? "#4bff6a" : "#aaaaaa"));
     }
 }

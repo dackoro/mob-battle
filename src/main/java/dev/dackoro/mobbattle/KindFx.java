@@ -18,6 +18,8 @@ final class KindFx {
 
     enum Opt {
         COUNTDOWN("countdown"),
+        /** Seconds to get in position before the VS screen and the countdown (ReadyWait). */
+        READY_TIME("readyTime"),
         CAMERA("camera"),
         CAMERA_STYLE("cameraStyle"),
         CAMERA_TIME("cameraTime"),
@@ -100,6 +102,11 @@ final class KindFx {
         return intOf(get(kind, Opt.COUNTDOWN));
     }
 
+    /** Seconds the player who starts a battle has to get in position first (ReadyWait); 0 = none. */
+    static int readyTime(BattleManager.Kind kind) {
+        return intOf(get(kind, Opt.READY_TIME));
+    }
+
     static boolean camera(BattleManager.Kind kind) {
         return "on".equals(get(kind, Opt.CAMERA));
     }
@@ -151,7 +158,7 @@ final class KindFx {
 
     /** /mobbattle vsScreen: the VS screen opens the countdown (VsScreen.countdownMs). */
     static boolean vsScreen(BattleManager.Kind kind) {
-        return "on".equals(get(kind, Opt.VS_SCREEN));
+        return FxSettings.serverVs && "on".equals(get(kind, Opt.VS_SCREEN));
     }
 
     /** off, slim, classic or wide. */
@@ -230,6 +237,7 @@ final class KindFx {
     static String global(Opt opt) {
         return switch (opt) {
             case COUNTDOWN -> String.valueOf(FxSettings.countdownSeconds);
+            case READY_TIME -> String.valueOf(FxSettings.readySeconds);
             case CAMERA -> onOff(FxSettings.fightCamera);
             case CAMERA_STYLE -> FxSettings.cameraStyle;
             case CAMERA_TIME -> String.valueOf(FxSettings.cameraSeconds);
@@ -256,6 +264,7 @@ final class KindFx {
     static void setGlobal(Opt opt, String value) {
         switch (opt) {
             case COUNTDOWN -> FxSettings.countdownSeconds = intOf(value);
+            case READY_TIME -> FxSettings.readySeconds = intOf(value);
             case CAMERA -> FxSettings.fightCamera = "on".equals(value);
             case CAMERA_STYLE -> FxSettings.cameraStyle = value;
             case CAMERA_TIME -> FxSettings.cameraSeconds = intOf(value);
@@ -295,6 +304,7 @@ final class KindFx {
         String lower = v.toLowerCase(Locale.ROOT);
         return switch (opt) {
             case COUNTDOWN -> number(lower, 0, FxSettings.MAX_COUNTDOWN);
+            case READY_TIME -> "off".equals(lower) ? "0" : number(lower, 0, FxSettings.MAX_READY);
             case CAMERA_TIME -> number(lower, 0, MAX_CAMERA_TIME);
             case CAMERA_SHOTS -> number(lower, 1, maxCameraShots());
             case END_CAMERA_TIME -> number(lower, 1, MAX_END_CAMERA_TIME);
@@ -319,11 +329,12 @@ final class KindFx {
     static String usage(Opt opt) {
         return switch (opt) {
             case COUNTDOWN -> "<seconds 0-" + FxSettings.MAX_COUNTDOWN + ">";
+            case READY_TIME -> "<seconds 0-" + FxSettings.MAX_READY + ">|off";
             case CAMERA_TIME -> "<seconds 0-" + MAX_CAMERA_TIME + "> (0 = as long as the countdown)";
             case CAMERA_SHOTS -> "<1-" + maxCameraShots() + "> (up to maxMobs)";
             case END_CAMERA_TIME -> "<seconds 1-" + MAX_END_CAMERA_TIME + ">";
             case CAMERA, START_TITLE, WIN_TITLE, LASER, RUNES, AUTO_WATCH, AUTO_FILM, VS_SCREEN -> "on|off";
-            case CAMERA_STYLE -> "auto|orbit|duel|showcase|teams|focus|drone";
+            case CAMERA_STYLE -> "auto|orbit|duel|showcase|teams|focus|drone|spotlight";
             case END_CAMERA -> "off|winner|lastHit";
             case CAMERA_BARS -> String.join("|", CAMERA_BARS);
             case CAMERA_BLUR -> String.join("|", CAMERA_BLURS);

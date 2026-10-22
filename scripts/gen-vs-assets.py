@@ -6,6 +6,7 @@ Writes into Common/Icons/MobBattle/Vs/:
       dots on the right); the right half also carries the bright seam along its slanted edge.
   VsLogo.png: big italic white VS, thick dark outline, red and blue offset shadows, a pale flash behind it.
   Glow_L.png / Glow_R.png: the soft halo put behind each fighter (warm / cold).
+  Unknown.png: the big "?" shown where a mob or player has no picture yet (`--unknown` writes only this one).
   The name bar (dark, its edge on the slant, a light line under it) is baked into each half.
 
 Geometry (in a 1920x1080 screen): the split runs from (1100, 0) to (820, 1080). Each half is a box HALF of the screen
@@ -103,6 +104,36 @@ def half(color, left):
     return out
 
 
+MASKS = Path(__file__).resolve().parent.parent / "Common/UI/Custom/MobBattle/Masks"
+SEAM_ROOM = 14   # baked px the right mask reaches past the slant, so the right half's bright seam is not cut
+
+
+def half_mask(left):
+    """A half's clip mask (VsScreen.ui #LHalf / #RHalf MaskTexturePath, 2026-10-17, user: each side cut at the slanted
+    split, as Smash): white where the half shows, transparent beyond its slanted edge; stretched to the half's box like
+    its background, so the two always meet on the background's own slant."""
+    x0 = 0 if left else W - BOX
+    sx = BOX_W / BOX
+    top, bottom = (TOP - x0) * sx, (BOTTOM - x0) * sx
+    if left:
+        pts = [(0, 0), (top, 0), (bottom, BOX_H), (0, BOX_H)]
+    else:
+        pts = [(top - SEAM_ROOM, 0), (BOX_W, 0), (BOX_W, BOX_H), (bottom - SEAM_ROOM, BOX_H)]
+    alpha = Image.new("L", (BOX_W, BOX_H), 0)
+    ImageDraw.Draw(alpha).polygon(pts, fill=255)
+    out = Image.new("RGBA", (BOX_W, BOX_H), (255, 255, 255, 0))
+    out.putalpha(alpha)
+    return out
+
+
+def write_masks():
+    MASKS.mkdir(parents=True, exist_ok=True)
+    for left in (True, False):
+        p = MASKS / f"Half{'L' if left else 'R'}.png"
+        half_mask(left).save(p, optimize=True)
+        print(p, p.stat().st_size, "bytes")
+
+
 def logo():
     k = 2   # drawn at twice the card's size: the game stretches it to about 640 px wide
     f = ImageFont.truetype(FONT_BLACK, 360 * k)
@@ -150,6 +181,33 @@ def title(text):
     canvas = Image.new("RGBA", TITLE_CANVAS, (0, 0, 0, 0))
     canvas.alpha_composite(im, ((TITLE_CANVAS[0] - im.width) // 2, (TITLE_CANVAS[1] - im.height) // 2))
     return canvas
+
+
+UNKNOWN_SIZE = 384   # VsScreen.PICTURE: the same square as a mob's picture, so it fills any slot a mob would
+
+
+def unknown():
+    """A mob with no picture yet (2026-10-17, user: not the game's small red X; a big "?" the size of a mob, in the VS
+    style, so the team color behind it still shows): white Impact "?", dark outline, red and blue offset shadows,
+    slanted, standing on the bottom edge like a mob's feet, on a transparent square."""
+    k = 3
+    s = UNKNOWN_SIZE * k
+    f = ImageFont.truetype(FONT_BLACK, int(s * 0.95))
+    txt = Image.new("RGBA", (s * 2, s * 2), (0, 0, 0, 0))
+    d = ImageDraw.Draw(txt)
+    pos = (s // 2, s // 4)
+    d.text((pos[0] - 14 * k, pos[1] + 6 * k), "?", font=f, fill=(255, 70, 70, 255), stroke_width=12 * k, stroke_fill=(255, 70, 70, 255))
+    d.text((pos[0] + 14 * k, pos[1] + 6 * k), "?", font=f, fill=(80, 160, 255, 255), stroke_width=12 * k, stroke_fill=(80, 160, 255, 255))
+    d.text(pos, "?", font=f, fill=(255, 255, 255, 255), stroke_width=9 * k, stroke_fill=(15, 10, 25, 255))
+    txt = txt.transform(txt.size, Image.AFFINE, (1, 0.18, -40 * k, 0, 1, 0), Image.BICUBIC)
+    txt = txt.crop(txt.getbbox())
+    # about as tall as a mob in its square (86 %), centered, its foot on the bottom edge
+    h = int(s * 0.86)
+    w = max(1, round(txt.width * h / txt.height))
+    txt = txt.resize((w, h), Image.LANCZOS)
+    canvas = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    canvas.alpha_composite(txt, ((s - w) // 2, s - h))
+    return canvas.resize((UNKNOWN_SIZE, UNKNOWN_SIZE), Image.LANCZOS)
 
 
 def column_overlay():
@@ -261,6 +319,15 @@ def royale_bg():
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    import sys
+    if "--masks" in sys.argv:   # only the halves' clip masks
+        write_masks()
+        return
+    if "--unknown" in sys.argv:   # only the "?" picture, the rest untouched
+        p = OUT / "Unknown.png"
+        unknown().save(p, optimize=True)
+        print(p, p.stat().st_size, "bytes")
+        return
     total = 0
     for name, color in PALETTE.items():
         for left in (True, False):
@@ -280,6 +347,9 @@ def main():
             total += p.stat().st_size
     p = OUT / "ColumnOverlay.png"
     column_overlay().save(p, optimize=True)
+    total += p.stat().st_size
+    p = OUT / "Unknown.png"
+    unknown().save(p, optimize=True)
     total += p.stat().st_size
     p = OUT / "MoreBadge.png"
     badge().save(p, optimize=True)

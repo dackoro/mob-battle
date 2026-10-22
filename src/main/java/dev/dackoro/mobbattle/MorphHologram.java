@@ -5,7 +5,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.setup.RequestCommonAssetsRebuild;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.asset.common.CommonAsset;
-import com.hypixel.hytale.server.core.asset.common.CommonAssetModule;
 import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
@@ -180,7 +179,7 @@ final class MorphHologram {
 
     /** Whatever changed for this player (turned on/off, new copy, item in hand): shows or hides the panel. */
     static void refresh(UUID player) {
-        if (DISABLED.contains(player) && !SHOWN.containsKey(player)) return;
+        if (off(player) && !SHOWN.containsKey(player)) return;
         startChecks();
         refreshNow(player);
     }
@@ -193,8 +192,21 @@ final class MorphHologram {
             return;
         }
         Store<EntityStore> store = ref.getStore();
-        store.getExternalData().getWorld().execute(() -> update(player, ref, store));
+        store.getExternalData().getWorld().execute(() -> {
+            if (broken) return;
+            try {
+                update(player, ref, store);
+            } catch (LinkageError e) {
+                // a game update changed the Model API: the world's task loop only catches Exceptions, so this would
+                // have stopped the world; the hologram turns off instead (audit 2026-10-17)
+                broken = true;
+                MobBattlePlugin.log("Morph Wand hologram off (game API changed): " + e);
+            }
+        });
     }
+
+    /** The game's model API did not match (LinkageError once): no hologram until a restart. */
+    private static volatile boolean broken;
 
     /** World thread: the panel the player should wear now, put on or taken off when it differs. */
     private static void update(UUID player, Ref<EntityStore> ref, Store<EntityStore> store) {
@@ -204,12 +216,12 @@ final class MorphHologram {
         }
         String want = null;
         String modelId = null;
-        if (!DISABLED.contains(player) && holdsWand(ref, store)) {
+        if (!off(player) && holdsWand(ref, store)) {
             MorphWand.Copy copy = MorphWand.copyOf(player);
             modelId = copy != null && copy.skin() == null ? copy.modelId() : null;
             want = modelId != null ? ThumbnailCache.hologramTexture(modelId) : null;
         }
-        if (want == null && modelId != null && !DISABLED.contains(player)) {
+        if (want == null && modelId != null && !off(player)) {
             liveTexture(player, modelId);   // not in the boot cache: made now, put on when ready
         }
         String style = STYLE.getOrDefault(player, PANEL);
@@ -279,10 +291,19 @@ final class MorphHologram {
         startChecks();
     }
 
+    /** No panel for this player: turned off for them, or the server feature is off (/mobbattle serverHolograms). */
+    private static boolean off(UUID player) {
+        return DISABLED.contains(player) || !FxSettings.serverHolograms;
+    }
+
     private static void check() {
         if (!checking) return;
+        // players who left: their HUD mark would keep a reconnect from getting the corner picture again, and the rest
+        // grows by one entry per player (audit 2026-10-17)
+        if (!HUD_SHOWN.isEmpty()) HUD_SHOWN.keySet().removeIf(id -> Universe.get().getPlayer(id) == null);
+        if (!LAST_PUT.isEmpty()) LAST_PUT.keySet().removeIf(id -> Universe.get().getPlayer(id) == null);
         Set<UUID> ids = new java.util.HashSet<>(SHOWN.keySet());
-        for (PlayerRef p : Universe.get().getPlayers()) if (!DISABLED.contains(p.getUuid())) ids.add(p.getUuid());
+        for (PlayerRef p : Universe.get().getPlayers()) if (!off(p.getUuid())) ids.add(p.getUuid());
         for (UUID id : ids) {
             try {
                 refreshNow(id);
@@ -315,7 +336,13 @@ final class MorphHologram {
         if (base == null) base = current;
         List<ModelAttachment> next = new ArrayList<>();
         if (look) {
-            if (texture != null) next.addAll(PlayerLook.attachments(skin.getPlayerSkin()));
+            if (texture != null) {
+                List<ModelAttachment> clothes = PlayerLook.attachments(skin.getPlayerSkin());
+                // No parts built (cosmetics not loaded, a read error): no panel at all rather than a bare, bald body
+                // (audit 2026-10-17); the skin the client already has stays.
+                if (clothes.isEmpty()) return;
+                next.addAll(clothes);
+            }
         } else if (base.getAttachments() != null) {
             for (ModelAttachment att : base.getAttachments()) {
                 if (att != null && !isHoloModel(att.getModel())) next.add(att);
@@ -396,7 +423,7 @@ final class MorphHologram {
      */
     static String register(String modelId, byte[] png, boolean rebuild) {
         String plain = texturePath(modelId);
-        CommonAssetModule.get().addCommonAsset(EyeRecolor.PACK, new RuntimeAsset(registryPrefix() + plain, png), false);
+        ThumbnailCache.addAsset(new RuntimeAsset(registryPrefix() + plain, png));
         if (rebuild) Universe.get().broadcastPacketNoCache(new RequestCommonAssetsRebuild());
         return plain;
     }
@@ -406,6 +433,9 @@ final class MorphHologram {
      * their assets once), then refreshes the player. One per model per session.
      */
     private static void liveTexture(UUID player, String modelId) {
+        // never in game (user, 2026-10-16: no "Reloaded assets" toast, ever): the boot run writes every model's
+        // hologram to disk and the next boot registers it; until then this copy shows no panel
+        if (!ThumbnailCache.mayRegister()) return;
         if (!LIVE.add(modelId)) return;
         ModelAsset asset = ModelAsset.getAssetMap().getAsset(modelId);
         if (asset == null) return;

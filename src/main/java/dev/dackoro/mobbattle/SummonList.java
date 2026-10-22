@@ -310,7 +310,7 @@ public final class SummonList {
             }
             if (next < plan.size()) {
                 var world = store.getExternalData().getWorld();
-                com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(this),
+                world.scheduleAfter(this,
                         SPAWN_STEP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
                 return;
             }
@@ -394,7 +394,7 @@ public final class SummonList {
         if ((toLook.isEmpty() || look == null) && toArmy.isEmpty()) return;
         var world = store.getExternalData().getWorld();
         java.util.UUID id = player.getUuid();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             if (store.isShutdown()) return;
             if (look != null) {
                 for (Ref<EntityStore> mob : toLook) {
@@ -407,7 +407,7 @@ public final class SummonList {
             for (Ref<EntityStore> mob : toArmy) {
                 if (mob.isValid() && !Army.isMember(id, mob)) Army.toggle(player, owner, mob, store);
             }
-        }), LOOK_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, LOOK_DELAY_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**

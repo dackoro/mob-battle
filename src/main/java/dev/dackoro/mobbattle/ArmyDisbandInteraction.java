@@ -48,8 +48,8 @@ public class ArmyDisbandInteraction extends SimpleInstantInteraction {
             Ref<EntityStore> ownerEntity = pick.leader() != null ? pick.leader() : Army.entityOf(pick.owner());
             int n = Army.disband(pick.owner(), ownerEntity, buffer);
             player.sendMessage((n == 0
-                    ? I18n.tr("chat.army.none.other").param("owner", pick.name())
-                    : I18n.tr("chat.army.disbanded.other").param("owner", pick.name()).param("count", n)).color(n == 0 ? "#ffcc55" : "#aaaaaa"));
+                    ? I18n.tr("chat.army.none.other").param("owner", MobNames.message(pick.name()))
+                    : I18n.tr("chat.army.disbanded.other").param("owner", MobNames.message(pick.name())).param("count", n)).color(n == 0 ? "#ffcc55" : "#aaaaaa"));
             return;
         }
         var mobs = Army.members(player.getUuid());

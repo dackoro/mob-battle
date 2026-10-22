@@ -40,13 +40,18 @@ final class RoleAppearance {
             }
             String own = json.has("Appearance") ? text(json.get("Appearance")) : null;
             if (own != null) return own;
+            // the role's own Appearance parameter before its template's: a Variant's parameter value overrides the
+            // template's default (MajorDungeons' Cult_Werewolf sets "Cult_Werewolf" over Template_MajorDungeons_
+            // Intelligent's "Trork_Hunter"; read the other way round it got a Trork icon and no VS column picture,
+            // user 2026-10-17)
+            if (json.has("Parameters") && json.getAsJsonObject("Parameters").has("Appearance")) {
+                JsonElement p = json.getAsJsonObject("Parameters").get("Appearance");
+                String param = text(p.isJsonObject() && p.getAsJsonObject().has("Value") ? p.getAsJsonObject().get("Value") : p);
+                if (param != null) return param;
+            }
             if (json.has("Reference")) {
                 String r = resolve(json.get("Reference").getAsString(), depth + 1);
                 if (r != null) return r;
-            }
-            if (json.has("Parameters") && json.getAsJsonObject("Parameters").has("Appearance")) {
-                JsonElement p = json.getAsJsonObject("Parameters").get("Appearance");
-                return text(p.isJsonObject() && p.getAsJsonObject().has("Value") ? p.getAsJsonObject().get("Value") : p);
             }
         } catch (Exception ex) {
             MobBattlePlugin.debug("could not read the appearance of role " + name + ": " + ex);

@@ -646,8 +646,11 @@ public final class FightManager {
                          ComponentAccessor<EntityStore> accessor) {
         WorldSupport world = WorldSupport.get(self, accessor);
         if (world == null) return false;
+        // Only fighters get an attitude memory created (as holdOff and turnAgainst): a memory made here on a pig or a
+        // dummy made canAttack count it as a fighter after any countdown (audit 2026-10-17).
+        boolean create = combatStateOf(StateSupport.get(self, accessor)) != null;
         for (Ref<EntityStore> other : others) {
-            if (other != self) tryOverride(world, other, Attitude.IGNORE, seconds, true);
+            if (other != self) tryOverride(world, other, Attitude.IGNORE, seconds, create);
         }
         MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
         Ref<EntityStore> locked = marked != null ? marked.getMarkedEntityRef(TARGET_SLOT) : null;

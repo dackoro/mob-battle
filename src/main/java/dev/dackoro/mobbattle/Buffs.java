@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Size is the game's EntityScaleComponent (what the builder tools scale entities with: the model stays, so a morph
  * and particles on it are kept, and the hitbox follows); a player also gets their model's scale, since their camera
  * follows the model (MorphWand.setPlayerSize). Health is a StaticModifier (MAX, MULTIPLICATIVE) on max
- * health: it raises the max, and only heals with buff &lt;who&gt; heal on (lone: heals the target when picked, even with no
+ * health, fitted to the other multipliers since vanilla sums them (healthAmount): it raises the max, and only heals with buff &lt;who&gt; heal on (lone: heals the target when picked, even with no
  * lone buff). Damage and defense (BuffDamageSystem): the battle
  * sources count against battle enemies only, the wand against anyone. Buffed mobs except the lone target wear a
  * crown (buff crown, MobBattle_Fx_CrownBuff_&lt;Color&gt;). The scale and the modifier are saved with the world like
@@ -302,6 +302,8 @@ final class Buffs {
         /** EntityScaleComponent scale before the size buff (null: not scaled by us). */
         Float baseScale;
         boolean health;
+        /** Health percent our max health modifier carries (0 = none), re-fitted once a second (refreshHealth). */
+        volatile int healthPct;
         String crownFx;
         /**
          * Wand, streak and champion buffs: the shimmer in buffColor while the buff lasts, BuffShimmer_&lt;Color&gt;[_S200]
@@ -490,7 +492,7 @@ final class Buffs {
         falling.count++;
         Store<EntityStore> store = mob.getStore();
         var world = store.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             // Taken off (cancelFalling) while it came down: it doesn't land.
             if (FALLING.get(mob) != falling) return;
             if (--falling.count <= 0) FALLING.remove(mob, falling);
@@ -501,7 +503,7 @@ final class Buffs {
             // The swirl went on with the click; a size change now rebuilds the mob on the client and cuts it, so it
             // goes on again once the new size is there.
             if (mob.isValid() && Math.abs(scaleOf(mob, store) - before) > 0.001f) WandFx.swirlLater(mob, FxSettings.buffColor);
-        }), delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
         return next;
     }
 
@@ -708,13 +710,14 @@ final class Buffs {
             float oldMax = before != null ? before.getMax() : 0, oldValue = before != null ? before.get() : 0;
             boolean changed = false;
             if (health > 0) {
-                stats.putModifier(index, MODIFIER_KEY, new StaticModifier(Modifier.ModifierTarget.MAX,
-                        StaticModifier.CalculationType.MULTIPLICATIVE, 1 + health / 100f));
+                putHealth(stats, index, health);
                 s.health = true;
+                s.healthPct = health;
                 changed = true;
             } else if (s.health) {
                 stats.removeModifier(index, MODIFIER_KEY);
                 s.health = false;
+                s.healthPct = 0;
                 changed = true;
             }
             if (changed) {
@@ -830,7 +833,7 @@ final class Buffs {
     private static void addLookLater(Ref<EntityStore> mob, State s, String look, long delayMs, long waited) {
         Store<EntityStore> store = mob.getStore();
         if (store.isShutdown()) return;
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> run(mob, st -> {
+        runLater(mob, st -> {
             if (!mob.isValid() || STATES.get(mob) != s || !s.lookPending || !look.equals(s.lookFx)) return;
             long total = waited + delayMs;
             long left = total < LOOK_WAIT_CAP_MS ? shortFxLeftMs(mob, st) : 0;
@@ -841,7 +844,7 @@ final class Buffs {
             s.lookPending = false;
             WandFx.addFx(mob, look, st);
             LookKeeper.trackBuff(mob, EntityEffect.getAssetMap().getAsset("MobBattle_Fx_" + look));
-        }), delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, delayMs);
     }
 
     /** Milliseconds until the last short (not infinite) MobBattle_Fx_ effect on the mob ends; 0 when none. */
@@ -863,6 +866,12 @@ final class Buffs {
      * The mob's model was swapped (Morph Wand, Cleanse): the client rebuilt it and dropped the crown and the buff look
      * put on the old one, so both go on again once the new model has arrived.
      */
+    /** MorphWand swapped a mob's model: a running size buff now grows from the new model's own scale. */
+    static void modelRescaled(Ref<EntityStore> mob, float natural) {
+        State s = mob == null ? null : STATES.get(mob);
+        if (s != null && s.baseScale != null) s.baseScale = natural;
+    }
+
     static void modelChanged(Ref<EntityStore> mob) {
         State s = mob == null ? null : STATES.get(mob);
         if (s == null || !mob.isValid()) return;
@@ -933,11 +942,11 @@ final class Buffs {
     private static void putAgainLater(Ref<EntityStore> mob, String fx, java.util.function.Supplier<String> current) {
         Store<EntityStore> store = mob.getStore();
         if (store.isShutdown()) return;
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> run(mob, st -> {
+        runLater(mob, st -> {
             if (!mob.isValid() || !fx.equals(current.get())) return;
             WandFx.removeFx(mob, fx, st);
             WandFx.addFx(mob, fx, st);
-        }), WandFx.MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, WandFx.MODEL_SETTLE_MS);
     }
 
     /**
@@ -947,14 +956,14 @@ final class Buffs {
     private static void setHealthLater(Ref<EntityStore> mob, float valueNow, float target) {
         Store<EntityStore> store = mob.getStore();
         if (store.isShutdown()) return;
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> run(mob, st -> {
+        runLater(mob, st -> {
             if (!mob.isValid() || st.getComponent(mob, com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent.getComponentType()) != null) return;
             EntityStatMap stats = st.getComponent(mob, EntityStatMap.getComponentType());
             int index = DefaultEntityStatTypes.getHealth();
             EntityStatValue v = stats != null ? stats.get(index) : null;
             if (v == null || v.get() <= 0) return;
             stats.setStatValue(index, Math.max(1f, Math.min(v.getMax(), target + v.get() - valueNow)));
-        }), WandFx.MODEL_SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, WandFx.MODEL_SETTLE_MS);
     }
 
     /** RoleChange: the same mob under a new Ref keeps its buffs; its crown and look go on again on the new model. */
@@ -980,12 +989,95 @@ final class Buffs {
         STATES.keySet().removeIf(r -> !r.isValid());
         PRE_LONE.removeIf(r -> !r.isValid());
         FALLING.keySet().removeIf(r -> !r.isValid());
+        refreshHealth();
+    }
+
+    /**
+     * Our max health modifier's amount, so the max comes out as (everything else) x (1 + percent/100). Vanilla SUMS
+     * every MULTIPLICATIVE modifier of a stat instead of multiplying them (EntityStatValue.computeModifiers, decompiled
+     * 0.7.2), so a plain 1 + p beside a food buff of 1.15 made a x2 buff x3.15 instead of x2.3. With other multipliers
+     * summing to S ours is S x p (S + S p = S (1 + p)); alone it is 1 + p.
+     */
+    private static float healthAmount(EntityStatValue value, int percent) {
+        float others = 0;
+        boolean any = false;
+        Map<String, Modifier> mods = value != null ? value.getModifiers() : null;
+        if (mods != null) {
+            for (Map.Entry<String, Modifier> e : mods.entrySet()) {
+                if (MODIFIER_KEY.equals(e.getKey()) || OLD_MODIFIER_KEY.equals(e.getKey())) continue;
+                if (e.getValue() instanceof StaticModifier m && m.getTarget() == Modifier.ModifierTarget.MAX
+                        && m.getCalculationType() == StaticModifier.CalculationType.MULTIPLICATIVE) {
+                    others += m.getAmount();
+                    any = true;
+                }
+            }
+        }
+        float p = percent / 100f;
+        return any ? others * p : 1 + p;
+    }
+
+    /** Puts our max health modifier for {@code percent} (healthAmount). False if it already had that amount. */
+    private static boolean putHealth(EntityStatMap stats, int index, int percent) {
+        EntityStatValue value = stats.get(index);
+        float amount = healthAmount(value, percent);
+        if (value != null && value.getModifier(MODIFIER_KEY) instanceof StaticModifier now
+                && now.getCalculationType() == StaticModifier.CalculationType.MULTIPLICATIVE
+                && Math.abs(now.getAmount() - amount) < 1e-4f) {
+            return false;
+        }
+        stats.putModifier(index, MODIFIER_KEY, new StaticModifier(Modifier.ModifierTarget.MAX,
+                StaticModifier.CalculationType.MULTIPLICATIVE, amount));
+        return true;
+    }
+
+    /**
+     * Once a second (prune): health buffs follow the other multipliers coming and going (food, effects, gear), one
+     * task per world with health-buffed mobs. A raised max keeps the mob's health share, as Buffs.apply does (sent a
+     * moment later); a lowered one is cut by vanilla.
+     */
+    private static void refreshHealth() {
+        java.util.List<Ref<EntityStore>> mobs = null;
+        for (Map.Entry<Ref<EntityStore>, State> e : STATES.entrySet()) {
+            if (e.getValue().healthPct <= 0) continue;
+            if (mobs == null) mobs = new java.util.ArrayList<>();
+            mobs.add(e.getKey());
+        }
+        if (mobs == null) return;
+        forEachWorld(mobs, (store, list) -> {
+            int index = DefaultEntityStatTypes.getHealth();
+            for (Ref<EntityStore> mob : list) {
+                State s = STATES.get(mob);
+                if (s == null || s.healthPct <= 0 || !mob.isValid()
+                        || store.getComponent(mob, com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent.getComponentType()) != null) {
+                    continue;
+                }
+                EntityStatMap stats = store.getComponent(mob, EntityStatMap.getComponentType());
+                EntityStatValue before = stats != null ? stats.get(index) : null;
+                if (before == null) continue;
+                float oldMax = before.getMax(), share = oldMax > 0 ? before.get() / oldMax : -1;
+                if (!putHealth(stats, index, s.healthPct)) continue;
+                EntityStatValue after = stats.get(index);
+                if (after != null && share > 0 && after.getMax() > oldMax + 0.001f) {
+                    float target = share * after.getMax();
+                    if (target > after.get() + 0.001f) setHealthLater(mob, after.get(), target);
+                }
+            }
+        });
     }
 
     private static void run(Ref<EntityStore> mob, java.util.function.Consumer<Store<EntityStore>> task) {
         Store<EntityStore> store = mob.getStore();
         if (store.isShutdown()) return;
         store.getExternalData().getWorld().execute(() -> task.accept(store));
+    }
+
+    /** {@link #run} {@code ms} later; World.scheduleAfter drops it if the world closed meanwhile. */
+    private static void runLater(Ref<EntityStore> mob, java.util.function.Consumer<Store<EntityStore>> task, long ms) {
+        Store<EntityStore> store = mob.getStore();
+        if (store.isShutdown()) return;
+        store.getExternalData().getWorld().scheduleAfter(() -> {
+            if (!store.isShutdown()) task.accept(store);
+        }, ms, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     // ---- settings (fx.properties via FxSettings) ----

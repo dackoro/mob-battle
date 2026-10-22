@@ -21,26 +21,44 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "Chaining",
-          "ChainingAllowance": 1.25,
-          "Next": [
-            {
-              "Type": "MobBattle_Kill",
-              "Effects": {
-                "ItemAnimationId": "KillCast",
-                "ClearAnimationOnFinish": true
-              },
-              "RunTime": 0.5
+          "Type": "Charging",
+          "AllowIndefiniteHold": true,
+          "DisplayProgress": true,
+          "Effects": {
+            "ItemAnimationId": "CastLeftCharging"
+          },
+          "Next": {
+            "0": {
+              "Type": "Chaining",
+              "ChainingAllowance": 1.25,
+              "Next": [
+                {
+                  "Type": "MobBattle_Kill",
+                  "Effects": {
+                    "ItemAnimationId": "KillCast",
+                    "ClearAnimationOnFinish": true
+                  },
+                  "RunTime": 0.5
+                },
+                {
+                  "Type": "MobBattle_Kill",
+                  "Effects": {
+                    "ItemAnimationId": "KillCast",
+                    "ClearAnimationOnFinish": true
+                  },
+                  "RunTime": 0.5
+                }
+              ]
             },
-            {
-              "Type": "MobBattle_Kill",
+            "1.5": {
+              "Type": "MobBattle_KillArea",
               "Effects": {
-                "ItemAnimationId": "KillCast",
-                "ClearAnimationOnFinish": true
+                "ItemPlayerAnimationsId": "MobBattle_SnapWand",
+                "ItemAnimationId": "SnapSlam"
               },
-              "RunTime": 0.5
+              "RunTime": 0.6
             }
-          ]
+          }
         }
       ]
     },

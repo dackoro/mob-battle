@@ -199,18 +199,19 @@ Mob Battle keeps its settings in `fx.properties` inside the plugin's data direct
 
 ### Security keys
 
-Three settings decide who can do what or what gets logged:
+These settings decide who can do what, what gets logged and which parts of the mod the server runs:
 - `permissions.mode`;
 - `debug` (`debugLog`);
-- `debug.record` (`debugRecord`).
+- `debug.record` (`debugRecord`);
+- `server.vs`, `server.hologram`, `server.icons` (`serverVs`, `serverHolograms`, `serverIcons`).
 
 These are kept out of everything that bulk-changes settings, so loading a preset can never quietly open the server or switch logging on:
 - Built-in presets, saved presets and `reset <group>` never change them.
 - Saved presets never store them.
 - The panel's Undo never restores the permission mode.
-- The two debug toggles are admin-only fields, so they only show up in an admin's form.
+- The debug toggles and the server features are admin-only fields, so they only show up in an admin's form.
 
-To change them, use the admin commands (`permissions`, `debugLog`, `debugRecord`), the Admin page, or edit the file and `reload`.
+To change them, use the admin commands (`permissions`, `debugLog`, `debugRecord`, `serverVs`, `serverHolograms`, `serverIcons`), the Admin page, or edit the file and `reload`.
 
 ## Debug tools
 
@@ -281,3 +282,13 @@ Countdown, titles, cameras, timers and music follow the usual settings for the b
 - Ownerless events don't draw the fighter laser. Its emitter must be a player, and an NPC emitter hasn't been verified.
 - How ownerless events look in game (viewers, titles, cameras, timers, music) has had limited testing so far.
 - Vanilla commands may not print NPC UUIDs. Use `/mobbattle event list` to find them.
+
+## Picture cache
+
+Mob Battle draws pictures of every mob (VS screen, settings panel icons, Morph Wand hologram) the first time it starts, then keeps them in one folder per machine, shared by every world and server on it: `UserData/MobBattleCache` next to `Saves` in single player, `%APPDATA%\Hytale\UserData\MobBattleCache` on Windows, else `~/.cache/mobbattle`. Set the `MOBBATTLE_CACHE` environment variable (or `-Dmobbattle.cache=<folder>`) to put it elsewhere. Only pictures whose model, texture or mod changed are drawn again. The folder can be deleted at any time; the next start draws everything again (1-2 minutes). The server log says where it is ("Picture cache: ..."). Each world or server only sends its players the pictures of mobs it has loaded (another world's mods stay in the folder, unsent). Pictures of mobs no world or server on the machine has loaded for 30 days are deleted at the next start.
+
+What each joining player downloads: the pictures of every mob the server has loaded, about 40 MB with a few big mod packs. Their game keeps them by content, so the next join only downloads the ones that changed. In single player the same happens inside your own computer, with no internet needed. A friend who joins your world downloads them from you.
+
+`/mobbattle pictures status` (admin, console too) says where the cache is, how many pictures of each kind there are, how much they weigh on disk and what each joining player downloads. `/mobbattle pictures rebuild` draws the missing or outdated pictures now, in the background, with progress in chat every few seconds and a summary at the end (time and size of each group); the game keeps running. `rebuild force` draws every picture again. New pictures are sent to the players online at once (one asset reload); pictures that were already in use and got redrawn are used from the next restart. The settings panel's Admin tab has both as buttons.
+
+**Lighter joins: turn picture features off.** On a server that does not want them, `/mobbattle serverVs off` (no VS screen), `serverHolograms off` (no Morph Wand hologram) and `serverIcons off` (the panel shows the game's own icons or a "?") stop those features at once, and from the next server restart their pictures are neither drawn nor sent: the VS screen alone is most of the download (about 35-50 MB with big mod packs). With all three off, the server draws no pictures at all at boot. Admins can also switch them on the settings panel's Admin tab, under Server features.

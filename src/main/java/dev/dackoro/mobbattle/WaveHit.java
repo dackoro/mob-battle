@@ -80,11 +80,11 @@ final class WaveHit {
         if (groups.isEmpty()) return;
         var store = targets.get(0).getStore();
         var world = store.getExternalData().getWorld();
-        groups.forEach((at, group) -> com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        groups.forEach((at, group) -> world.scheduleAfter(() -> {
             if (store.isShutdown()) return;
             List<Ref<EntityStore>> live = new ArrayList<>();
             for (Ref<EntityStore> r : group) if (r.isValid()) live.add(r);
             if (!live.isEmpty()) hit.accept(live, store);
-        }), at, java.util.concurrent.TimeUnit.MILLISECONDS));
+        }, at, java.util.concurrent.TimeUnit.MILLISECONDS));
     }
 }

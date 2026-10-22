@@ -137,7 +137,7 @@ public final class MobBattleApi {
                 FightManager.provoke(second, first, acc);
                 FightManager.provoke(first, second, acc);
                 Arena.setupAround(battle, acc);
-                FightFx.title(battle, I18n.tr("battle.fight"), I18n.tr("battle.fight.vs").param("a", nameA).param("b", nameB));
+                FightFx.title(battle, I18n.tr("battle.fight"), I18n.tr("battle.fight.vs").param("a", MobNames.message(nameA)).param("b", MobNames.message(nameB)));
                 running(id);
             }, reason -> terminal(id, reason, List.of(), null));
             return accepted(id, eventAnchor, Mode.DUEL);
@@ -218,7 +218,7 @@ public final class MobBattleApi {
             if (refused != null) return refused;
             beginIntro(BattleManager.Kind.ALL_VS_ONE, eventAnchor, center,
                     List.of(List.of(target), new ArrayList<>(attackers)), store);
-            Countdown.run(BattleManager.Kind.ALL_VS_ONE, eventAnchor, store, new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", targetName)), all, acc -> {
+            Countdown.run(BattleManager.Kind.ALL_VS_ONE, eventAnchor, store, new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", MobNames.message(targetName))), all, acc -> {
                 attackers.removeIf(m -> !livingNpc(m, acc) || !PlayerFighters.canStart(m, acc));
                 if (!livingNpc(target, acc) || !PlayerFighters.canStart(target, acc) || attackers.isEmpty()) {
                     terminal(id, EndReason.CANCELLED_COUNTDOWN, List.of(), null);
@@ -246,7 +246,7 @@ public final class MobBattleApi {
                 }
                 WandFx.loneCrown(target, acc);
                 Buffs.set(target, Buffs.Source.LONE, 1);
-                FightFx.title(battle, I18n.tr("battle.label.everyone").param("name", targetName),
+                FightFx.title(battle, I18n.tr("battle.label.everyone").param("name", MobNames.message(targetName)),
                         I18n.tr("battle.sub.attackers").param("count", aggressive));
                 running(id);
             }, reason -> terminal(id, reason, List.of(), null));

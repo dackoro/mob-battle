@@ -403,7 +403,7 @@ final class LookKeeper {
     /** Second half of a re-send: the look goes back on, if the mob is still tracked with it and alive. */
     private static void resendLater(Ref<EntityStore> ref, Tracked t, Store<EntityStore> store) {
         var world = store.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             t.pending = false;
             if (store.isShutdown() || !ref.isValid() || TRACKED.get(ref) != t
                     || store.getComponent(ref, DeathComponent.getComponentType()) != null) {
@@ -421,7 +421,7 @@ final class LookKeeper {
             t.seen = effects.getActiveEffectIndexes().clone();
             t.seenLeft = remaining(effects, t.seen);
             t.touched = false;
-        }), RESEND_GAP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, RESEND_GAP_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** From WandFx.prune (BattleManager.maintain, 1/s): a Ref keeps its whole world alive. */

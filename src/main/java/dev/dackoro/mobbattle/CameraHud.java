@@ -55,6 +55,42 @@ final class CameraHud {
         });
     }
 
+    /** Players whose chat a VS screen hid (it was showing then): it comes back when the VS ends. */
+    private static final Set<UUID> CHAT_HIDDEN = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Hides the chat while a VS screen shows (user, 2026-10-17: the countdown's chat lines sat over the VS). Only when
+     * it shows now, so a player who hid their chat keeps it hidden. Any thread; queued after an earlier hide/restore.
+     */
+    static void hideChat(PlayerRef player) {
+        if (player == null) return;
+        onWorld(player, p -> {
+            var huds = p.getHudManager();
+            Set<HudComponent> now = huds.getVisibleHudComponents();
+            if (now == null || !now.contains(HudComponent.Chat)) return;
+            Set<HudComponent> less = copy(now);
+            less.remove(HudComponent.Chat);
+            huds.setVisibleHudComponents(player, less);
+            CHAT_HIDDEN.add(player.getUuid());
+        });
+    }
+
+    /** Puts back the chat hideChat took (after the VS end's restore, which may have brought it back already). */
+    static void showChat(PlayerRef player) {
+        if (player == null || !CHAT_HIDDEN.remove(player.getUuid())) return;
+        onWorld(player, p -> {
+            var huds = p.getHudManager();
+            Set<HudComponent> now = huds.getVisibleHudComponents();
+            Set<HudComponent> more = now == null ? EnumSet.noneOf(HudComponent.class) : copy(now);
+            if (more.add(HudComponent.Chat)) huds.setVisibleHudComponents(player, more);
+        });
+    }
+
+    /** A player who left during a VS: nothing to give back. */
+    static void forgetChat(UUID player) {
+        CHAT_HIDDEN.remove(player);
+    }
+
     /** Players whose restore came while a VS screen covered them: the VS gives the HUD back when it ends. */
     private static final Set<UUID> DEFERRED = ConcurrentHashMap.newKeySet();
 
@@ -69,7 +105,9 @@ final class CameraHud {
         DEFERRED.remove(player.getUuid());
         onWorld(player, p -> {
             Set<HudComponent> saved = SAVED.remove(player.getUuid());
-            if (saved != null) p.getHudManager().setVisibleHudComponents(player, saved);
+            // A watch that began meanwhile set the spectator's own HUD (GameModeTypes.enter); the saved one would undo
+            // it (audit 2026-10-17: a cut intro's restore landed after /mobbattle watch).
+            if (saved != null && !BattleWatch.isWatching(player)) p.getHudManager().setVisibleHudComponents(player, saved);
         });
     }
 
@@ -83,21 +121,42 @@ final class CameraHud {
     }
 
     private static void onWorld(PlayerRef player, java.util.function.Consumer<Player> task) {
-        if (!player.isValid()) return;
+        onWorld(player, task, 3);
+    }
+
+    /**
+     * On the player's world thread. A player who changed world meanwhile gets it on the new one (a few tries): the game
+     * keeps the hidden HUD set across worlds, so a lost restore left it hidden there (audit 2026-10-17).
+     */
+    private static void onWorld(PlayerRef player, java.util.function.Consumer<Player> task, int tries) {
+        if (tries <= 0 || !player.isValid()) return;
         Ref<EntityStore> ref = player.getReference();
-        if (ref == null || !ref.isValid()) return;
-        ref.getStore().getExternalData().getWorld().execute(() -> {
-            try {
-                Player p = ref.isValid() ? ref.getStore().getComponent(ref, Player.getComponentType()) : null;
-                if (p != null) task.accept(p);
-            } catch (RuntimeException e) {
-                MobBattlePlugin.log("Camera HUD failed: " + e);
-            }
-        });
+        if (ref == null || !ref.isValid()) {
+            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> onWorld(player, task, tries - 1),
+                    500, java.util.concurrent.TimeUnit.MILLISECONDS);
+            return;
+        }
+        try {
+            ref.getStore().getExternalData().getWorld().execute(() -> {
+                if (player.getReference() != ref || !ref.isValid()) {
+                    onWorld(player, task, tries - 1);
+                    return;
+                }
+                try {
+                    Player p = ref.getStore().getComponent(ref, Player.getComponentType());
+                    if (p != null) task.accept(p);
+                } catch (RuntimeException e) {
+                    MobBattlePlugin.log("Camera HUD failed: " + e);
+                }
+            });
+        } catch (RuntimeException e) {   // the world stopped taking tasks
+            MobBattlePlugin.log("Camera HUD: world task refused: " + e);
+        }
     }
 
     /** FightCamera.prune: forgets players who left (a reconnect gets the game's default HUD anyway). */
     static void prune() {
+        if (!DEFERRED.isEmpty()) DEFERRED.removeIf(id -> Universe.get().getPlayer(id) == null);
         if (SAVED.isEmpty()) return;
         SAVED.keySet().removeIf(id -> Universe.get().getPlayer(id) == null);
     }

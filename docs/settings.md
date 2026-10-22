@@ -53,6 +53,7 @@ Overrides are saved as `kind.<kind>.<option>` with the option word in lowercase,
 | Option | Global key | Override key | Override values | Reset group |
 |---|---|---|---|---|
 | `countdown` | `fight.countdown` | `kind.<kind>.countdown` | 0-10 | titles |
+| `readyTime` | `fight.ready` | `kind.<kind>.readytime` | 0-60 | titles |
 | `startTitle` | `title.enabled` | `kind.<kind>.starttitle` | on, off | titles |
 | `winTitle` | `wintitle.enabled` | `kind.<kind>.wintitle` | on, off | titles |
 | `music` | `battle.music`, `battle.music.track` | `kind.<kind>.music` | on (global track), off, or a track ID | titles |
@@ -95,7 +96,7 @@ A preset changes many settings at once. In the panel, loading a preset only fill
 | `fight` | Just the fights: no countdown, intro or end camera, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
 | `effects` | All the show but no cameras: countdown 3, titles, music, runes, area `discBorder`, a scoreboard for every kind; duels, all vs one and teams get a 2 minute timer with `timeUp health`, the royale keeps its 3 minutes and `judge`. |
 | `debug` | Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card, the all vs one card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
-| `cinematic` | Countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), `cameraBars wide`, titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
+| `cinematic` | 8 seconds to get in position (`readyTime`), countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), `cameraBars wide`, titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
 
 Every built-in preset except `default` first puts the presentation settings back to their defaults (countdown, cameras, titles, music, laser, area look, runes, crown, waves, border colors, mob looks, duel card, all vs one card, scoreboards) and removes every per-kind override, then applies its own values. Settings it doesn't name (area radius, max mobs, battle rules, buffs, wands and so on) stay as they are.
 
@@ -115,7 +116,7 @@ Every built-in preset except `default` first puts the presentation settings back
 |---|---|
 | `effects` | Fighter laser and its color, runes, area look, color, height and "only with the wand", waves, border colors, mob looks, lone-target crown, team look (mode, time, only with the wand), army tint and color, wand effects, Cleanse/Buff/Heal Wand colors and lights, look glow, death glow, summon jade and its color; per-kind `fightLaser`, `runes`, `areaStyle`. |
 | `cameras` | Intro camera, camera style, time, showcase shots, who sees the cameras, end camera and its time, auto watch; their per-kind overrides. |
-| `titles` | Countdown, start and winner titles, title style, who sees the titles, battle music and track; per-kind `countdown`, `startTitle`, `winTitle`, `music`. |
+| `titles` | Countdown, time to get in position, start and winner titles, title style, who sees the titles, battle music and track; per-kind `countdown`, `readyTime`, `startTitle`, `winTitle`, `music`. |
 | `arenas` | Arena, timer, at time up, judge by, closing arena (per kind, plus its final radius and time), scoreboard, arena size, timer box, tie break, unstick, stand-off shove, passive win and its "never ends against" list, duel card, all vs one card. |
 | `rules` | Isolation, self defense, friendly fire, players can fight, battle PvP, duel mode, area radius, max mobs, team by type, every buff setting, summon area, random counts, at least one, summons leave, lifetime, how they leave, summons join my army. |
 | `wands` | Heal Wand wave and reach, Effect Wand effect, its wave and reach, Kill Wand (soul rip time, cast hit delay, loot, players), Snap Wand (mode, share, time, hit delay, reach, players), Cleanse Wand wave and its reach, Morph Wand (players, held-click waves and their reach), Debug Wand follow time. |
@@ -132,6 +133,7 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
 | Countdown | `/mobbattle countdown <seconds>` | `fight.countdown` | 0-10, 0 = start at once | 0 | titles |
+| Time to get in position | `/mobbattle readyTime <seconds>\|off` | `fight.ready` | 0-60, 0 = none. Seconds to get to your spot before the VS screen and the countdown; crouch to start at once. Never when you fight in the battle yourself | 0 | titles |
 | Start title | `/mobbattle startTitle on\|off` | `title.enabled` | true, false | on | titles |
 | Winner title | `/mobbattle winTitle on\|off` | `wintitle.enabled` | true, false | on | titles |
 | Title style | `/mobbattle titleStyle <style>` | `title.style` | `Default`, `Major`, `GoblinBreach`, `VoidEviction`, `random` | `Major` | titles |
@@ -142,7 +144,7 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Laser color | `/mobbattle fightLaserColor <color>\|random` | `laser.color` | palette color (stored as its hex) or `random` | red (`#FF4B3E`) | effects |
 | Summoning runes | `/mobbattle runes on\|off` | `fx.runes` | true, false | on | effects |
 
-`music <track>` also turns the music on. Default: `MobBattle_Battle_Music` (the goblin boss battle song, louder and looping). Game battle tracks: `Track_Z1D_Goblin_Boss_Battle` (quiet, plays once), `Track_Void_Escalation`, `Track_Void_Tension`.
+`music <track>` also turns the music on. Default: `MobBattle_Battle_Music` (the game's goblin boss battle song, louder and looping). The game's own `Track_Z1D_Goblin_Boss_Battle` is quiet and plays once, so naming it plays `MobBattle_Battle_Music` instead. Other game battle tracks: `Track_Void_Escalation`, `Track_Void_Tension`.
 
 ### Cameras
 
@@ -159,17 +161,20 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | End camera | `/mobbattle endCamera off\|winner\|lastHit` | `camera.end` | off, winner, lasthit | off | cameras |
 | End camera time | `/mobbattle endCameraTime <seconds>` | `camera.end.time` | 1-600 (above 15 warns) | 5 | cameras |
 | Auto watch | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
+| Watch: changing fighter | `/mobbattle watchTransition cut\|glide` | `camera.watch.transition` | cut, glide | glide | cameras |
+| Watch: next fighter every | `/mobbattle watchAutoSwitch <seconds>\|off` | `camera.watch.autoswitch` | 0 (off), 3-600 | 0 | cameras |
 | Film bands | `/mobbattle cameraBars off\|slim\|classic\|wide` | `camera.bars` | off, slim, classic, wide | classic | cameras |
 | Background blur | `/mobbattle cameraBlur off\|soft\|strong` | `camera.blur` | off, soft, strong | soft | cameras |
 | Auto film | `/mobbattle autoFilm on\|off` | `camera.autofilm` | true, false | off | cameras |
 | Shots of you | `/mobbattle filmPlayerShots <0-100>` | `camera.film.player` | 0-100 (percent, 0 = only the battle) | 20 | cameras |
 | Far wide shots | `/mobbattle filmWideShots <0-100>` | `camera.film.wide` | 0-100 (percent, +15 with a mob over 4 blocks tall) | 30 | cameras |
-| Close-ups face the mob | `/mobbattle cameraFace on\|off` | `camera.face` | on, off | on | cameras |
+| Close-ups face the mob | `/mobbattle cameraFace on\|off` | `camera.face` | true, false | on | cameras |
 | Shot length | `/mobbattle filmShotTime <seconds>` | `camera.film.shot` | 3-60 | 8 | cameras |
 | Shot length variation | `/mobbattle filmShotVariation <0-90>` | `camera.film.variation` | 0-90 (percent) | 25 | cameras |
 | Camera pace | `/mobbattle filmPace <25-300>` | `camera.film.pace` | 25-300 (percent) | 100 | cameras |
 | Between shots | `/mobbattle filmTransition cut\|glide` | `camera.film.transition` | cut, glide | cut | cameras |
 | Film shots | `/mobbattle filmShot <shot> <0-300>` (`filmShots <list>` = those on, the rest off; `filmShots default` = all back to default; panel: Defaults button) | `camera.film.weight.<shot>` | 0-300 percent of normal per shot: wide, track, arc, pushin, closeup, landscape, playerback, playerclose, zenith, spiral, telephoto, descent, groundrise, profile | 100; spiral 80, telephoto and descent 70, landscape and groundrise 50, zenith 40 | cameras |
+| Film style | `/mobbattle filmStyle default\|battle\|action\|cinematic` (panel: the four buttons above the film shots) | (sets every `camera.film.*` key) | battle = fight always in view; action = close on the fighters; cinematic = open, slow, gliding shots | default | cameras |
 | Duel card | `/mobbattle duelCard on\|off` | `battle.duelCard` | true, false | off | arenas |
 | All vs one card | `/mobbattle focusCard on\|off` | `battle.focusCard` | true, false | off | arenas |
 
@@ -307,6 +312,9 @@ Shortcuts: `/mobbattle buff <who> all <percent>` sets every stat at once, speed 
 | Drop loot | `/mobbattle killLoot on\|off` | `kill.loot` | true, false | off | wands |
 | Death glow | `/mobbattle deathGlow <0-15>` | `fx.glow.death` | 0-15, 0 = off | 12 | effects |
 | Works on players (Kill Wand) | `/mobbattle killPlayers on\|off` | `kill.players` | true, false | on | wands |
+| Kill wave (held left click) | `/mobbattle killArea on\|off` | `kill.area` | true, false | on | wands |
+| Kill wave reach | `/mobbattle killRadius <blocks>` | `kill.area.radius` | 1-2048 (above 128 warns) | 12 | wands |
+| Kill wave takes players | `/mobbattle killAreaPlayers on\|off` | `kill.area.players` | true, false | off | wands |
 | Snap mode | `/mobbattle snapMode global\|team` | `snap.mode` | global, team | global | wands |
 | Share that turns to dust | `/mobbattle snapPercent <1-100>` | `snap.percent` | 1-100 | 50 | wands |
 | Dust time | `/mobbattle snapTime <seconds>` | `snap.time` | 1-600 seconds | 5 | wands |
@@ -360,6 +368,11 @@ These are changed only by their own commands (admin), never by presets, resets o
 |---|---|---|---|---|
 | Debug log | `/mobbattle debugLog on\|off` | `debug` | true, false | off |
 | Debug recorder | `/mobbattle debugRecord on\|off` | `debug.record` | true, false | off |
+| Server feature: VS screen | `/mobbattle serverVs on\|off` | `server.vs` | true, false | on |
+| Server feature: Morph Wand hologram | `/mobbattle serverHolograms on\|off` | `server.hologram` | true, false | on |
+| Server feature: panel mob pictures | `/mobbattle serverIcons on\|off` | `server.icons` | true, false | on |
 | Permission mode (Admin tab buttons) | `/mobbattle permissions open\|server` | `permissions.mode` | open, server | open |
 
-The panel can change the debug log and recorder (admins only), but never the permission mode through the form. Related admin commands that are not settings: `/mobbattle debugDump` (write the recorder's lines to `debug/`), `/mobbattle reload`. See [server-setup.md](server-setup.md).
+The server features turn a part of the mod off for the whole server: off, it does nothing, and from the next server restart its pictures are neither drawn nor sent to joining players (the VS screen's are the biggest download). See [server-setup.md](server-setup.md#picture-cache).
+
+The panel can change the debug log, the recorder and the server features (admins only), but never the permission mode through the form. Related admin commands that are not settings: `/mobbattle debugDump` (write the recorder's lines to `debug/`), `/mobbattle reload`. See [server-setup.md](server-setup.md).

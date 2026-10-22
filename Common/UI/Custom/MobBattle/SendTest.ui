@@ -1,0 +1,43 @@
+// Dev test (UiTests.java, /mobbattle test send; 2026-10-17): can a picture sent to ONE player (never registered for
+// everyone) show in their HUD? 1 = its asset packets only, 2 = the same plus an asset rebuild for that player only,
+// 3 = a path never sent, 4 = sent 1.5 s after the screen opened. (The game's sendAssetsToPlayer crashed the client.)
+Group #SendTest {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+  Background: #0b0f18(0.92);
+
+  Label #Title {
+    Anchor: (Left: 60, Top: 120, Width: 1800, Height: 34);
+    Text: "Sent only to you. 1 = packets, no rebuild (green circle). 2 = packets + rebuild for you (blue triangle). 3 = never sent. 4 = arrives 1.5 s after the screen (orange square)";
+    Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true);
+  }
+
+  Group #S0 {
+    Anchor: (Left: 60, Top: 260, Width: 420, Height: 420);
+    Background: #303848(0.9);
+    AssetImage #S0Img { Anchor: (Left: 10, Top: 10, Width: 400, Height: 400); }
+  }
+
+  Group #S1 {
+    Anchor: (Left: 510, Top: 260, Width: 420, Height: 420);
+    Background: #303848(0.9);
+    AssetImage #S1Img { Anchor: (Left: 10, Top: 10, Width: 400, Height: 400); }
+  }
+
+  Group #S2 {
+    Anchor: (Left: 960, Top: 260, Width: 420, Height: 420);
+    Background: #303848(0.9);
+    AssetImage #S2Img { Anchor: (Left: 10, Top: 10, Width: 400, Height: 400); }
+  }
+
+  Group #S3 {
+    Anchor: (Left: 1410, Top: 260, Width: 420, Height: 420);
+    Background: #303848(0.9);
+    AssetImage #S3Img { Anchor: (Left: 10, Top: 10, Width: 400, Height: 400); }
+  }
+
+  Label #Info {
+    Anchor: (Left: 60, Top: 740, Width: 1800, Height: 40);
+    Text: "";
+    Style: (FontSize: 16, TextColor: #9fb3c8);
+  }
+}

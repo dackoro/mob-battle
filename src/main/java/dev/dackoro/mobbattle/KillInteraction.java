@@ -67,7 +67,7 @@ public class KillInteraction extends SimpleInstantInteraction {
         if (npc == null && PlayerFighters.cantDie(target, buffer)) {
             WandFx.onTarget(target, WandFx.FAIL, buffer);
             if (player != null) {
-                player.sendMessage(I18n.tr("chat.kill.cantDie").param("name", ChaosWand.nameOf(target, buffer)).color("#ffcc55"));
+                player.sendMessage(I18n.tr("chat.kill.cantDie").param("name", MobNames.message(ChaosWand.nameOf(target, buffer))).color("#ffcc55"));
             }
             return;
         }
@@ -82,17 +82,17 @@ public class KillInteraction extends SimpleInstantInteraction {
         // sound and the disintegration wait for it, like the Snap Wand's slam (snapHitDelay).
         var store = self.getStore();
         var world = store.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             if (store.isShutdown() || !target.isValid() || !BattleManager.isAlive(target, store)) return;
             hitNow(target, self.isValid() ? self : null, isNpc, player, name, store);
-        }), hit, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, hit, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     private static void hitNow(Ref<EntityStore> target, Ref<EntityStore> killer, boolean npc, PlayerRef player,
                                String name, com.hypixel.hytale.component.ComponentAccessor<EntityStore> buffer) {
         WandFx.kill(target, killer, npc, buffer);
         if (player != null && player.isValid()) {
-            player.sendMessage(I18n.tr("chat.kill.done").param("name", name).color("#ff5555"));
+            player.sendMessage(I18n.tr("chat.kill.done").param("name", MobNames.message(name)).color("#ff5555"));
         }
     }
 

@@ -32,8 +32,9 @@ final class MajorDungeonsCompat {
     /** {@code mob} (world thread) keeps its MajorDungeons arena from resetting it; no-op for any other mob. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     static void keepBoss(Ref<EntityStore> mob, ComponentAccessor<EntityStore> acc) {
-        if (looked && type == null) return;
-        if (!ready() || mob == null || !mob.isValid()) return;
+        // the lock only on the first call: this runs for every battle mob every second, on every world thread
+        if (!looked) ready();
+        if (type == null || mob == null || !mob.isValid()) return;
         try {
             Object boss = acc.getComponent(mob, (ComponentType) type);
             if (boss != null) setEmptySince.invoke(boss, System.currentTimeMillis());

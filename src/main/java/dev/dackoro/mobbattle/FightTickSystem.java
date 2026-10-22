@@ -60,7 +60,10 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         boolean countdowns = Countdown.hasPending();
         boolean snaps = Snap.any();
         boolean homes = ChaseSupport.anyHome();
-        if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !snaps && !homes && !FightManager.hasFights()) {
+        // DamageGroups: a mob whose wand fight ended with nothing else running still needs its groups back
+        boolean groups = DamageGroups.any();
+        if (!battles && !drafts && !stops && !heals && !looks && !kills && !countdowns && !snaps && !homes && !groups
+                && !FightManager.hasFights()) {
             // Nothing running anywhere: drop the timers, their Refs would keep unloaded worlds reachable.
             if (!timers.isEmpty()) timers.clear();
             return;
@@ -124,7 +127,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             // Managed mobs too (audit 2026-10-14): a mob stays managed after its battle, and an army fight it had later
             // left its HOME entry for good, which kept this system busy on every NPC.
             if (homes && ChaseSupport.hasHome(self)) ChaseSupport.restoreLeash(self, buffer);
-            if (DamageGroups.any()) DamageGroups.restore(self, buffer);
+            if (groups) DamageGroups.restore(self, buffer);
             return;
         }
         if (!due(self, now, CHECK_INTERVAL_MS, t -> t.check, (t, v) -> t.check = v)) {

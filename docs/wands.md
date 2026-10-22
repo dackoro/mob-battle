@@ -20,7 +20,7 @@ Each wand's tooltip explains what it does, in English and Spanish.
 |---|---|---|---|---|---|
 | `MobBattle_Wand` | Battle Wand | Legendary | Pick mob A, then mob B: they duel | Clear the selection, or cancel a duel countdown | Yes, with `playerFights duel` |
 | `MobBattle_ChaosWand` | Chaos Wand | Epic | Everyone vs one: every mob around attacks the clicked one | Battle royale around the mob you aim at, or around you | Yes, with `playerFights allVsOne` / `royale` |
-| `MobBattle_TeamWand` | Team Wand | Rare | Add or remove a mob in the current team | In the air: next team. On a mob: start the team battle | Yes, with `playerFights teams` |
+| `MobBattle_TeamWand` | Team Wand | Rare | Add or remove a mob in the current team | In the air: next team. On a mob: start the team battle. Crouching in the air, 3 times: clear every team | Yes, with `playerFights teams` |
 | `MobBattle_SummonWand` | Summon Wand | Uncommon | Add or remove the mob's type in the summon list | Summon the whole list around you | No |
 | `MobBattle_ArmyWand` | Army Wand | Rare | Add or remove a mob in your army (crouch: recruit for a mob leader or another player) | Disband that army | No |
 | `MobBattle_MorphWand` | Morph Wand | Uncommon | Give the mob the copied model (hold: every mob around) | Copy a model or a player's look (in the air: show the copied one; hold: the mobs around swap looks) | Yes, with `morphPlayers` |
@@ -116,6 +116,8 @@ Builds teams and starts a team battle. The last team standing wins. Full details
 
 **Right click** spins the color wheel in the middle of the wand one full turn. **Right click in the air:** switches to the next team. **Right click a mob:** starts the battle. It needs at least 2 teams with living members.
 
+**Crouch + right click in the air, three times:** clears every team. The first click warns in yellow, the second in red, and the third clears them (each within 4 seconds of the last). While flying in Creative the crouch key flies down instead, so land first.
+
 **While you hold the wand**, each team's mobs show a ring in the team color at their feet. Only you can see these rings.
 
 **Sound:** a spellbook impact on each left click.
@@ -182,6 +184,8 @@ Gives a mob another mob's model. It keeps its own AI, weapon, attacks and health
 
 **Switching to the wand** in your hotbar plays the Omnitrix power-on sound.
 
+**Hologram:** while you hold the wand, a green hologram of the mob you copied floats over its gem (not for a copied player look). Everyone around sees it. The pictures are drawn by the server when it starts; a mob copied for the first time gets its hologram after the next restart.
+
 **Sounds:** `SFX_MobBattle_OmnitrixOn` (switching to the wand, at you), `SFX_MobBattle_OmnitrixCopy` (at the mob whose model you copy) and `SFX_MobBattle_OmnitrixTransform` (at the mob as it transforms), each with a small random pitch and skipped with `wandFx off`. The transform burst also plays in the world at the mob, since the model swap can drop particles attached to the old model.
 
 **Other ways to pick a model:** [`/mobbattle morph <model>`](settings.md) (for example `Frog_Green`). `/mobbattle morph list [text]` searches model IDs (first 40 matches), and the Wands page of the settings panel has a searchable list with icons.
@@ -224,6 +228,8 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 
 **Left click:** kills the target, whatever its health.
 
+**Hold left click** (1.5 s, [`/mobbattle killArea on|off`](settings.md), default on): you slam the ground and a purple shockwave goes out [`/mobbattle killRadius`](settings.md) blocks (default 12). Every mob it reaches gets the soul rip, as the ring gets to it (`waveTravel`), with one hakai sound for the whole wave. You and your own army (every mob under you, also the armies of leaders that serve you) are spared. Players only with [`/mobbattle killAreaPlayers on`](settings.md) (default off, and `killPlayers` on too), never you nor a player who can't die. With `killArea off` the held click kills the target, like a quick one.
+
 **Step by step (a mob, default settings)**
 1. You channel with the wand. The hit lands [`/mobbattle killHitDelay`](settings.md) after the click (default 175 ms, matching the cast animation; `0` = on the click; skipped with `wandFx off`). The hakai sound, the disintegration and `killDelay` all start at the hit.
 2. A "hakai" sound (`SFX_MobBattle_Hakai`) plays from you, with a random pitch so it never sounds the same, also on instant kills. The mob plays its own death sound at the start, or a random dark one if its model has none; it doesn't repeat on removal.
@@ -253,6 +259,7 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 **Who is affected**
 - **Click a mob that is in a battle:** that battle's fighters, wherever they are.
 - **Click the air, or a mob in no battle:** every mob within [`/mobbattle snapRadius`](settings.md) (default 60) of the clicked mob or of you, fighting or not. This counts at any height, so fliers above and mobs in caves below are included, up to `maxMobs`. A white shockwave on the ground shows how far it reached. Players in reach are taken too with [`/mobbattle snapPlayers on`](settings.md) (the default), but never you and never players in Creative or invulnerable.
+- **Your own army is never snapped:** the mobs that serve you, also the armies of leaders under you, are left out of both cases.
 
 **Step by step**
 1. You slam the ground. The snap fires when the slam lands ([`/mobbattle snapHitDelay`](settings.md), default 310 ms) with the snap sound, even if nobody is picked.

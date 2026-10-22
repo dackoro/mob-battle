@@ -4,7 +4,6 @@ import com.hypixel.hytale.protocol.packets.interface_.EventTitleStyle;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
@@ -73,6 +72,12 @@ public final class FxSettings {
     /** Battle Wand: retain and merge connected duels instead of replacing the old pair. */
     public static boolean accumulateDuels = false;
     public static final int MAX_COUNTDOWN = 10;
+    /**
+     * Seconds to get in position before the VS screen and the countdown (/mobbattle readyTime, KindFx READY_TIME,
+     * ReadyWait; user, 2026-10-20). Default 0 = none; crouching starts it at once.
+     */
+    public static int readySeconds = 0;
+    public static final int MAX_READY = 60;
 
     /** Wand target effects: heal glow, soul rip, charm... (/mobbattle wandfx). Default: on. */
     public static boolean wandFx = true;
@@ -233,6 +238,16 @@ public final class FxSettings {
      * (DebugRecorder). Default off. Admin only, like debug (Presets.isSecurityKey).
      */
     public static volatile boolean debugRecord = false;
+    /**
+     * Server features (2026-10-18, user: a server owner can turn parts of the mod off; on by default). Off = the
+     * feature does nothing AND its pictures are neither drawn nor registered at boot, so joining players do not
+     * download them (that part takes a server restart). Admin only, never changed by presets, resets or Undo.
+     * VS screen (keys server.vs), Morph Wand hologram (server.hologram), panel mob pictures (server.icons).
+     */
+    public static volatile boolean serverVs = true;
+    public static volatile boolean serverHolograms = true;
+    public static volatile boolean serverIcons = true;
+    static final String[] SERVER_KEYS = {"server.vs", "server.hologram", "server.icons"};
     /** Debug Wand: seconds a left-clicked mob is followed after its report (/mobbattle debugTrack, 0 = report only). */
     public static int debugTrackSeconds = 30;
     static final int MAX_DEBUG_TRACK_SECONDS = 600;
@@ -502,6 +517,13 @@ public final class FxSettings {
     public static int endCameraSeconds = 5;
     /** The camera viewers start watching (/mobbattle watch) as soon as a battle starts (/mobbattle autoWatch). */
     public static boolean autoWatch = false;
+    /** Watch: how the camera goes to another fighter, cut (at once) or glide (it travels there through blocks) (/mobbattle watchTransition). */
+    public static String watchTransition = "glide";
+    static final String[] WATCH_TRANSITIONS = {"cut", "glide"};
+    /** Watch: seconds on each fighter before the camera goes to the next by itself, 0 = off (/mobbattle watchAutoSwitch). */
+    public static int watchAutoSwitch = 0;
+    static final int MIN_WATCH_AUTO_SWITCH = 3;
+    static final int MAX_WATCH_AUTO_SWITCH = 600;
     /** Black cinema bars over the intro and end cameras (/mobbattle cameraBars): off, slim, classic or wide (KindFx). */
     public static String cameraBars = "classic";
     /** /mobbattle cameraHud: hide = the game's HUD (hotbar, compass, boss bar...) goes away while a camera films (CameraHud). */
@@ -601,6 +623,14 @@ public final class FxSettings {
     public static boolean cleanseAreaSelf = false;
     public static boolean effectAreaSelf = false;
     public static boolean morphBurstSelf = false;
+    /**
+     * Kill Wand held left click: every mob in killRadius dies, never the caster nor their own army (/mobbattle killArea);
+     * players only with killAreaPlayers (and killPlayers) on.
+     */
+    public static boolean killArea = true;
+    public static final int DEFAULT_KILL_RADIUS = 12;
+    public static int killRadius = DEFAULT_KILL_RADIUS;
+    public static boolean killAreaPlayers = false;
     /** Heal Wand held click: reach in blocks (/mobbattle healRadius). */
     public static final int DEFAULT_HEAL_RADIUS = 12;
     public static int healRadius = DEFAULT_HEAL_RADIUS;
@@ -846,9 +876,18 @@ public final class FxSettings {
             } catch (NumberFormatException ignored) {
                 // keep the default
             }
+            try {
+                readySeconds = Math.max(0, Math.min(MAX_READY,
+                        Integer.parseInt(p.getProperty("fight.ready", String.valueOf(readySeconds)).trim())));
+            } catch (NumberFormatException ignored) {
+                // keep the default
+            }
             wandFx = Boolean.parseBoolean(p.getProperty("wand.fx", String.valueOf(wandFx)));
             debug = Boolean.parseBoolean(p.getProperty("debug", String.valueOf(debug)));
             debugRecord = Boolean.parseBoolean(p.getProperty("debug.record", String.valueOf(debugRecord)));
+            serverVs = Boolean.parseBoolean(p.getProperty("server.vs", String.valueOf(serverVs)));
+            serverHolograms = Boolean.parseBoolean(p.getProperty("server.hologram", String.valueOf(serverHolograms)));
+            serverIcons = Boolean.parseBoolean(p.getProperty("server.icons", String.valueOf(serverIcons)));
             if (!debugRecord) DebugRecorder.clear();
             try {
                 debugTrackSeconds = Math.max(0, Math.min(MAX_DEBUG_TRACK_SECONDS,
@@ -980,6 +1019,10 @@ public final class FxSettings {
             endCameraSeconds = Math.max(1, Math.min(KindFx.MAX_END_CAMERA_TIME, intOr(p, "camera.end.time", endCameraSeconds)));
             runes = Boolean.parseBoolean(p.getProperty("fx.runes", String.valueOf(runes)));
             autoWatch = Boolean.parseBoolean(p.getProperty("camera.autowatch", String.valueOf(autoWatch)));
+            String wt = p.getProperty("camera.watch.transition", watchTransition).trim().toLowerCase(java.util.Locale.ROOT);
+            watchTransition = java.util.Arrays.asList(WATCH_TRANSITIONS).contains(wt) ? wt : "glide";
+            int was = intOr(p, "camera.watch.autoswitch", watchAutoSwitch);
+            watchAutoSwitch = was <= 0 ? 0 : Math.max(MIN_WATCH_AUTO_SWITCH, Math.min(MAX_WATCH_AUTO_SWITCH, was));
             String bars = KindFx.parse(KindFx.Opt.CAMERA_BARS, p.getProperty("camera.bars", cameraBars));
             cameraBars = bars != null ? bars : "classic";
             String hud = p.getProperty("camera.hud", cameraHud).trim().toLowerCase(java.util.Locale.ROOT);
@@ -1032,6 +1075,10 @@ public final class FxSettings {
             morphBurstSelf = Boolean.parseBoolean(p.getProperty("morph.burst.self", String.valueOf(morphBurstSelf)));
             int hr = intOr(p, "heal.area.radius", healRadius);
             healRadius = hr <= 0 ? DEFAULT_HEAL_RADIUS : clampRadius(hr);
+            killArea = Boolean.parseBoolean(p.getProperty("kill.area", String.valueOf(killArea)));
+            int kr = intOr(p, "kill.area.radius", killRadius);
+            killRadius = kr <= 0 ? DEFAULT_KILL_RADIUS : clampRadius(kr);
+            killAreaPlayers = Boolean.parseBoolean(p.getProperty("kill.area.players", String.valueOf(killAreaPlayers)));
             waveTravel = Boolean.parseBoolean(p.getProperty("wand.wave.travel", String.valueOf(waveTravel)));
             waveGroundOnly = Boolean.parseBoolean(p.getProperty("wand.wave.groundonly", String.valueOf(waveGroundOnly)));
             battleWaveTravel = Boolean.parseBoolean(p.getProperty("battle.wave.travel", String.valueOf(battleWaveTravel)));
@@ -1047,13 +1094,41 @@ public final class FxSettings {
         }
         Properties p = toProperties();
         try {
-            Files.createDirectories(file.getParent());
-            try (OutputStream out = Files.newOutputStream(file)) {
-                p.store(out, "Mob Battle fight start effects (/mobbattle)");
-            }
+            storeAtomically(file, p, "Mob Battle fight start effects (/mobbattle)");
         } catch (IOException e) {
             MobBattlePlugin.log("Could not save " + file + ": " + e);
         }
+    }
+
+    /** One write at a time through writeAtomically (small, rare files: fx.properties, presets, summon lists, armies). */
+    private static final Object WRITE_LOCK = new Object();
+
+    /**
+     * Writes {@code bytes} to {@code file} through {@code <file>.tmp} and a rename, so a stop halfway through a write
+     * leaves the old file whole instead of a cut one (as PictureCache and vanilla BsonUtil.writeDocumentSync do).
+     */
+    static void writeAtomically(Path file, byte[] bytes) throws IOException {
+        synchronized (WRITE_LOCK) {
+            Files.createDirectories(file.getParent());
+            Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+            try {
+                Files.write(tmp, bytes);
+                try {
+                    Files.move(tmp, file, java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(tmp);
+            }
+        }
+    }
+
+    /** {@code p} as Properties.store writes it, through writeAtomically. */
+    static void storeAtomically(Path file, Properties p, String comment) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        p.store(out, comment);
+        writeAtomically(file, out.toByteArray());
     }
 
     /** Every setting as properties (what fx.properties holds). */
@@ -1076,9 +1151,13 @@ public final class FxSettings {
         p.setProperty("chaos.area.color", areaColor);
         p.setProperty("team.fx.onlywand", String.valueOf(teamLookOnlyWand));
         p.setProperty("fight.countdown", String.valueOf(countdownSeconds));
+        p.setProperty("fight.ready", String.valueOf(readySeconds));
         p.setProperty("wand.fx", String.valueOf(wandFx));
         p.setProperty("debug", String.valueOf(debug));
         p.setProperty("debug.record", String.valueOf(debugRecord));
+        p.setProperty("server.vs", String.valueOf(serverVs));
+        p.setProperty("server.hologram", String.valueOf(serverHolograms));
+        p.setProperty("server.icons", String.valueOf(serverIcons));
         p.setProperty("wand.debug.track", String.valueOf(debugTrackSeconds));
         p.setProperty("kill.delay.millis", String.valueOf(killDelayMs));
         p.setProperty("kill.loot", String.valueOf(killLoot));
@@ -1149,6 +1228,8 @@ public final class FxSettings {
         p.setProperty("camera.end", endCamera);
         p.setProperty("camera.end.time", String.valueOf(endCameraSeconds));
         p.setProperty("camera.autowatch", String.valueOf(autoWatch));
+        p.setProperty("camera.watch.transition", watchTransition);
+        p.setProperty("camera.watch.autoswitch", String.valueOf(watchAutoSwitch));
         p.setProperty("camera.bars", cameraBars);
         p.setProperty("camera.hud", cameraHud);
         p.setProperty("camera.face", String.valueOf(cameraFace));
@@ -1183,6 +1264,9 @@ public final class FxSettings {
         p.setProperty("effect.area.radius", String.valueOf(effectRadius));
         p.setProperty("heal.area", String.valueOf(healArea));
         p.setProperty("heal.area.radius", String.valueOf(healRadius));
+        p.setProperty("kill.area", String.valueOf(killArea));
+        p.setProperty("kill.area.radius", String.valueOf(killRadius));
+        p.setProperty("kill.area.players", String.valueOf(killAreaPlayers));
         p.setProperty("wand.wave.travel", String.valueOf(waveTravel));
         p.setProperty("wand.wave.groundonly", String.valueOf(waveGroundOnly));
         p.setProperty("battle.wave.travel", String.valueOf(battleWaveTravel));
@@ -1288,9 +1372,10 @@ public final class FxSettings {
     /** Settings as short labelled lines, one per group (see {@link #groupOf}). */
     public static String[] describeLines() {
         return new String[] {
-                "Titles: countdown " + countdownSeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope + ", camera " + onOff(fightCamera) + ", music " + (battleMusic ? musicTrack : "off")
+                "Titles: countdown " + countdownSeconds + " s, readyTime " + readySeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope + ", camera " + onOff(fightCamera) + ", music " + (battleMusic ? musicTrack : "off")
                         + ", runes " + onOff(runes) + " | cameraStyle " + cameraStyle + ", cameraTime " + (cameraSeconds > 0 ? cameraSeconds + " s" : "countdown")
                         + ", cameraShots " + cameraShots + ", endCamera " + endCamera + ", endCameraTime " + endCameraSeconds + " s, cameraScope " + cameraScope + ", autoWatch " + onOff(autoWatch)
+                        + ", watchTransition " + watchTransition + ", watchAutoSwitch " + (watchAutoSwitch > 0 ? watchAutoSwitch + " s" : "off")
                         + ", cameraBars " + cameraBars + ", cameraBlur " + cameraBlur + ", cameraHud " + cameraHud + ", cameraFace " + onOff(cameraFace)
                         + ", vsScreen " + onOff(vsScreen) + ", vsTeamReps " + vsTeamReps + ", autoFilm " + onOff(autoFilm) + ", filmPlayerShots " + filmPlayerShots + "%, filmWideShots " + filmWideShots + "%, filmShotTime " + filmShotSeconds + " s, filmShotVariation " + filmShotVariation + "%, filmPace " + filmPace + "%, filmTransition " + filmTransition + ", filmShot " + filmWeightsText()
                         + " | per kind: " + KindFx.describeOverrides(),
@@ -1314,23 +1399,24 @@ public final class FxSettings {
                         + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonCalm " + summonCalm + ", summonArmy " + onOff(summonArmy) + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
                         + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase() + ", armyFriendlyFire " + onOff(armyFriendlyFire),
-                "Wands: wandEffect " + effect + ", effectArea " + onOff(effectArea) + ", effectRadius " + effectRadius + ", healArea " + onOff(healArea) + ", healAreaSelf " + onOff(healAreaSelf) + ", effectAreaSelf " + onOff(effectAreaSelf) + ", cleanseAreaSelf " + onOff(cleanseAreaSelf) + ", morphBurstSelf " + onOff(morphBurstSelf) + ", healRadius " + healRadius + ", waveTravel " + onOff(waveTravel) + ", waveGroundOnly " + onOff(waveGroundOnly) + ", battleWaveTravel " + onOff(battleWaveTravel) + ", battleWaveGroundOnly " + onOff(battleWaveGroundOnly) + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", morphBurst " + onOff(morphBurst) + ", morphShuffle " + onOff(morphShuffle) + ", morphBurstRadius " + morphBurstRadius + ", cleanseColor " + cleanseColor.toLowerCase() + ", cleanseArea " + onOff(cleanseArea) + ", cleanseRadius " + cleanseRadius + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", buffLook " + buffLook + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
-                "Permissions: " + permissionsMode + " (/mobbattle permissions open|server)",
+                "Wands: wandEffect " + effect + ", effectArea " + onOff(effectArea) + ", effectRadius " + effectRadius + ", healArea " + onOff(healArea) + ", healAreaSelf " + onOff(healAreaSelf) + ", effectAreaSelf " + onOff(effectAreaSelf) + ", cleanseAreaSelf " + onOff(cleanseAreaSelf) + ", morphBurstSelf " + onOff(morphBurstSelf) + ", healRadius " + healRadius + ", waveTravel " + onOff(waveTravel) + ", waveGroundOnly " + onOff(waveGroundOnly) + ", battleWaveTravel " + onOff(battleWaveTravel) + ", battleWaveGroundOnly " + onOff(battleWaveGroundOnly) + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", killArea " + onOff(killArea) + ", killRadius " + killRadius + ", killAreaPlayers " + onOff(killAreaPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", morphBurst " + onOff(morphBurst) + ", morphShuffle " + onOff(morphShuffle) + ", morphBurstRadius " + morphBurstRadius + ", cleanseColor " + cleanseColor.toLowerCase() + ", cleanseArea " + onOff(cleanseArea) + ", cleanseRadius " + cleanseRadius + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", buffLook " + buffLook + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
+                "Permissions: " + permissionsMode + " (/mobbattle permissions open|server) | server features: serverVs " + onOff(serverVs)
+                        + ", serverHolograms " + onOff(serverHolograms) + ", serverIcons " + onOff(serverIcons),
         };
     }
 
     /** Which describeLines() line a setting key belongs to. */
     public static int groupOf(String key) {
         return switch (key) {
-            case "title", "wintitle", "style", "countdown", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch", "camerabars", "camerablur", "camerahud", "cameraface", "vsscreen", "vsteamreps", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "film" -> 0;
+            case "title", "wintitle", "style", "countdown", "readytime", "titlescope", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "autowatch", "watchtransition", "watchautoswitch", "camerabars", "camerablur", "camerahud", "cameraface", "vsscreen", "vsteamreps", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "filmstyle", "film" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "battlebelow", "battleabove", "arenavertical", "passivewin", "passivewinignore", "idleend", "battlemaxtime", "duelcard", "focuscard", "timerstyle", "tiebreak", "killtiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;
-            case "debuglog", "debugrecord", "debugtrack", "bufflook", "snapplayers", "morphplayers", "morphburst", "morphshuffle", "morphburstradius", "cleansearea", "cleanseradius", "healareaself", "cleanseareaself", "effectareaself", "morphburstself", "effectarea", "effectradius", "healarea", "healradius", "wavetravel", "wavegroundonly", "battlewavetravel", "battlewavegroundonly", "killhitdelay", "cleansecolor", "buffcolor", "bufflight", "heallight" -> 6;
+            case "debuglog", "debugrecord", "debugtrack", "killarea", "killradius", "killareaplayers", "bufflook", "snapplayers", "morphplayers", "morphburst", "morphshuffle", "morphburstradius", "cleansearea", "cleanseradius", "healareaself", "cleanseareaself", "effectareaself", "morphburstself", "effectarea", "effectradius", "healarea", "healradius", "wavetravel", "wavegroundonly", "battlewavetravel", "battlewavegroundonly", "killhitdelay", "cleansecolor", "buffcolor", "bufflight", "heallight" -> 6;
             case "radius", "area", "areacolor", "wave", "glow", "mobfx", "crown", "height", "areaonlywand", "maxmobs", "summonradius",
                  "summondespawn", "summonlifetime", "summonexit", "summoncalm", "summonarmy", "summonjade", "summonjadecolor" -> 4;
             case "teamfx", "teambytype", "armytint", "armytintcolor", "armyfriendlyfire" -> 5;
-            case "permissions" -> 7;
+            case "permissions", "servervs", "serverholograms", "servericons" -> 7;
             default -> 6;
         };
     }

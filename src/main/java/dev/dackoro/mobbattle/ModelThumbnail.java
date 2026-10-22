@@ -317,6 +317,8 @@ final class ModelThumbnail {
         JsonObject anim = JsonParser.parseString(pose.animJson()).getAsJsonObject();
         double duration = anim.has("duration") ? anim.get("duration").getAsDouble() : FPS;
         double time = Math.max(0, Math.min(1, pose.t())) * duration;
+        // a looping animation (holdLastKeyframe false) goes from its last keyframe back to its first, as in game
+        double loop = anim.has("holdLastKeyframe") && anim.get("holdLastKeyframe").getAsBoolean() ? 0 : duration;
         JsonObject nodes = anim.has("nodeAnimations") && anim.get("nodeAnimations").isJsonObject()
                 ? anim.getAsJsonObject("nodeAnimations") : new JsonObject();
         for (Group g : m.groups) {
@@ -324,20 +326,32 @@ final class ModelThumbnail {
             // far, so hoods and helmets covered the face in every animated pose (user, 2026-10-16)
             if (g.piece) continue;
             if (!nodes.has(g.name) || !nodes.get(g.name).isJsonObject()) continue;
+            // a node inside one of the same name (BetterMobExpansion's leopard: "Head" in "Head", the forearms too) is
+            // carried by it: animating both turned the inner one twice, a second head beside the first (user,
+            // 2026-10-17); only the outermost of the name takes the animation
+            if (insideSameName(g)) continue;
             JsonObject n = nodes.getAsJsonObject(g.name);
-            double[] q = sample(n, "orientation", time, true);
+            double[] q = sample(n, "orientation", time, true, loop);
             if (q != null) g.animQuat = normQ(q);
-            double[] p = sample(n, "position", time, false);
+            double[] p = sample(n, "position", time, false, loop);
             if (p != null) g.animPos = p;
-            double[] st = sample(n, "shapeStretch", time, false);
+            double[] st = sample(n, "shapeStretch", time, false, loop);
             if (st != null) g.animStretch = st;
             Boolean vis = sampleVisible(n, time);
             if (vis != null) g.animHidden = !vis;
         }
     }
 
+    /** Whether a group above {@code g} (not an attachment piece) has the same name. */
+    private static boolean insideSameName(Group g) {
+        for (Group up = g.parent; up != null; up = up.parent) {
+            if (!up.piece && g.name.equals(up.name)) return true;
+        }
+        return false;
+    }
+
     /** A vector channel ({x,y,z} or {x,y,z,w}) at {@code time} frames, or null if it has no keyframe. */
-    private static double[] sample(JsonObject node, String channel, double time, boolean quaternion) {
+    private static double[] sample(JsonObject node, String channel, double time, boolean quaternion, double loop) {
         if (!node.has(channel) || !node.get(channel).isJsonArray()) return null;
         JsonArray kfs = node.getAsJsonArray(channel);
         if (kfs.isEmpty()) return null;
@@ -347,10 +361,28 @@ final class ModelThumbnail {
             if (k.get("time").getAsDouble() <= time) a = k;
             else if (b == null) b = k;
         }
-        if (a == null) return vecOf(b.getAsJsonObject("delta"), quaternion);
-        if (b == null) return vecOf(a.getAsJsonObject("delta"), quaternion);
-        double ta = a.get("time").getAsDouble(), tb = b.get("time").getAsDouble();
-        double f = tb > ta ? (time - ta) / (tb - ta) : 0;
+        double ta, tb;
+        if (a != null && b != null) {
+            ta = a.get("time").getAsDouble();
+            tb = b.get("time").getAsDouble();
+        } else if (loop > 0 && kfs.size() > 1) {
+            // past the last keyframe (or before the first) of a looping animation: on its way from the last back to the
+            // first (2026-10-16, user: the flipbook's punch restarted before the arm came back)
+            JsonObject first = kfs.get(0).getAsJsonObject(), last = kfs.get(kfs.size() - 1).getAsJsonObject();
+            double tf = first.get("time").getAsDouble(), tl = last.get("time").getAsDouble();
+            a = last;
+            b = first;
+            if (time >= tl) {
+                ta = tl;
+                tb = tf + loop;
+            } else {
+                ta = tl - loop;
+                tb = tf;
+            }
+        } else {
+            return vecOf((a != null ? a : b).getAsJsonObject("delta"), quaternion);
+        }
+        double f = tb > ta ? Math.max(0, Math.min(1, (time - ta) / (tb - ta))) : 0;
         if (a.has("interpolationType") && "smooth".equals(a.get("interpolationType").getAsString())) f = f * f * (3 - 2 * f);
         double[] va = vecOf(a.getAsJsonObject("delta"), quaternion), vb = vecOf(b.getAsJsonObject("delta"), quaternion);
         if (quaternion) return nlerp(va, vb, f);
@@ -426,38 +458,14 @@ final class ModelThumbnail {
      */
     static final ThreadLocal<double[]> LAST_HEAD = new ThreadLocal<>();
 
-    /**
-     * What the model really draws, bind pose, in model units: {minX, minY, minZ, maxX, maxY, maxZ} over every box
-     * corner of the main mass (the same boxes render() keeps), or null with no boxes (2026-10-16: the 3D preview
-     * framed a mob by its hitbox, and a Gobliterator's crane and arm stuck out far above and to one side).
-     */
-    static double[] bounds(List<Part> parts) {
-        Model m = new Model();
-        for (int i = 0; i < parts.size(); i++) parse(m, parts.get(i).modelJson(), i, i > 0);
-        if (m.boxes.isEmpty()) return null;
-        List<double[]> centers = new ArrayList<>();
-        for (Box b : m.boxes) {
-            centers.add(world(b, new double[] {(b.from[0] + b.to[0]) / 2, (b.from[1] + b.to[1]) / 2, (b.from[2] + b.to[2]) / 2}));
-        }
-        boolean[] keep = keepMainMass(centers);
-        double[] r = {Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
-        boolean any = false;
-        for (int bi = 0; bi < m.boxes.size(); bi++) {
-            if (!keep[bi]) continue;
-            Box b = m.boxes.get(bi);
-            for (int f = 0; f < 6; f++) {
-                if (b.uv[f] == null) continue;
-                for (double[] c : corners(f, b.from, b.to)) {
-                    double[] p = world(b, c);
-                    for (int k = 0; k < 3; k++) {
-                        r[k] = Math.min(r[k], p[k]);
-                        r[k + 3] = Math.max(r[k + 3], p[k]);
-                    }
-                    any = true;
-                }
-            }
-        }
-        return any ? r : null;
+    /** Pixels per model unit in the last render() of this thread (64 units = 1 block at scale 1), or null. */
+    static final ThreadLocal<Double> LAST_SCALE = new ThreadLocal<>();
+
+    /** How much of a vertical length shows on screen from this view direction (the camera's up axis against the world's). */
+    static double upFactor(double[] dir) {
+        double[] z = norm(dir);
+        double[] x = norm(cross(new double[] {0, 1, 0}, z));
+        return Math.abs(cross(z, x)[1]);
     }
 
     static BufferedImage render(List<Part> parts, Pose pose, int size, double[] dir, boolean shade) {
@@ -509,6 +517,7 @@ final class ModelThumbnail {
         }
         double spanX = Math.max(1e-6, maxX - minX), spanY = Math.max(1e-6, maxY - minY);
         double scale = (size - 4) / Math.max(spanX, spanY);
+        LAST_SCALE.set(scale);
         int w = Math.max(1, (int) Math.ceil(spanX * scale) + 4), h = Math.max(1, (int) Math.ceil(spanY * scale) + 4);
         double ox = -minX * scale + 2, oy = maxY * scale + 2;   // screen y grows downward
         // where the head lands in the picture (centers of the "Head" bone's boxes), for framing on the face

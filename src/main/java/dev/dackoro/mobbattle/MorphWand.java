@@ -194,7 +194,8 @@ public final class MorphWand {
     }
 
     /**
-     * The copy's model at its scale times {@code factor} (a player's size buff), or null if its asset is gone. Its boxes
+     * The copy's model at its scale times {@code factor} (a player's size buff), or null if its asset is gone or the game
+     * refuses its copied skin (CosmeticsModule.createModel; callers check). Its boxes
      * scale with it, as vanilla expects: the hitbox is the model box times entity scale / model scale
      * (EntityScaleBoundingBoxSystem.resolveBoxScale, javap), so it ends up at the entity scale.
      */
@@ -207,7 +208,7 @@ public final class MorphWand {
         return asset != null ? Model.createScaledModel(asset, scale) : null;
     }
 
-    /** A player's own look at {@code factor} (as vanilla /model reset with a scale). */
+    /** A player's own look at {@code factor} (as vanilla /model reset with a scale); null for a skin the game refuses. */
     private static Model skinModel(PlayerSkin skin, float factor) {
         return CosmeticsModule.get().createModel(skin, factor);
     }
@@ -234,9 +235,26 @@ public final class MorphWand {
             // From a copied player look to a plain model: the copied skin goes, or the client keeps drawing it.
             dropSkin(entity, accessor);
         }
+        keepScaleRatio(entity, current.getModel(), model, accessor);
         putModel(entity, model, copy.skin() != null, accessor);
         modelChanged(entity);
         return true;
+    }
+
+    /**
+     * A mob's entity scale (a size buff, builder tools) replaces its model's own scale when drawn: across a model swap
+     * it keeps the same growth over the new model's size (audit 2026-10-17: a goblin morphed into a 2.5x Nightlord with
+     * a size buff, then cleansed, stayed 2.5x big for good, the scale saved with it). Players: Buffs and setPlayerSize.
+     */
+    private static void keepScaleRatio(Ref<EntityStore> entity, Model from, Model to, ComponentAccessor<EntityStore> accessor) {
+        if (from == null || to == null || isPlayer(entity, accessor)) return;
+        var es = accessor.getComponent(entity,
+                com.hypixel.hytale.server.core.modules.entity.component.EntityScaleComponent.getComponentType());
+        if (es == null) return;
+        float a = from.getScale(), b = to.getScale();
+        if (!(a > 0) || !(b > 0) || !Float.isFinite(a) || !Float.isFinite(b) || Math.abs(a - b) < 0.0001f) return;
+        es.setScale(es.getScale() / a * b);
+        Buffs.modelRescaled(entity, b);
     }
 
     /** Gives the entity back the look it had before its first morph. Returns false if it wasn't morphed. */
@@ -259,6 +277,11 @@ public final class MorphWand {
         Model model = original.skin() != null && isPlayer(entity, accessor)
                 ? skinModel(original.skin(), PLAYER_SIZE.getOrDefault(entity, 1f))
                 : original.model();
+        // createModel is null for a skin the game no longer accepts (validateSkin, decompiled 0.7.2): the saved model.
+        if (model == null) model = original.model();
+        if (model == null) return true;
+        ModelComponent before = accessor.getComponent(entity, ModelComponent.getComponentType());
+        keepScaleRatio(entity, before != null ? before.getModel() : null, model, accessor);
         putModel(entity, model, original.skin() != null, accessor);
         modelChanged(entity);
         return true;

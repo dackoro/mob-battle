@@ -62,6 +62,10 @@ final class BattleWatch extends CustomUIHud {
         final java.util.Set<Ref<EntityStore>> seen = ConcurrentHashMap.newKeySet();
         /** A 1v1 duel's two fighters, in team order, kept once seen (the fallen one leaves the battle's members). */
         List<Ref<EntityStore>> duelPair;
+        /** The camera on its way to another fighter (watchTransition glide), null when it follows one. */
+        volatile Glide glide;
+        /** When the camera last went to another fighter (watchAutoSwitch counts from here). */
+        volatile long lastSwitch = System.currentTimeMillis();
 
         Watch(BattleManager.Battle battle, Store<EntityStore> store, Vector3d home, Rotation3f homeLook) {
             this.battle = battle;
@@ -195,8 +199,7 @@ final class BattleWatch extends CustomUIHud {
             player.sendMessage(I18n.tr("battle.watch.not").color(WARN));
             return;
         }
-        Spectating sp = acc.getComponent(me, Spectating.getComponentType());
-        Ref<EntityStore> current = sp != null ? sp.getTargetRef() : null;
+        Ref<EntityStore> current = watched(w, me, acc);
         Ref<EntityStore> next = null;
         if (dir < 0) {
             synchronized (w.history) {
@@ -204,6 +207,14 @@ final class BattleWatch extends CustomUIHud {
                     Ref<EntityStore> r = w.history.removeLast();
                     if (r != current && r.isValid() && w.battle.has(r) && BattleManager.isAlive(r, acc)) next = r;
                 }
+            }
+            if (next == null) {
+                // nothing earlier: the fighter before the watched one in team order, the first wrapping to the last
+                // (user, 2026-10-17: "if I'm on the first, jump to the last of the list")
+                List<Ref<EntityStore>> alive = aliveSorted(w.battle, acc);
+                int at = current != null ? alive.indexOf(current) : -1;
+                Ref<EntityStore> before = alive.isEmpty() ? null : alive.get(at < 0 ? alive.size() - 1 : (at - 1 + alive.size()) % alive.size());
+                if (before != null && before != current) next = before;
             }
             if (next == null) {
                 player.sendMessage(I18n.tr("battle.watch.noearlier").color("#aaaaaa"));
@@ -231,7 +242,205 @@ final class BattleWatch extends CustomUIHud {
         }
         if (current != null) w.seen.add(current);
         w.seen.add(next);
-        switchTo(me, next, acc);
+        go(player, w, me, next, acc);
+    }
+
+    /** The fighter the camera is on, or on its way to. */
+    private static Ref<EntityStore> watched(Watch w, Ref<EntityStore> me, ComponentAccessor<EntityStore> acc) {
+        Glide g = w.glide;
+        if (g != null) return g.to;
+        Spectating sp = acc.getComponent(me, Spectating.getComponentType());
+        return sp != null ? sp.getTargetRef() : null;
+    }
+
+    // ---- going to another fighter: cut or glide ----
+
+    /**
+     * The camera on its way from one fighter to the next (watchTransition glide, 2026-10-18, user: the watch cut
+     * between fighters, the film can glide). Server camera frames (FightCamera.frame) every FRAME_MS: the point it
+     * looks at slides from the old fighter's eyes to the new one's (both followed while they move), the distance from
+     * one follow distance to the other, and the direction turns from the watcher's own to the line from where the
+     * camera started to the new fighter, so it ends behind it as the follow camera would be. A server camera at a
+     * set position never collides, so it goes through hills and walls. Spectating keeps the old fighter until the
+     * end (putting the new one sends vanilla's follow camera at once, which would cut), then the follow camera
+     * takes over with the glide's last direction.
+     */
+    private static final class Glide {
+        final Ref<EntityStore> from;   // followed while it stands; null = start from a fixed point (a glide cut short)
+        final Ref<EntityStore> to;
+        final double fromDist, toDist;
+        final float yaw0, pitch0, yaw1, pitch1;
+        final long start, durMs;
+        Vector3d fromLook, toLook;     // last known eyes of each end
+        float yaw, pitch;              // last frame
+        double dist;
+        Vector3d look;
+
+        Glide(Ref<EntityStore> from, Ref<EntityStore> to, Vector3d fromLook, Vector3d toLook, double fromDist, double toDist,
+              float yaw0, float pitch0, float yaw1, float pitch1, long durMs) {
+            this.from = from;
+            this.to = to;
+            this.fromLook = fromLook;
+            this.toLook = toLook;
+            this.fromDist = fromDist;
+            this.toDist = toDist;
+            this.yaw0 = yaw0;
+            this.pitch0 = pitch0;
+            this.yaw1 = yaw1;
+            this.pitch1 = pitch1;
+            this.start = System.currentTimeMillis();
+            this.durMs = durMs;
+            this.yaw = yaw0;
+            this.pitch = pitch0;
+            this.dist = fromDist;
+            this.look = fromLook;
+        }
+    }
+
+    private static final long FRAME_MS = 50;
+    /** Glide time: GLIDE_BASE_MS + GLIDE_MS_PER_BLOCK per block between the two, within GLIDE_MIN_MS..GLIDE_MAX_MS. */
+    private static final long GLIDE_BASE_MS = 400, GLIDE_MS_PER_BLOCK = 22, GLIDE_MIN_MS = 500, GLIDE_MAX_MS = 1600;
+    /** Frames at the end spot before the follow camera takes over, so the client's smoothing catches up. */
+    private static final long SETTLE_MS = 150;
+    /** Client smoothing of each frame (as the drone intro). */
+    private static final float GLIDE_LERP = 0.4f;
+    /** The direction it ends with: not steeper than this down or up (radians). */
+    private static final float PITCH_DOWN = -0.6f, PITCH_UP = 0.15f;
+
+    /** Goes to {@code target}: a glide (watchTransition glide) or a cut. World thread. */
+    private static void go(PlayerRef player, Watch w, Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        w.lastSwitch = System.currentTimeMillis();
+        if ("glide".equals(FxSettings.watchTransition) && glide(player, w, me, target, acc)) return;
+        w.glide = null;
+        switchTo(me, target, acc);
+    }
+
+    /** Starts a glide to {@code target} from where the camera is now; false when it can't (then go() cuts). */
+    private static boolean glide(PlayerRef player, Watch w, Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        Vector3d toLook = eyesOf(target, acc);
+        if (toLook == null) return false;
+        Glide now = w.glide;
+        Ref<EntityStore> from;
+        Vector3d fromLook;
+        double fromDist;
+        float yaw0, pitch0;
+        if (now != null) {
+            // already on the way: from the spot it is at now
+            from = null;
+            fromLook = now.look;
+            fromDist = now.dist;
+            yaw0 = now.yaw;
+            pitch0 = now.pitch;
+        } else {
+            Spectating sp = acc.getComponent(me, Spectating.getComponentType());
+            from = sp != null ? sp.getTargetRef() : null;
+            fromLook = from != null && from.isValid() ? eyesOf(from, acc) : null;
+            TransformComponent t = acc.getComponent(me, TransformComponent.getComponentType());
+            if (fromLook == null) {
+                // the old fighter is gone: the watcher's body still stands where it was
+                if (t == null) return false;
+                fromLook = new Vector3d(t.getPosition()).add(0, 1.6, 0);
+                from = null;
+            }
+            fromDist = from != null ? followDistance(from, acc) : 4;
+            HeadRotation head = acc.getComponent(me, HeadRotation.getComponentType());
+            Rotation3f r = head != null ? new Rotation3f(head.getRotation()) : t != null ? new Rotation3f(t.getRotation()) : null;
+            yaw0 = r != null ? r.yaw() : 0f;
+            pitch0 = r != null ? r.pitch() : -0.3f;
+        }
+        if (from == target) return false;
+        double toDist = followDistance(target, acc);
+        // where the camera is now, and the direction from there to the new fighter (kept level enough)
+        Vector3d cam = behind(fromLook, yaw0, pitch0, fromDist);
+        double dx = toLook.x - cam.x, dy = toLook.y - cam.y, dz = toLook.z - cam.z;
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        float yaw1 = flat > 1 ? (float) Math.atan2(-dx, -dz) : yaw0;
+        float pitch1 = flat > 1 ? (float) Math.max(PITCH_DOWN, Math.min(PITCH_UP, Math.atan2(dy, flat))) : pitch0;
+        long ms = Math.max(GLIDE_MIN_MS, Math.min(GLIDE_MAX_MS, GLIDE_BASE_MS + (long) (fromLook.distance(toLook) * GLIDE_MS_PER_BLOCK)));
+        Glide g = new Glide(from, target, fromLook, toLook, fromDist, toDist, yaw0, pitch0, yaw1, pitch1, ms);
+        w.glide = g;
+        frame(player, g, acc);
+        scheduleGlide(player, w, g);
+        return true;
+    }
+
+    private static void scheduleGlide(PlayerRef player, Watch w, Glide g) {
+        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+            if (w.glide != g || w.store.isShutdown()) return;
+            try {
+                w.store.getExternalData().getWorld().execute(() -> glideStep(player, w, g));
+            } catch (RuntimeException e) {
+                w.glide = null;   // the world stopped
+            }
+        }, FRAME_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /** One glide frame on the world thread; at the end the follow camera on the new fighter. */
+    private static void glideStep(PlayerRef player, Watch w, Glide g) {
+        if (w.glide != g || WATCHING.get(player.getUuid()) != w) return;
+        Ref<EntityStore> me = player.isValid() ? player.getReference() : null;
+        Store<EntityStore> store = w.store;
+        if (me == null || !me.isValid() || me.getStore() != store || store.isShutdown()) {
+            w.glide = null;
+            return;
+        }
+        try {
+            frame(player, g, store);
+            if (System.currentTimeMillis() - g.start < g.durMs + SETTLE_MS) {
+                scheduleGlide(player, w, g);
+                return;
+            }
+            if (g.to.isValid() && BattleManager.isAlive(g.to, store) && (w.battle.has(g.to) || w.battle.over)) {
+                w.glide = null;
+                var rot = new com.hypixel.hytale.protocol.Direction(g.yaw, g.pitch, 0f);
+                switchTo(me, g.to, store, rot);
+                followCamera(me, g.to, store, rot);
+                return;
+            }
+            // it fell on the way: on to the next one from here
+            Ref<EntityStore> next = w.battle.over ? winner(w.battle, store) : replacement(w.battle, g.to, me, store);
+            if (next != null && next != g.to) go(player, w, me, next, store);
+            else w.glide = null;
+        } catch (RuntimeException e) {
+            w.glide = null;
+            MobBattlePlugin.log("Watch glide frame failed: " + e);
+        }
+    }
+
+    /** Sends the glide's frame for now (and keeps it in g for a glide that starts from here). */
+    private static void frame(PlayerRef player, Glide g, ComponentAccessor<EntityStore> acc) {
+        double u = Math.min(1, (System.currentTimeMillis() - g.start) / (double) g.durMs);
+        double e = u * u * u * (u * (u * 6 - 15) + 10);   // smootherstep
+        if (g.from != null && g.from.isValid() && BattleManager.isAlive(g.from, acc)) {
+            Vector3d a = eyesOf(g.from, acc);
+            if (a != null) g.fromLook = a;
+        }
+        if (g.to.isValid()) {
+            Vector3d b = eyesOf(g.to, acc);
+            if (b != null) g.toLook = b;
+        }
+        Vector3d look = new Vector3d(g.fromLook).lerp(g.toLook, e);
+        double turn = Math.atan2(Math.sin(g.yaw1 - g.yaw0), Math.cos(g.yaw1 - g.yaw0));
+        g.yaw = (float) (g.yaw0 + turn * e);
+        g.pitch = (float) (g.pitch0 + (g.pitch1 - g.pitch0) * e);
+        g.dist = g.fromDist + (g.toDist - g.fromDist) * e;
+        g.look = look;
+        Vector3d cam = behind(look, g.yaw, g.pitch, g.dist);
+        FightCamera.send(player, FightCamera.blurred(FightCamera.frame(cam, look, GLIDE_LERP), 0));
+    }
+
+    /** The camera spot {@code dist} back from {@code look} along the direction yaw/pitch (the game's convention). */
+    private static Vector3d behind(Vector3d look, float yaw, float pitch, double dist) {
+        double c = Math.cos(pitch);
+        return new Vector3d(look.x + Math.sin(yaw) * c * dist, look.y - Math.sin(pitch) * dist, look.z + Math.cos(yaw) * c * dist);
+    }
+
+    /** Where the follow camera looks on {@code r}: its eyes, at least 1 block up (as followCamera). */
+    private static Vector3d eyesOf(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
+        Vector3d p = ChaosWand.positionOf(r, acc);
+        if (p == null) return null;
+        float eye = com.hypixel.hytale.server.core.modules.entity.component.ModelComponent.getEyeHeight(r, acc);
+        return new Vector3d(p).add(0, Math.max(1, eye), 0);
     }
 
     /** After a cut camera's glide back (FightCamera.cut: 0.3 s sequence, then the camera reset). */
@@ -249,15 +458,15 @@ final class BattleWatch extends CustomUIHud {
      * (user). Calls vanilla's private applyFollowCamera instead.
      */
     private static void reattachLater(PlayerRef player, Store<EntityStore> store, long delayMs) {
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+        if (store.isShutdown()) return;
+        store.getExternalData().getWorld().scheduleAfter(() -> {
             if (store.isShutdown()) return;
-            store.getExternalData().getWorld().execute(() -> {
-                Ref<EntityStore> me = player.isValid() ? player.getReference() : null;
-                if (me == null || !me.isValid() || me.getStore() != store || !WATCHING.containsKey(player.getUuid())) return;
-                Spectating sp = store.getComponent(me, Spectating.getComponentType());
-                Ref<EntityStore> target = sp != null ? sp.getTargetRef() : null;
-                if (target != null && target.isValid()) followCamera(me, target, store);
-            });
+            Ref<EntityStore> me = player.isValid() ? player.getReference() : null;
+            Watch w = WATCHING.get(player.getUuid());
+            if (me == null || !me.isValid() || me.getStore() != store || w == null || w.glide != null) return;
+            Spectating sp = store.getComponent(me, Spectating.getComponentType());
+            Ref<EntityStore> target = sp != null ? sp.getTargetRef() : null;
+            if (target != null && target.isValid()) followCamera(me, target, store);
         }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
@@ -266,12 +475,18 @@ final class BattleWatch extends CustomUIHud {
      * back, whatever the target's size), then our sized follow camera a tick later, which replaces it.
      */
     private static void switchTo(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        switchTo(me, target, acc, null);
+    }
+
+    /** As above, the follow camera looking along {@code rot} (null = the watcher's own rotation). */
+    private static void switchTo(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc,
+                                 com.hypixel.hytale.protocol.Direction rot) {
         acc.putComponent(me, Spectating.getComponentType(), new Spectating(target));
         var store = me.getStore();
         store.getExternalData().getWorld().execute(() -> {
             if (store.isShutdown() || !me.isValid() || !target.isValid()) return;
             Spectating sp = store.getComponent(me, Spectating.getComponentType());
-            if (sp != null && sp.getTargetRef() == target) followCamera(me, target, store);
+            if (sp != null && sp.getTargetRef() == target) followCamera(me, target, store, rot);
         });
     }
 
@@ -283,6 +498,12 @@ final class BattleWatch extends CustomUIHud {
      * hitbox), at least 4. Also used to re-attach after an intro reset. World thread.
      */
     static void followCamera(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        followCamera(me, target, acc, null);
+    }
+
+    /** As above, looking along {@code rot} (null = the watcher's own rotation; a glide passes its last direction). */
+    static void followCamera(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc,
+                             com.hypixel.hytale.protocol.Direction rot) {
         PlayerRef player = acc.getComponent(me, PlayerRef.getComponentType());
         var net = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId.getComponentType());
         if (player == null || net == null) return;
@@ -304,7 +525,9 @@ final class BattleWatch extends CustomUIHud {
         s.rotationType = com.hypixel.hytale.protocol.RotationType.Custom;
         s.applyLookType = com.hypixel.hytale.protocol.ApplyLookType.Rotation;
         var mine = acc.getComponent(me, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
-        if (mine != null) {
+        if (rot != null) {
+            s.rotation = rot;
+        } else if (mine != null) {
             var r = mine.getRotation();
             s.rotation = new com.hypixel.hytale.protocol.Direction(r.yaw(), r.pitch(), r.roll());
         }
@@ -385,10 +608,8 @@ final class BattleWatch extends CustomUIHud {
             PlayerRef p = Universe.get().getPlayer(id);
             Ref<EntityStore> ref = p != null && p.isValid() ? p.getReference() : null;
             if (ref == null || !ref.isValid() || ref.getStore() != victim.getStore()) continue;
-            Spectating sp = acc.getComponent(ref, Spectating.getComponentType());
-            if (sp != null && sp.getTargetRef() == victim) {
-                switchTo(ref, killer, acc);
-            }
+            Watch w = WATCHING.get(id);
+            if (w != null && watched(w, ref, acc) == victim) go(p, w, ref, killer, acc);
         }
     }
 
@@ -429,14 +650,13 @@ final class BattleWatch extends CustomUIHud {
             synchronized (w.history) {
                 w.history.removeIf(r -> !r.isValid());
             }
-            Spectating sp = store.getComponent(me, Spectating.getComponentType());
-            Ref<EntityStore> target = sp != null ? sp.getTargetRef() : null;
+            Ref<EntityStore> target = watched(w, me, store);
             if (w.battle.over) {
                 if (w.endsAt == 0) {
                     w.endsAt = now + END_MS;
                     Ref<EntityStore> winner = winner(w.battle, store);
                     if (winner != null && winner != target) {
-                        switchTo(me, winner, store);
+                        go(p, w, me, winner, store);
                         target = winner;
                     }
                 } else if (now >= w.endsAt) {
@@ -446,9 +666,15 @@ final class BattleWatch extends CustomUIHud {
             } else if (target == null || !target.isValid() || !w.battle.has(target) || !BattleManager.isAlive(target, store)) {
                 Ref<EntityStore> next = replacement(w.battle, target, me, store);
                 if (next != null) {
-                    switchTo(me, next, store);
+                    go(p, w, me, next, store);
                     target = next;
                 }
+            } else if (FxSettings.watchAutoSwitch > 0 && w.glide == null
+                    && now - w.lastSwitch >= FxSettings.watchAutoSwitch * 1000L) {
+                // watchAutoSwitch (2026-10-18, user): on to the next fighter by itself, as a right click
+                w.lastSwitch = now;
+                cycle(p, me, store, 1);
+                target = watched(w, me, store);
             }
             if (now >= w.nextCard) {
                 w.nextCard = now + CARD_MS;
@@ -564,7 +790,7 @@ final class BattleWatch extends CustomUIHud {
         boolean up = BattleManager.isAlive(mob, store);
         String name = ChaosWand.nameOf(mob, store);
         int team = b.team(mob);
-        line(ui, "#Name", DuelCard.shorten(name == null ? "?" : name.replace('_', ' ')),
+        line(ui, "#Name", DuelCard.shorten(MobNames.text(name, player)),
                 b.isTeams() ? b.color(team) : up ? "#ffd23e" : "#888888");
         line(ui, "#Side", sideText(b, team), b.isTeams() ? b.color(team) : "#96a9be");
         line(ui, "#Health", DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
@@ -603,7 +829,7 @@ final class BattleWatch extends CustomUIHud {
             boolean up = mob.isValid() && BattleManager.isAlive(mob, store);
             boolean on = mob == watched;
             String name = mob.isValid() ? ChaosWand.nameOf(mob, store) : null;
-            line(ui, "#Name" + side, DuelCard.shorten(name == null ? "?" : name.replace('_', ' ')),
+            line(ui, "#Name" + side, DuelCard.shorten(MobNames.text(name, hud.getPlayerRef())),
                     up ? (on ? "#ffd23e" : "#e8eef5") : "#888888");
             line(ui, "#Tag" + side, on ? I18n.tr("hud.watching.tag") : Message.empty(), "#ffd23e");
             line(ui, "#Health" + side, DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");

@@ -173,10 +173,13 @@ public final class ChaosWand {
         String targetName = nameOf(target, buffer);
         if (around.isEmpty()) {
             // Only the cast animation and this message: no area, no effects.
-            player.sendMessage(I18n.tr("chat.chaos.nomobs").param("radius", FxSettings.radius).param("name", targetName).color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.nomobs").param("radius", FxSettings.radius).param("name", MobNames.message(targetName)).color(WARN));
             return;
         }
         BattleManager.Kind kind = BattleManager.Kind.ALL_VS_ONE;
+        List<Ref<EntityStore>> fighters = withTarget(around, target);
+        // readyTime: the marks last through it too
+        int marked = ReadyWait.secondsFor(kind, player, fighters) + KindFx.countdown(kind);
         FightFx.area(ActionFx.Action.ALL_VS_ONE, kind, playerEntity, center, FxSettings.radius, FightFx.areaSeconds(), buffer);
         // A shockwave out to the area edge (/mobbattle wave allVsOne, default gold), with the Snap Wand's sound.
         ActionFx.shockwave(ActionFx.Action.ALL_VS_ONE, center, FxSettings.radius, buffer);
@@ -187,23 +190,31 @@ public final class ChaosWand {
             // /mobbattle mobFx allVsOne / attackers.
             String lone = ActionFx.mobFx(ActionFx.Role.LONE);
             String rage = ActionFx.mobFx(ActionFx.Role.ATTACKERS);
-            if (lone != null) WandFx.onTarget(target, lone, KindFx.countdown(kind), buffer);
+            if (lone != null) WandFx.onTarget(target, lone, marked, buffer);
             // battleWaveTravel: each attacker's mark comes as the ring reaches it.
             if (rage != null) {
-                int seconds = KindFx.countdown(kind);
                 WaveHit.hit(center, FxSettings.radius, new ArrayList<>(around), FxSettings.battleWaveTravel, buffer, (group, acc) -> {
-                    for (Ref<EntityStore> npc : group) WandFx.onTarget(npc, rage, seconds, acc);
+                    for (Ref<EntityStore> npc : group) WandFx.onTarget(npc, rage, marked, acc);
                 });
             }
         }
-        FightFx.summonRune(kind, center, buffer);
-        FightCamera.intro(kind, player, center, List.of(List.of(target), new ArrayList<>(around)), buffer);
-        Countdown.run(kind, player, buffer, new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", targetName)), withTarget(around, target),
-                acc -> focusNow(player, playerEntity, target, targetName, around, center, acc),
-                reason -> Buffs.cancelPreLone(target));
-        // The lone buff from the countdown on (after Countdown.run: a replaced countdown of this target cancels
-        // first), so it is already big and healthy when the mobs around it start hitting.
-        if (KindFx.countdown(kind) > 0) Buffs.preLone(target);
+        Countdown.Label label = new Countdown.Label("EVERYONE vs " + targetName, I18n.tr("battle.label.everyone").param("name", MobNames.message(targetName)));
+        // readyTime first (ReadyWait): time to get in position before the VS and the countdown
+        ReadyWait.then(kind, player, fighters, label, buffer, acc -> {
+            if (!BattleManager.isAlive(target, acc)) {
+                player.sendMessage(I18n.tr("chat.chaos.focuscancelled").param("name", MobNames.message(targetName)).color(WARN));
+                return;
+            }
+            around.removeIf(r -> !BattleManager.isAlive(r, acc));
+            FightFx.summonRune(kind, center, acc);
+            FightCamera.intro(kind, player, center, List.of(List.of(target), new ArrayList<>(around)), acc);
+            Countdown.run(kind, player, acc, label, withTarget(around, target),
+                    acc2 -> focusNow(player, playerEntity, target, targetName, around, center, acc2),
+                    reason -> Buffs.cancelPreLone(target));
+            // The lone buff from the countdown on (after Countdown.run: a replaced countdown of this target cancels
+            // first), so it is already big and healthy when the mobs around it start hitting.
+            if (KindFx.countdown(kind) > 0) Buffs.preLone(target);
+        });
     }
 
     private static void focusNow(PlayerRef player, Ref<EntityStore> playerEntity, Ref<EntityStore> target,
@@ -212,7 +223,7 @@ public final class ChaosWand {
         around.removeIf(r -> !BattleManager.isAlive(r, buffer) || !PlayerFighters.canStart(r, buffer));
         if (!BattleManager.isAlive(target, buffer) || !PlayerFighters.canStart(target, buffer) || around.isEmpty()) {
             Buffs.cancelPreLone(target);
-            player.sendMessage(I18n.tr("chat.chaos.focuscancelled").param("name", targetName).color(WARN));
+            player.sendMessage(I18n.tr("chat.chaos.focuscancelled").param("name", MobNames.message(targetName)).color(WARN));
             return;
         }
 
@@ -248,9 +259,9 @@ public final class ChaosWand {
             FightManager.turnAgainst(target, firstAttacker, buffer);
         }
         MobBattlePlugin.log("Chaos focus on " + targetName + ": " + around.size() + " mobs, " + attackers + " aggressive");
-        player.sendMessage(I18n.tr("chat.chaos.focusstart").param("name", targetName).param("attackers", attackers)
+        player.sendMessage(I18n.tr("chat.chaos.focusstart").param("name", MobNames.message(targetName)).param("attackers", attackers)
                 .param("total", around.size()).param("radius", FxSettings.radius).color(FIGHT));
-        FightFx.title(BattleManager.Kind.ALL_VS_ONE, player, I18n.tr("battle.label.everyone").param("name", targetName),
+        FightFx.title(BattleManager.Kind.ALL_VS_ONE, player, I18n.tr("battle.label.everyone").param("name", MobNames.message(targetName)),
                 I18n.tr("battle.sub.attackers").param("count", attackers));
     }
 
@@ -268,12 +279,14 @@ public final class ChaosWand {
             return;
         }
         BattleManager.Kind kind = BattleManager.Kind.ROYALE;
+        // readyTime: the marks last through it too
+        int marked = ReadyWait.secondsFor(kind, player, around) + KindFx.countdown(kind);
         FightFx.area(ActionFx.Action.ROYALE, kind, playerEntity, center, FxSettings.radius, FightFx.areaSeconds(), buffer);
         // A shockwave out to the area edge, in the area color (same reach as the arena), when the right click's
         // ground slam (SnapSlam) lands: snapHitDelay after the click, like the Snap Wand.
         // /mobbattle wave royale (default purple), with the snap's sound.
         var world = buffer.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             var store = world.getEntityStore().getStore();
             if (store.isShutdown()) return;
             ActionFx.shockwave(ActionFx.Action.ROYALE, center, FxSettings.radius, store);
@@ -281,24 +294,28 @@ public final class ChaosWand {
             // battleWaveTravel: each fighter's mark comes as the ring reaches it.
             String mark = KindFx.runes(kind) && FxSettings.battleWaveTravel ? ActionFx.mobFx(ActionFx.Role.ROYALE) : null;
             if (mark != null) {
-                int seconds = KindFx.countdown(kind);
                 WaveHit.hit(center, FxSettings.radius, new ArrayList<>(around), true, store, (group, acc) -> {
-                    for (Ref<EntityStore> npc : group) if (npc.isValid()) WandFx.onTarget(npc, mark, seconds, acc);
+                    for (Ref<EntityStore> npc : group) if (npc.isValid()) WandFx.onTarget(npc, mark, marked, acc);
                 });
             }
-        }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
         warnLeftOut(player);
         if (KindFx.runes(kind)) {
             // /mobbattle mobFx royale (default purple).
             String brawl = ActionFx.mobFx(ActionFx.Role.ROYALE);
             // With battleWaveTravel the marks come with the ring instead (above).
             for (Ref<EntityStore> npc : around) {
-                if (brawl != null && !FxSettings.battleWaveTravel) WandFx.onTarget(npc, brawl, KindFx.countdown(kind), buffer);
+                if (brawl != null && !FxSettings.battleWaveTravel) WandFx.onTarget(npc, brawl, marked, buffer);
             }
         }
-        FightFx.summonRune(kind, center, buffer);
-        FightCamera.intro(kind, player, center, List.of(new ArrayList<>(around)), buffer);
-        Countdown.run(kind, player, buffer, new Countdown.Label("BATTLE ROYALE", I18n.tr("battle.label.royale")), around, acc -> brawlNow(player, playerEntity, around, center, acc));
+        Countdown.Label label = new Countdown.Label("BATTLE ROYALE", I18n.tr("battle.label.royale"));
+        // readyTime first (ReadyWait): time to get in position before the VS and the countdown
+        ReadyWait.then(kind, player, around, label, buffer, acc -> {
+            around.removeIf(r -> !BattleManager.isAlive(r, acc));
+            FightFx.summonRune(kind, center, acc);
+            FightCamera.intro(kind, player, center, List.of(new ArrayList<>(around)), acc);
+            Countdown.run(kind, player, acc, label, around, acc2 -> brawlNow(player, playerEntity, around, center, acc2));
+        });
     }
 
     /** How many of the closest opponents a royale fighter picks its first one from. */

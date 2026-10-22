@@ -133,6 +133,14 @@ final class Army {
         return leader == null ? key : topOf(leader, key);
     }
 
+    /**
+     * True when {@code mob} serves {@code player} somewhere down their chain of command (their army, or the army of a
+     * leader under them): the Kill Wand's wave and the Snap spare them (2026-10-18, user). False for a null player.
+     */
+    static boolean servesPlayer(Ref<EntityStore> mob, UUID player) {
+        return player != null && mob != null && player.equals(topOf(mob, leaderKey(mob)));
+    }
+
     /** True when both are in one chain of command: mates, a leader and its mobs, an owner and every army under it. */
     static boolean sameChain(Ref<EntityStore> a, UUID aKey, Ref<EntityStore> b, UUID bKey) {
         UUID top = topOf(a, aKey);
@@ -231,8 +239,7 @@ final class Army {
         all.forEach((id, a) -> b.append(id).append(' ').append(a.owner() == null ? "-" : a.owner()).append(' ')
                 .append(a.bossIsLeader()).append(' ').append(a.leads()).append(' ').append(a.fought()).append('\n'));
         try {
-            java.nio.file.Files.createDirectories(dir);
-            java.nio.file.Files.writeString(dir.resolve(FILE), b.toString());
+            FxSettings.writeAtomically(dir.resolve(FILE), b.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (java.io.IOException e) {
             MobBattlePlugin.log("Armies: could not save (" + e + ")");
         }
@@ -657,9 +664,7 @@ final class Army {
                 if (!Double.isFinite(y)) y = FightFx.standableY(x, z, p.y - FLY_SEARCH / 2.0, FLY_SEARCH / 2, spot, store);
                 if (!Double.isFinite(y)) continue;
                 org.joml.Vector3d to = new org.joml.Vector3d(x, y, z);
-                store.putComponent(npc, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
-                        com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createExact(to,
-                                new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f)));
+                if (!FightFx.teleport(npc, to, new com.hypixel.hytale.math.vector.Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f), store)) continue;
                 WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
             }
         });

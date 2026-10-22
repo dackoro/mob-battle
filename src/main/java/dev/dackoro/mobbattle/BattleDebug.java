@@ -50,8 +50,7 @@ final class BattleDebug {
         send(playerRef, store, "Battle debug: " + npcs.size() + " NPCs; snapshots now, +2s, +4s. Hit log for 10s (max 100). No AI changes.");
         snapshot(playerRef, store, npcs, 0);
         for (int seconds : new int[]{2, 4}) {
-            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(
-                    () -> world.execute(() -> snapshot(playerRef, store, npcs, seconds)), seconds, TimeUnit.SECONDS);
+            world.scheduleAfter(() -> snapshot(playerRef, store, npcs, seconds), seconds, TimeUnit.SECONDS);
         }
     }
 

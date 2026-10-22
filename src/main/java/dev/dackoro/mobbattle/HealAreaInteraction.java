@@ -53,10 +53,10 @@ public class HealAreaInteraction extends SimpleInstantInteraction {
         // The wave and the heal go when the slam hits (as the Snap Wand's).
         var store = caster.getStore();
         var world = store.getExternalData().getWorld();
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> world.execute(() -> {
+        world.scheduleAfter(() -> {
             if (store.isShutdown() || !caster.isValid()) return;
             burst(player, caster, store);
-        }), FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }, FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** World thread: the wave, each target's light, then one task heals them all when the lights land. */
@@ -96,10 +96,10 @@ public class HealAreaInteraction extends SimpleInstantInteraction {
             }
             for (Ref<EntityStore> r : group) WandFx.onTarget(r, WandFx.BUFF_LIGHT + light + WandFx.lightHeight(r, acc), acc);
             var store = group.get(0).getStore();
-            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> store.getExternalData().getWorld().execute(() -> {
+            store.getExternalData().getWorld().scheduleAfter(() -> {
                 if (store.isShutdown()) return;
                 for (Ref<EntityStore> r : group) if (r.isValid()) HealInteraction.healNow(r, store);
-            }), HealInteraction.LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }, HealInteraction.LIGHT_LANDS_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         });
         return around;
     }

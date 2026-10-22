@@ -2,7 +2,6 @@ package dev.dackoro.mobbattle;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -36,8 +35,8 @@ final class Presets {
 
     /** Presentation keys a built-in preset first puts back to default (with every per-kind override). */
     private static final String[] PRESENTATION_KEYS = {
-            "fight.countdown", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
-            "camera.end.time", "camera.autowatch", "camera.bars", "camera.blur", "camera.autofilm", "camera.vsscreen", "camera.vs.teamreps", "camera.film.player", "camera.film.wide", "camera.face", "camera.film.shot", "camera.film.variation", "camera.film.pace", "camera.film.transition", "camera.film.weight.wide", "camera.film.weight.track", "camera.film.weight.arc", "camera.film.weight.pushin", "camera.film.weight.closeup", "camera.film.weight.landscape", "camera.film.weight.playerback", "camera.film.weight.playerclose", "camera.film.weight.zenith", "camera.film.weight.spiral", "camera.film.weight.telephoto", "camera.film.weight.descent", "camera.film.weight.groundrise", "camera.film.weight.profile", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
+            "fight.countdown", "fight.ready", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
+            "camera.end.time", "camera.autowatch", "camera.watch.transition", "camera.watch.autoswitch", "camera.bars", "camera.blur", "camera.autofilm", "camera.vsscreen", "camera.vs.teamreps", "camera.film.player", "camera.film.wide", "camera.face", "camera.hud", "camera.film.shot", "camera.film.variation", "camera.film.pace", "camera.film.transition", "camera.film.weight.wide", "camera.film.weight.track", "camera.film.weight.arc", "camera.film.weight.pushin", "camera.film.weight.closeup", "camera.film.weight.landscape", "camera.film.weight.playerback", "camera.film.weight.playerclose", "camera.film.weight.zenith", "camera.film.weight.spiral", "camera.film.weight.telephoto", "camera.film.weight.descent", "camera.film.weight.groundrise", "camera.film.weight.profile", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
             "laser.enabled", "chaos.area", "fx.runes", "fx.crown", "battle.duelCard", "battle.focusCard"
     };
 
@@ -114,6 +113,8 @@ final class Presets {
             }
             case "cinematic" -> {
                 m.put("fight.countdown", "5");
+                // Time to get in position before the VS (user, 2026-10-20: the preset for filming; crouch starts it)
+                m.put("fight.ready", "8");
                 m.put("fight.camera", "true");
                 m.put("camera.style", "auto");
                 m.put("camera.time", "0");
@@ -234,10 +235,7 @@ final class Presets {
         p.putAll(settings);
         p.keySet().removeIf(k -> isListKey(k.toString()) || isSecurityKey(k.toString()));
         try {
-            Files.createDirectories(file.getParent());
-            try (OutputStream out = Files.newOutputStream(file)) {
-                p.store(out, "Mob Battle preset " + name + " (/mobbattle preset load " + name + ")");
-            }
+            FxSettings.storeAtomically(file, p, "Mob Battle preset " + name + " (/mobbattle preset load " + name + ")");
         } catch (IOException e) {
             return "Could not save " + file.getFileName() + ": " + e.getMessage();
         }
@@ -287,7 +285,8 @@ final class Presets {
      * reset group (only /mobbattle permissions, debugLog and debugRecord change them).
      */
     private static boolean isSecurityKey(String key) {
-        return FxSettings.PERMISSIONS_KEY.equals(key) || "debug".equals(key) || "debug.record".equals(key);
+        return FxSettings.PERMISSIONS_KEY.equals(key) || "debug".equals(key) || "debug.record".equals(key)
+                || java.util.Arrays.asList(FxSettings.SERVER_KEYS).contains(key);
     }
 
     /** /mobbattle reset groups, in help order. */
@@ -302,7 +301,7 @@ final class Presets {
             String opt = key.substring(key.lastIndexOf('.') + 1);
             return switch (opt) {
                 case "camera", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "autowatch", "camerabars", "camerablur", "autofilm", "vsscreen" -> "cameras";
-                case "countdown", "starttitle", "wintitle", "music" -> "titles";
+                case "countdown", "readytime", "starttitle", "wintitle", "music" -> "titles";
                 case "tiebreak", "killtiebreak" -> "arenas";
                 default -> "effects";
             };
@@ -312,7 +311,7 @@ final class Presets {
                 || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")
                 || key.equals("wand.buff.light") || key.equals("wand.buff.look") || key.equals("wand.heal.light") || key.startsWith("summon.jade") || key.startsWith("army.tint")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
-        if (key.equals("fight.countdown") || key.startsWith("title.") || key.startsWith("wintitle.")
+        if (key.equals("fight.countdown") || key.equals("fight.ready") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
                 || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak") || key.equals("battle.killtiebreak")

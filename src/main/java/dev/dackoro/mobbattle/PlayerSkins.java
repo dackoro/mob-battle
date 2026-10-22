@@ -60,10 +60,9 @@ final class PlayerSkins {
                 // public fields
             }
         }
-        Files.createDirectories(dir);
-        try (Writer w = Files.newBufferedWriter(dir.resolve(id + ".properties"), StandardCharsets.UTF_8)) {
-            p.store(w, "Mob Battle VS screen: a player skin seen on this server");
-        }
+        java.io.StringWriter w = new java.io.StringWriter();
+        p.store(w, "Mob Battle VS screen: a player skin seen on this machine");
+        PictureCache.writeText(dir.resolve(id + ".properties"), w.toString());
     }
 
     /** The saved skin, or null. */
