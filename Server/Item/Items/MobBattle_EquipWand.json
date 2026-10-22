@@ -6,14 +6,13 @@
   "Categories": [
     "Items.Weapons"
   ],
-  "Icon": "Icons/Items/MobBattle/HealWand.png",
+  "Icon": "Icons/Items/MobBattle/EquipWand.png",
   "Quality": "Uncommon",
   "ItemLevel": 1,
   "MaxStack": 1,
-  "Model": "Items/MobBattle/HealWand/MobBattle_HealWand.blockymodel",
-  "Texture": "Items/MobBattle/HealWand/MobBattle_HealWand_Texture.png",
+  "Model": "Items/MobBattle/EquipWand/MobBattle_EquipWand.blockymodel",
+  "Texture": "Items/MobBattle/EquipWand/MobBattle_EquipWand_Texture.png",
   "PlayerAnimationsId": "Staff",
-  "Animation": "Items/MobBattle/HealWand/idle.blockyanim",
   "Utility": {
     "Compatible": true
   },
