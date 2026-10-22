@@ -1741,3 +1741,7 @@ mobbattle.equip.savekit = Guardar kit
 mobbattle.equip.applykit = Aplicar kit
 mobbattle.equip.kitsaved = Guardado como kit {kit}. Úsalo con summon kit, teams kit o army kit.
 mobbattle.equip.kitapplied = Kit {kit} puesto.
+
+# --- maniquíes de entrenamiento (Server/NPC/Roles/MobBattle) ---
+npcRoles.MobBattle_Dummy_Knight.name = Caballero de entrenamiento
+npcRoles.MobBattle_Dummy_Archer.name = Arquero de entrenamiento

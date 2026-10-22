@@ -1741,3 +1741,7 @@ mobbattle.equip.savekit = Save as kit
 mobbattle.equip.applykit = Apply kit
 mobbattle.equip.kitsaved = Saved as kit {kit}. Use it with summon kit, teams kit or army kit.
 mobbattle.equip.kitapplied = Kit {kit} put on.
+
+# --- training dummies (Server/NPC/Roles/MobBattle) ---
+npcRoles.MobBattle_Dummy_Knight.name = Training Knight
+npcRoles.MobBattle_Dummy_Archer.name = Training Archer
