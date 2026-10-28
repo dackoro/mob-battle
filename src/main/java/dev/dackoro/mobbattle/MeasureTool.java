@@ -79,7 +79,7 @@ final class MeasureTool {
         var world = store.getExternalData().getWorld();
         int perWindow = (int) (WINDOW_MS / SAMPLE_MS), perSecond = (int) (1000 / SAMPLE_MS);
         Run run = new Run();
-        run.task = HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+        run.task = MobBattlePlugin.track(HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             // A world that shut down runs no more tasks: stop here instead of queueing into it 20 times a second.
             if (store.isShutdown()) {
                 if (run.task != null) run.task.cancel(false);
@@ -119,7 +119,7 @@ final class MeasureTool {
                         i / perSecond, d, p.y - pos[0][1]), INFO);
             }
             });
-        }, SAMPLE_MS, SAMPLE_MS, TimeUnit.MILLISECONDS);
+        }, SAMPLE_MS, SAMPLE_MS, TimeUnit.MILLISECONDS));
         RUNNING.put(key, run);
     }
 

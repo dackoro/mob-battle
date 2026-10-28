@@ -77,7 +77,7 @@ final class PicturesCommand {
         // a line every few seconds while it draws, only when the count moved
         String[] last = {""};
         ScheduledFuture<?>[] tick = new ScheduledFuture<?>[1];
-        tick[0] = com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
+        tick[0] = MobBattlePlugin.track(com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             if (finished.get() || !ThumbnailCache.running()) {
                 ScheduledFuture<?> t = tick[0];
                 if (t != null) t.cancel(false);
@@ -88,7 +88,7 @@ final class PicturesCommand {
             if (now.phase().isEmpty() || key.equals(last[0])) return;
             last[0] = key;
             say(to, progress("cmd.pictures.progress", now), INFO);
-        }, PROGRESS_EVERY_S, PROGRESS_EVERY_S, TimeUnit.SECONDS);
+        }, PROGRESS_EVERY_S, PROGRESS_EVERY_S, TimeUnit.SECONDS));
     }
 
     private static void summary(CommandSender to, ThumbnailCache.Summary s, boolean force) {

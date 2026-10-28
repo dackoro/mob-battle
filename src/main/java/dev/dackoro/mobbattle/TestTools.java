@@ -329,6 +329,8 @@ final class TestTools {
         // Test mobs drop no loot when they die (user, 2026-10-13: the test field filled up with items).
         NPCEntity npc = store.getComponent(mob, NPCEntity.getComponentType());
         if (npc != null && npc.getRole() != null) npc.getRole().setDeathItemsDropped();
+        // never saved with the chunk: a test mob left over after a crash or restart came back into later tests
+        store.putComponent(mob, EntityStore.REGISTRY.getNonSerializedComponentType(), com.hypixel.hytale.component.NonSerialized.get());
         UUID id = idOf(mob, store);
         if (id != null) {
             SPAWNED.put(id, store.getExternalData().getWorld().getName());

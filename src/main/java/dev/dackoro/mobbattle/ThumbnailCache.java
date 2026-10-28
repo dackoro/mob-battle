@@ -519,7 +519,7 @@ final class ThumbnailCache {
             try {
                 byte[] png = Files.readAllBytes(f);
                 if (!mayRegister(late)) continue;
-                HOLOGRAMS.put(id, MorphHologram.register(id, png, false));
+                HOLOGRAMS.put(id, MorphHologram.register(id, png, f));
                 bytes += png.length;
                 HOLO_BYTES.addAndGet(png.length);
                 n++;
@@ -565,7 +565,7 @@ final class ThumbnailCache {
                 String plain = ICON_FOLDER + "MobBattle_Icon_" + safe(id) + ".png";
                 byte[] png = Files.readAllBytes(f);
                 if (!mayRegister(late)) continue;
-                addAsset(new RuntimeCommonAsset(prefix + plain, png));
+                addAsset(new RuntimeCommonAsset(prefix + plain, png, f));
                 ICONS.put(id, plain);
                 bytes += png.length;
                 ICON_BYTES.addAndGet(png.length);

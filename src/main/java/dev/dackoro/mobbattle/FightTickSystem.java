@@ -254,13 +254,24 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         }
     }
 
+    /**
+     * A wild mob in a battle drops out of natural spawning: the world's overpopulation despawn (SpawningPlugin
+     * .shouldNPCDespawn) would REMOVE it mid-fight and that counts as a death. Integer.MIN_VALUE is what vanilla
+     * RoleChangeSystem gives a changed mob; the mob simply stays in the world afterwards.
+     */
+    private static void keepFromDespawn(Ref<EntityStore> self, CommandBuffer<EntityStore> buffer) {
+        NPCEntity npc = buffer.getComponent(self, NPCEntity.getComponentType());
+        if (npc != null && npc.getSpawnConfiguration() != Integer.MIN_VALUE) npc.setSpawnConfiguration(Integer.MIN_VALUE);
+    }
+
     /** Winners and the timeout are checked once per second per world by BattleLifecycleSystem. */
     private static void tickBattle(BattleManager.Battle battle, Ref<EntityStore> self, CommandBuffer<EntityStore> buffer) {
         if (battle.over || !BattleManager.isAlive(self, buffer)) {
             return;
         }
         MajorDungeonsCompat.keepBoss(self, buffer);   // its arena must not reset (remove) it mid-battle
-        DamageGroups.open(self, buffer);              // e.g. a Feastmaster may hit a goblin enemy (DisableDamageGroups)
+        keepFromDespawn(self, buffer);
+        DamageGroups.open(self, buffer);             // e.g. a Feastmaster may hit a goblin enemy (DisableDamageGroups)
         if (battle.killAll && battle.team(self) != battle.survivorTeam) {
             if (!WandFx.isDying(self)) WandFx.kill(self, null, true, buffer);
             return;

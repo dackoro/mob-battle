@@ -2178,9 +2178,9 @@ final class VsScreen extends CustomUIHud {
         if (leftBytes == null || variant >= 0 && !Files.exists(right)) return false;
         if (!ThumbnailCache.mayRegister(late)) return false;
         String prefix = MorphHologram.registryPrefix();
-        ThumbnailCache.addAsset(new RuntimeCommonAsset(prefix + pathOf(model, variant, false), leftBytes));
+        ThumbnailCache.addAsset(new RuntimeCommonAsset(prefix + pathOf(model, variant, false), leftBytes, left));
         if (variant >= 0) {
-            ThumbnailCache.addAsset(new RuntimeCommonAsset(prefix + pathOf(model, variant, true), Files.readAllBytes(right)));
+            ThumbnailCache.addAsset(new RuntimeCommonAsset(prefix + pathOf(model, variant, true), Files.readAllBytes(right), right));
         }
         Long before = STAND_INS.remove(key);
         if (before != null) REGISTERED_BYTES.addAndGet(-before);

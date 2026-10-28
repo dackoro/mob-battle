@@ -34,6 +34,22 @@ public class MobBattlePlugin extends JavaPlugin {
         return instance != null ? instance.getIdentifier().toString() : "Dackoro:Mob Battle";
     }
 
+    /**
+     * Hands a repeating task to the plugin's task registry, so a /plugin unload cancels it instead of leaving it to run
+     * against classes of an unloaded plugin.
+     */
+    @SuppressWarnings("unchecked")
+    static <T extends java.util.concurrent.ScheduledFuture<?>> T track(T task) {
+        if (instance != null && task != null) {
+            try {
+                instance.getTaskRegistry().registerTask((java.util.concurrent.ScheduledFuture<Void>) task);
+            } catch (Exception e) {
+                log("Task not registered: " + e);
+            }
+        }
+        return task;
+    }
+
     /** Writes to the server log (Saves/&lt;world&gt;/logs), and to the debug recorder when it is on. */
     public static void log(String message) {
         if (instance != null) {

@@ -424,6 +424,17 @@ final class MorphHologram {
     static String register(String modelId, byte[] png, boolean rebuild) {
         String plain = texturePath(modelId);
         ThumbnailCache.addAsset(new RuntimeAsset(registryPrefix() + plain, png));
+        return registered(plain, rebuild);
+    }
+
+    /** The same for a hologram read from the picture cache: its bytes are only held softly (RuntimeCommonAsset). */
+    static String register(String modelId, byte[] png, java.nio.file.Path file) {
+        String plain = texturePath(modelId);
+        ThumbnailCache.addAsset(new RuntimeCommonAsset(registryPrefix() + plain, png, file));
+        return registered(plain, false);
+    }
+
+    private static String registered(String plain, boolean rebuild) {
         if (rebuild) Universe.get().broadcastPacketNoCache(new RequestCommonAssetsRebuild());
         return plain;
     }
