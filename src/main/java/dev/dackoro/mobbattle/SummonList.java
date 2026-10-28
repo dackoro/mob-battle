@@ -30,6 +30,8 @@ public final class SummonList {
     public static final Map<String, String> ENTRIES = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
     /** Entry key -> team index (Team Wand colors). Used by summon and /mobbattle teams auto. */
     public static final Map<String, Integer> TEAMS = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
+    /** Entry key -> equipment kit name (Kits) its mobs spawn with; saved as summon.kits = key:kit,. */
+    static final Map<String, String> KIT_OF = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
 
     /*
      * Both maps are edited by /mobbattle commands and read by the world thread (Summon Wand, teams auto).
@@ -148,6 +150,7 @@ public final class SummonList {
             if (roleOf(key).equals(role)) {
                 ENTRIES.remove(key);
                 TEAMS.remove(key);
+                KIT_OF.remove(key);
                 removed = true;
             }
         }
@@ -168,6 +171,8 @@ public final class SummonList {
             if (team != null) {
                 sb.append(" (").append(Teams.name(team)).append(")");
             }
+            String kit = KIT_OF.get(role);
+            if (kit != null) sb.append(" [").append(kit).append("]");
             sb.append(", ");
         });
         sb.setLength(sb.length() - 2);
@@ -188,6 +193,8 @@ public final class SummonList {
             if (team != null) {
                 sb.append(" (").append(Teams.name(team)).append(")");
             }
+            String kit = KIT_OF.get(role);
+            if (kit != null) sb.append(" [").append(kit).append("]");
             sb.append(", ");
         });
         sb.setLength(sb.length() - 2);
@@ -280,6 +287,8 @@ public final class SummonList {
         final Map<String, Integer> ok = new LinkedHashMap<>();
         final List<Ref<EntityStore>> toLook = new ArrayList<>();
         final List<Ref<EntityStore>> toArmy = new ArrayList<>();
+        /** Spawned mobs whose entry has a kit, with the kit name (put on with the jade, after LOOK_DELAY_MS). */
+        final List<Map.Entry<Ref<EntityStore>, String>> toKit = new ArrayList<>();
         int next;
         int spawned;
         int failed;
@@ -333,6 +342,8 @@ public final class SummonList {
                     return;
                 }
                 SummonDespawn.track(result.first());
+                String kit = KIT_OF.get(key);
+                if (kit != null) toKit.add(Map.entry(result.first(), kit));
                 Integer team = TEAMS.get(key);
                 if (team != null) {
                     // Spawned straight into the player's team draft (Team Wand / teams start).
@@ -357,7 +368,7 @@ public final class SummonList {
             StringBuilder summary = new StringBuilder();
             ok.forEach((role, n) -> summary.append(role).append(" x").append(n).append(", "));
             if (summary.length() > 0) summary.setLength(summary.length() - 2);
-            afterSpawn(toLook, look, toArmy, player, owner, store);
+            afterSpawn(toLook, look, toArmy, toKit, player, owner, store);
             player.sendMessage(Message.join(I18n.tr("chat.summon.done").param("count", spawned).param("summary", summary.toString()),
                     failed > 0 ? I18n.tr("chat.summon.failed").param("count", failed) : Message.empty(),
                     capped ? I18n.tr("chat.summon.capped") : Message.empty()).color("#4bff6a"));
@@ -390,12 +401,17 @@ public final class SummonList {
      * (kept by LookKeeper like an Effect Wand look) and {@code toArmy} into the player's army (summonArmy).
      */
     private static void afterSpawn(List<Ref<EntityStore>> toLook, EntityEffect look, List<Ref<EntityStore>> toArmy,
+                                   List<Map.Entry<Ref<EntityStore>, String>> toKit,
                                    PlayerRef player, Ref<EntityStore> owner, Store<EntityStore> store) {
-        if ((toLook.isEmpty() || look == null) && toArmy.isEmpty()) return;
+        if ((toLook.isEmpty() || look == null) && toArmy.isEmpty() && toKit.isEmpty()) return;
         var world = store.getExternalData().getWorld();
         java.util.UUID id = player.getUuid();
         world.scheduleAfter(() -> {
             if (store.isShutdown()) return;
+            // Each entry's kit (Kits: one random option per slot, per mob).
+            for (Map.Entry<Ref<EntityStore>, String> e : toKit) {
+                if (e.getKey().isValid()) Kits.apply(e.getKey(), Kits.get(e.getValue()), store);
+            }
             if (look != null) {
                 for (Ref<EntityStore> mob : toLook) {
                     if (!mob.isValid()) continue;
@@ -455,6 +471,11 @@ public final class SummonList {
         }
         setRandomRange(randomMin, randomMax);
         atLeastOne = Boolean.parseBoolean(p.getProperty("summon.atleastone", String.valueOf(atLeastOne)));
+        KIT_OF.clear();
+        for (String item : p.getProperty("summon.kits", "").split(",")) {
+            String[] kv = item.trim().split(":");
+            if (kv.length == 2 && !kv[0].isBlank() && Kits.validName(kv[1].trim())) KIT_OF.put(kv[0].trim(), kv[1].trim());
+        }
         TEAMS.clear();
         for (String item : p.getProperty("summon.teams", "").split(",")) {
             String[] kv = item.trim().split(":");
@@ -472,6 +493,11 @@ public final class SummonList {
         p.setProperty("summon.min", String.valueOf(randomMin));
         p.setProperty("summon.max", String.valueOf(randomMax));
         p.setProperty("summon.atleastone", String.valueOf(atLeastOne));
+        StringBuilder kits = new StringBuilder();
+        KIT_OF.forEach((key, kit) -> {
+            if (ENTRIES.containsKey(key)) kits.append(key).append(':').append(kit).append(',');
+        });
+        p.setProperty("summon.kits", kits.toString());
         StringBuilder teams = new StringBuilder();
         TEAMS.forEach((role, team) -> {
             if (Teams.exists(team)) {

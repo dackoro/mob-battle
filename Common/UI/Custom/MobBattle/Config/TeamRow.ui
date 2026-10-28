@@ -24,6 +24,11 @@ Group {
     Anchor: (Width: 180, Top: 4, Right: 16, Height: 32);
   }
 
+  // The equipment kit this team wears in team battles (Kits); "-" = its own gear.
+  $C.@DropdownBox #Kit {
+    Anchor: (Width: 150, Top: 4, Right: 12, Height: 32);
+  }
+
   $C.@SmallSecondaryTextButton #Remove {
     @Text = %server.mobbattle.panel.button.remove;
     @Anchor = (Width: 110, Top: 4);

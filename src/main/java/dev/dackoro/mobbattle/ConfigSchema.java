@@ -523,6 +523,7 @@ final class ConfigSchema {
                 section("everybattle"),
                 toggle("battle.pvp"),
                 toggle("army.friendlyfire"),
+                toggle("equip.weapon.damage"),
                 toggle("battle.unstick"),
                 number("battle.standoff", 0, FxSettings.MAX_STANDOFF_SECONDS),
                 number("battle.passivewin", 0, FxSettings.MAX_PASSIVE_WIN_SECONDS),
@@ -767,7 +768,8 @@ final class ConfigSchema {
         List<String> out = new ArrayList<>();
         for (String k : p.stringPropertyNames()) {
             if (known.contains(k) || k.equals(FxSettings.PERMISSIONS_KEY) || k.equals(FxSettings.AREA_STYLES_KEY)
-                    || k.equals("teams.list") || k.equals("summon.list") || k.equals("summon.teams")) continue;
+                    || k.equals("teams.list") || k.equals("summon.list") || k.equals("summon.teams")
+                    || k.equals("teams.kits") || k.equals("summon.kits") || k.startsWith(Kits.PREFIX)) continue;
             out.add(k);
         }
         Collections.sort(out);

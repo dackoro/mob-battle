@@ -1,0 +1,101 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.MobBattle_EquipWand.name",
+    "Description": "server.items.MobBattle_EquipWand.description"
+  },
+  "Categories": [
+    "Items.Weapons"
+  ],
+  "Icon": "Icons/Items/MobBattle/EquipWand.png",
+  "Quality": "Uncommon",
+  "ItemLevel": 1,
+  "MaxStack": 1,
+  "Model": "Items/MobBattle/EquipWand/MobBattle_EquipWand.blockymodel",
+  "Texture": "Items/MobBattle/EquipWand/MobBattle_EquipWand_Texture.png",
+  "PlayerAnimationsId": "Staff",
+  "Utility": {
+    "Compatible": true
+  },
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "Charging",
+          "AllowIndefiniteHold": true,
+          "DisplayProgress": true,
+          "Effects": {
+            "ItemAnimationId": "CastSummonCharging"
+          },
+          "Next": {
+            "0": {
+              "Type": "MobBattle_EquipPaste",
+              "Effects": {
+                "ItemAnimationId": "SwingLeft"
+              },
+              "RunTime": 0.1
+            },
+            "1.5": {
+              "Type": "MobBattle_EquipArea",
+              "Effects": {
+                "ItemPlayerAnimationsId": "MobBattle_SnapWand",
+                "ItemAnimationId": "SnapSlam"
+              },
+              "RunTime": 0.6
+            }
+          }
+        }
+      ]
+    },
+    "Ability1": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_SkipCamera",
+          "RunTime": 0
+        }
+      ]
+    },
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_EquipEdit",
+          "Effects": {
+            "ItemAnimationId": "SwingRight"
+          },
+          "RunTime": 0.1
+        }
+      ]
+    }
+  },
+  "Particles": [
+    {
+      "SystemId": "MobBattle_EquipWand_Sparkles",
+      "TargetNodeName": "Star"
+    },
+    {
+      "SystemId": "MobBattle_EquipWand_Sparkles_Small",
+      "TargetNodeName": "Pommel_Star"
+    }
+  ],
+  "Light": {
+    "Radius": 1,
+    "Color": "#a83"
+  },
+  "IconProperties": {
+    "Scale": 0.6,
+    "Translation": [
+      -13,
+      -16
+    ],
+    "Rotation": [
+      45,
+      90,
+      0
+    ]
+  },
+  "DroppedItemAnimation": "Items/Animations/Dropped/Dropped_Diagonal_Left.blockyanim",
+  "Tags": {
+    "Type": [
+      "Tool"
+    ]
+  }
+}

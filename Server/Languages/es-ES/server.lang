@@ -1923,3 +1923,97 @@ mobbattle.panel.field.camera.slowmo.hint = porcentaje de velocidad, 0 = apagado
 mobbattle.panel.field.camera.slowmo.time.label = La cámara lenta dura
 mobbattle.panel.field.camera.slowmo.time.tip = Segundos reales hasta que el mundo vuelve a velocidad normal (por defecto 3).
 mobbattle.panel.field.camera.slowmo.time.hint = segundos
+
+mobbattle.cmd.apply.unknownitem = Objeto desconocido: {value}.
+mobbattle.cmd.apply.why.canthold = no lo puede llevar
+
+items.MobBattle_EquipWand.name = Varita de Equipo
+items.MobBattle_EquipWand.description = Clic derecho en un mob: su equipo (agachado: lo copia). Clic izquierdo: pone el equipo copiado. Mantén izquierdo: a todos los mobs cerca.
+mobbattle.chat.equip.notmob = Haz clic en un mob.
+mobbattle.chat.equip.nothingcopied = Aún no copiaste nada: agáchate + clic derecho en un mob, o pulsa Copiar en su panel.
+mobbattle.chat.equip.pasted = Equipo puesto a {name}.
+mobbattle.chat.equip.area = Equipo puesto a {n, plural, one {# mob} other {# mobs}}.
+mobbattle.equip.title = Equipo
+mobbattle.equip.hint = Las armas son solo apariencia: el mob sigue atacando como su rol. La armadura sí lo protege.
+mobbattle.equip.slot.hand = Mano
+mobbattle.equip.slot.offhand = Otra mano
+mobbattle.equip.slot.head = Cabeza
+mobbattle.equip.slot.chest = Pecho
+mobbattle.equip.slot.hands = Manos
+mobbattle.equip.slot.legs = Piernas
+mobbattle.equip.empty = Quitar
+mobbattle.equip.copy = Copiar
+mobbattle.equip.paste = Pegar
+mobbattle.equip.clearall = Vaciar todo
+mobbattle.equip.copied = Copiado. Clic izquierdo con la varita en un mob para ponérselo.
+mobbattle.equip.pastedhere = Equipo copiado puesto.
+mobbattle.equip.nooffhand = Este mob no tiene otra mano.
+mobbattle.equip.why.cant_hold_it = No puede llevar eso.
+mobbattle.equip.why.no_off_hand = Este mob no tiene otra mano.
+mobbattle.equip.why.wrong_slot = Esa pieza va en otra casilla.
+mobbattle.equip.why.not_a_mob = No es un mob.
+
+mobbattle.chat.equip.copiedfrom = Copiado el equipo de {name}: {set}. Clic izquierdo en un mob para ponérselo, mantén izquierdo para todos los de alrededor.
+
+mobbattle.chat.equip.kept = {name} conservó su arma: sus ataques solo funcionan con ella en la mano.
+mobbattle.chat.equip.areakept = {n, plural, one {# mob conservó su arma} other {# mobs conservaron su arma}}: sus ataques solo funcionan con ella en la mano.
+mobbattle.equip.needs = Este mob solo ataca con {items} en la mano: si se lo cambias deja de atacar. Pegar lo conserva.
+mobbattle.equip.breaks = Cambiado. Necesita {items} en la mano para atacar, así que ya no atacará.
+mobbattle.equip.pastedkept = Equipo copiado puesto. Conservó su arma, que sus ataques necesitan.
+
+mobbattle.equip.twohanded = Objeto a dos manos en la mano: la otra mano queda vacía.
+mobbattle.equip.why.two_handed = La mano lleva un objeto a dos manos: vacíala o elige uno de una mano primero.
+
+mobbattle.equip.restore = Restaurar
+mobbattle.equip.restored = De vuelta al equipo que le da su rol.
+mobbattle.equip.norestore = No se pudo leer el equipo original de este mob.
+mobbattle.equip.clearedkept = Vaciado. Conservó su arma, que sus ataques necesitan.
+mobbattle.equip.locked = Sus ataques solo funcionan con {items} en la mano: esas manos están bloqueadas para que siga peleando.
+mobbattle.equip.search = Buscar objetos...
+mobbattle.equip.editing.hand = Eligiendo para: Mano
+mobbattle.equip.editing.offhand = Eligiendo para: Otra mano
+mobbattle.equip.editing.head = Eligiendo para: Cabeza
+mobbattle.equip.editing.chest = Eligiendo para: Pecho
+mobbattle.equip.editing.hands = Eligiendo para: Manos
+mobbattle.equip.editing.legs = Eligiendo para: Piernas
+mobbattle.equip.count = {total} objetos
+mobbattle.equip.count.more = Mostrando {shown} de {total}: busca o filtra para ver el resto.
+
+mobbattle.help.battles.75 = equipWeaponDamage on|off - el arma de un mob cambia su daño: sus golpes se escalan por el poder del arma frente al arma de su rol, de x0.25 a x3 (por defecto off)
+mobbattle.cmd.desc.equip_weapon_damage = El arma de un mob cambia su daño (por defecto off)
+mobbattle.cmd.desc.equip_weapon_damage_on = Golpes escalados por el poder del arma
+mobbattle.cmd.desc.equip_weapon_damage_off = Las armas son solo apariencia (por defecto)
+mobbattle.panel.field.equip.weapon.damage.label = Bono de daño por arma
+mobbattle.panel.field.equip.weapon.damage.tip = Los golpes de un mob se escalan por el poder de su arma frente al arma de su rol (Varita de Equipo), de x0.25 a x3. Off: las armas son solo apariencia (por defecto off).
+
+mobbattle.help.battles.76 = kit list | show <kit> | save <kit> [copied|look] | set <kit> <casilla> <objeto|objeto2|-|none> | remove <kit> - kits de equipo: una casilla con varios objetos elige uno al azar por mob, - la vacía, none la deja como la tiene el mob
+mobbattle.help.battles.77 = summon kit <rol> <kit|none> / teams kit <equipo> <kit|none> / army kit <kit> / apply <quién> kit <kit> - los summons aparecen con él, un equipo lo lleva en las batallas de equipos (se lo quita al final), tu ejército lo recibe ya
+mobbattle.cmd.desc.kit = Kits de equipo para summons, equipos y ejércitos
+mobbattle.cmd.desc.kit_list = Lista los kits
+mobbattle.cmd.desc.kit_show = Muestra las casillas de un kit
+mobbattle.cmd.desc.kit_save = Guarda el equipo copiado (o el del mob que miras) como kit
+mobbattle.cmd.desc.kit_set = Pone los objetos de una casilla (objeto|objeto2 al azar, - vacía, none sin tocar)
+mobbattle.cmd.desc.kit_remove = Borra un kit
+mobbattle.cmd.desc.summon_kit = El kit con el que aparece un mob de la lista (kit|none)
+mobbattle.cmd.desc.teams_kit = El kit que lleva un equipo en las batallas de equipos (kit|none)
+mobbattle.cmd.kit.list = Kits: {kits}
+mobbattle.cmd.kit.none = Aún no hay kits: /mobbattle kit save <nombre> (Varita de Equipo: agáchate + clic derecho en un mob para copiar su equipo primero).
+mobbattle.cmd.kit.show = Kit {kit}: {slots}
+mobbattle.cmd.kit.saved = Kit {kit} guardado: {slots}
+mobbattle.cmd.kit.removed = Kit {kit} borrado.
+mobbattle.cmd.kit.full = Demasiados kits (máximo {max}).
+mobbattle.cmd.kit.name = Nombres de kit: letras, números, - y _, hasta 24.
+mobbattle.cmd.kit.nosource = No hay nada copiado ni un mob a la vista: copia un equipo con la Varita de Equipo o mira a un mob.
+mobbattle.cmd.kit.team = {team} lleva el kit {kit} en las batallas de equipos.
+mobbattle.cmd.kit.team.none = {team} pelea con su propio equipo.
+mobbattle.cmd.kit.army = Kit {kit} puesto a {count} mobs del ejército.
+
+mobbattle.equip.kitname = Nombre del kit...
+mobbattle.equip.savekit = Guardar kit
+mobbattle.equip.applykit = Aplicar kit
+mobbattle.equip.kitsaved = Guardado como kit {kit}. Úsalo con summon kit, teams kit o army kit.
+mobbattle.equip.kitapplied = Kit {kit} puesto.
+
+# --- maniquíes de entrenamiento (Server/NPC/Roles/MobBattle) ---
+npcRoles.MobBattle_Dummy_Knight.name = Caballero de entrenamiento
+npcRoles.MobBattle_Dummy_Archer.name = Arquero de entrenamiento

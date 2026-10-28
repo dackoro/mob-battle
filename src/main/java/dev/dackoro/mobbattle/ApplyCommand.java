@@ -32,10 +32,10 @@ import java.util.Locale;
 final class ApplyCommand {
 
     static final String USAGE_SYNTAX = "/mobbattle apply <me|look|players|near <radius>|player <name>|id:<uuid>|last> <buff <clicks>|size|health|damage|defense|speed <value>"
-            + "|unbuff|heal|cleanse|effect <id>|look <jade|shimmer>[:color]|morph <model|player>|unmorph|army add [player|id:<uuid>|last]|army remove|team <team|none>>";
+            + "|unbuff|heal|cleanse|effect <id>|look <jade|shimmer>[:color]|morph <model|player>|unmorph|army add [player|id:<uuid>|last]|army remove|team <team|none>|equip <item>|unequip|kit <kit>>";
     static final String USAGE = "Usage: " + USAGE_SYNTAX;
     static final List<String> ACTIONS = List.of("buff", "size", "health", "damage", "defense", "speed", "unbuff", "heal", "cleanse",
-            "effect", "look", "morph", "unmorph", "army", "team");
+            "effect", "look", "morph", "unmorph", "army", "team", "equip", "unequip", "kit");
     static final double LOOK_RANGE = 64;
     private static final String OK = "#7dff8a";
     private static final String ERR = "#ff6b6b";
@@ -243,6 +243,9 @@ final class ApplyCommand {
             case "unmorph" -> "Its own model back";
             case "army" -> "Into or out of an army: yours, or add <player|id:<uuid>|last> for another player's or a leader mob's";
             case "team" -> "Into one of your Team Wand teams, or none";
+            case "equip" -> "A weapon or item in its hand, or an armor piece on it (mobs only)";
+            case "unequip" -> "Empty hand and no armor (mobs only)";
+            case "kit" -> "An equipment kit (mobs only; /mobbattle kit list)";
             default -> action;
         };
     }
@@ -298,6 +301,18 @@ final class ApplyCommand {
                         || w.length == 2 && w[0].equalsIgnoreCase("add");
                 if (!ok) return usageProblem("apply <who> army add [player|id:<uuid>|last] | army remove",
                         "Usage: apply <who> army add [player|id:<uuid>|last] | army remove", null);
+            }
+            case "kit" -> {
+                if (value == null || Kits.get(value) == null) {
+                    return new Problem(Message.join(I18n.tr("cmd.usage").param("usage", "apply <who> kit <kit>"), Message.raw(" "), Kits.listMessage()),
+                            "Usage: apply <who> kit <kit>. Kits: " + Kits.names());
+                }
+            }
+            case "equip" -> {
+                if (value == null) return usageProblem("apply <who> equip <item>", "Usage: apply <who> equip <item>", null);
+                if (findItem(value) == null) {
+                    return new Problem(I18n.tr("cmd.apply.unknownitem").param("value", value), "Unknown item: " + value + ".");
+                }
             }
             case "team" -> {
                 if (value == null || !value.equalsIgnoreCase("none") && BattleManager.teamIndex(value) < 0) {
@@ -429,6 +444,14 @@ final class ApplyCommand {
                 if (!MorphWand.apply(t, copy, store)) return "can't wear it";
                 WandFx.onTarget(t, WandFx.MORPH, store);
             }
+            case "kit" -> {
+                if (!Kits.apply(t, Kits.get(value), store)) return "not a mob";
+            }
+            case "equip", "unequip" -> {
+                NPCEntity mob = store.getComponent(t, NPCEntity.getComponentType());
+                if (mob == null || mob.getInventory() == null) return "not a mob";
+                return equip(t, mob, action.equals("equip") ? findItem(value) : null, store);
+            }
             case "unmorph" -> {
                 if (!MorphWand.restore(t, store)) return "not morphed";
                 WandFx.onTarget(t, WandFx.UNMORPH, store);
@@ -498,6 +521,32 @@ final class ApplyCommand {
         reply(ctx, usageMsg(), USAGE, ERR);
     }
 
+    /** The game's spelling of an item id (any case), or null. */
+    static String findItem(String word) {
+        var map = com.hypixel.hytale.server.core.asset.type.item.config.Item.getAssetMap().getAssetMap();
+        if (map.containsKey(word)) return word;
+        for (String id : map.keySet()) if (id.equalsIgnoreCase(word)) return id;
+        return null;
+    }
+
+    /**
+     * Puts an item on a mob as vanilla NPC roles do (InventoryHelper: armor into its armor slots, anything else into
+     * its hand), or with item null empties its hand and armor. World thread.
+     */
+    private static String equip(Ref<EntityStore> t, NPCEntity mob, String item, Store<EntityStore> store) {
+        // The Equipment Wand's slots (every slot of a hand, so a role switching slots keeps showing it).
+        if (item == null) {
+            for (int i = 0; i < EquipWand.SLOTS.length; i++) {
+                if (i != 1 || EquipWand.hasOffHand(t, store)) EquipWand.set(t, i, null, store);
+            }
+            return null;
+        }
+        var asset = com.hypixel.hytale.server.core.asset.type.item.config.Item.getAssetMap().getAsset(item);
+        int slot = asset != null && asset.getArmor() != null && asset.getArmor().getArmorSlot() != null
+                ? 2 + asset.getArmor().getArmorSlot().ordinal() : 0;
+        return EquipWand.set(t, slot, item, store) == null ? null : "can't hold it";
+    }
+
     /** The chat text of a skip reason (apply() returns it in English, which the log keeps). */
     private static Message whyMsg(String why) {
         String key = switch (why) {
@@ -506,6 +555,7 @@ final class ApplyCommand {
             case "no such model here" -> "nomodel";
             case "can't wear it" -> "cantwear";
             case "not morphed" -> "notmorphed";
+            case "can't hold it" -> "canthold";
             case "not a mob" -> "notmob";
             case "you are in another world" -> "otherworld";
             case "already in that army" -> "inarmy";

@@ -31,7 +31,7 @@ public class MobBattleCommand extends CommandBase {
     private static final String ERR = "#ffcc55";
     private static final String[] WAND_IDS = {
             "MobBattle_Wand", "MobBattle_ChaosWand", "MobBattle_TeamWand",
-            "MobBattle_SummonWand", "MobBattle_MorphWand", "MobBattle_HealWand",
+            "MobBattle_SummonWand", "MobBattle_MorphWand", "MobBattle_HealWand", "MobBattle_EquipWand",
             "MobBattle_KillWand", "MobBattle_EffectWand", "MobBattle_CleanseWand", "MobBattle_ArmyWand",
             "MobBattle_SnapWand", "MobBattle_BuffWand", "MobBattle_DebugWand"
     };
@@ -198,6 +198,9 @@ public class MobBattleCommand extends CommandBase {
                 "help.battles.71",
                 "help.battles.72",
                 "help.battles.73",
+                "help.battles.75",
+                "help.battles.76",
+                "help.battles.77",
                 "help.battles.70",
         });
         HELP.put("teams", new String[] {
@@ -1176,6 +1179,9 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("on", I18n.id("cmd.desc.tinted_army")),
                 new Sub("off", I18n.id("cmd.desc.no_tint_default"))));
         addSubCommand(new Sub("armytintcolor", I18n.id("cmd.desc.color_of_the_army_tint_a_pal")));
+        addSubCommand(new Sub("equipweapondamage", I18n.id("cmd.desc.equip_weapon_damage"),
+                new Sub("on", I18n.id("cmd.desc.equip_weapon_damage_on")),
+                new Sub("off", I18n.id("cmd.desc.equip_weapon_damage_off"))));
         addSubCommand(new Sub("armyfriendlyfire", I18n.id("cmd.desc.army_friendly_fire"),
                 new Sub("on", I18n.id("cmd.desc.army_friendly_fire_on")),
                 new Sub("off", I18n.id("cmd.desc.army_friendly_fire_off"))));
@@ -1192,6 +1198,7 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("teams", I18n.id("cmd.desc.team_battles_and_custom_team"),
                 new Sub("auto", I18n.id("cmd.desc.put_mobs_in_range_into_teams")),
                 new Sub("start", I18n.id("cmd.desc.start_the_team_battle")),
+                new Sub("kit", I18n.id("cmd.desc.teams_kit")),
                 new Sub("clear", I18n.id("cmd.desc.empty_your_teams")),
                 new Sub("clearall", I18n.id("cmd.desc.empty_every_player_s_teams")),
                 new Sub("list", I18n.id("cmd.desc.show_the_teams")),
@@ -1202,6 +1209,12 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("reset", I18n.id("cmd.desc.back_to_the_4_default_teams")),
                 new Sub("join", I18n.id("cmd.desc.fight_with_a_team_yourself_t")),
                 new Sub("leave", I18n.id("cmd.desc.leave_your_team_or_team_batt"))));
+        addSubCommand(new Sub("kit", I18n.id("cmd.desc.kit"),
+                new Sub("list", I18n.id("cmd.desc.kit_list")),
+                new Sub("show", I18n.id("cmd.desc.kit_show")),
+                new Sub("save", I18n.id("cmd.desc.kit_save")),
+                new Sub("set", I18n.id("cmd.desc.kit_set")),
+                new Sub("remove", I18n.id("cmd.desc.kit_remove"))));
         addSubCommand(new Sub("summon", I18n.id("cmd.desc.summon_the_list_around_you_o"),
                 new Sub("list", I18n.id("cmd.desc.show_the_summon_list")),
                 new Sub("add", I18n.id("cmd.desc.add_a_mob_type_role_count_ra")),
@@ -1211,6 +1224,7 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("clear", I18n.id("cmd.desc.empty_the_list")),
                 new Sub("team", I18n.id("cmd.desc.team_rule_role_team_none"),
                         new Sub("all", I18n.id("cmd.desc.summon_team_all"), new Sub("none", I18n.id("cmd.desc.summon_team_all")))),
+                new Sub("kit", I18n.id("cmd.desc.summon_kit")),
                 new Sub("random", I18n.id("cmd.desc.range_for_random_counts_min")),
                 new Sub("atleastone", I18n.id("cmd.desc.random_types_spawn_at_least"), words(I18n.id("cmd.desc.at_least_one"), "true", "false")),
                 new Sub("lists", I18n.id("cmd.desc.summon_lists")),
@@ -1269,7 +1283,7 @@ public class MobBattleCommand extends CommandBase {
                 case "list" -> null;
                 case "auto", "start", "join", "leave", "clear" -> Perms.USE;
                 case "clearall", "reset" -> Perms.ADMIN;
-                case "add", "color", "rename", "remove" -> Perms.CONFIG;
+                case "add", "color", "rename", "remove", "kit" -> Perms.CONFIG;
                 default -> Perms.CONFIG;
             };
         }
@@ -1289,6 +1303,8 @@ public class MobBattleCommand extends CommandBase {
                 || command.equals("resetall") || command.equals("debuglog") || command.equals("skiptimer")
                 || command.equals("debugrecord") || command.equals("debugdump")
                 || command.equals("servervs") || command.equals("serverholograms") || command.equals("servericons")) return Perms.ADMIN;
+        if (command.equals("army") && sub.equals("kit")) return Perms.USE;
+        if (command.equals("kit")) return sub.isEmpty() || sub.equals("list") || sub.equals("show") ? null : Perms.CONFIG;
         if (command.equals("army") || command.equals("apply") || command.equals("measure") || command.equals("test")
                 || command.equals("pictures")) return Perms.ADMIN;
         if (command.equals("chaos")) return Perms.USE;
@@ -2089,10 +2105,18 @@ public class MobBattleCommand extends CommandBase {
                 teams(ctx);
                 return;
             }
+            case "kit" -> {
+                kitCommand(ctx);
+                return;
+            }
             case "army" -> {
                 String[] a = argsAfter(ctx, "army");
+                if (a.length == 2 && a[0].equalsIgnoreCase("kit")) {
+                    armyKit(ctx, a[1]);
+                    return;
+                }
                 if (a.length != 1 || !a[0].equalsIgnoreCase("clearall")) {
-                    usage(ctx, "/mobbattle army clearAll");
+                    usage(ctx, "/mobbattle army clearAll | kit <kit>");
                     return;
                 }
                 var ref = ctx.isPlayer() ? ctx.senderAsPlayerRef() : null;
@@ -2201,6 +2225,14 @@ public class MobBattleCommand extends CommandBase {
                     return;
                 }
                 FxSettings.armyTint = on;
+            }
+            case "equipweapondamage" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    usage(ctx, "/mobbattle equipWeaponDamage on|off", defaultNote("off"));
+                    return;
+                }
+                FxSettings.equipWeaponDamage = on;
             }
             case "armyfriendlyfire" -> {
                 Boolean on = parseOnOff(val);
@@ -2741,6 +2773,7 @@ public class MobBattleCommand extends CommandBase {
             case "remove" -> {
                 String role = a.length > 1 ? SummonList.listedKey(a[1]) : null;
                 if (role != null) SummonList.TEAMS.remove(role);
+                if (role != null) SummonList.KIT_OF.remove(role);
                 if (role == null || SummonList.ENTRIES.remove(role) == null) {
                     usage(ctx, "/mobbattle summon remove <role in the list>");
                     return;
@@ -2749,6 +2782,17 @@ public class MobBattleCommand extends CommandBase {
             case "clear" -> {
                 SummonList.ENTRIES.clear();
                 SummonList.TEAMS.clear();
+                SummonList.KIT_OF.clear();
+            }
+            case "kit" -> {
+                // summon kit <role in the list> <kit|none>: the equipment its mobs spawn with.
+                String role = a.length > 2 ? SummonList.listedKey(a[1]) : null;
+                Kits.Kit kit = a.length > 2 ? Kits.get(a[2]) : null;
+                if (role == null || kit == null && !"none".equalsIgnoreCase(a[2])) {
+                    usage(ctx, "/mobbattle summon kit <role in the list> <kit|none>", Kits.listMessage());
+                    return;
+                }
+                if (kit == null) SummonList.KIT_OF.remove(role); else SummonList.KIT_OF.put(role, kit.name());
             }
             case "team" -> {
                 // summon team all none: every entry loses its team, the mobs stay (2026-10-17, user: a button that
@@ -2855,7 +2899,7 @@ public class MobBattleCommand extends CommandBase {
                 return;
             }
             default -> {
-                usage(ctx, "/mobbattle summon [list | add <role> [count|random] [team] | fill <types> [each:<n>] [teams:<n>] [mod:..] [type:..] [group:..] [add] | modify <role> [team] <count|random> | team <role> <color|none> | team all none | remove <role> | clear"
+                usage(ctx, "/mobbattle summon [list | add <role> [count|random] [team] | fill <types> [each:<n>] [teams:<n>] [mod:..] [type:..] [group:..] [add] | modify <role> [team] <count|random> | team <role> <color|none> | team all none | kit <role> <kit|none> | remove <role> | clear"
                         + " | random <min> <max> | atLeastOne true|false | lists | save <name> | load <name> | delete <name>]");
                 return;
             }
@@ -2868,7 +2912,127 @@ public class MobBattleCommand extends CommandBase {
     static final int SUMMON_FILL_MAX = 40;
 
     private static final String TEAMS_USAGE = "/mobbattle teams auto | start | clear | join <team> | leave | list"
-            + " | add <name> <color> | color <team> <color> | rename <team> <name> | remove <team> | reset";
+            + " | add <name> <color> | color <team> <color> | rename <team> <name> | kit <team> <kit|none> | remove <team> | reset";
+
+    /**
+     * /mobbattle kit list | show <kit> | save <kit> [copied|look] | set <kit> <slot> <item|item2|...|-|none>
+     * | remove <kit>: equipment kits (Kits). save takes the Equipment Wand's copied set (default) or the mob looked at.
+     */
+    private static void kitCommand(CommandContext ctx) {
+        String[] a = argsAfter(ctx, "kit");
+        String sub = a.length > 0 ? a[0].toLowerCase(java.util.Locale.ROOT) : "list";
+        final String usage = "/mobbattle kit list | show <kit> | save <kit> [copied|look] | set <kit> <slot> <item|item2|-|none> | remove <kit>";
+        switch (sub) {
+            case "list" -> reply(ctx, Kits.listMessage(), OK);
+            case "show" -> {
+                Kits.Kit kit = a.length > 1 ? Kits.get(a[1]) : null;
+                if (kit == null) {
+                    usage(ctx, "/mobbattle kit show <kit>", Kits.listMessage());
+                    return;
+                }
+                reply(ctx, I18n.tr("cmd.kit.show").param("kit", kit.name()).param("slots", kit.describe()), OK);
+            }
+            case "remove" -> {
+                if (a.length < 2 || !Kits.remove(a[1])) {
+                    usage(ctx, "/mobbattle kit remove <kit>", Kits.listMessage());
+                    return;
+                }
+                FxSettings.save();
+                reply(ctx, I18n.tr("cmd.kit.removed").param("kit", a[1]), OK);
+            }
+            case "set" -> {
+                // set <kit> <slot> <options>: one slot's options ("|" between them, "-" empties, "none" = untouched).
+                int slot = a.length > 3 ? java.util.Arrays.asList(EquipWand.SLOTS).indexOf(a[2].toLowerCase(java.util.Locale.ROOT)) : -1;
+                if (a.length < 4 || !Kits.validName(a[1]) || slot < 0) {
+                    usage(ctx, "/mobbattle kit set <kit> <" + String.join("|", EquipWand.SLOTS) + "> <item|item2|-|none>");
+                    return;
+                }
+                java.util.List<String> opts = new java.util.ArrayList<>();
+                if (!a[3].equalsIgnoreCase("none")) {
+                    for (String o : a[3].split("\\|")) {
+                        if (o.isBlank()) continue;
+                        if (o.equals(Kits.EMPTY)) {
+                            opts.add(Kits.EMPTY);
+                            continue;
+                        }
+                        String id = ApplyCommand.findItem(o);
+                        if (id == null) {
+                            reply(ctx, I18n.tr("cmd.apply.unknownitem").param("value", o), ERR);
+                            return;
+                        }
+                        opts.add(id);
+                    }
+                }
+                Kits.Kit kit = Kits.get(a[1]);
+                if (kit == null) kit = Kits.blank(a[1]);
+                if (!Kits.put(Kits.withSlot(kit, slot, opts))) {
+                    reply(ctx, I18n.tr("cmd.kit.full").param("max", Kits.MAX_KITS), ERR);
+                    return;
+                }
+                FxSettings.save();
+                reply(ctx, I18n.tr("cmd.kit.show").param("kit", a[1]).param("slots", Kits.get(a[1]).describe()), OK);
+            }
+            case "save" -> {
+                if (a.length < 2 || !Kits.validName(a[1])) {
+                    usage(ctx, "/mobbattle kit save <kit> [copied|look]", I18n.tr("cmd.kit.name"));
+                    return;
+                }
+                if (!ctx.isPlayer()) {
+                    reply(ctx, I18n.tr("cmd.teams.onlyplayer"), ERR);
+                    return;
+                }
+                var ref = ctx.senderAsPlayerRef();
+                if (ref == null || !ref.isValid()) return;
+                boolean look = a.length > 2 && a[2].equalsIgnoreCase("look");
+                var store = ref.getStore();
+                store.getExternalData().getWorld().execute(() -> {
+                    var player = store.getComponent(ref, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
+                    if (player == null) return;
+                    String[] set = look ? null : EquipWand.copied(player.getUuid());
+                    if (set == null) {
+                        var mob = ApplyCommand.lookedAt(ref, store);
+                        if (mob == null || EquipWand.inventory(mob, store) == null) {
+                            reply(ctx, I18n.tr("cmd.kit.nosource"), ERR);
+                            return;
+                        }
+                        set = EquipWand.read(mob, store);
+                    }
+                    if (!Kits.put(Kits.fromSet(a[1], set))) {
+                        reply(ctx, I18n.tr("cmd.kit.full").param("max", Kits.MAX_KITS), ERR);
+                        return;
+                    }
+                    FxSettings.save();
+                    reply(ctx, I18n.tr("cmd.kit.saved").param("kit", a[1]).param("slots", Kits.get(a[1]).describe()), OK);
+                });
+            }
+            default -> usage(ctx, usage);
+        }
+    }
+
+    /** /mobbattle army kit <kit>: the kit on every mob of the sender's army. */
+    private static void armyKit(CommandContext ctx, String name) {
+        Kits.Kit kit = Kits.get(name);
+        if (kit == null) {
+            usage(ctx, "/mobbattle army kit <kit>", Kits.listMessage());
+            return;
+        }
+        if (!ctx.isPlayer()) {
+            reply(ctx, I18n.tr("cmd.teams.onlyplayer"), ERR);
+            return;
+        }
+        var ref = ctx.senderAsPlayerRef();
+        if (ref == null || !ref.isValid()) return;
+        var store = ref.getStore();
+        store.getExternalData().getWorld().execute(() -> {
+            var player = store.getComponent(ref, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType());
+            if (player == null) return;
+            int n = 0;
+            for (var mob : Army.members(player.getUuid())) {
+                if (mob.getStore() == store && Kits.apply(mob, kit, store)) n++;
+            }
+            reply(ctx, I18n.tr("cmd.kit.army").param("kit", kit.name()).param("count", n), OK);
+        });
+    }
 
     /** Team setup: list, add, color, rename, remove, reset. */
     private static boolean teamConfig(CommandContext ctx, String sub, String[] a) {
@@ -2936,6 +3100,18 @@ public class MobBattleCommand extends CommandBase {
                 String name = Teams.name(slot);
                 Teams.remove(slot);
                 reply(ctx, plus(I18n.tr("cmd.team.removed").param("team", name), Teams.describeMessage()), OK);
+            }
+            case "kit" -> {
+                // teams kit <team> <kit|none>: the equipment its mobs wear in team battles (taken off at the end).
+                int slot = a.length > 2 ? Teams.find(a[1]) : -1;
+                Kits.Kit kit = a.length > 2 ? Kits.get(a[2]) : null;
+                if (slot < 0 || kit == null && !"none".equalsIgnoreCase(a[2])) {
+                    usage(ctx, "/mobbattle teams kit <team> <kit|none>", Message.join(Teams.describeMessage(), Message.raw(" "), Kits.listMessage()));
+                    return true;
+                }
+                Teams.setKit(slot, kit == null ? null : kit.name());
+                reply(ctx, kit == null ? I18n.tr("cmd.kit.team.none").param("team", Teams.name(slot))
+                        : I18n.tr("cmd.kit.team").param("team", Teams.name(slot)).param("kit", kit.name()), Teams.color(slot));
             }
             case "reset" -> {
                 BattleManager.clearConfiguredTeams();

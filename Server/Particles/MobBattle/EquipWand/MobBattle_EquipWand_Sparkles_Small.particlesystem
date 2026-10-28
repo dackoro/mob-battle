@@ -1,0 +1,10 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "MobBattle_EquipWand_Sparkles_Small",
+      "FixedRotation": true
+    }
+  ],
+  "BoundingRadius": 0.4,
+  "CullDistance": 30
+}

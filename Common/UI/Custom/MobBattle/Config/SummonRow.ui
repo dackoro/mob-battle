@@ -12,12 +12,12 @@ Group {
   }
 
   Label #Role {
-    Anchor: (Right: 12, Width: 210);
+    Anchor: (Right: 12, Width: 170);
     Style: (...$C.@DefaultLabelStyle, VerticalAlignment: Center, Wrap: true);
   }
 
   $C.@TextField #Count {
-    @Anchor = (Width: 90, Right: 60, Top: 3);
+    @Anchor = (Width: 90, Right: 16, Top: 3);
   }
 
   // The team's color, as on the Teams page; hidden for no team. Its place stays taken, so a row with no team keeps its
@@ -31,7 +31,12 @@ Group {
   }
 
   $C.@DropdownBox #Team {
-    Anchor: (Width: 170, Top: 6, Right: 16, Height: 32);
+    Anchor: (Width: 150, Top: 6, Right: 16, Height: 32);
+  }
+
+  // The equipment kit this entry's mobs spawn with (Kits); "-" = none.
+  $C.@DropdownBox #Kit {
+    Anchor: (Width: 150, Top: 6, Right: 12, Height: 32);
   }
 
   $C.@SmallSecondaryTextButton #Remove {

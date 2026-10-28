@@ -479,6 +479,13 @@ public final class FxSettings {
      * user). Default off.
      */
     public static boolean armyFriendlyFire = false;
+
+    /**
+     * Weapon damage bonus (Equipment Wand, 2026-10-16, user): a mob's hits scaled by its held weapon's power over its
+     * role's own weapon (WeaponDamageSystem, EquipWand.weaponFactor). /mobbattle equipWeaponDamage, key
+     * equip.weapon.damage, default off.
+     */
+    public static boolean equipWeaponDamage = false;
     /** Color of the army tint (/mobbattle armyTintColor), a palette color. Default blue (the Army Wand color). */
     public static String armyTintColor = "Blue";
     /** How a summon leaves: disintegrate (the Kill Wand's soul rip, no loot), vanish (removed at once) or shatter (jade glass) (/mobbattle summonExit). */
@@ -848,9 +855,11 @@ public final class FxSettings {
             if (jadeColor != null) summonJadeColor = jadeColor;
             armyTint = Boolean.parseBoolean(p.getProperty("army.tint", String.valueOf(armyTint)));
             armyFriendlyFire = Boolean.parseBoolean(p.getProperty("army.friendlyfire", String.valueOf(armyFriendlyFire)));
+            equipWeaponDamage = Boolean.parseBoolean(p.getProperty("equip.weapon.damage", String.valueOf(equipWeaponDamage)));
             String tintColor = SummonList.parseJadeColor(p.getProperty("army.tint.color"));
             if (tintColor != null) armyTintColor = tintColor;
             effect = p.getProperty("effect.id", effect);
+            Kits.load(p);
             Teams.load(p);
             SummonList.load(p);
             String fx = p.getProperty("team.fx", teamFx);
@@ -1213,6 +1222,7 @@ public final class FxSettings {
         p.setProperty("snap.hitdelay", String.valueOf(snapHitDelayMs));
         p.setProperty("snap.radius", String.valueOf(snapRadius));
         p.setProperty("effect.id", effect);
+        Kits.save(p);
         Teams.save(p);
         SummonList.save(p);
         p.setProperty("team.fx", teamFx);
@@ -1228,6 +1238,7 @@ public final class FxSettings {
         p.setProperty("summon.jade.color", summonJadeColor);
         p.setProperty("army.tint", String.valueOf(armyTint));
         p.setProperty("army.friendlyfire", String.valueOf(armyFriendlyFire));
+        p.setProperty("equip.weapon.damage", String.valueOf(equipWeaponDamage));
         p.setProperty("army.tint.color", armyTintColor);
         p.setProperty("chaos.height", String.valueOf(pillarHeight));
         p.setProperty("camera.style", cameraStyle);
@@ -1408,7 +1419,8 @@ public final class FxSettings {
                         + ", summonRadius " + (summonRadius > 0 ? summonRadius : "auto") + ", summonDespawn " + summonDespawn
                         + ", summonLifetime " + summonLifetime + " s, summonExit " + summonExit + ", summonCalm " + summonCalm + ", summonArmy " + onOff(summonArmy) + ", summonJade " + onOff(summonJade) + ", summonJadeColor " + summonJadeColor.toLowerCase() + " | " + ActionFx.describe() + " (wave/borderColor)",
                 "Team look: teamByType " + onOff(teamByType) + ", teamLook " + teamFx + ", time " + (teamFxSeconds > 0 ? teamFxSeconds + " s" : "infinite")
-                        + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase() + ", armyFriendlyFire " + onOff(armyFriendlyFire),
+                        + ", onlyWand " + onOff(teamLookOnlyWand) + " | armyTint " + onOff(armyTint) + ", armyTintColor " + armyTintColor.toLowerCase() + ", armyFriendlyFire " + onOff(armyFriendlyFire)
+                        + " | equipWeaponDamage " + onOff(equipWeaponDamage),
                 "Wands: wandEffect " + effect + ", effectArea " + onOff(effectArea) + ", effectRadius " + effectRadius + ", healArea " + onOff(healArea) + ", healAreaSelf " + onOff(healAreaSelf) + ", effectAreaSelf " + onOff(effectAreaSelf) + ", cleanseAreaSelf " + onOff(cleanseAreaSelf) + ", morphBurstSelf " + onOff(morphBurstSelf) + ", healRadius " + healRadius + ", waveTravel " + onOff(waveTravel) + ", waveGroundOnly " + onOff(waveGroundOnly) + ", battleWaveTravel " + onOff(battleWaveTravel) + ", battleWaveGroundOnly " + onOff(battleWaveGroundOnly) + ", wandFx " + onOff(wandFx) + ", killDelay " + (killDelayMs / 1000f) + " s, killHitDelay " + killHitDelayMs + " ms, killLoot " + onOff(killLoot) + ", killPlayers " + onOff(killPlayers) + ", killArea " + onOff(killArea) + ", killRadius " + killRadius + ", killAreaPlayers " + onOff(killAreaPlayers) + ", snapPlayers " + onOff(snapPlayers) + ", morphPlayers " + onOff(morphPlayers) + ", morphBurst " + onOff(morphBurst) + ", morphShuffle " + onOff(morphShuffle) + ", morphBurstRadius " + morphBurstRadius + ", cleanseColor " + cleanseColor.toLowerCase() + ", cleanseArea " + onOff(cleanseArea) + ", cleanseRadius " + cleanseRadius + ", buffColor " + buffColor.toLowerCase() + ", buffLight " + buffLight.toLowerCase() + ", buffLook " + buffLook + ", healLight " + healLight.toLowerCase() + ", lookGlow " + lookGlow + ", deathGlow " + deathGlow + ", debugTrack " + debugTrackSeconds + " s, debugLog " + onOff(debug) + ", debugRecord " + onOff(debugRecord),
                 "Permissions: " + permissionsMode + " (/mobbattle permissions open|server) | server features: serverVs " + onOff(serverVs)
                         + ", serverHolograms " + onOff(serverHolograms) + ", serverIcons " + onOff(serverIcons),

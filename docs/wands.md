@@ -25,6 +25,7 @@ Each wand's tooltip explains what it does, in English and Spanish.
 | `MobBattle_ArmyWand` | Army Wand | Rare | Add or remove a mob in your army (crouch: recruit for a mob leader or another player) | Disband that army | No |
 | `MobBattle_MorphWand` | Morph Wand | Uncommon | Give the mob the copied model (hold: every mob around) | Copy a model or a player's look (in the air: show the copied one; hold: the mobs around swap looks) | Yes, with `morphPlayers` |
 | `MobBattle_HealWand` | Heal Wand | Uncommon | Back to full health (hold: everyone around you) | None | Yes |
+| `MobBattle_EquipWand` | Equipment Wand | Uncommon | Weapon, off hand and armor on a mob (copy and paste sets) | Opens its panel (crouch: copy) | No |
 | `MobBattle_KillWand` | Kill Wand | Epic | Kill it (soul rip, then removal) | None | Yes, with `killPlayers` |
 | `MobBattle_SnapWand` | Snap Wand | Legendary | Half of the fighters turn to dust | None | Yes, with `snapPlayers` |
 | `MobBattle_EffectWand` | Effect Wand | Legendary | Give the selected effect (hold: everyone around you) | Next effect in the list | Yes |
@@ -219,6 +220,35 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 **Gotchas**
 - It only restores health. Effects, buffs and morphs stay.
 - A mob with a health buff is healed to its raised max.
+
+## Equipment Wand (`MobBattle_EquipWand`)
+
+Put weapons, an off hand item and armor on mobs.
+
+- **Right click a mob:** its equipment panel.
+  - Left side: the mob's six slots (hand, off hand, head, chest, hands, legs) with the item drawn. Click a slot to choose what goes in it; Empty takes it off.
+  - Right side: a search box (item id or its name in your language), filters by mod, type (Weapon, Tool, Potion...) and group (Sword, Staff, Shield...), and a gallery of items. Click one to put it on. The hand opens on weapons; armor slots show only that slot's pieces.
+  - Buttons: Copy, Paste, Restore (the gear the mob's role gives it) and Empty all.
+- **Crouch + right click a mob:** copies its set.
+- **Left click a mob:** puts the copied set on it.
+- **Hold left (1.5 s):** puts the copied set on every mob within 12 blocks (never players).
+- Only items that make sense in a fight are listed: weapons, tools, potions, food, fish, runes, bombs, torches and lanterns, and any mod item that is not a block.
+- Weapons are only a look by default: a mob still attacks with its role's own attacks and damage. Turn on `/mobbattle equipWeaponDamage on` (Battles page of the panel) and its hits are scaled by the weapon's power against its role's own weapon (a skeleton with an adamantite sword instead of its rusty axe hits x1.45, with a crude sword x0.58; x0.25 to x3). Mobs without a weapon of their own count as a fist; staffs, wands and spellbooks give no bonus. Armor protects it with the game's normal resistances (a full adamantite Trork took 18% less damage in a test duel).
+- Two-handed items (battleaxes, longswords, maces, spears, staffs, bows, daggers, spellbooks) empty and lock the off hand, as for players.
+- Some mobs only attack with their own weapon in hand (the Goblin Guardians and the Dungeon Goblin Mace, and mod mobs built the same way). Their hands are locked in the panel, and Copy/Paste keep their weapon, so they keep fighting.
+- The off hand only works on mobs whose role has one; on the rest it is locked.
+- Mobs only. From the console: `/mobbattle apply <who> equip <item>` and `apply <who> unequip`.
+
+### Equipment kits
+
+A kit is a named set for the six slots. Each slot can hold several items: every mob gets one of them at random. A slot can also say `-` (empty it) or be left out (the mob keeps what it has).
+
+- **Make one:** the panel's "Save as kit" saves the mob's current set; `/mobbattle kit save <name>` saves the set you copied with the wand (or `kit save <name> look` the mob you look at); `/mobbattle kit set <name> <slot> <item|item2|->` sets one slot's options (`none` = leave it alone). `kit list`, `kit show <name>`, `kit remove <name>`.
+- **Summon list:** `/mobbattle summon kit <mob> <kit|none>`, or the Kit dropdown on each row of the panel's Summon list. Those mobs spawn wearing it.
+- **Battle teams:** `/mobbattle teams kit <team> <kit|none>`, or the Kit dropdown on the Teams page. When a team battle starts, that team's mobs put it on, and they get their own gear back when it ends.
+- **Your army:** `/mobbattle army kit <kit>` puts it on every mob of your army now.
+- **Any mob:** the panel's "Apply kit", or `/mobbattle apply <who> kit <kit>`.
+- Kits follow the wand's rules: mobs that need their own weapon keep it, two-handed items empty the off hand.
 
 ## Kill Wand (`MobBattle_KillWand`)
 

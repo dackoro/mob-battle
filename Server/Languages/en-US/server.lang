@@ -1923,3 +1923,97 @@ mobbattle.panel.field.camera.slowmo.hint = percent speed, 0 = off
 mobbattle.panel.field.camera.slowmo.time.label = Slow motion lasts
 mobbattle.panel.field.camera.slowmo.time.tip = Real seconds before the world goes back to normal speed (default 3).
 mobbattle.panel.field.camera.slowmo.time.hint = seconds
+
+mobbattle.cmd.apply.unknownitem = Unknown item: {value}.
+mobbattle.cmd.apply.why.canthold = can't hold it
+
+items.MobBattle_EquipWand.name = Equipment Wand
+items.MobBattle_EquipWand.description = Right click a mob: its equipment (crouch: copy it). Left click: put the copied set on. Hold left: on every mob around.
+mobbattle.chat.equip.notmob = Click a mob.
+mobbattle.chat.equip.nothingcopied = Nothing copied yet: crouch + right click a mob, or press Copy in its panel.
+mobbattle.chat.equip.pasted = Equipment put on {name}.
+mobbattle.chat.equip.area = Equipment put on {n, plural, one {# mob} other {# mobs}}.
+mobbattle.equip.title = Equipment
+mobbattle.equip.hint = Weapons are only a look: the mob still attacks as its role does. Armor protects it.
+mobbattle.equip.slot.hand = Hand
+mobbattle.equip.slot.offhand = Off hand
+mobbattle.equip.slot.head = Head
+mobbattle.equip.slot.chest = Chest
+mobbattle.equip.slot.hands = Hands
+mobbattle.equip.slot.legs = Legs
+mobbattle.equip.empty = Empty
+mobbattle.equip.copy = Copy set
+mobbattle.equip.paste = Paste set
+mobbattle.equip.clearall = Empty all
+mobbattle.equip.copied = Copied. Left click a mob with the wand to put it on.
+mobbattle.equip.pastedhere = Copied set put on.
+mobbattle.equip.nooffhand = This mob has no off hand.
+mobbattle.equip.why.cant_hold_it = It can't hold that.
+mobbattle.equip.why.no_off_hand = This mob has no off hand.
+mobbattle.equip.why.wrong_slot = That piece goes in another slot.
+mobbattle.equip.why.not_a_mob = Not a mob.
+
+mobbattle.chat.equip.copiedfrom = Copied {name}'s equipment: {set}. Left click a mob to put it on, hold left for every mob around.
+
+mobbattle.chat.equip.kept = {name} kept its own weapon: its attacks only work with it in hand.
+mobbattle.chat.equip.areakept = {n, plural, one {# mob} other {# mobs}} kept their own weapon: their attacks only work with it in hand.
+mobbattle.equip.needs = This mob only attacks with {items} in hand: change it and it stops attacking. Paste keeps it.
+mobbattle.equip.breaks = Changed. It needs {items} in hand to attack, so now it won't attack.
+mobbattle.equip.pastedkept = Copied set put on. It kept its own weapon, which its attacks need.
+
+mobbattle.equip.twohanded = Two-handed item in hand: the off hand stays empty.
+mobbattle.equip.why.two_handed = The hand holds a two-handed item: empty it or pick a one-handed one first.
+
+mobbattle.equip.restore = Restore
+mobbattle.equip.restored = Back to the gear its role gives it.
+mobbattle.equip.norestore = Couldn't read this mob's original gear.
+mobbattle.equip.clearedkept = Emptied. It kept its own weapon, which its attacks need.
+mobbattle.equip.locked = Its attacks only work with {items} in hand: those hands are locked so it keeps fighting.
+mobbattle.equip.search = Search items...
+mobbattle.equip.editing.hand = Choosing for: Hand
+mobbattle.equip.editing.offhand = Choosing for: Off hand
+mobbattle.equip.editing.head = Choosing for: Head
+mobbattle.equip.editing.chest = Choosing for: Chest
+mobbattle.equip.editing.hands = Choosing for: Hands
+mobbattle.equip.editing.legs = Choosing for: Legs
+mobbattle.equip.count = {total} items
+mobbattle.equip.count.more = Showing {shown} of {total}: search or filter to see the rest.
+
+mobbattle.help.battles.75 = equipWeaponDamage on|off - a mob's weapon changes its damage: its hits are scaled by the weapon's power against its role's own weapon, x0.25 to x3 (default off)
+mobbattle.cmd.desc.equip_weapon_damage = A mob's weapon changes its damage (default off)
+mobbattle.cmd.desc.equip_weapon_damage_on = Hits scaled by the weapon's power
+mobbattle.cmd.desc.equip_weapon_damage_off = Weapons are only a look (default)
+mobbattle.panel.field.equip.weapon.damage.label = Weapon damage bonus
+mobbattle.panel.field.equip.weapon.damage.tip = A mob's hits are scaled by its weapon's power against its role's own weapon (Equipment Wand), x0.25 to x3. Off: weapons are only a look (default off).
+
+mobbattle.help.battles.76 = kit list | show <kit> | save <kit> [copied|look] | set <kit> <slot> <item|item2|-|none> | remove <kit> - equipment kits: a slot with several items picks one at random per mob, - empties it, none leaves it as the mob has it
+mobbattle.help.battles.77 = summon kit <role> <kit|none> / teams kit <team> <kit|none> / army kit <kit> / apply <who> kit <kit> - summons spawn with it, a team wears it in team battles (taken off at the end), your army gets it now
+mobbattle.cmd.desc.kit = Equipment kits for summons, teams and armies
+mobbattle.cmd.desc.kit_list = List the kits
+mobbattle.cmd.desc.kit_show = Show a kit's slots
+mobbattle.cmd.desc.kit_save = Save the copied set (or the mob you look at) as a kit
+mobbattle.cmd.desc.kit_set = Set one slot's items (item|item2 random, - empty, none untouched)
+mobbattle.cmd.desc.kit_remove = Delete a kit
+mobbattle.cmd.desc.summon_kit = The kit a listed mob spawns with (kit|none)
+mobbattle.cmd.desc.teams_kit = The kit a team wears in team battles (kit|none)
+mobbattle.cmd.kit.list = Kits: {kits}
+mobbattle.cmd.kit.none = No kits yet: /mobbattle kit save <name> (Equipment Wand: crouch + right click a mob to copy its set first).
+mobbattle.cmd.kit.show = Kit {kit}: {slots}
+mobbattle.cmd.kit.saved = Kit {kit} saved: {slots}
+mobbattle.cmd.kit.removed = Kit {kit} deleted.
+mobbattle.cmd.kit.full = Too many kits (max {max}).
+mobbattle.cmd.kit.name = Kit names: letters, numbers, - and _, up to 24.
+mobbattle.cmd.kit.nosource = Nothing copied and no mob in sight: copy a set with the Equipment Wand or look at a mob.
+mobbattle.cmd.kit.team = {team} wears kit {kit} in team battles.
+mobbattle.cmd.kit.team.none = {team} fights with its own gear.
+mobbattle.cmd.kit.army = Kit {kit} put on {count} army mobs.
+
+mobbattle.equip.kitname = Kit name...
+mobbattle.equip.savekit = Save as kit
+mobbattle.equip.applykit = Apply kit
+mobbattle.equip.kitsaved = Saved as kit {kit}. Use it with summon kit, teams kit or army kit.
+mobbattle.equip.kitapplied = Kit {kit} put on.
+
+# --- training dummies (Server/NPC/Roles/MobBattle) ---
+npcRoles.MobBattle_Dummy_Knight.name = Training Knight
+npcRoles.MobBattle_Dummy_Archer.name = Training Archer

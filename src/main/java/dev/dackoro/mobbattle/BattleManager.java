@@ -393,6 +393,7 @@ public final class BattleManager {
      * keeps its whole Store (world) reachable, so dead or unloaded entities must be dropped.
      */
     static void maintain() {
+        Kits.prune();
         // Retired mobs stay managed on purpose (joinOwnersSide must not pull them back into a battle).
         MANAGED.removeIf(npc -> !npc.isValid());
         long spawnCutoff = System.currentTimeMillis() - SPAWN_MEMORY_MS;
@@ -506,6 +507,11 @@ public final class BattleManager {
         // summonDespawn battleEnd: the surviving summons that fought here leave (each claimed once).
         SummonDespawn.battleEnded(all);
         SummonDespawn.battleEnded(formerMembers);
+        if (battle.isTeams()) {
+            List<Ref<EntityStore>> geared = new ArrayList<>(all);
+            geared.addAll(formerMembers);
+            Kits.teamBattleEnd(geared, battle.store);
+        }
         for (Ref<EntityStore> npc : all) {
             if (!npc.isValid()) continue;
             if (isPlayerFighter(npc)) {

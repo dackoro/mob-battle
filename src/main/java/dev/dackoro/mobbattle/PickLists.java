@@ -125,6 +125,7 @@ final class PickLists {
         MobNames.clear();
         RoleAttack.clear();
         ChaseSupport.clear();
+        EquipWand.rolesChanged();
         Medium.rolesChanged();
     }
 
@@ -526,6 +527,11 @@ final class PickLists {
             name = json.has("Reference") && json.get("Reference").isJsonPrimitive() ? json.get("Reference").getAsString() : null;
         }
         return out;
+    }
+
+    /** A role or role component file's JSON by name (any pack), or null. Not cached: callers cache what they derive. */
+    static JsonObject roleJson(String name) {
+        return read(name, new HashMap<>());
     }
 
     private static JsonObject read(String name, Map<String, JsonObject> files) {

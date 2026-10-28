@@ -277,7 +277,7 @@ final class Presets {
             "summon.min", "summon.max", "summon.atleastone");
 
     static boolean isListKey(String key) {
-        return key.startsWith("teams.") || key.startsWith("summon.") && !SUMMON_SETTINGS.contains(key);
+        return key.startsWith("teams.") || key.startsWith(Kits.PREFIX) || key.startsWith("summon.") && !SUMMON_SETTINGS.contains(key);
     }
 
     /**

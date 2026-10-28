@@ -1,0 +1,45 @@
+{
+  "$Comment": "Mob Battle training archer: the game's intelligent template (as Skeleton_Archer) with the mannequin body and an iron shortbow. Shoots real arrows (Skeleton_Archer_Bow_Shoot) at hostile mobs and players from 5-15 blocks and backs off when they come within 4.",
+  "Type": "Variant",
+  "Reference": "Template_Intelligent",
+  "Parameters": {
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.MobBattle_Dummy_Archer.name",
+      "Description": "Translation key for NPC name display"
+    }
+  },
+  "Modify": {
+    "Appearance": "Mannequin",
+    "MaxHealth": 100,
+    "Weapons": [
+      "Weapon_Shortbow_Iron"
+    ],
+    "OffHand": [],
+    "DropList": "Empty",
+    "WakingPeriod": [
+      0,
+      24
+    ],
+    "WanderRadius": 3,
+    "Patrol": false,
+    "FollowPatrolPath": false,
+    "HearingRange": 8,
+    "ViewSector": 270,
+    "HitInterruptEnabled": true,
+    "KnockbackScale": 0.3,
+    "Attack": "Skeleton_Archer_Bow_Shoot",
+    "CombatBackOffAfterAttack": false,
+    "AttackDistance": 15,
+    "CombatFleeIfTooCloseDistance": 4,
+    "DesiredAttackDistanceRange": [
+      5,
+      14.5
+    ],
+    "CombatBehaviorDistance": 15,
+    "TargetRange": 15,
+    "LeashMinPlayerDistance": 18,
+    "NameTranslationKey": {
+      "Compute": "NameTranslationKey"
+    }
+  }
+}
