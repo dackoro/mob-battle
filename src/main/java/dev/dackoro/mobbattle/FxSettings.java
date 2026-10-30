@@ -80,6 +80,11 @@ public final class FxSettings {
      */
     public static int readySeconds = 0;
     public static final int MAX_READY = 60;
+    /**
+     * The countdown also ticks in chat ("[label] 3", /mobbattle countdownChat on|off). Default off (2026-10-30, playtest:
+     * ten chat lines per battle on top of the big title).
+     */
+    public static boolean countdownChat = false;
 
     /** Wand target effects: heal glow, soul rip, charm... (/mobbattle wandfx). Default: on. */
     public static boolean wandFx = true;
@@ -1000,6 +1005,7 @@ public final class FxSettings {
             } catch (NumberFormatException ignored) {
                 // keep the default
             }
+            countdownChat = Boolean.parseBoolean(p.getProperty("fight.countdown.chat", String.valueOf(countdownChat)));
             wandFx = Boolean.parseBoolean(p.getProperty("wand.fx", String.valueOf(wandFx)));
             debug = Boolean.parseBoolean(p.getProperty("debug", String.valueOf(debug)));
             debugRecord = Boolean.parseBoolean(p.getProperty("debug.record", String.valueOf(debugRecord)));
@@ -1289,6 +1295,7 @@ public final class FxSettings {
         p.setProperty("team.fx.onlywand", String.valueOf(teamLookOnlyWand));
         p.setProperty("fight.countdown", String.valueOf(countdownSeconds));
         p.setProperty("fight.ready", String.valueOf(readySeconds));
+        p.setProperty("fight.countdown.chat", String.valueOf(countdownChat));
         p.setProperty("wand.fx", String.valueOf(wandFx));
         p.setProperty("debug", String.valueOf(debug));
         p.setProperty("debug.record", String.valueOf(debugRecord));
@@ -1527,7 +1534,7 @@ public final class FxSettings {
     /** Settings as short labelled lines, one per group (see {@link #groupOf}). */
     public static String[] describeLines() {
         return new String[] {
-                "Titles: countdown " + countdownSeconds + " s, readyTime " + readySeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope + " (nearby = " + scopeRadius + " blocks), camera " + onOff(fightCamera) + ", music " + (battleMusic ? musicTrack : "off")
+                "Titles: countdown " + countdownSeconds + " s (chat " + onOff(countdownChat) + "), readyTime " + readySeconds + " s, startTitle " + onOff(titleEnabled) + ", winTitle " + onOff(winTitleEnabled) + ", titleStyle " + titleStyle + ", titleScope " + titleScope + " (nearby = " + scopeRadius + " blocks), camera " + onOff(fightCamera) + ", music " + (battleMusic ? musicTrack : "off")
                         + ", runes " + onOff(runes) + " | cameraStyle " + cameraStyle + ", cameraTime " + (cameraSeconds > 0 ? cameraSeconds + " s" : "countdown")
                         + ", cameraShots " + cameraShots + ", endCamera " + endCamera + ", endCameraTime " + endCameraSeconds + " s, cameraScope " + cameraScope + ", vsScope " + vsScope + ", autoWatch " + onOff(autoWatch)
                         + ", watchTransition " + watchTransition + ", watchAutoSwitch " + (watchAutoSwitch > 0 ? watchAutoSwitch + " s" : "off") + ", endSlowMo " + (endSlowMo > 0 ? endSlowMo + "x slower for " + endSlowMoSeconds + " s" : "off")
@@ -1566,7 +1573,7 @@ public final class FxSettings {
     /** Which describeLines() line a setting key belongs to. */
     public static int groupOf(String key) {
         return switch (key) {
-            case "title", "wintitle", "style", "countdown", "readytime", "titlescope", "scoperadius", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "vsscope", "autowatch", "watchtransition", "watchautoswitch", "endslowmo", "endslowmotime", "camerabars", "camerablur", "camerahud", "bandtimer", "bandtitle", "bandrows", "bandinfo", "cameraface", "vsscreen", "vsteamreps", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "filmstyle", "film" -> 0;
+            case "title", "wintitle", "style", "countdown", "countdownchat", "readytime", "titlescope", "scoperadius", "camera", "music", "runes", "camerastyle", "cameratime", "camerashots", "endcamera", "endcameratime", "camerascope", "vsscope", "autowatch", "watchtransition", "watchautoswitch", "endslowmo", "endslowmotime", "camerabars", "camerablur", "camerahud", "bandtimer", "bandtitle", "bandrows", "bandinfo", "cameraface", "vsscreen", "vsteamreps", "autofilm", "filmplayershots", "filmwideshots", "filmshot", "filmshottime", "filmpace", "filmshotvariation", "filmtransition", "filmshots", "filmstyle", "film" -> 0;
             case "laser", "color" -> 1;
             case "isolation", "battleisolation", "selfdefense", "friendlyfire", "duelmode", "playerfights", "battlepvp", "buff" -> 2;
             case "scoreboard", "arena", "timer", "timeup", "judgeby", "arenasize", "arenashrink", "arenashrinkto", "arenashrinktime", "unstick", "standofftime", "battlebelow", "battleabove", "arenavertical", "passivewin", "battleloot", "passivewinignore", "idleend", "battlemaxtime", "duelcard", "focuscard", "timerstyle", "tiebreak", "killtiebreak", "snapmode", "snappercent", "snaptime", "snaphitdelay", "snapradius" -> 3;

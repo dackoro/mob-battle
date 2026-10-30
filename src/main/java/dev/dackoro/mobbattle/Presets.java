@@ -15,15 +15,19 @@ import java.util.stream.Stream;
  * /mobbattle preset: whole looks at once.
  * <ul>
  *   <li>default: every setting back to its default (team list and summon list are kept).</li>
- *   <li>fight: just the fights, nothing in the way (no countdown, cameras, titles, music, lasers, runes, area
- *       drawings or timers; arenas keep only their wall).</li>
- *   <li>effects: countdown 3, 2 min timer (most health wins; the royale keeps its 3 min judge), titles, music, runes, area, scoreboards, no laser;
- *       no cameras.</li>
- *   <li>debug: everything visible for testing (area floor + zone + glow, lasers, runes, arenas drawn, team
- *       look, duel card, every scoreboard), no cinematics. The debug log is not part of any preset (see isSecurityKey).</li>
- *   <li>cinematic: countdown and full camera work (western duel, drone royale, team sweep, focus, end
- *       camera with kill count), music and titles, area look, waves and arenas as by default; no lasers, runes
- *       or border glow.</li>
+ *   <li>clean (old name fight): only what the wands do (no countdown, VS screen, cameras, titles, music, cards,
+ *       scoreboards, lasers, runes, area drawings or timers; arenas keep only their wall).</li>
+ *   <li>cinematic: the show without numbers: VS screen, countdown 5, intro camera, the battle film for the camera
+ *       viewers, end camera, slow motion on the final blow, wide film bands, music and titles; no cards, scoreboards,
+ *       chat countdown, lasers, runes or border glow.</li>
+ *   <li>spectator: like a shooter's spectator mode: the camera viewers watch the battle from its start (it
+ *       follows one fighter, glides to the killer when it falls, a click changes fighter), every scoreboard, end
+ *       camera and slow motion on the final blow.</li>
+ *   <li>stats (old name effects): spectator without the watch, plus every number on screen: a timer for every kind
+ *       (2 min, most health wins; the royale keeps its 3 min judge), every scoreboard, the duel and all vs one cards,
+ *       the countdown in chat too, end camera and slow motion on the final blow.</li>
+ *   <li>debug (command only): everything visible for testing (area floor + zone + glow, lasers, runes, arenas drawn,
+ *       team look, duel card, every scoreboard), no cinematics. The debug log is not part of any preset (see isSecurityKey).</li>
  *   <li>save / load / delete &lt;name&gt;: your own presets, in &lt;plugin data dir&gt;/presets/&lt;name&gt;.properties.</li>
  * </ul>
  * Built-in presets other than default only change the presentation settings (KindFx options, overrides
@@ -31,13 +35,25 @@ import java.util.stream.Stream;
  */
 final class Presets {
 
-    static final String[] BUILT_IN = {"default", "fight", "effects", "debug", "cinematic"};
+    static final String[] BUILT_IN = {"default", "clean", "cinematic", "spectator", "stats", "debug"};
+
+    /** The built-in presets the panel shows as buttons (debug is a command for testing). */
+    static final String[] PANEL = {"default", "clean", "cinematic", "spectator", "stats"};
+
+    /** Names from before 1.2.1 (2026-10-30, playtest: "fight" and "effects" did not say what they do). */
+    private static final Map<String, String> OLD_NAMES = Map.of("fight", "clean", "effects", "stats");
+
+    /** A built-in preset's current name for {@code name} (old names included), else {@code name} lowercased. */
+    static String canonical(String name) {
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        return OLD_NAMES.getOrDefault(lower, lower);
+    }
 
     /** Presentation keys a built-in preset first puts back to default (with every per-kind override). */
     private static final String[] PRESENTATION_KEYS = {
-            "fight.countdown", "fight.ready", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
+            "fight.countdown", "fight.countdown.chat", "fight.ready", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
             "camera.end.time", "camera.autowatch", "camera.watch.transition", "camera.watch.autoswitch", "camera.bars", "camera.blur", "camera.autofilm", "camera.vsscreen", "camera.vs.teamreps", "camera.film.player", "camera.film.wide", "camera.face", "camera.hud", "camera.bands.timer", "camera.bands.title", "camera.bands.rows", "camera.bands.info", "camera.film.shot", "camera.film.variation", "camera.film.pace", "camera.film.transition", "camera.film.weight.wide", "camera.film.weight.track", "camera.film.weight.arc", "camera.film.weight.pushin", "camera.film.weight.closeup", "camera.film.weight.landscape", "camera.film.weight.playerback", "camera.film.weight.playerclose", "camera.film.weight.zenith", "camera.film.weight.spiral", "camera.film.weight.telephoto", "camera.film.weight.descent", "camera.film.weight.groundrise", "camera.film.weight.profile", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
-            "laser.enabled", "chaos.area", "fx.runes", "fx.crown", "battle.duelCard", "battle.focusCard"
+            "camera.slowmo.times", "camera.slowmo.time", "laser.enabled", "chaos.area", "fx.runes", "fx.crown", "battle.duelCard", "battle.focusCard"
     };
 
     /** Prefixes of presentation keys a built-in preset also puts back first (waves, glow, mob looks). */
@@ -50,8 +66,9 @@ final class Presets {
     private static Map<String, String> overlay(String name) {
         Map<String, String> m = new LinkedHashMap<>();
         switch (name) {
-            case "fight" -> {
+            case "clean" -> {
                 m.put("fight.countdown", "0");
+                m.put("camera.vsscreen", "false");
                 m.put("fight.camera", "false");
                 m.put("camera.end", "off");
                 // the cards are on by default since 2026-10-30; "just the fights" keeps the screen clear
@@ -71,22 +88,27 @@ final class Presets {
                 for (ActionFx.Role r : ActionFx.Role.values()) m.put("mobfx." + r.key, ActionFx.OFF);
                 for (BattleManager.Kind k : BattleManager.Kind.values()) {
                     m.put("battle.timer." + k.key, "0");
+                    m.put("battle.scoreboard." + k.key, "false");
                     // Arenas that were on keep their wall, without drawing it.
                     Arena.Mode mode = FxSettings.arenaMode(k);
                     m.put("battle.arena." + k.key, mode == Arena.Mode.OFF ? "off" : "wall");
                 }
             }
-            case "effects" -> {
-                // Fights with all the show but no cameras: countdown, timer, titles, music, runes, area (the laser
-                // is debug only, playtest 2026-10-12).
+            case "stats" -> {
+                // Every number on screen (2026-10-30, playtest): timers, scoreboards, both cards and the countdown in
+                // chat; the rest of the show stays as by default (the laser is debug only, playtest 2026-10-12).
                 m.put("fight.countdown", "3");
-                m.put("fight.camera", "false");
-                m.put("camera.end", "off");
+                m.put("fight.countdown.chat", "true");
+                m.put("battle.duelCard", "true");
+                m.put("battle.focusCard", "true");
+                // The spectator preset without the watch (2026-10-30, playtest): the winner and its slow motion too.
+                m.put("camera.vsscreen", "true");
+                m.put("camera.end", "winner");
+                m.put("camera.slowmo.times", "4");
+                m.put("camera.slowmo.time", "3");
                 m.put("title.enabled", "true");
                 m.put("wintitle.enabled", "true");
                 m.put("battle.music", "true");
-                m.put("chaos.area", "discBorder");
-                m.put("fx.runes", "true");
                 Properties defaults = FxSettings.defaults();
                 for (BattleManager.Kind k : BattleManager.Kind.values()) {
                     // The royale keeps its own 3 min and judge (playtest 2026-10-12); the rest get 2 min, health.
@@ -95,6 +117,22 @@ final class Presets {
                     m.put("battle.timeup." + k.key, royale ? defaults.getProperty("battle.timeup." + k.key, "judge") : "health");
                     m.put("battle.scoreboard." + k.key, "true");
                 }
+            }
+            case "spectator" -> {
+                // Like a shooter's spectator mode (2026-10-30, playtest): follow a fighter from the start, the kill
+                // table on screen, the winner in slow motion at the end. The film would win over the watch: off.
+                m.put("camera.vsscreen", "true");
+                m.put("camera.autofilm", "false");
+                m.put("camera.autowatch", "true");
+                m.put("camera.watch.transition", "glide");
+                m.put("camera.end", "winner");
+                m.put("camera.slowmo.times", "4");
+                m.put("camera.slowmo.time", "3");
+                m.put("fight.countdown.chat", "false");
+                m.put("title.enabled", "true");
+                m.put("wintitle.enabled", "true");
+                m.put("battle.music", "true");
+                for (BattleManager.Kind k : BattleManager.Kind.values()) m.put("battle.scoreboard." + k.key, "true");
             }
             case "debug" -> {
                 m.put("fight.countdown", "0");
@@ -124,6 +162,15 @@ final class Presets {
                 m.put("camera.shots", "4");
                 m.put("camera.end", "winner");
                 m.put("camera.end.time", "5");
+                // The film for the camera viewers and slow motion on the final blow, no numbers on screen
+                // (2026-10-30, playtest: only the film, the winner and the slow motion).
+                m.put("camera.vsscreen", "true");
+                m.put("camera.autofilm", "true");
+                m.put("camera.slowmo.times", "4");
+                m.put("camera.slowmo.time", "3");
+                m.put("fight.countdown.chat", "false");
+                m.put("battle.duelCard", "false");
+                m.put("battle.focusCard", "false");
                 // Widest film bands (2026-10-16); the blur stays at its default.
                 m.put("camera.bars", "wide");
                 m.put("title.enabled", "true");
@@ -136,7 +183,8 @@ final class Presets {
                 for (ActionFx.Action a : ActionFx.Action.values()) {
                     m.put("glow." + a.key, ActionFx.OFF);
                 }
-                m.put(KindFx.propKey(BattleManager.Kind.ROYALE, KindFx.Opt.CAMERA_STYLE), "drone");
+                // The royale keeps auto (spotlight): the drone flew through tree tops over scattered wild mobs
+                // (2026-10-30, playtest video).
                 m.put(KindFx.propKey(BattleManager.Kind.ROYALE, KindFx.Opt.END_CAMERA), "lasthit");
                 m.put(KindFx.propKey(BattleManager.Kind.ALL_VS_ONE, KindFx.Opt.END_CAMERA), "lasthit");
                 Properties defaults = FxSettings.defaults();
@@ -144,6 +192,7 @@ final class Presets {
                     // Arenas as they come by default (drawn where they are on).
                     String key = "battle.arena." + k.key;
                     if (defaults.getProperty(key) != null) m.put(key, defaults.getProperty(key));
+                    m.put("battle.scoreboard." + k.key, "false");
                 }
             }
             default -> {
@@ -153,8 +202,9 @@ final class Presets {
     }
 
     static boolean isBuiltIn(String name) {
+        String c = canonical(name);
         for (String b : BUILT_IN) {
-            if (b.equalsIgnoreCase(name)) return true;
+            if (b.equals(c)) return true;
         }
         return false;
     }
@@ -183,7 +233,7 @@ final class Presets {
 
     /** The settings a preset gives (the settings panel loads them into its form). */
     static Preview preview(String name) {
-        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        String lower = canonical(name);
         Properties p = FxSettings.toProperties();
         Properties defaults = FxSettings.defaults();
         if ("default".equals(lower)) {
@@ -221,6 +271,16 @@ final class Presets {
             }
         }
         return new Preview(p, null);
+    }
+
+    /** The panel's built-in preset the saved settings are exactly now, or null (changed by hand). */
+    static String current() {
+        Properties now = FxSettings.toProperties();
+        for (String name : PANEL) {
+            Preview pv = preview(name);
+            if (pv.props() != null && pv.props().equals(now)) return name;
+        }
+        return null;
     }
 
     /** Saves the current settings (not the team and summon lists) as a preset. Returns null if done, else why not. */
@@ -314,7 +374,7 @@ final class Presets {
                 || key.startsWith("team.fx") || key.equals("wand.fx") || key.equals("wand.cleanse.color") || key.equals("wand.buff.color")
                 || key.equals("wand.buff.light") || key.equals("wand.buff.look") || key.equals("wand.heal.light") || key.startsWith("summon.jade") || key.startsWith("army.tint")) return "effects";
         if (key.equals("fight.camera") || key.startsWith("camera.")) return "cameras";
-        if (key.equals("fight.countdown") || key.equals("fight.ready") || key.startsWith("title.") || key.startsWith("wintitle.")
+        if (key.equals("fight.countdown") || key.equals("fight.countdown.chat") || key.equals("fight.ready") || key.startsWith("title.") || key.startsWith("wintitle.")
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
                 || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak") || key.equals("battle.killtiebreak")

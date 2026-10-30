@@ -444,6 +444,19 @@ final class ConfigSchema {
         return new Section(id);
     }
 
+    /** The id of the first page, which repeats the most used fields of the others (the search skips it). */
+    static final String MAIN = "main";
+
+    /** The field already on another page (same Field: same draft, same row texts). */
+    private static FieldItem shared(List<Page> pages, String key) {
+        for (Page p : pages) {
+            for (Item item : p.items()) {
+                if (item instanceof FieldItem fi && fi.field().key.equals(key)) return fi;
+            }
+        }
+        throw new IllegalStateException("No panel field " + key);
+    }
+
     private static Item note(String id) {
         return new Note(id);
     }
@@ -453,14 +466,25 @@ final class ConfigSchema {
     static {
         List<Page> pages = new ArrayList<>();
 
+        // Pages in the order of the menu; "main" goes first once every page exists (it shows fields of the others).
+        // 2026-10-30 (playtest, new players): who sees what, the cards and the film got their own sections and tab.
         pages.add(new Page("presentation", List.of(
                 section("start"),
                 number("fight.countdown", 0, FxSettings.MAX_COUNTDOWN),
+                toggle("fight.countdown.chat"),
                 number("fight.ready", 0, FxSettings.MAX_READY),
                 toggle("title.enabled"),
                 toggle("wintitle.enabled"),
                 choice("title.style", ConfigSchema::titleStyles),
+                section("hud"),
+                note("hud"),
+                toggle("battle.duelCard"),
+                toggle("battle.focusCard"),
+                choice("battle.timer.style", "custom", "portal"),
+                section("whosees"),
                 choice("title.scope", FxSettings.TITLE_SCOPES),
+                choice("camera.scope", FxSettings.TITLE_SCOPES),
+                choice("camera.vs.scope", FxSettings.TITLE_SCOPES),
                 number("title.scope.radius", FxSettings.MIN_SCOPE_RADIUS, FxSettings.MAX_SCOPE_RADIUS),
                 section("musicfx"),
                 toggle("battle.music"),
@@ -478,19 +502,20 @@ final class ConfigSchema {
                 choice("camera.style", KindFx.CAMERA_STYLES),
                 number("camera.time", 0, KindFx.MAX_CAMERA_TIME),
                 number("camera.shots", 1, FxSettings.MAX_MOBS_LIMIT),
-                choice("camera.scope", FxSettings.TITLE_SCOPES),
-                choice("camera.vs.scope", FxSettings.TITLE_SCOPES),
-                choice("camera.hud", FxSettings.CAMERA_HUDS),
-                choice("camera.bands.timer", FxSettings.BAND_PLACES),
-                choice("camera.bands.title", FxSettings.BAND_PLACES),
-                choice("camera.bands.rows", new String[] {"1", "2"}),
-                choice("camera.bands.info", FxSettings.BAND_INFO_PLACES),
-                toggle("camera.face"),
-                choice("camera.bars", KindFx.CAMERA_BARS),
-                choice("camera.blur", KindFx.CAMERA_BLURS),
                 section("endcamera"),
                 choice("camera.end", KindFx.END_CAMERAS),
                 number("camera.end.time", 1, KindFx.MAX_END_CAMERA_TIME),
+                number("camera.slowmo.times", 0, FxSettings.MAX_SLOW_MO_TIMES),
+                number("camera.slowmo.time", 1, FxSettings.MAX_SLOW_MO_SECONDS),
+                section("cameralook"),
+                choice("camera.bars", KindFx.CAMERA_BARS),
+                choice("camera.blur", KindFx.CAMERA_BLURS),
+                toggle("camera.face"),
+                choice("camera.hud", FxSettings.CAMERA_HUDS),
+                note("cameras")
+        ), null, false));
+
+        pages.add(new Page("film", List.of(
                 section("film"),
                 toggle("camera.autofilm"),
                 number("camera.film.player", 0, 100),
@@ -499,6 +524,11 @@ final class ConfigSchema {
                 number("camera.film.variation", 0, 90),
                 number("camera.film.pace", FxSettings.MIN_FILM_PACE, FxSettings.MAX_FILM_PACE),
                 choice("camera.film.transition", FxSettings.FILM_TRANSITIONS),
+                section("filmbands"),
+                choice("camera.bands.timer", FxSettings.BAND_PLACES),
+                choice("camera.bands.title", FxSettings.BAND_PLACES),
+                choice("camera.bands.rows", new String[] {"1", "2"}),
+                choice("camera.bands.info", FxSettings.BAND_INFO_PLACES),
                 section("filmshots"),
                 number("camera.film.weight.wide", 0, FxSettings.MAX_FILM_WEIGHT),
                 number("camera.film.weight.track", 0, FxSettings.MAX_FILM_WEIGHT),
@@ -514,15 +544,11 @@ final class ConfigSchema {
                 number("camera.film.weight.descent", 0, FxSettings.MAX_FILM_WEIGHT),
                 number("camera.film.weight.groundrise", 0, FxSettings.MAX_FILM_WEIGHT),
                 number("camera.film.weight.profile", 0, FxSettings.MAX_FILM_WEIGHT),
-                section("watchhud"),
+                section("watch"),
                 toggle("camera.autowatch"),
                 choice("camera.watch.transition", FxSettings.WATCH_TRANSITIONS),
                 number("camera.watch.autoswitch", 0, FxSettings.MAX_WATCH_AUTO_SWITCH),
-                number("camera.slowmo.times", 0, FxSettings.MAX_SLOW_MO_TIMES),
-                number("camera.slowmo.time", 1, FxSettings.MAX_SLOW_MO_SECONDS),
-                toggle("battle.duelCard"),
-                toggle("battle.focusCard"),
-                note("cameras")
+                note("film")
         ), null, false));
 
         pages.add(new Page("battles", List.of(
@@ -545,7 +571,6 @@ final class ConfigSchema {
                 toggle("battle.wave.travel"),
                 toggle("battle.wave.groundonly"),
                 section("arenastimers"),
-                choice("battle.timer.style", "custom", "portal"),
                 number("battle.arena.size", 0, FxSettings.MAX_ARENA).p("min", FxSettings.MIN_ARENA).p("max", FxSettings.MAX_ARENA),
                 number("battle.shrink.to", FxSettings.MIN_SHRINK_TO, FxSettings.MAX_ARENA),
                 number("battle.shrink.time", 10, FxSettings.MAX_TIMER),
@@ -780,6 +805,29 @@ final class ConfigSchema {
             }
         }
         pages.add(new Page("admin", admin, "admin", true));
+
+        // Main (2026-10-30, playtest: a new player should find the big switches without reading every tab): the
+        // presets and the settings that change the show the most, the same fields as on their own pages.
+        pages.add(0, new Page(MAIN, List.of(
+                section("mainpresets"),
+                section("mainbefore"),
+                shared(pages, "camera.vsscreen"),
+                shared(pages, "fight.countdown"),
+                shared(pages, "fight.camera"),
+                shared(pages, "title.enabled"),
+                shared(pages, "wintitle.enabled"),
+                section("mainduring"),
+                shared(pages, "camera.autofilm"),
+                shared(pages, "camera.autowatch"),
+                shared(pages, "battle.music"),
+                shared(pages, "battle.duelCard"),
+                shared(pages, "battle.focusCard"),
+                shared(pages, "battle.loot"),
+                section("mainend"),
+                shared(pages, "camera.end"),
+                shared(pages, "camera.slowmo.times"),
+                note("main")
+        ), null, false));
 
         PAGES = List.copyOf(pages);
     }

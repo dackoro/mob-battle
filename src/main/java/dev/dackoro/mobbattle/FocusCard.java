@@ -59,7 +59,7 @@ final class FocusCard extends CustomUIHud {
             for (BattleManager.Battle b : BattleManager.battles()) {
                 if (b.over || b.store != store || b.kind != BattleManager.Kind.ALL_VS_ONE) continue;
                 for (PlayerRef p : FightFx.titleViewers(b)) {
-                    if (p.isValid() && !BattleWatch.isWatching(p) && RightSlot.owns(p, b, store)) want.put(p.getUuid(), b);
+                    if (p.isValid() && !BattleWatch.isWatching(p) && !VsScreen.covers(p) && RightSlot.owns(p, b, store)) want.put(p.getUuid(), b);
                 }
             }
         }
@@ -135,11 +135,8 @@ final class FocusCard extends CustomUIHud {
         line(b, "#Name", DuelCard.shorten(MobNames.text(name, lang)), up ? "#ffd23e" : "#888888");
         if (lone != null) {
             line(b, "#Health", DuelCard.healthText(lone, store, up), up ? "#ff6b5e" : "#888888");
-            line(b, "#Attack", I18n.tr("hud.attack").param("v", DuelCard.stat(lone, Buffs.Stat.DAMAGE)), DuelCard.color(lone, Buffs.Stat.DAMAGE));
-            line(b, "#Defense", I18n.tr("hud.defense").param("v", DuelCard.stat(lone, Buffs.Stat.DEFENSE)), DuelCard.color(lone, Buffs.Stat.DEFENSE));
-            float scale = DuelCard.scaleOf(lone, store);
-            boolean scaled = Math.abs(scale - 1f) > 0.01f;
-            line(b, "#Size", I18n.tr("hud.size").param("v", DuelCard.sizeValue(scale)), scaled ? "#7dff8a" : PLAIN);
+            int hidden = DuelCard.statLines(b, "", lone, store);
+            DuelCard.bodyHeight(b, DuelCard.BODY_HEIGHT - hidden * DuelCard.LINE_HEIGHT);
             BattleManager.Kills k = battle.kills.get(lone);
             line(b, "#Kills", I18n.tr("hud.kills").param("n", k == null ? 0 : k.count()), PLAIN);
         }

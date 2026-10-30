@@ -243,17 +243,17 @@ public class MobBattlePlugin extends JavaPlugin {
                     Buffs.onPlayerReady(event.getPlayerRef());
                     // Their own skin in the VS screen: saved, drawn and registered in the background when new.
                     VsScreen.onPlayerReady(event.getPlayerRef());
-                    var player = event.getPlayer();
-                    if (player == null || player.getGameMode() != com.hypixel.hytale.protocol.GameMode.Creative) {
-                        return;
-                    }
+                    // Welcome once per server run, in any game mode (a new world starts in Adventure).
                     var entity = event.getPlayerRef();
                     var ref = entity != null && entity.isValid()
                             ? entity.getStore().getComponent(entity, com.hypixel.hytale.server.core.universe.PlayerRef.getComponentType())
                             : null;
                     if (ref != null && WELCOMED.add(ref.getUuid())) {
+                        // Two lines (2026-10-30, playtest): config and help first, then the film and watch tip.
                         ref.sendMessage(I18n.tr("chat.plugin.welcome")
                                 .color("#ffd23e"));
+                        ref.sendMessage(I18n.tr("chat.plugin.welcome.watch")
+                                .color("#c8d4e0"));
                     }
                 });
 

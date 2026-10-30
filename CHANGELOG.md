@@ -2,6 +2,18 @@
 
 Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (`v1.0.0`, ...) and matches the file uploaded to CurseForge.
 
+## 1.2.1 (2026-10-30)
+
+A cleaner start for new players: the settings panel and the presets are easier to find, the screen and the chat are quieter, and the battle film keeps the fighters in view.
+
+- **A Main tab in the settings panel**: the presets and the settings that change a battle the most (VS screen, countdown, intro camera, titles, Auto film, Auto watch, music, the stats cards, loot, end camera, slow motion) on the first tab. The battle film and watch mode have their own tab (Film & watch), the stats cards and "who sees it" moved to Presentation, the 14 film shot weights are marked advanced.
+- **New presets**: `clean` (only what the wands do, nothing on screen; old name `fight`), `cinematic` (now with the battle film and slow motion on the final blow, no cards or scoreboards), `spectator` (follow a fighter from the start, as in a shooter, with the scoreboard), `stats` (the spectator preset without following a fighter, plus timers and both cards; old name `effects`). `debug` stays as a command.
+- **Settings search finds the setting you mean first.** Settings whose name matches come first; those that only mention the word in their description follow under their own heading. The global watch setting is now called Auto watch, as on each battle kind's tab.
+- **A tidier Summon list tab**: the list comes first with **Summon now** and **Clear list** right under its title, then Add a mob (the pictures first, then the search by name), Random battle in its own section, the saved lists, and the summon settings at the end.
+- **The battle film follows the fighters when they are spread out.** With wild mobs scattered over a wide Chaos Wand area it filmed the empty middle between them; now it follows a group: the biggest one, where a group that is fighting counts double, so it goes where the blows land; it stays on it at least 8 seconds and moves to another only when that one scores twice as much or its own group is gone. The cinematic preset's royale intro is the spotlight now (the drone flew through tree tops).
+- **The stats cards wait for the VS screen** instead of being drawn over it, and show attack, defense and size only when they differ from the mob's own (no more "base" lines). Same for the watch mode cards.
+- **Quieter chat.** The countdown no longer ticks in chat on top of the big title (`countdownChat on|off`, default off), and the welcome message is two short lines: `/mobbattle config` and `/mobbattle help` first, then how to watch a battle as a film or as a spectator.
+
 ## 1.2.0 "Showtime" (2026-10-30)
 
 ### New: cameras

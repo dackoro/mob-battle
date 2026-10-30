@@ -40,6 +40,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class BattleWatch extends CustomUIHud {
 
+    /** #Body heights of WatchCard.ui and WatchDuel.ui with every line shown (hidden stat lines give theirs back). */
+    private static final int WATCH_BODY = 190;
+    private static final int WATCH_DUEL_BODY = 298;
+
     static final String GAME_MODE = "MobBattle_Spectator";
     static final String KEY = "MobBattleWatch";
     private static final String UI = "MobBattle/WatchCard.ui";
@@ -1059,6 +1063,8 @@ final class BattleWatch extends CustomUIHud {
         if (mob == null || !mob.isValid()) {
             line(ui, "#Name", "?", "#888888");
             for (String id : new String[] {"#Side", "#Health", "#Attack", "#Defense", "#Size", "#Kills"}) line(ui, id, "", "#888888");
+            for (String id : new String[] {"#Attack", "#Defense", "#Size"}) ui.set(id + ".Visible", true);
+            DuelCard.bodyHeight(ui, WATCH_BODY);
             hud.update(false, ui);
             return;
         }
@@ -1069,11 +1075,8 @@ final class BattleWatch extends CustomUIHud {
                 b.isTeams() ? b.color(team) : up ? "#ffd23e" : "#888888");
         line(ui, "#Side", sideText(b, team), b.isTeams() ? b.color(team) : "#96a9be");
         line(ui, "#Health", DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
-        line(ui, "#Attack", I18n.tr("hud.attack").param("v", DuelCard.stat(mob, Buffs.Stat.DAMAGE)), DuelCard.color(mob, Buffs.Stat.DAMAGE));
-        line(ui, "#Defense", I18n.tr("hud.defense").param("v", DuelCard.stat(mob, Buffs.Stat.DEFENSE)), DuelCard.color(mob, Buffs.Stat.DEFENSE));
-        float scale = DuelCard.scaleOf(mob, store);
-        boolean scaled = Math.abs(scale - 1f) > 0.01f;
-        line(ui, "#Size", I18n.tr("hud.size").param("v", DuelCard.sizeValue(scale)), scaled ? "#7dff8a" : "#c8d4e0");
+        // only the stats that differ from the mob's own (2026-10-30, as the duel card)
+        DuelCard.bodyHeight(ui, WATCH_BODY - DuelCard.statLines(ui, "", mob, store) * DuelCard.LINE_HEIGHT);
         BattleManager.Kills k = b.kills.get(mob);
         line(ui, "#Kills", I18n.tr("hud.kills").param("n", k != null ? k.count() : 0), k != null ? "#ffd23e" : "#c8d4e0");
         hud.update(false, ui);
@@ -1098,6 +1101,7 @@ final class BattleWatch extends CustomUIHud {
         UICommandBuilder ui = new UICommandBuilder();
         ui.set("#Title.TextSpans", Message.translation("server.mobbattle.timer." + b.kind.key));
         String[] sides = {"A", "B"};
+        int hidden = 0;
         for (int i = 0; i < 2; i++) {
             Ref<EntityStore> mob = pair.get(i);
             String side = sides[i];
@@ -1108,12 +1112,9 @@ final class BattleWatch extends CustomUIHud {
                     up ? (on ? "#ffd23e" : "#e8eef5") : "#888888");
             line(ui, "#Tag" + side, on ? I18n.tr("hud.watching.tag") : Message.empty(), "#ffd23e");
             line(ui, "#Health" + side, DuelCard.healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
-            line(ui, "#Attack" + side, I18n.tr("hud.attack").param("v", DuelCard.stat(mob, Buffs.Stat.DAMAGE)), DuelCard.color(mob, Buffs.Stat.DAMAGE));
-            line(ui, "#Defense" + side, I18n.tr("hud.defense").param("v", DuelCard.stat(mob, Buffs.Stat.DEFENSE)), DuelCard.color(mob, Buffs.Stat.DEFENSE));
-            float scale = DuelCard.scaleOf(mob, store);
-            boolean scaled = Math.abs(scale - 1f) > 0.01f;
-            line(ui, "#Size" + side, I18n.tr("hud.size").param("v", DuelCard.sizeValue(scale)), scaled ? "#7dff8a" : "#c8d4e0");
+            hidden += DuelCard.statLines(ui, side, mob, store);
         }
+        DuelCard.bodyHeight(ui, WATCH_DUEL_BODY - hidden * DuelCard.LINE_HEIGHT);
         line(ui, "#Left", b.over ? I18n.tr("hud.battleover") : Message.empty(), "#c8d4e0");
         hud.update(false, ui);
     }

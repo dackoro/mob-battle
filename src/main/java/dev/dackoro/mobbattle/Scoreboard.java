@@ -72,7 +72,7 @@ final class Scoreboard extends CustomUIHud {
             if (b.over || b.store != store || !FxSettings.scoreboard(b.kind) || cardShown(b)) continue;
             for (PlayerRef p : FightFx.titleViewers(b)) {
                 // One card per player on the right: the nearest battle's (RightSlot).
-                if (p.isValid() && RightSlot.owns(p, b, store)) want.put(p.getUuid(), b);
+                if (p.isValid() && !VsScreen.covers(p) && RightSlot.owns(p, b, store)) want.put(p.getUuid(), b);
             }
         }
         // Boards of battles that ended (or of players who left their range): removed.

@@ -228,6 +228,9 @@ final class FilmCamera {
         /** The shot battlePlan is trying (room() reads its distance), else null. */
         Type planning;
         long hotSince;
+        /** thickest(): the center of the group of fighters the film follows (null = everyone) and since when. */
+        Vector3d group;
+        long groupSince;
         /** Fighters standing at the last read. */
         int count = 2;
         /** The close-up's subject, its eased position and its hitbox height. */
@@ -557,6 +560,9 @@ final class FilmCamera {
         // One height band only (review 2026-10-29: half in a cave, half on the surface put the center inside the rock
         // between them and every shot failed): the band of the action, else the fullest; the rest are stragglers.
         pts = mainBand(pts, hot);
+        // Scattered fighters (2026-10-30, playtest video: a Chaos Wand royale of 8 wild mobs over a 60-block radius, the
+        // median between them was empty grass for the whole film): only the thickest group counts.
+        pts = thickest(f, pts, hot);
         // the median, not the mean: one fighter far off no longer drags the center (and the frame) toward it
         Vector3d c = median(pts);
         double[] dist = new double[pts.size()];
@@ -583,6 +589,70 @@ final class FilmCamera {
         f.aimWide = Math.max(0.3, wide);
         if (f.star != null && starAlive(f)) f.starHeight = heightOf(f.star, store);
         return true;
+    }
+
+    /** Fighters within this many blocks (horizontally) of a group's center belong to it. */
+    private static final double GROUP_REACH = MAX_SPREAD;
+    /** The film stays on its group at least this long (playtest 2026-10-30: no hopping from one mob to another). */
+    private static final long GROUP_HOLD_MS = 8000;
+    /** After the hold, another group takes over only with this many times the score of the current one. */
+    private static final double GROUP_SWITCH = 2;
+
+    /**
+     * The fighters of the group the film follows. Everyone when they all stand within GROUP_REACH of one of them;
+     * else the group with the best score: its fighters, doubled for the group with the action (hotSpot: the last hit,
+     * else the top damage dealer), so a fight beats a few mobs only walking (2026-10-30, playtest: at the start the
+     * scattered wild mobs are alone, the film goes where the first blows land). The group is kept GROUP_HOLD_MS and
+     * followed as it moves (its center is the mean of its fighters at each read); after that a group with
+     * GROUP_SWITCH times its score takes over, and an emptied group is replaced at once.
+     */
+    private static List<Vector3d> thickest(Film f, List<Vector3d> pts, Vector3d hot) {
+        if (pts.size() < 3) return pts;
+        long now = System.currentTimeMillis();
+        int best = -1;
+        double bestScore = 0;
+        boolean everyone = false;
+        for (int i = 0; i < pts.size(); i++) {
+            List<Vector3d> g = near(pts, pts.get(i));
+            if (g.size() >= pts.size()) everyone = true;
+            double score = groupScore(g, hot);
+            if (score > bestScore) {
+                best = i;
+                bestScore = score;
+            }
+        }
+        if (everyone) {
+            f.group = null;
+            return pts;
+        }
+        List<Vector3d> kept = f.group != null ? near(pts, f.group) : List.of();
+        boolean hold = !kept.isEmpty()
+                && (now - f.groupSince < GROUP_HOLD_MS || bestScore < groupScore(kept, hot) * GROUP_SWITCH);
+        List<Vector3d> group = hold ? kept : near(pts, pts.get(best));
+        if (!hold) f.groupSince = now;
+        f.group = mean(group);
+        return group;
+    }
+
+    /** A group's fighters, doubled when the action (hot) is among them. */
+    private static double groupScore(List<Vector3d> group, Vector3d hot) {
+        if (hot != null) {
+            for (Vector3d p : group) {
+                if (flat(p, hot) <= 2) return group.size() * 2.0;
+            }
+        }
+        return group.size();
+    }
+
+    /** The points within GROUP_REACH (horizontally) of {@code at}. */
+    private static List<Vector3d> near(List<Vector3d> pts, Vector3d at) {
+        List<Vector3d> out = new ArrayList<>();
+        for (Vector3d p : pts) if (flat(p, at) <= GROUP_REACH) out.add(p);
+        return out;
+    }
+
+    private static double flat(Vector3d a, Vector3d b) {
+        return Math.hypot(a.x - b.x, a.z - b.z);
     }
 
     /** Height band (blocks) of mainBand. */

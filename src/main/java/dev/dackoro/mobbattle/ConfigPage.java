@@ -205,16 +205,25 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
 
     /** The rows of one page (fields, then its custom list). */
     private void pageRows(Rows rows, ConfigSchema.Page p, Properties live) {
+        // The summon list page shows the list first and its settings at the end (2026-10-30, playtest: they are set
+        // once, the list every time); every other page has its settings first.
+        boolean listFirst = "summon".equals(p.custom());
+        if (listFirst) customRows(rows, p);
         for (ConfigSchema.Item item : p.items()) {
             switch (item) {
                 case ConfigSchema.Section s -> {
                     rows.section(s.title());
+                    // Main page: the built-in presets on top (2026-10-30), as on the Presets tab.
+                    if ("mainpresets".equals(s.id())) presetButtons(rows);
                     // Film shots: one button puts every percent back to its default (2026-10-16).
                     if ("filmshots".equals(s.id())) {
                         // Film styles: every film setting at once, into the draft (2026-10-16).
                         String style = FilmStyles.current();
                         rows.note(style == null ? I18n.tr("panel.note.filmstyle.custom")
                                 : I18n.tr("panel.note.filmstyle").param("style", styleName(style)));
+                        // the styles' meaning on a line of its own (playtest 2026-10-30: the second line of one long
+                        // note was cut by the buttons under it)
+                        rows.note(I18n.tr("panel.note.filmstyle.help"));
                         String[] names = FilmStyles.NAMES;
                         Message[] labels = new Message[names.length];
                         EventData[] data = new EventData[names.length];
@@ -230,6 +239,11 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
                 case ConfigSchema.FieldItem f -> fieldRow(rows, f.field(), live);
             }
         }
+        if (!listFirst) customRows(rows, p);
+    }
+
+    /** A page's own rows besides its fields (lists, presets, tools, admin). */
+    private void customRows(Rows rows, ConfigSchema.Page p) {
         if (p.custom() != null) {
             switch (p.custom()) {
                 case "wands" -> wandsRows(rows);
@@ -318,10 +332,11 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             return sel;
         }
 
-        /** Up to four buttons in a row; returns the row's selector (buttons #B0..#B3). */
+        /** Up to five buttons in a row; returns the row's selector (buttons #B0..#B4). */
         String buttons(Message[] labels, EventData[] data) {
             String sel = add("Buttons.ui");
-            for (int i = 0; i < Math.min(4, labels.length); i++) {
+            if (labels.length > 4) ui.set(sel + " #G4.Visible", true);
+            for (int i = 0; i < Math.min(5, labels.length); i++) {
                 ui.set(sel + " #B" + i + ".Visible", true);
                 I18n.text(ui, sel + " #B" + i + ".Text", labels[i]);
                 ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #B" + i, data[i], false);
@@ -481,7 +496,11 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private record Hit(int page, int order, int score, ConfigSchema.Field field) {
     }
 
-    /** The matching settings, each group under its page's title, with the same controls as on its page. */
+    /**
+     * The matching settings, each group under its page's title, with the same controls as on its page: first those whose
+     * name or key matches, then (under their own heading) those that only mention it in their description (playtest
+     * 2026-10-30: "film" listed Camera time, whose description says "films", above Auto film).
+     */
     private void searchRows(Rows rows, Properties live) {
         List<Hit> hits = searchHits();
         searchCount = hits.size();
@@ -490,7 +509,13 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             return;
         }
         int shown = -1;
+        boolean described = false;
         for (Hit h : hits) {
+            if (h.score() >= 2 && !described) {
+                rows.section(I18n.tr("panel.search.described"));
+                described = true;
+                shown = -1;
+            }
             if (h.page() != shown) {
                 rows.section(ConfigSchema.PAGES.get(h.page()).title());
                 shown = h.page();
@@ -501,8 +526,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
 
     /**
      * Fields whose name (in the player's language and in English), setting key or description holds every word of
-     * the search, accents and case ignored. At most MAX_RESULTS, the best first (name, then key, then description),
-     * then shown in page order. Admin-only pages only for admins.
+     * the search, accents and case ignored. At most MAX_RESULTS, the best first (name, then key, then description);
+     * name and key matches come before description-only ones, each in page order. Admin-only pages only for admins.
      */
     private List<Hit> searchHits() {
         String[] words = norm(query).split("\\s+");
@@ -514,6 +539,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         for (int i = 0; i < ConfigSchema.PAGES.size(); i++) {
             ConfigSchema.Page p = ConfigSchema.PAGES.get(i);
             if (p.adminOnly() && !admin) continue;
+            // the main page repeats fields of the others: a hit shows under the page it belongs to
+            if (ConfigSchema.MAIN.equals(p.id())) continue;
             int order = 0;
             for (ConfigSchema.Item item : p.items()) {
                 if (!(item instanceof ConfigSchema.FieldItem fi)) continue;
@@ -532,7 +559,8 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             hits.sort(java.util.Comparator.comparingInt(Hit::score));
             hits = new ArrayList<>(hits.subList(0, MAX_RESULTS));
         }
-        hits.sort(java.util.Comparator.comparingInt(Hit::page).thenComparingInt(Hit::order));
+        hits.sort(java.util.Comparator.comparingInt((Hit h) -> h.score() >= 2 ? 1 : 0)
+                .thenComparingInt(Hit::page).thenComparingInt(Hit::order));
         return hits;
     }
 
@@ -832,7 +860,15 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
     private void summonRows(Rows rows) {
         Map<String, String> list = SummonList.snapshot();
         rows.section(I18n.tr("panel.section.summonlist").param("count", list.size()));
-        if (list.isEmpty()) rows.note(I18n.tr("panel.note.summonempty"));
+        if (list.isEmpty()) {
+            rows.note(I18n.tr("panel.note.summonempty"));
+        } else {
+            // Summon and Clear right under the title (2026-10-30, playtest: Summon, the button used most, sat at the
+            // bottom of "Add a mob"); Clear still asks for a second click.
+            String bar = rows.buttons(new Message[] {I18n.tr("panel.button.summonnow"), I18n.tr("panel.button.summonclear")},
+                    new EventData[] {data("Act").append("A", "summonSpawn"), data("Act").append("A", "summonClear")});
+            confirmButtons.put("summonClear", new Confirm(bar + " #B1", () -> I18n.tr("panel.button.summonclear")));
+        }
         List<ConfigSchema.Opt> teams = teamOptions(true);
         // A long list scrolls in its own box (SummonBox.ui #List), as the Teams gallery's chips do.
         Rows into = list.size() > SUMMON_BOX_ROWS ? new Rows(rows.ui, rows.ev, rows.add("SummonBox.ui") + " #List") : rows;
@@ -864,6 +900,10 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
             rows.ui.set(noTeamsRow + ".Visible", anyTeam());
         }
         rows.section(I18n.tr("panel.section.addmob"));
+        // Mob gallery (2026-10-16, playtest: pictures instead of a text list, as a popup over the panel): tiles load only
+        // when it opens; a tile puts its mob in the row below. First, as the easiest way (2026-10-30).
+        rows.action(I18n.tr("panel.row.gallery.label"), I18n.tr("panel.button.gallery.show"), data("Act").append("A", "galleryOpen"));
+        rows.note(I18n.tr("panel.note.addbyname"));
         filterRow(rows, "summonAdd");
         String sel = rows.add("ActionPick.ui");
         filterTarget.put("summonAdd", sel);
@@ -892,13 +932,10 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         rows.ev.addEventBinding(CustomUIEventBindingType.Activating, sel + " #Button",
                 data("Act").append("A", "summonAdd").append("@V", sel + " #Input.Value").append("@C", sel + " #Count.Value")
                         .append("@E", sel + " #Extra.Value"), false);
-        // Mob gallery (2026-10-16, playtest: pictures instead of a text list, as a popup over the panel): tiles load only
-        // when it opens; a tile puts its mob in the row above.
-        rows.action(I18n.tr("panel.row.gallery.label"), I18n.tr("panel.button.gallery.show"), data("Act").append("A", "galleryOpen"));
         // summon fill (2026-10-14): random mobs that fight, of similar strength; replaces the list (Undo restores it).
+        // A section of its own (2026-10-30).
+        rows.section(I18n.tr("panel.section.randombattle"));
         fillRow(rows);
-        if (!list.isEmpty()) confirmable(rows, "summonClear", I18n.tr("panel.row.summonclear.label"), () -> I18n.tr("panel.button.summonclear"));
-        rows.action(I18n.tr("panel.row.summonspawn.label"), I18n.tr("panel.button.summon"), data("Act").append("A", "summonSpawn"));
         // Saved lists (SummonLists, 2026-10-16, playtest: save my list 1, 2 with counts, colors and teams), as the presets
         // page: one row per list (name = load, Delete with confirm), then a name field + Save.
         // Newest first by default, or by name (2026-10-29, playtest: they came sorted by name only); past
@@ -1493,21 +1530,36 @@ final class ConfigPage extends InteractiveCustomUIPage<ConfigPage.Unused> {
         ui.set(selector + ".AssetPath", path != null ? path : MISSING_ICON);
     }
 
+    /**
+     * The built-in presets the panel offers (Presets.PANEL; debug stays a command), with which one the saved settings
+     * match. A click fills the form; Save changes applies it.
+     */
+    private void presetButtons(Rows rows) {
+        rows.note(I18n.tr("panel.note.builtin"));
+        String now = Presets.current();
+        rows.note(now == null ? I18n.tr("panel.note.preset.custom")
+                : I18n.tr("panel.note.preset.now").param("preset", presetName(now)));
+        String[] names = Presets.PANEL;
+        Message[] labels = new Message[names.length];
+        EventData[] data = new EventData[names.length];
+        for (int i = 0; i < names.length; i++) {
+            labels[i] = I18n.tr("panel.button.preset." + names[i]);
+            data[i] = data("Act").append("A", "presetLoad").append("N", names[i]);
+        }
+        rows.buttons(labels, data);
+    }
+
+    /** A preset's button text in the player's language, as a plain String (a Message param shows raw in .Text). */
+    private String presetName(String preset) {
+        String key = "server.mobbattle.panel.button.preset." + preset;
+        String v = translated(playerRef.getLanguage(), key);
+        if (v.isEmpty()) v = translated("en-US", key);
+        return v.isEmpty() ? ConfigSchema.label(preset) : v;
+    }
+
     private void presetRows(Rows rows) {
         rows.section(I18n.tr("panel.section.builtin"));
-        rows.note(I18n.tr("panel.note.builtin"));
-        String[] builtIn = Presets.BUILT_IN;
-        for (int i = 0; i < builtIn.length; i += 4) {
-            int n = Math.min(4, builtIn.length - i);
-            Message[] labels = new Message[n];
-            EventData[] data = new EventData[n];
-            for (int j = 0; j < n; j++) {
-                // The preset names are what the player types (/mobbattle preset fight): not translated.
-                labels[j] = Message.raw(ConfigSchema.label(builtIn[i + j]));
-                data[j] = data("Act").append("A", "presetLoad").append("N", builtIn[i + j]);
-            }
-            rows.buttons(labels, data);
-        }
+        presetButtons(rows);
         List<String> saved = Presets.saved();
         rows.section(I18n.tr("panel.section.yourpresets").param("count", saved.size()));
         if (saved.isEmpty()) rows.note(I18n.tr("panel.note.nopresets"));

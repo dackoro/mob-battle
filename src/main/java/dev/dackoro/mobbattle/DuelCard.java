@@ -33,6 +33,9 @@ final class DuelCard extends CustomUIHud {
     private static final String UI = "MobBattle/DuelCard.ui";
     private static final String BUFFED = "#7dff8a";
     private static final String PLAIN = "#c8d4e0";
+    /** #Body's height in the .ui with every line shown, and one stat line's (a hidden line gives its room back). */
+    static final int BODY_HEIGHT = 246;
+    static final int LINE_HEIGHT = 17;
 
     /** Players that have the card up. */
     private static final java.util.Set<UUID> SHOWN = ConcurrentHashMap.newKeySet();
@@ -77,7 +80,7 @@ final class DuelCard extends CustomUIHud {
                 for (PlayerRef p : d.viewers()) {
                     // A /mobbattle watch spectator has the watch card in the same spot; a nearer battle's card or
                     // board takes it from a farther one (RightSlot).
-                    if (!p.isValid() || BattleWatch.isWatching(p)) continue;
+                    if (!p.isValid() || BattleWatch.isWatching(p) || VsScreen.covers(p)) continue;
                     boolean mine = d.battle() != null ? RightSlot.owns(p, d.battle(), store) : !RightSlot.taken(p, store);
                     if (mine) want.put(p.getUuid(), d);
                 }
@@ -130,21 +133,47 @@ final class DuelCard extends CustomUIHud {
             huds.addCustomHud(player, hud);
         }
         UICommandBuilder b = new UICommandBuilder();
-        fill(b, "A", duel.fighters().get(0), store, player);
-        fill(b, "B", duel.fighters().get(1), store, player);
+        int hidden = fill(b, "A", duel.fighters().get(0), store, player)
+                + fill(b, "B", duel.fighters().get(1), store, player);
+        bodyHeight(b, BODY_HEIGHT - hidden * LINE_HEIGHT);
         hud.update(false, b);
     }
 
-    private static void fill(UICommandBuilder b, String side, Ref<EntityStore> mob, Store<EntityStore> store, PlayerRef viewer) {
+    /** One fighter's lines; returns how many stat lines it hides (stats at their base value). */
+    private static int fill(UICommandBuilder b, String side, Ref<EntityStore> mob, Store<EntityStore> store, PlayerRef viewer) {
         boolean up = mob.isValid() && BattleManager.isAlive(mob, store);
         String name = mob.isValid() ? ChaosWand.nameOf(mob, store) : null;
         line(b, "#Name" + side, shorten(MobNames.text(name, viewer)), up ? "#ffd23e" : "#888888");
         line(b, "#Health" + side, healthText(mob, store, up), up ? "#ff6b5e" : "#888888");
-        line(b, "#Attack" + side, I18n.tr("hud.attack").param("v", stat(mob, Buffs.Stat.DAMAGE)), color(mob, Buffs.Stat.DAMAGE));
-        line(b, "#Defense" + side, I18n.tr("hud.defense").param("v", stat(mob, Buffs.Stat.DEFENSE)), color(mob, Buffs.Stat.DEFENSE));
+        return statLines(b, side, mob, store);
+    }
+
+    /**
+     * Attack, defense and size, each only when it differs from the mob's own (2026-10-30, playtest: "Attack base" told
+     * a new player nothing); returns how many are hidden. {@code side}: "A"/"B" on the duel card, "" on the focus card.
+     */
+    static int statLines(UICommandBuilder b, String side, Ref<EntityStore> mob, Store<EntityStore> store) {
+        int hidden = 0;
+        for (Buffs.Stat st : new Buffs.Stat[] {Buffs.Stat.DAMAGE, Buffs.Stat.DEFENSE}) {
+            String id = (st == Buffs.Stat.DAMAGE ? "#Attack" : "#Defense") + side;
+            boolean changed = mob.isValid() && Buffs.totalOf(mob, st) > 0;
+            b.set(id + ".Visible", changed);
+            if (changed) line(b, id, I18n.tr(st == Buffs.Stat.DAMAGE ? "hud.attack" : "hud.defense").param("v", stat(mob, st)), BUFFED);
+            else hidden++;
+        }
         float scale = scaleOf(mob, store);
         boolean scaled = Math.abs(scale - 1f) > 0.01f;
-        line(b, "#Size" + side, I18n.tr("hud.size").param("v", sizeValue(scale)), scaled ? BUFFED : PLAIN);
+        b.set("#Size" + side + ".Visible", scaled);
+        if (scaled) line(b, "#Size" + side, I18n.tr("hud.size").param("v", sizeValue(scale)), BUFFED);
+        else hidden++;
+        return hidden;
+    }
+
+    /** #Body follows its shown lines (an Anchor object, as the VS screen places its pictures). */
+    static void bodyHeight(UICommandBuilder b, int height) {
+        var a = new com.hypixel.hytale.server.core.ui.Anchor();
+        a.setHeight(com.hypixel.hytale.server.core.ui.Value.of(height));
+        b.setObject("#Body.Anchor", a);
     }
 
     /** A colored Message goes in TextSpans (.Text only takes a plain string; see Scoreboard). */

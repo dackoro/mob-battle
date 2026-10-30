@@ -16,7 +16,7 @@
 
 - The magnifying glass in the panel's title bar opens a search box that looks through every tab at once. Type two letters or more (for example `countdown`, `camera` or `buff`).
 - It looks in each setting's name (in your language and in English), its setting key and its description, ignoring accents and case. Every word you type has to match.
-- The results show the matching settings grouped under their tab's name, with the same controls as on their tab: change them there and **Save changes** as usual.
+- The results show the matching settings grouped under their tab's name, with the same controls as on their tab: change them there and **Save changes** as usual. Settings whose name or key matches come first; the ones that only mention the word in their description follow under "Also mentioned in their description".
 - Clear the box, or pick a tab on the left, to go back.
 
 ### Draft, Save, Discard
@@ -81,6 +81,12 @@ See [server-setup.md](server-setup.md) for the permission nodes and how to grant
 ## Tabs
 
 Tabs appear in this order. Field names below are exactly as the panel shows them. "Per kind" means the battle-kind tabs can override the value.
+
+### Main
+
+The first tab, for a quick setup: the built-in presets as buttons (Default, Clean, Cinematic, Spectator, Stats, with which one your saved settings match now), then the settings that change a battle the most, the same fields as on their own tabs: VS screen, countdown, intro camera, start and winner titles (before the fight); Auto film, Auto watch, battle music, duel card, all vs one card, loot from battle deaths (during); end camera and end slow motion (at the end). The search skips this tab and shows each setting under its own tab.
+
+The settings that used to be together on Cameras are now on three places: **Presentation** has the stats cards (duel card, all vs one card, timer style) and **Who sees it** (titles, cameras, VS screen and the "nearby" distance); **Cameras** keeps the intro camera, the VS screen, the end camera with its slow motion and the camera look; **Film & watch** has the battle film, its bands and shots, and watch mode.
 
 ### Presentation
 
@@ -327,7 +333,7 @@ Team Wand teams. See [teams-summon-army.md](teams-summon-army.md).
 
 ![The Summon list tab: each mob with its icon, count and team, add a mob, summon now](images/panel-summon-list.jpg)
 
-The Summon Wand list. Add, remove, clear, Fill and loading a saved list apply at once; counts, teams and the settings need Save changes. Each mob row shows its team's color square next to the team (none for no team). A list of more than 8 mobs scrolls in its own box, so Add a mob stays close.
+The Summon Wand list. Add, remove, clear, Fill and loading a saved list apply at once; counts, teams and the settings need Save changes. Each mob row shows its team's color square next to the team (none for no team). A list of more than 8 mobs scrolls in its own box, so Add a mob stays close. From the top: the list (with **Summon now** and **Clear list** under its title), Add a mob, Random battle, Saved lists, and the summon settings at the end.
 
 | Section | Field | What it does |
 |---|---|---|
@@ -343,20 +349,20 @@ The Summon Wand list. Add, remove, clear, Fill and loading a saved list apply at
 | | Summons in jade | Summons come out wearing the jade look, as if given by the Effect Wand. |
 | | Summon jade color | Color of the summons' jade. |
 
-Below the settings:
+Above the settings:
 
+- **Summon now** (summons the list around you now) and **Clear list** (confirm), right under the list's title.
 - **Mobs in the list:** one row per entry with its icon, the mob's in-game name (its ID in grey beside it when they differ), a **count** (a number 0-100000 or `random`), a **team** (or No team) and **Remove**. The same mob can have several entries (10 archers in red and 10 in green).
-- **Add a mob:** pick a mob (searchable, with an icon preview; the list opens wide so long names fit). The **Show** row above it filters the list: by mod (every mod, Hytale only, or one mod) and by type (Fighters, Defend only, No attack, Avoid: immortal, scenery and test roles), and by group (the first part of the name: Aquatic, Undead...). The group list only offers groups that the chosen mod and type still have. The type is read from each mob's definition, so a mod's unusual mob can land in the wrong one. With every mod shown, mobs from mods are marked *. Each player's filters are remembered until the server restarts. Then pick a count and a team, then **Add**. Every **Add** makes a new entry, even for a mob and team already listed (change a count in its row instead). The row starts on your last pick (else the test dummy), so adding the same mob for another team is one click.
+- **Add a mob:** first **Show pictures** (below), then the search by name: pick a mob (searchable, with an icon preview; the list opens wide so long names fit). The **Show** row above it filters the list: by mod (every mod, Hytale only, or one mod) and by type (Fighters, Defend only, No attack, Avoid: immortal, scenery and test roles), and by group (the first part of the name: Aquatic, Undead...). The group list only offers groups that the chosen mod and type still have. The type is read from each mob's definition, so a mod's unusual mob can land in the wrong one. With every mod shown, mobs from mods are marked *. Each player's filters are remembered until the server restarts. Then pick a count and a team, then **Add**. Every **Add** makes a new entry, even for a mob and team already listed (change a count in its row instead). The row starts on your last pick (else the test dummy), so adding the same mob for another team is one click.
 - **Show pictures** opens a gallery over the panel: a picture of every mob the Show filters keep, with its in-game name, a search box (name or ID, accents and case ignored) and the same mod, type and group filters (changing them there changes the Show row too). Click a picture to put that mob in the Add a mob row (count and team stay as they were), then **Add**. **Close** shuts the gallery.
-- **Fill** (random battle): how many mob **Types**, how many of each (**Per type**) and how many **Teams** (0 = none, else 2-14), then **Fill**. It replaces the list with random mob types that fight, of similar strength, dealt into balanced teams if you asked for teams, and it follows the Show filters (mod, type, group). Same as `/mobbattle summon fill`. Your last numbers are remembered until the server restarts.
-- **Clear list** (confirm) and **Summon** (summons the list around you now).
+- **Random battle** (its own section): how many mob **Types**, how many of each (**Per type**) and how many **Teams** (0 = none, else 2-14), then **Fill**. It replaces the list with random mob types that fight, of similar strength, dealt into balanced teams if you asked for teams, and it follows the Show filters (mod, type, group). Same as `/mobbattle summon fill`. Your last numbers are remembered until the server restarts.
 - **Saved lists:** keep several summon lists. Type a name (letters, digits, `-` and `_`, up to 32) and press **Save list**: it saves the list as last saved (mobs, counts, team rules and the teams' names and colors; Save changes first if you edited rows). Each saved list has a row: click its name to load it (it replaces the list and the teams at once; **Undo last change** brings the old one back) or **Delete** it (confirm). They show newest first; a button switches to sorted by name. With more than 8 they scroll in their own box. Same as `/mobbattle summon save|load|delete <name>`.
 
 ### Presets & reset
 
 A preset or reset fills the form: check it, then Save changes (or Discard).
 
-- **Built-in presets:** Default, Fight, Effects, Debug, Cinematic.
+- **Built-in presets:** Default, Clean, Cinematic, Spectator, Stats (also on the Main tab). The `debug` preset is a command only.
 - **Your presets:** one row per saved preset: its name (click it to load it into the form) and **Delete** (asks for a second click).
 - **Save the form as a preset:** type a name and press **Save preset**. It saves the form *including unsaved changes*. A preset holds every setting except the team list, the summon list, the permission mode and the debug log/recorder.
 - **Back to defaults (into the form):** Reset effects, Reset cameras, Reset titles, Reset arenas, Reset rules, Reset wands, Reset all.

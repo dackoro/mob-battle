@@ -93,12 +93,13 @@ A preset changes many settings at once. In the panel, loading a preset only fill
 | Preset | What it sets |
 |---|---|
 | `default` | Every setting back to its default and every per-kind override removed. |
-| `fight` | Just the fights: no countdown, intro or end camera, duel or all vs one card, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
-| `effects` | All the show but no cameras: countdown 3, titles, music, runes, area `discBorder`, a scoreboard for every kind; duels, all vs one and teams get a 2 minute timer with `timeUp health`, the royale keeps its 3 minutes and `judge`. |
-| `debug` | Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card, the all vs one card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
-| `cinematic` | 8 seconds to get in position (`readyTime`), countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), `cameraBars wide`, titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
+| `clean` (old name `fight`) | Only what the wands do: no countdown, VS screen, intro or end camera, duel or all vs one card, scoreboard, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. The wands' own effects (smoke, soul rip, dust, swirls) and the team colors stay. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
+| `cinematic` | The show without numbers: 8 seconds to get in position (`readyTime`), VS screen, countdown 5, intro camera (`auto`), the battle film for the camera viewers (`autoFilm`), end camera `winner` (`lastHit` for royale and all vs one), slow motion x4 for 3 s on the final blow, `cameraBars wide`, titles and music; no duel or all vs one card, scoreboard, countdown in chat, laser, runes or border glow; area look, waves and arenas at their defaults. Mob looks and the crown stay. |
+| `spectator` | Like a shooter's spectator mode: VS screen, the camera viewers watch the battle from its start (`autoWatch`: a fighter followed, the killer next when it falls, a click changes fighter, `watchTransition glide`), a scoreboard for every kind, end camera `winner`, slow motion x4 for 3 s on the final blow, titles and music. |
+| `stats` (old name `effects`) | The `spectator` preset without the watch, plus every number on screen: the duel and all vs one cards, a scoreboard for every kind, the countdown in chat too; duels, all vs one and teams get a 2 minute timer with `timeUp health`, the royale keeps its 3 minutes and `judge`; VS screen, end camera `winner` and slow motion x4 for 3 s on the final blow, titles and music. |
+| `debug` | Command only. Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card, the all vs one card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
 
-Every built-in preset except `default` first puts the presentation settings back to their defaults (countdown, cameras, titles, music, laser, area look, runes, crown, waves, border colors, mob looks, duel card, all vs one card, scoreboards) and removes every per-kind override, then applies its own values. Settings it doesn't name (area radius, max mobs, battle rules, buffs, wands and so on) stay as they are.
+Every built-in preset except `default` first puts the presentation settings back to their defaults (countdown, cameras, film, watch, slow motion, titles, music, laser, area look, runes, crown, waves, border colors, mob looks, duel card, all vs one card, scoreboards) and removes every per-kind override, then applies its own values. Settings it doesn't name (area radius, max mobs, battle rules, buffs, wands and so on) stay as they are.
 
 ### Saved presets
 
@@ -133,6 +134,7 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
 | Countdown | `/mobbattle countdown <seconds>` | `fight.countdown` | 0-10, 0 = start at once | 3 | titles |
+| Countdown in chat | `/mobbattle countdownChat on\|off` | `fight.countdown.chat` | on, off | off | titles |
 | Time to get in position | `/mobbattle readyTime <seconds>\|off` | `fight.ready` | 0-60, 0 = none. Seconds to get to your spot before the VS screen and the countdown; crouch to start at once. Never when you fight in the battle yourself | 0 | titles |
 | Start title | `/mobbattle startTitle on\|off` | `title.enabled` | true, false | on | titles |
 | Winner title | `/mobbattle winTitle on\|off` | `wintitle.enabled` | true, false | on | titles |
@@ -166,7 +168,7 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Fighters left in the film bands | `/mobbattle bandInfo off\|top\|bottom\|box` | `camera.bands.info` | off, top, bottom, box | bottom | cameras |
 | End camera | `/mobbattle endCamera off\|winner\|lastHit` | `camera.end` | off, winner, lasthit | winner | cameras |
 | End camera time | `/mobbattle endCameraTime <seconds>` | `camera.end.time` | 1-600 (above 15 warns) | 5 | cameras |
-| Auto spectate | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
+| Auto watch | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
 | Watch: changing fighter | `/mobbattle watchTransition cut\|glide` | `camera.watch.transition` | cut, glide | glide | cameras |
 | Watch: next fighter every | `/mobbattle watchAutoSwitch <seconds>\|off` | `camera.watch.autoswitch` | 0 (off), 3-600 | 0 | cameras |
 | Slow motion after the final blow (times slower) | `/mobbattle endSlowMo <times>\|off` | `camera.slowmo.times` | 0 (off), 2-20 | 0 | cameras |

@@ -302,8 +302,9 @@ final class Countdown {
     private static void announce(Pending p, PlayerRef player, int left) {
         boolean title = left <= p.titleFrom;
         if (player != null) {
-            // the big title already counts; during a test script the chat keeps only the script's own lines
-            if (!TestTools.quietFor(player.getUuid())) {
+            // the big title already counts (countdownChat off by default); during a test script the chat keeps only
+            // the script's own lines
+            if (FxSettings.countdownChat && !TestTools.quietFor(player.getUuid())) {
                 player.sendMessage(I18n.tr("battle.countdown.tick").param("label", p.label.text()).param("left", left)
                         .color("#ffd23e"));
             }

@@ -150,7 +150,8 @@ mobbattle.chat.morph.nocopy = Aún no has copiado ningún modelo. Haz clic derec
 mobbattle.chat.death.self = Caíste: estás fuera de la batalla.
 mobbattle.chat.death.other = {name} cayó y está fuera de la batalla.
 mobbattle.chat.death.someone = Un jugador cayó y está fuera de la batalla.
-mobbattle.chat.plugin.welcome = Mob Battle de Dackoro: /mobbattle help explica las varitas y los comandos. /mobbattle give te da las trece varitas. Todo es configurable (efectos, cámaras, temporizadores, reglas, equipos, lista de invocación, presets) en la ventana de ajustes: /mobbattle config, o con comandos. ¿Quieres ver la batalla como una película? Activa Filmar automáticamente o Modo espectador automático en /mobbattle config > Cámaras; del film se sale con /mobbattle film exit.
+mobbattle.chat.plugin.welcome = Mob Battle de Dackoro: /mobbattle config ajusta todo, /mobbattle help lista los comandos.
+mobbattle.chat.plugin.welcome.watch = Mira una batalla como una película o como espectador: activa Filmar automáticamente o Espectador automático en /mobbattle config (o elige el preset Cinemático o Espectador).
 mobbattle.chat.buffs.reach = Pasas de x2: las armas y herramientas no alcanzan más lejos con tu tamaño (el juego mide el alcance desde tus ojos), así que los mobs justo a tus pies pueden quedar fuera de alcance.
 mobbattle.chat.buffs.sizewarn = El límite de tamaño {limit} supera el recomendado {safe}: los jugadores grandes no caben bajo techos ni en cuevas, su cámara puede quedar dentro de los bloques, y las runas y coronas de los mobs grandes pueden quedar dentro de su cabeza (los efectos del buff crecen menos que el cuerpo).
 mobbattle.chat.teams.list = Equipos ({count}/{max}): {list}
@@ -554,6 +555,7 @@ mobbattle.help.titles.26 = cameraHud hide|show - oculta la interfaz del juego (b
 mobbattle.help.titles.35 = bandTimer off|top|bottom, bandTitle off|top|bottom - durante la película de la batalla, el tiempo que queda y el título de la batalla en la banda negra de arriba o de abajo (por defecto los dos arriba; el recuadro del temporizador se queda con sus líneas, sin el reloj)
 mobbattle.help.titles.36 = bandRows 1|2 - título y tiempo en la misma banda: en una línea o en dos filas (por defecto 2)
 mobbattle.help.titles.37 = bandInfo off|top|bottom|box - con el tiempo en una banda, las demás líneas del recuadro del temporizador (luchadores que quedan, equipos) van en la banda de arriba o de abajo y el recuadro se quita; off = en ningún sitio; box = el recuadro se queda sin el reloj (por defecto bottom)
+mobbattle.help.titles.38 = countdownChat on|off - la cuenta atrás también sale en el chat, una línea por segundo (por defecto off: el título grande ya cuenta)
 mobbattle.help.titles.29 = cameraFace on|off - los primeros planos se ponen delante de la cara del mob mire donde mire; off = hacia la batalla o el rival (por defecto on)
 mobbattle.help.titles.33 = watchTransition cut|glide - cómo pasa la cámara de observar a otro luchador: de golpe, o viajando hasta él a través de los bloques (por defecto glide); watchAutoSwitch <3-600>|off - segundos en cada luchador antes de que el watch pase solo al siguiente, como un clic derecho (por defecto off); endSlowMo <2-20>|off - cámara lenta tras el golpe final: cuántas veces más lento va el mundo (4 = cuatro veces más lento); frena todo el mundo, no se aplica si hay otra batalla en él (por defecto off); endSlowMoTime <1-20> - sus segundos (por defecto 3)
 mobbattle.help.titles.28 = filmShot <plano> <0-300> - cada cuánto usa la película ese plano, % de lo normal: 0 = nunca, 200 = el doble (por defecto: 100, groundrise 50, zenith 40, landscape 10, spiral 80, telephoto y descent 70; filmShots <lista> = esos encendidos, el resto apagados; filmShots default = todos a su valor por defecto)
@@ -710,12 +712,13 @@ mobbattle.help.morph.27 = eyeTest [<color>|off] - (experimental, admin) recolore
 mobbattle.help.presets.1 = Presets
 mobbattle.help.presets.2 = preset list - presets incluidos y guardados
 mobbattle.help.presets.3 = preset default - todos los ajustes vuelven a su valor por defecto (las listas de equipos e invocaciones se quedan)
-mobbattle.help.presets.4 = preset fight - solo las peleas: sin cuenta atrás, cámaras, títulos, música, láseres, runas, ondas, bordes, aspectos de mobs, corona, dibujos ni temporizadores
-mobbattle.help.presets.5 = preset effects - cuenta atrás 3, temporizador de 2 min (gana quien tenga más salud; el royale mantiene 3 min judge), títulos, música, runas, área discBorder, ondas, bordes, aspectos de mobs, marcadores; sin cámaras ni láseres
+mobbattle.help.presets.4 = preset clean - solo lo que hacen las varitas: sin cuenta atrás, pantalla VS, cámaras, títulos, música, tarjetas, marcadores, láseres, runas, ondas, bordes, looks de mobs, corona, dibujos ni temporizadores (nombre viejo: fight)
+mobbattle.help.presets.5 = preset stats - el preset espectador sin el modo espectador, más todos los números en pantalla: temporizador de 2 min en cada tipo (gana quien tenga más vida; la royale mantiene sus 3 min con juez), todos los marcadores, las tarjetas de duelo y de todos contra uno, la cuenta atrás también en el chat; cámara final y cámara lenta x4 en el último golpe (nombre viejo: effects)
 mobbattle.help.presets.6 = preset debug - todo visible: área wall, ondas, bordes, aspectos de mobs, láseres, runas, arenas, aspecto de equipo both, tarjeta de duelo, marcadores (los presets nunca cambian el registro de depuración: es solo para admin)
-mobbattle.help.presets.7 = preset cinematic - cuenta atrás 5, cámaras (duelo western, royale dron, allVsOne foco, equipos barrido), cámara final con número de muertes, bandas de película anchas, música, área, ondas, arenas, aspectos de mobs y corona; sin láseres, runas ni brillo de borde
+mobbattle.help.presets.7 = preset cinematic - el espectáculo sin números: pantalla VS, cuenta atrás de 5, cámara de intro, la película de la batalla para quienes ven las cámaras, cámara final, cámara lenta x4 en el último golpe, bandas anchas, música y títulos; sin tarjetas, marcadores, láseres, runas ni brillo de borde
 mobbattle.help.presets.8 = preset save <nombre> / load <nombre> / delete <nombre> - tus propios presets
 mobbattle.help.presets.9 = reset effects|cameras|titles|arenas|rules|wands|all - solo ese grupo de ajustes vuelve a su valor por defecto
+mobbattle.help.presets.10 = preset spectator - como el modo espectador de un shooter: quienes ven las cámaras miran la batalla desde el inicio (siguen a un luchador, al que lo mató cuando cae, con clic cambian de luchador), todos los marcadores, cámara final y cámara lenta x4 en el último golpe
 mobbattle.help.server.1 = Configuración del servidor
 mobbattle.help.server.2 = permissions open|server - open deja que cualquiera use y configure; server comprueba los permisos use/config
 mobbattle.help.server.3 = dackoro.mob_battle.use - varitas y batallas iniciadas por jugadores (por defecto hytale:Adventurer)
@@ -903,6 +906,7 @@ mobbattle.cmd.desc.roles_that_never_let_passive = Roles que nunca dejan que pass
 mobbattle.cmd.desc.seconds_with_no_fighter_hurt = Segundos sin que ningún luchador hiera a un enemigo antes de que la batalla termine en empate (0-3600, por defecto 150 = 2,5 min, 0 = off)
 mobbattle.cmd.desc.seconds_without_a_hit_before = Segundos sin golpes antes de que gane el único bando que puede pelear contra mobs pasivos (0-3600, por defecto 15, 0 = off)
 mobbattle.cmd.desc.battle_loot = Los mobs que mueren en una batalla sueltan su botín: on u off (por defecto)
+mobbattle.cmd.desc.countdown_chat = Los números de la cuenta atrás también en el chat: on u off (por defecto; el título grande cuenta igual)
 mobbattle.cmd.desc.battle_below = Bloques bajo el centro de los que un royale o todos contra uno toma mobs (por defecto 50, off = sin límite)
 mobbattle.cmd.desc.battle_above = Bloques sobre el centro de los que un royale o todos contra uno toma mobs (por defecto 40, off = sin límite)
 mobbattle.cmd.desc.arena_vertical = Cuánto puede alejarse un luchador por encima o por debajo del nivel del ruedo antes de que el muro lo devuelva (por defecto off)
@@ -1027,10 +1031,13 @@ mobbattle.cmd.desc.summoning_runes_and_fighter = Runas de invocación y marcas d
 mobbattle.cmd.desc.presets_built_in_or_your_own = Presets: incluidos o los tuyos (preset list, save, load, delete)
 mobbattle.cmd.desc.built_in_and_saved_presets = Presets incluidos y guardados
 mobbattle.cmd.desc.every_setting_back_to_defaul = Todos los ajustes vuelven a su valor por defecto (se conservan las listas de equipos e invocaciones)
-mobbattle.cmd.desc.just_the_fights_no_countdown = Solo las peleas: sin cuenta atrás, cámaras, títulos, música, láseres, runas, dibujos ni temporizadores
-mobbattle.cmd.desc.countdown_3_2_min_timer_most = Cuenta atrás 3, temporizador de 2 min (gana quien tenga más salud; el royale mantiene el suyo), títulos, música, runas, área, marcadores; sin cámaras ni láseres
+mobbattle.cmd.desc.just_the_fights_no_countdown = Solo lo que hacen las varitas: sin cuenta atrás, pantalla VS, cámaras, títulos, música, tarjetas, marcadores, dibujos ni temporizadores
+mobbattle.cmd.desc.countdown_3_2_min_timer_most = Todos los números en pantalla: temporizadores, marcadores, las dos tarjetas, la cuenta atrás en el chat; cámara final y cámara lenta en el último golpe
 mobbattle.cmd.desc.everything_visible_area_wall = Todo visible: área wall, ondas, bordes, aspectos de mobs, láseres, runas, arenas, tarjeta de duelo, marcadores; sin cinemáticas (el registro de depuración es solo para admin: debugLog)
-mobbattle.cmd.desc.countdown_full_camera_work_e = Cuenta atrás, trabajo de cámara completo, cámara final con número de muertes, bandas de película anchas, música, área, ondas, arenas; sin láseres, runas ni brillo de borde
+mobbattle.cmd.desc.preset_old_fight = Nombre viejo del preset clean
+mobbattle.cmd.desc.preset_old_effects = Nombre viejo del preset stats
+mobbattle.cmd.desc.preset_spectator = Como el espectador de un shooter: sigues a un luchador desde el inicio, marcadores, cámara final y cámara lenta en el último golpe
+mobbattle.cmd.desc.countdown_full_camera_work_e = Pantalla VS, cámara de intro, película de la batalla, cámara final y cámara lenta en el último golpe; sin tarjetas ni marcadores
 mobbattle.cmd.desc.save_your_current_settings_s = Guarda tus ajustes actuales: save <nombre>
 mobbattle.cmd.desc.load_a_saved_preset_load_nam = Carga un preset guardado: load <nombre>
 mobbattle.cmd.desc.delete_a_saved_preset_delete = Borra un preset guardado: delete <nombre>
@@ -1196,6 +1203,8 @@ mobbattle.cmd.desc.apply.team = A uno de tus equipos de la Varita de Equipos, o 
 mobbattle.panel.field.fight.countdown.label = Cuenta atrás
 mobbattle.panel.field.fight.countdown.tip = Títulos 3, 2, 1 antes de que empiece una pelea (por defecto 3). Con menos de 2 s no hay pantalla VS ni cámara de intro.
 mobbattle.panel.field.fight.countdown.hint = segundos, 0 = empezar ya
+mobbattle.panel.field.fight.countdown.chat.label = Cuenta atrás en el chat
+mobbattle.panel.field.fight.countdown.chat.tip = La cuenta atrás también sale en el chat, una línea por segundo. El título grande en pantalla cuenta igual (por defecto off).
 mobbattle.panel.field.fight.ready.label = Tiempo para ir a tu sitio
 mobbattle.panel.field.fight.ready.tip = Segundos para llegar a tu sitio (la grada de una arena) antes de la pantalla VS y la cuenta. Un número grande cuenta para ti, los luchadores esperan el inicio y agacharte lo empieza ya. Nunca si peleas tú en la batalla (por defecto apagado).
 mobbattle.panel.field.fight.ready.hint = segundos, 0 = sin espera
@@ -1249,7 +1258,7 @@ mobbattle.panel.field.camera.end.tip = Filma al ganador o a quien dio el último
 mobbattle.panel.field.camera.end.time.label = Duración de la cámara final
 mobbattle.panel.field.camera.end.time.tip = Cuánto filma la cámara final.
 mobbattle.panel.field.camera.end.time.hint = segundos
-mobbattle.panel.field.camera.autowatch.label = Modo espectador automático
+mobbattle.panel.field.camera.autowatch.label = Espectador automático
 mobbattle.panel.field.camera.autowatch.tip = Al empezar cada batalla, quienes ven las cámaras entran a mirarla como espectadores (lo mismo que /mobbattle watch): la cámara sigue a un luchador y con clic cambias de luchador.
 mobbattle.panel.field.camera.watch.transition.label = Observar: cambio de luchador
 mobbattle.panel.field.camera.watch.transition.tip = Cut = la cámara salta al siguiente luchador; glide = viaja hasta él, atravesando colinas y paredes (por defecto glide).
@@ -1261,7 +1270,7 @@ mobbattle.panel.field.camera.bars.tip = Bandas negras arriba y abajo de la panta
 mobbattle.panel.field.camera.blur.label = Desenfoque de fondo
 mobbattle.panel.field.camera.blur.tip = Cada plano de intro o final se mantiene nítido en lo que filma y desenfoca el resto, sobre todo el fondo (por defecto soft).
 mobbattle.panel.field.camera.autofilm.label = Filmar automáticamente
-mobbattle.panel.field.camera.autofilm.tip = Quienes ven las cámaras reciben la película de la batalla (/mobbattle film) desde que empieza, tras la intro, hasta que termina. Gana a Ver automáticamente (por defecto off).
+mobbattle.panel.field.camera.autofilm.tip = Quienes ven las cámaras reciben la película de la batalla (/mobbattle film) desde que empieza, tras la intro, hasta que termina. Gana a Espectador automático (por defecto off).
 mobbattle.panel.field.camera.vsscreen.label = Pantalla VS
 mobbattle.panel.field.camera.vsscreen.tip = Una pantalla VS estilo Smash antes de la cuenta atrás: cada lado entra con imágenes de sus luchadores (hasta tres grandes, en multitud si el lado es mayor, una sola multitud por toda la pantalla en una battle royale, una columna por equipo con 3 equipos o más) y un VS grande. Suma 3 s a cualquier cuenta atrás mayor que 0 y la cámara de intro conserva todo su tiempo después. Las imágenes se preparan al arrancar el servidor, así que nada se carga en mitad de una batalla; un mob que aún no tiene imagen muestra su icono hasta el siguiente arranque (por defecto encendido).
 mobbattle.panel.field.camera.vs.teamreps.label = Luchadores VS por equipo
@@ -1397,7 +1406,7 @@ mobbattle.panel.field.kind.camerashots.hint = vacío = global (1-{max}, hasta ma
 mobbattle.panel.field.kind.endcamera.label = Cámara final
 mobbattle.panel.field.kind.endcameratime.label = Duración de la cámara final
 mobbattle.panel.field.kind.endcameratime.hint = vacío = global (segundos 1-{max})
-mobbattle.panel.field.kind.autowatch.label = Ver automáticamente
+mobbattle.panel.field.kind.autowatch.label = Espectador automático
 mobbattle.panel.field.kind.camerabars.label = Bandas de película
 mobbattle.panel.field.kind.camerablur.label = Desenfoque de fondo
 mobbattle.panel.field.kind.autofilm.label = Filmar automáticamente
@@ -1641,9 +1650,9 @@ mobbattle.panel.field.server.hologram.tip = El holograma del mob copiado sobre l
 mobbattle.panel.field.server.icons.label = Imágenes de mobs del panel
 mobbattle.panel.field.server.icons.tip = Imágenes para los mobs sin icono del juego en este panel. Apagadas: esos mobs muestran el icono del juego o un "?", y las imágenes dejan de enviarse tras el próximo reinicio (por defecto activadas).
 mobbattle.panel.page.presentation.title = Presentación
-mobbattle.panel.page.presentation.hint = Cómo empiezan y terminan las peleas: cuenta atrás, títulos, música, láser y runas. Cada tipo de batalla puede cambiarlos en su propia pestaña.
+mobbattle.panel.page.presentation.hint = Cuenta atrás, títulos, las tarjetas de estadísticas, quién lo ve, música, láser y runas. Cada tipo de batalla puede cambiarlos en su propia pestaña.
 mobbattle.panel.page.cameras.title = Cámaras
-mobbattle.panel.page.cameras.hint = Pantalla VS y cámara de intro antes de la pelea, película de la batalla, cámara final sobre el ganador, modo espectador y la tarjeta de duelo.
+mobbattle.panel.page.cameras.hint = Pantalla VS y cámara de intro antes de la pelea, la cámara final sobre el ganador con su cámara lenta, y el aspecto de las cámaras.
 mobbattle.panel.page.battles.title = Batallas
 mobbattle.panel.page.battles.hint = Lo que comparten todos los tipos de batalla. Cada tipo tiene su propia pestaña con su presentación, reglas, arena y temporizador.
 mobbattle.panel.page.kind.duel.title = Duelo
@@ -1668,6 +1677,29 @@ mobbattle.panel.page.summon.title = Lista de invocación
 mobbattle.panel.page.summon.hint = Lista de la Varita de Invocación. Añadir, quitar y vaciar se aplican al instante; las cantidades y equipos (dorados hasta guardar) y los ajustes de abajo necesitan Guardar cambios.
 mobbattle.panel.page.presets.title = Preajustes y restablecer
 mobbattle.panel.page.presets.hint = Un preajuste o restablecimiento rellena el formulario: revísalo y luego Guardar cambios (o Descartar).
+mobbattle.panel.page.main.title = Lo principal
+mobbattle.panel.page.main.hint = Los presets y los ajustes que más cambian una batalla. Todo lo demás está en las otras pestañas, y cada tipo de batalla puede tener sus propios valores en su pestaña.
+mobbattle.panel.page.film.title = Película y espectador
+mobbattle.panel.page.film.hint = Dos formas de seguir una batalla: la película (planos de cine elegidos por ti) o el modo espectador (sigues a un luchador y cambias con clic).
+mobbattle.panel.section.mainpresets = Presets
+mobbattle.panel.section.mainbefore = Antes de la pelea
+mobbattle.panel.section.mainduring = Durante la pelea
+mobbattle.panel.section.mainend = Al final
+mobbattle.panel.section.hud = Tarjetas de estadísticas y temporizador
+mobbattle.panel.section.whosees = Quién lo ve
+mobbattle.panel.section.cameralook = Aspecto de las cámaras
+mobbattle.panel.section.filmbands = Bandas de la película
+mobbattle.panel.section.watch = Modo espectador
+mobbattle.panel.note.main = Los temporizadores, las arenas y el marcador de cada tipo de batalla están en su propia pestaña (Duelo, Todos contra uno, Royale, Batallas por equipos).
+mobbattle.panel.note.hud = El marcador y el temporizador de la batalla se ajustan por tipo de batalla, en su pestaña.
+mobbattle.panel.note.film = Para salir de la película: /mobbattle film exit. En modo espectador: clic derecho = siguiente luchador, izquierdo = anterior, E = cambio automático, Q o /mobbattle watch exit = salir.
+mobbattle.panel.note.preset.now = Tus ajustes ahora: {preset}.
+mobbattle.panel.note.preset.custom = Tus ajustes ahora: tu propia mezcla.
+mobbattle.panel.button.preset.default = Por defecto
+mobbattle.panel.button.preset.clean = Limpio
+mobbattle.panel.button.preset.cinematic = Cinemático
+mobbattle.panel.button.preset.spectator = Espectador
+mobbattle.panel.button.preset.stats = Estadísticas
 mobbattle.panel.page.tools.title = Herramientas
 mobbattle.panel.page.tools.hint = Cosas que puedes hacer ahora mismo (igual que los comandos).
 mobbattle.panel.page.admin.title = Admin
@@ -1681,8 +1713,9 @@ mobbattle.panel.filmshots.reset.label = Todos los planos de la película a su po
 mobbattle.panel.filmshots.reset.button = Por defecto
 mobbattle.panel.notice.filmshots.default = Planos de la película a sus porcentajes por defecto (en dorado hasta que guardes).
 mobbattle.panel.notice.filmstyle = Estilo de la película {style} puesto abajo (en dorado hasta que guardes).
-mobbattle.panel.note.filmstyle = Estilo de la película: {style}. Batalla = la pelea siempre a la vista, Acción = cerca de los luchadores y sus ataques, Cinemático = planos abiertos, lentos y deslizados.
-mobbattle.panel.note.filmstyle.custom = Estilo de la película: tu propia mezcla. Batalla = la pelea siempre a la vista, Acción = cerca de los luchadores y sus ataques, Cinemático = planos abiertos, lentos y deslizados.
+mobbattle.panel.note.filmstyle = Estilo de la película: {style}.
+mobbattle.panel.note.filmstyle.custom = Estilo de la película: tu propia mezcla.
+mobbattle.panel.note.filmstyle.help = Batalla = la pelea siempre a la vista. Acción = cerca de los ataques. Cinemático = planos abiertos y lentos.
 mobbattle.panel.button.filmstyle.default = Por defecto
 mobbattle.panel.button.filmstyle.battle = Batalla
 mobbattle.panel.button.filmstyle.action = Acción
@@ -1690,11 +1723,11 @@ mobbattle.panel.button.filmstyle.cinematic = Cinemático
 mobbattle.gallery.search = Buscar mobs (nombre o ID)...
 mobbattle.gallery.title = Galería de mobs
 mobbattle.gallery.close = Cerrar
-mobbattle.panel.row.gallery.label = O elígelo en las imágenes de todos los mobs
+mobbattle.panel.row.gallery.label = Elígelo en las imágenes de todos los mobs
 mobbattle.panel.button.gallery.show = Ver imágenes
 mobbattle.panel.notice.gallerypick = {name} elegido: pon la cantidad y el equipo y pulsa Añadir.
 mobbattle.gallery.count = {total} mobs
-mobbattle.panel.section.filmshots = Planos de la película (porcentaje de lo normal, 0 = nunca)
+mobbattle.panel.section.filmshots = Planos de la película (avanzado: porcentaje de lo normal, 0 = nunca)
 mobbattle.panel.section.watchhud = Espectador y HUD
 mobbattle.panel.section.everybattle = Todas las batallas
 mobbattle.panel.section.battlewaves = Ondas de batalla
@@ -1738,6 +1771,9 @@ mobbattle.panel.section.addteam = Añadir un equipo
 mobbattle.panel.section.gallery = Tus equipos de la Varita de Equipos
 mobbattle.panel.section.summonlist = Mobs en la lista ({count})
 mobbattle.panel.section.addmob = Añadir un mob
+mobbattle.panel.button.summonnow = Invocar ahora
+mobbattle.panel.note.addbyname = O búscalo por nombre:
+mobbattle.panel.section.randombattle = Batalla al azar
 mobbattle.panel.section.builtin = Preajustes incluidos
 mobbattle.panel.section.yourpresets = Tus preajustes ({count})
 mobbattle.panel.section.summonlists = Listas guardadas ({count})
@@ -1749,7 +1785,7 @@ mobbattle.panel.section.apply = Aplicar a jugadores o mobs
 mobbattle.panel.section.permissions = Permisos: {mode}
 mobbattle.panel.section.server = Servidor
 mobbattle.panel.section.cleanup = Limpieza (pide confirmación)
-mobbattle.panel.note.cameras = Agacharte, o /mobbattle skipCamera, salta una cámara en marcha. /mobbattle watch te permite ver una batalla en marcha (clic derecho = siguiente luchador, izquierdo = anterior, E = cambio automático, Q o /mobbattle watch exit = salir).
+mobbattle.panel.note.cameras = Agacharte, o /mobbattle skipCamera, salta una cámara en marcha.
 mobbattle.panel.note.battlewaves = Las ondas de la Varita del Chasquido (sin batalla), del battle royale y de todos contra uno.
 mobbattle.panel.note.ties = Dos empates distintos: quién GANA cuando los bandos están igualados al acabarse el tiempo, y en qué ORDEN se listan los luchadores con las mismas bajas. Cada pestaña de batalla puede cambiarlos para sus propias batallas.
 mobbattle.panel.note.kindtab = Presentación y cámaras: Global = el valor de las pestañas Presentación / Cámaras (campos numéricos: déjalos vacíos).
@@ -1760,7 +1796,7 @@ mobbattle.panel.note.morphmodel = Clic derecho en un mob con la Varita de Transf
 mobbattle.panel.note.teamnames = Nombres: letras, números y _ (hasta 16). Siempre hay al menos 2 equipos.
 mobbattle.panel.note.nogallery = Aún no hay mobs en tus equipos: Varita de Equipos (clic izquierdo en un mob) o Herramientas > Equipos automáticos.
 mobbattle.panel.note.summonempty = La lista está vacía: añade mobs abajo o con la Varita de Invocación (clic derecho en un mob).
-mobbattle.panel.note.builtin = Default: todo vuelve a sus valores por defecto. Fight: sin espectáculo, solo las peleas. Effects: cuenta atrás, temporizador, títulos, música, láseres, runas. Debug: todo visible (el registro de depuración se queda como está). Cinematic: todo el trabajo de cámara, sin láseres ni dibujos de área.
+mobbattle.panel.note.builtin = Por defecto: todo como viene. Limpio: solo lo que hacen las varitas, nada en pantalla. Cinemático: pantalla VS, la película de la batalla y cámara lenta en el último golpe, sin números. Espectador: sigues a un luchador desde el inicio, como en un shooter, con el marcador. Estadísticas: como Espectador sin seguir a un luchador, más temporizadores y las dos tarjetas. Un preset llena el formulario: luego Guardar cambios.
 mobbattle.panel.note.nopresets = Aún no hay preajustes guardados.
 mobbattle.panel.note.presetclick = Haz clic en el nombre de un preajuste para cargarlo en el formulario.
 mobbattle.panel.note.nosummonlists = Aún no hay listas guardadas: ponle un nombre a esta abajo y guárdala.
@@ -1771,13 +1807,13 @@ mobbattle.panel.button.summonlistsort.date = Más recientes primero
 mobbattle.panel.button.summonlistsort.name = Ordenar por nombre
 mobbattle.panel.note.presetholds = Un preajuste guarda todos los ajustes excepto la lista de equipos, la lista de invocación y el modo de permisos.
 mobbattle.panel.note.permissions = open = cualquiera puede usar las varitas y cambiar ajustes. server = necesita los permisos dackoro.mob_battle.use / .config. Las acciones de admin siempre necesitan dackoro.mob_battle.admin.
-mobbattle.panel.kindtip.global.duel = Solo para duelos. Global = usa el valor de las pestañas Presentación/Cámaras.
+mobbattle.panel.kindtip.global.duel = Solo para duelos. Global = usa el valor de las pestañas Presentación, Cámaras y Película.
 mobbattle.panel.kindtip.ties.duel = Solo para duelos. Global = usa el valor de la pestaña Batallas (Empates).
-mobbattle.panel.kindtip.global.allvsone = Solo para todos contra uno. Global = usa el valor de las pestañas Presentación/Cámaras.
+mobbattle.panel.kindtip.global.allvsone = Solo para todos contra uno. Global = usa el valor de las pestañas Presentación, Cámaras y Película.
 mobbattle.panel.kindtip.ties.allvsone = Solo para todos contra uno. Global = usa el valor de la pestaña Batallas (Empates).
-mobbattle.panel.kindtip.global.royale = Solo para battle royale. Global = usa el valor de las pestañas Presentación/Cámaras.
+mobbattle.panel.kindtip.global.royale = Solo para battle royale. Global = usa el valor de las pestañas Presentación, Cámaras y Película.
 mobbattle.panel.kindtip.ties.royale = Solo para battle royale. Global = usa el valor de la pestaña Batallas (Empates).
-mobbattle.panel.kindtip.global.teams = Solo para batallas de equipos. Global = usa el valor de las pestañas Presentación/Cámaras.
+mobbattle.panel.kindtip.global.teams = Solo para batallas de equipos. Global = usa el valor de las pestañas Presentación, Cámaras y Película.
 mobbattle.panel.kindtip.ties.teams = Solo para batallas de equipos. Global = usa el valor de la pestaña Batallas (Empates).
 mobbattle.panel.buffhint.pct.limit = % (por defecto {size} = x3)
 mobbattle.panel.buffhint.pct = % (0 = desactivado, hasta {max})
@@ -1789,6 +1825,7 @@ mobbattle.panel.search.placeholder = Buscar ajustes: cuenta atrás, cámara, buf
 mobbattle.panel.search.title = Búsqueda: {query}
 mobbattle.panel.search.count = Ajustes encontrados: {n}. Cámbialos aquí como en su página y luego guarda. Borra la búsqueda o elige una página para volver.
 mobbattle.panel.search.none = Nada coincide con "{query}". Prueba otra palabra, en español o en inglés.
+mobbattle.panel.search.described = También lo mencionan en su descripción
 mobbattle.panel.readonlynote = Solo lectura: cambiar los ajustes necesita el permiso dackoro.mob_battle.config (modo de permisos server).
 mobbattle.panel.undo = Deshacer último cambio
 mobbattle.panel.discard = Descartar cambios
@@ -1858,10 +1895,10 @@ mobbattle.panel.button.apply = Aplicar
 mobbattle.panel.row.morph.label = Tu Varita de Transformación convierte mobs en (escribe para buscar)
 mobbattle.panel.row.addteam.label = Nombre y color (cada equipo tiene su propio color)
 mobbattle.panel.row.teamreset.label = Volver a los cuatro equipos por defecto (Rojo, Azul, Verde, Amarillo)
-mobbattle.panel.row.addmob.label = Mob (escribe para buscar), cantidad (número o random), equipo
+mobbattle.panel.row.addmob.label = Mob · cuántos (un número o random) · equipo
 mobbattle.panel.row.summonclear.label = Quitar todos los mobs de la lista
 mobbattle.panel.row.summonnoteams.label = Sacar de su equipo a todos los mobs de la lista (los mobs se quedan)
-mobbattle.panel.row.summonfill.label = Batalla al azar: tipos de mob que pelean, de fuerza parecida (reemplaza la lista; sigue los filtros Mostrar)
+mobbattle.panel.row.summonfill.label = Tipos de mob que pelean, de fuerza parecida. Reemplaza tu lista; usa los filtros Mostrar de arriba.
 mobbattle.panel.fill.types = Tipos
 mobbattle.panel.fill.each = Por tipo
 mobbattle.panel.fill.teams = Equipos (0 = ninguno)

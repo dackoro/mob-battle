@@ -1536,6 +1536,10 @@ final class VsScreen extends CustomUIHud {
             VsScreen hud = new VsScreen(player, plan);
             huds.addCustomHud(player, hud);
             LIVE.put(player.getUuid(), hud);
+            // the cards on the right go until the VS ends (their next once-a-second pass skips covered players)
+            for (String card : new String[] {DuelCard.KEY, FocusCard.KEY, Scoreboard.KEY}) {
+                if (huds.getCustomHud(card) != null) huds.removeCustomHud(player, card);
+            }
             // a title still on screen (an earlier battle's start or win) would sit over the VS (playtest 2026-10-17); the
             // ones that come while it shows wait for its end (FightFx.flushTitle, endsAt). While the client loads the
             // screen, "Preparing the battle..." takes its place, in the title style the countdown uses (2026-10-29,
@@ -1772,6 +1776,14 @@ final class VsScreen extends CustomUIHud {
     /** Whether a VS screen covers this player now. */
     static boolean showing(PlayerRef player) {
         return player != null && LIVE.containsKey(player.getUuid());
+    }
+
+    /**
+     * A VS screen shows or is about to for this player: the cards on the right (duel card, all vs one card, scoreboard)
+     * wait for its end (2026-10-30, playtest: the duel card was drawn over the VS screen).
+     */
+    static boolean covers(PlayerRef player) {
+        return showing(player) || player != null && endsAt(player.getUuid()) > 0;
     }
 
     /** "Preparing the battle..." as a title (the battle's kind under it), in the configured title style. */

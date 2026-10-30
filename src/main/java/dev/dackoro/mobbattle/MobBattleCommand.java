@@ -79,6 +79,7 @@ public class MobBattleCommand extends CommandBase {
         HELP.put("titles", new String[] {
                 "help.titles.1",
                 "help.titles.2",
+                "help.titles.38",
                 "help.titles.34",
                 "help.titles.3",
                 "help.titles.4",
@@ -290,6 +291,7 @@ public class MobBattleCommand extends CommandBase {
                 "help.presets.5",
                 "help.presets.6",
                 "help.presets.7",
+                "help.presets.10",
                 "help.presets.8",
                 "help.presets.9",
         });
@@ -1087,6 +1089,7 @@ public class MobBattleCommand extends CommandBase {
                 new Sub("clearall", I18n.id("cmd.desc.disband_every_player_s_army"))));
         addSubCommand(kindFxSub("countdown", I18n.id("cmd.desc.seconds_of_3_2_1_titles_befo"),
                 "0", "3", "5", "10"));
+        addSubCommand(new Sub("countdownchat", I18n.id("cmd.desc.countdown_chat"), words(I18n.id("cmd.desc.countdown_chat"), "on", "off")));
         addSubCommand(kindFxSub("readytime", I18n.id("cmd.desc.ready_time"), "off", "5", "8", "15"));
         addSubCommand(kindFxSub("camerastyle", I18n.id("cmd.desc.intro_camera_auto_orbit_area"),
                 "auto", "orbit", "duel", "showcase", "teams", "focus", "drone", "spotlight"));
@@ -1136,10 +1139,14 @@ public class MobBattleCommand extends CommandBase {
         addSubCommand(new Sub("preset", I18n.id("cmd.desc.presets_built_in_or_your_own"),
                 new Sub("list", I18n.id("cmd.desc.built_in_and_saved_presets")),
                 new Sub("default", I18n.id("cmd.desc.every_setting_back_to_defaul")),
-                new Sub("fight", I18n.id("cmd.desc.just_the_fights_no_countdown")),
-                new Sub("effects", I18n.id("cmd.desc.countdown_3_2_min_timer_most")),
-                new Sub("debug", I18n.id("cmd.desc.everything_visible_area_wall")),
+                new Sub("clean", I18n.id("cmd.desc.just_the_fights_no_countdown")),
                 new Sub("cinematic", I18n.id("cmd.desc.countdown_full_camera_work_e")),
+                new Sub("spectator", I18n.id("cmd.desc.preset_spectator")),
+                new Sub("stats", I18n.id("cmd.desc.countdown_3_2_min_timer_most")),
+                new Sub("debug", I18n.id("cmd.desc.everything_visible_area_wall")),
+                // names from before 1.2.1, still accepted
+                new Sub("fight", I18n.id("cmd.desc.preset_old_fight")),
+                new Sub("effects", I18n.id("cmd.desc.preset_old_effects")),
                 new Sub("save", I18n.id("cmd.desc.save_your_current_settings_s")),
                 new Sub("load", I18n.id("cmd.desc.load_a_saved_preset_load_nam")),
                 new Sub("delete", I18n.id("cmd.desc.delete_a_saved_preset_delete"))));
@@ -1603,6 +1610,14 @@ public class MobBattleCommand extends CommandBase {
                 }
                 if (key.equals("battlebelow")) FxSettings.battleBelow = n;
                 else FxSettings.battleAbove = n;
+            }
+            case "countdownchat" -> {
+                Boolean on = parseOnOff(val);
+                if (on == null) {
+                    usage(ctx, "/mobbattle countdownChat on|off");
+                    return;
+                }
+                FxSettings.countdownChat = on;
             }
             case "battleloot" -> {
                 Boolean on = parseOnOff(val);
@@ -3425,7 +3440,7 @@ public class MobBattleCommand extends CommandBase {
         });
     }
 
-    private static final String PRESET_USAGE = "/mobbattle preset [list | default|fight|effects|debug|cinematic|<name> | save|load|delete <name>]";
+    private static final String PRESET_USAGE = "/mobbattle preset [list | default|clean|cinematic|spectator|stats|debug|<name> | save|load|delete <name>]";
 
     /** /mobbattle preset [list | <name> | load|save|delete <name>]: whole looks at once (see Presets). */
     private static void preset(CommandContext ctx) {
