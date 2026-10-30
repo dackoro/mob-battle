@@ -1,0 +1,22 @@
+{
+  "$Comment": "Debug Wand: the mob is inspected and followed (red tint, red burst ring; sound played by the code).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ff4040",
+    "EntityBottomTint": "#8a0a0a",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Mark_Burst_Red",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

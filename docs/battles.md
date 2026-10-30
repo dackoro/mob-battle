@@ -62,15 +62,15 @@ Two team battles can use the same team names and colors without sharing targets,
 
 ## Battle waves
 
-The Snap Wand (without a battle), the battle royale and all vs one send a ring out from where they start. By default it is only a look: everyone in reach is taken at once, at any height.
-- [`/mobbattle battleWaveTravel on`](settings.md): each mob is reached when the ring gets there. A snap's dust starts then; royale and all vs one marks come with the ring (the battle itself still starts for everyone after the countdown).
+The Snap Wand (without a battle), the battle royale and all vs one send a ring out from where they start, at any height.
+- [`/mobbattle battleWaveTravel on`](settings.md) (default): each mob is reached when the ring gets there. A snap's dust starts then; royale and all vs one marks come with the ring (the battle itself still starts for everyone after the countdown). `off`: the ring is only a look and everyone in reach is taken at once.
 - [`/mobbattle battleWaveGroundOnly on`](settings.md): only mobs within 3 blocks above or below the wave are snapped or join the battle. Fliers and mobs in caves stay out.
 
 Both are off by default.
 
 ## Countdown
 
-`countdown <seconds>` (0-10, default 0 = start at once) shows a big `3`, `2`, `1` before any fight, one per second, then the start title. The chat counts too (`[DUEL: A vs B] 3`, `2`, `1`). It works globally or per kind (`countdown royale 5`).
+`countdown <seconds>` (0-10, default 3; 0 = start at once, and under 2 s there is no VS screen or intro camera) shows a big `3`, `2`, `1` before any fight, one per second, then the start title. The chat counts too (`[DUEL: A vs B] 3`, `2`, `1`). It works globally or per kind (`countdown royale 5`).
 
 - Several countdowns can run at once. A new order cancels only the countdowns that share a mob with it.
 - If mobs die during the countdown, the fight starts without them, or is cancelled if there are not enough left.
@@ -154,7 +154,7 @@ An arena keeps a battle in one place. Per kind: `arena <kind|all> on|show|wall|o
 | `on` | Both. |
 | `off` | No arena. |
 
-Default: `on` for allVsOne and royale, `off` for duels and teams. Everyone sees a drawn arena; how it is drawn follows `areaStyle` (see [colors-and-looks.md](colors-and-looks.md)).
+Default: `on` for allVsOne, royale and teams, `off` for duels. Everyone sees a drawn arena; how it is drawn follows `areaStyle` (see [colors-and-looks.md](colors-and-looks.md)).
 
 - **Size.** Chaos Wand battles use `areaRadius`. Duels and team battles use `arenaSize <8-128>|auto`, centered on the fighters; `auto` (default) covers their spread plus 6 blocks, at least 8.
 - **Teleports** put a fighter on a spot it can stand on (solid ground with room above) near its own height: a mob in a cave stays in the cave, one on a mountain stays up, and nobody lands inside a hill or in lava, fire or poison (water is fine). With no such spot, it is only pushed.
@@ -165,6 +165,7 @@ Default: `on` for allVsOne and royale, `off` for duels and teams. Everyone sees 
 `timer <kind|all> <time>|off` gives a battle a time limit of up to 24 hours. Times can be written `90`, `90s`, `2m`, `1m30s`, or `--minutes=1 --seconds=30`. Default: 3 minutes for royale, off for the rest.
 
 - Players who see the titles get a **timer box** at the top right: the battle kind, who is fighting ("Skeleton vs Trork", "vs X: 5 attackers", "6 left"), the kill leader, and the time left. `timerStyle custom|portal` picks the mod's own box (default, with the game's container header and panel textures; its layout is the asset `Common/UI/Custom/MobBattle/TimerHud.ui`) or the game's Void portal box (only its title is the mod's; the client keeps its own "Fragment of Orbis" / "until the Veil closes" text).
+- During the battle film, with its black bands on, the time goes in a band (`bandTimer off|top|bottom`, default top, under the title) and so does the battle's title (`bandTitle`, default top). The timer box's other lines (fighters left, the teams) go in a band too (`bandInfo off|top|bottom|box`, default bottom) and the box goes away; a scoreboard, duel card or all vs one card on the right moves up into its spot. `bandInfo box` keeps the box with those lines, without the clock.
 - If the timer is too short for the arena (fighters at opposite edges could not even meet, about 0.8 s per block of radius), the chat warns you and suggests a time.
 - A timer longer than the 15-minute safety limit extends that limit.
 
@@ -182,10 +183,10 @@ When the timer reaches 0, `timeUp <kind|all>` decides:
 
 | Value | Score |
 |---|---|
-| `health` (default) | Average health left, in percent of each fighter's own max; the fallen count as 0%. A big mob doesn't win just for having more health. |
+| `health` (default, except royale) | Average health left, in percent of each fighter's own max; the fallen count as 0%. A big mob doesn't win just for having more health. |
 | `damage` | The side's share of all damage dealt. |
 | `kills` | The side's share of all kills. |
-| `mix` | The three above averaged. |
+| `mix` (royale's default) | The three above averaged, so a side that hid all battle doesn't win on health alone. |
 
 Damage and kills are divided by each side's size first, so 20 attackers don't beat one target just for being 20. Scores within 0.5% are even and go to `tieBreak`:
 
@@ -241,6 +242,26 @@ A skeleton can never finish off a duck flying out of its reach. `passiveWin <sec
 
 **Training dummies.** While a mob on the `passiveWinIgnore <role,role*,...>|none` list is alive in the battle, `passiveWin` never ends the battle (its time never starts), so you can test a mob against an immortal dummy for as long as you like. The list is comma separated and case-insensitive, and a trailing `*` matches any ending. The default is `Test_Dummy*`, which covers the game's six test dummies. `none` removes every exception. In the panel it is "Never ends against" on the Battles tab.
 
+**Mob Battle's own training dummies.** One mannequin-bodied fighter per weapon of the game, each using that weapon's player attacks, to test a mob against something that fights like a player. The role IDs are `MobBattle_Dummy_<weapon>`:
+
+| Role | Weapon | Attacks |
+|---|---|---|
+| `MobBattle_Dummy_Knight` | iron sword and shield | swing combo, charged stab, spin-and-stab signature, shield block |
+| `MobBattle_Dummy_Mace` | iron mace | swing combo, charged swings, Groundslam, guard |
+| `MobBattle_Dummy_Daggers` | iron daggers | swing and stab combo, pounce, Razorstrike, guard |
+| `MobBattle_Dummy_Battleaxe` | iron battleaxe | swing combo, downstrike, Whirlwind, guard |
+| `MobBattle_Dummy_Axe` | iron axe | swing combo, charged swing, block |
+| `MobBattle_Dummy_Longsword` | iron longsword | swing combo, charged stab, block |
+| `MobBattle_Dummy_Spear` | iron spear | stab, block (no throw: a thrown spear would leave it unarmed) |
+| `MobBattle_Dummy_Club` | iron club | swing combo, block |
+| `MobBattle_Dummy_Flail` | rusty steel flail | swing combo, charged spin, block |
+| `MobBattle_Dummy_Archer` | iron shortbow | two kinds of arrow shot, a 3-arrow volley as signature, guard; keeps 5-15 blocks away |
+| `MobBattle_Dummy_Crossbow` | iron crossbow | bolts, a 3-bolt burst as signature, guard; keeps 5-15 blocks away |
+| `MobBattle_Dummy_Staff` | iron staff | close swings, orb cast (50 mana); keeps 5-15 blocks away |
+| `MobBattle_Dummy_Spellbook` | fire spellbook | close swings, orb cast (100 mana, the book is not used up); keeps 5-15 blocks away |
+
+Like a player, each one uses its weapon's signature attack only once its signature energy is full (its hits fill it; after that, the archer's 3-arrow volley and the crossbow's 3-bolt burst come about every 15 s), casts only with enough mana, and raises its guard after taking hits. They are neutral until a battle turns them against someone. Add them to the summon list or spawn them with `/npc spawn <role>`; `dummyHealth`, `dummyDamage`, `dummyDefense`, `dummySpeed` and `dummySize` set the stats of every one that spawns (see [settings](settings.md)). Their attacks are made for the weapon they spawn with, so they always keep their hands: an [equipment kit](wands.md#equipment-kits) only changes their armor, runes and stats, and the Equipment Wand locks their hands.
+
 ## Nobody fights: idleEnd
 
 Some mobs can fight but never start a fight: a battle royale of boars and bison can stand still for its whole timer. `idleEnd <seconds>|off` (0-300, default 150 = 2.5 minutes) ends a battle in a draw when no fighter hurts an enemy for that long, counted from the start or from the last hit. The end title says how long, e.g. "Nobody fought for 2m 30s". While a `passiveWinIgnore` mob (a training dummy) is alive, it never ends the battle either. In the panel it is "End when nobody fights" on the Battles tab.
@@ -259,7 +280,7 @@ The winner is checked once per second per world. There is no minimum fight lengt
 
 - The same line always goes to chat, even with titles off.
 - `startTitle on|off` and `winTitle on|off` (global or per kind) turn the titles on or off. `titleStyle` picks the banner style (`Default`, `Major` (default), `GoblinBreach`, `VoidEviction`, `random`).
-- `titleScope owner|nearby|world` decides who sees titles, timer boxes, scoreboards and alerts: only you, players within 64 blocks (default), or the whole world. Players fighting in a battle always see its titles.
+- `titleScope owner|nearby|world` decides who sees titles, timer boxes, scoreboards and alerts: only you, players within 64 blocks (default; `scopeRadius <8-1024>` changes that distance for titles, cameras and the VS screen), or the whole world. Players fighting in a battle always see its titles.
 - Each title lasts about 3 s. Victories are queued in order and take priority over pending start titles; a new fight never overwrites a victory, and a winner title may wait for a title already on screen to finish. Repeated start titles keep only the newest pending one.
 - Each player has their own title queue, so fights started by different players never cancel each other's titles: start titles are merged, winner titles all play. A countdown number shows at once and replaces whatever title that player had on screen, and the big titles follow your newest countdown.
 - The titles are the client's built-in event title banners (`EventTitleStyle`); the mod only picks which style to show.
@@ -317,7 +338,7 @@ With `/mobbattle buff unit multiplier` (or "Buff values as" in the panel), value
 
 `cameraTime <0-600>`: intro length in seconds (above 30 warns: viewers have no controls meanwhile); `0` (default) = as long as the countdown. Shots follow the fighters as they move: `orbit` uses the game's own camera sequences (like the vanilla `/tpcinematic`), and every other style sends server camera frames every 50 ms from the fighters' current positions.
 
-**VS screen** (`vsScreen on|off`, global or per kind, default on): a Smash-like VS screen before the countdown. It adds 3 s to any countdown above 0 (none with `countdown 0`), and the intro camera then plays with its full time. It goes to the players who get the cameras (`cameraScope`), except those watching a battle; the game's HUD is hidden meanwhile.
+**VS screen** (`vsScreen on|off`, global or per kind, default on): a Smash-like VS screen before the countdown. It adds 3 s to any countdown above 0 (none with `countdown 0`), and the intro camera then plays with its full time. It goes to the players set by `vsScope owner|nearby|world` (default nearby) and to every player fighting in the battle, except those watching a battle; the game's HUD is hidden meanwhile. The intro camera after it only goes to the `cameraScope` players.
 
 - Each side slides in from its edge in its color (the team's color in team battles, else red and blue), a big VS flashes where they meet, and the battle kind's title shows under it.
 - Sides of up to three fighters show them big; bigger sides show as a crowd (one of each kind first, flying mobs up in the sky) with "+N" for the rest. The bar under each side names its fighters.
@@ -332,11 +353,11 @@ With `/mobbattle buff unit multiplier` (or "Buff values as" in the panel), value
 
 Both can be set per battle kind, like the other camera options. If another mod also takes over the camera (for example an "away from keyboard" film mod), the last one to send a frame wins.
 
-`cameraScope owner|nearby|world`: who gets the cameras: only you (default), players within 64 blocks, or everyone in the world. Each player gets the shot from their own side.
+`cameraScope owner|nearby|world`: who gets the cameras: only you (default), players within `scopeRadius` blocks (64), or everyone in the world. Each player gets the shot from their own side.
 
 ### End camera
 
-`endCamera off|winner|lastHit` (default off): when a battle ends with a winner, your camera films one fighter in a slow half circle for `endCameraTime` (1-600 s, above 15 warns; default 5).
+`endCamera off|winner|lastHit` (default winner): when a battle ends with a winner, your camera films one fighter in a slow half circle for `endCameraTime` (1-600 s, above 15 warns; default 5).
 
 - `winner`: the last one standing (duel, royale), or the winning side's top killer still standing (all vs one, teams).
 - `lastHit`: whoever scored the final kill, if still standing; else the winner.
@@ -397,19 +418,19 @@ The end title and chat line add that fighter's name and kills, e.g. `Last one st
 - Mostly wide shots: wide pans and arcs come most often, more so for big or crowded battles; close-ups come more often as fewer fighters are left.
 - Each shot looks for a clear view: the camera stays out of hills, trees and roofs, and nothing solid stands between it and the battle. With no clear view low, a shot is filmed from higher up.
 - It uses the film bands (`cameraBars`) and background blur (`cameraBlur`) of the intro cameras.
-- You can't move while it films. Crouch or `/mobbattle film exit` to stop; in single player, Esc (the pause menu) stops it too. Starting `watch` also ends it.
+- You can't move while it films: mobs can't hit you meanwhile, and you get your game mode and spot back when it ends. Type `/mobbattle film exit` to stop; in single player, Esc (the pause menu) stops it too. Starting `watch` also ends it.
 - When the battle ends, the end camera takes over if it is on (`endCamera`); else you get your view back.
 - You can't film a battle you fight in, or while you watch or spectate.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `filmPlayerShots <0-100>` | 20 | Percent of shots that show you watching (0 = only the battle). |
+| `filmPlayerShots <0-100>` | 5 | Percent of shots that show you watching (0 = only the battle). |
 | `filmWideShots <0-100>` | 30 | Percent of battle shots filmed wide and from far away, so big attacks show whole; +15 while a mob over 4 blocks tall fights. |
-| `filmShotTime <3-60>` | 8 | Seconds each shot lasts before the next one. |
+| `filmShotTime <3-60>` | 6 | Seconds each shot lasts before the next one. |
 | `filmShotVariation <0-90>` | 25 | Each shot lasts up to that percent longer or shorter, at random, so the cuts don't come like clockwork. |
 | `filmPace <25-300>` | 100 | How far the camera moves in a shot (pans, arcs, push-ins), in percent. |
 | `filmTransition cut\|glide` | cut | Cut to the next shot at once, or glide there. |
-| `filmShot <shot> <0-300>` | 100; spiral 80, telephoto and descent 70, landscape and groundrise 50, zenith 40 | How often each shot comes up, percent of normal: 0 = never, 200 = twice as often. Shots: `wide`, `track`, `arc`, `pushin`, `closeup` (fewer with many fighters), `landscape` (rare, turns quickly to the fight), `playerback`, `playerclose`, and the showier `zenith` (straight down from above), `spiral` (circles while rising), `telephoto` (far away with a long lens), `descent` (crane down), `groundrise` (from the grass up), `profile` (two fighters from the side). |
+| `filmShot <shot> <0-300>` | 100; spiral 80, telephoto and descent 70, groundrise 50, zenith 40, landscape 10 | How often each shot comes up, percent of normal: 0 = never, 200 = twice as often. Shots: `wide`, `track`, `arc`, `pushin`, `closeup` (fewer with many fighters), `landscape` (rare, turns quickly to the fight), `playerback`, `playerclose`, and the showier `zenith` (straight down from above), `spiral` (circles while rising), `telephoto` (far away with a long lens), `descent` (crane down), `groundrise` (from the grass up), `profile` (two fighters from the side). |
 | `filmShots all\|battle\|<list>` | | Shortcut: the listed shots on, the rest off (`battle` = every shot but the two of you). |
 | `filmStyle default\|battle\|action\|cinematic` | | Every film setting at once. `battle`: the fight always in view, few shots of you. `action`: close on the fighters and their attacks, no landscapes. `cinematic`: open, slow, gliding shots, longer and wider. `default`: back to the defaults. Each value can still be changed after (panel: Cameras, film shots section). |
 
@@ -419,8 +440,8 @@ If another mod also takes over the camera (for example an "away from keyboard" f
 
 ## Duel card and watch cards
 
-- **Duel card** (`duelCard on|off`, default off): a read-only card on the right of the screen, in the scoreboard's place (it replaces that duel's scoreboard), for a 1 vs 1 duel, with both fighters' health (now / max), attack, defense and size, including their buffs. It shows from the countdown to the end of the duel, for the players who see the titles, and refreshes once a second.
-- **All vs one card** (`focusCard on|off`, default off): the same kind of card for an all vs one, also on the right in place of its scoreboard. On top, the lone target with its health (now / max), attack, defense, size (with its buffs) and kills; below, how many attackers are left out of the most there were, their summed health, and the attacker that dealt the most damage. It shows from the start of the battle (not during the countdown) until the end, for the players who see the titles, and refreshes once a second.
+- **Duel card** (`duelCard on|off`, default on): a read-only card on the right of the screen, in the scoreboard's place (it replaces that duel's scoreboard), for a 1 vs 1 duel, with both fighters' health (now / max), attack, defense and size, including their buffs. It shows from the countdown to the end of the duel, for the players who see the titles, and refreshes once a second.
+- **All vs one card** (`focusCard on|off`, default on): the same kind of card for an all vs one, also on the right in place of its scoreboard. On top, the lone target with its health (now / max), attack, defense, size (with its buffs) and kills; below, how many attackers are left out of the most there were, their summed health, and the attacker that dealt the most damage. It shows from the start of the battle (not during the countdown) until the end, for the players who see the titles, and refreshes once a second.
 - **Watch card**: while you watch, a card on the left shows the watched fighter's name, side, health, attack and defense buffs, size, kills, and how many fighters are left.
 - **Watch duel card**: in a 1 vs 1 duel the watch card shows both fighters instead, and tags the one you are watching with "Watching".
 

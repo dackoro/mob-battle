@@ -79,7 +79,7 @@ final class Snap {
         Vector3d waveCenter = null;
         double waveReach = reach;
         BattleManager.Battle clicked = target != null ? BattleManager.battleOf(target) : null;
-        // the snapper's own army (its whole chain of command) is never in the snap (2026-10-18, user)
+        // the snapper's own army (its whole chain of command) is never in the snap (2026-10-18)
         java.util.UUID snapper = player != null ? player.getUuid() : null;
         if (clicked != null) {
             // A mob in a battle: that battle, wherever its fighters are.

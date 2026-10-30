@@ -41,7 +41,7 @@ public class MorphCopyInteraction extends SimpleInstantInteraction {
         Ref<EntityStore> target = context.getTargetEntity();
         MorphWand.Copy copy = target != null && target.isValid() ? MorphWand.read(target, buffer) : null;
         if (copy == null) {
-            // Once per HINT_GAP_MS: a right click with no mob under the cursor came 4-5 times in a row (user,
+            // Once per HINT_GAP_MS: a right click with no mob under the cursor came 4-5 times in a row (playtest,
             // 2026-10-16: the chat filled with the yellow line, which read as if it had copied from far away).
             long now = System.currentTimeMillis();
             Long last = LAST_HINT.get(player.getUuid());

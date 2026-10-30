@@ -13,7 +13,7 @@ $C.@DecoratedContainer {
         @Alignment = Center;
       }
 
-      // Search over every page (2026-10-16, user): typing fills #SearchResults with the matching settings. Same
+      // Search over every page (2026-10-16, playtest): typing fills #SearchResults with the matching settings. Same
       // look and place as the game's own search (Common.ui @HeaderSearch in the title bar of CommandListPage /
       // EntitySpawnPage: a magnifying glass that opens into a field), copied here because our id is #Search.
       // The icon is a PatchStyle on the game's texture, as our HUD cards load ../Common/ContainerHeader.png. Tried

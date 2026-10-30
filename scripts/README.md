@@ -19,6 +19,7 @@ Run one after changing what it generates, then build.
 | `gen-hologram-anims.py` | The Morph Wand hologram's motion (`Server/Item/Animations/MobBattle_MorphWand.json` and its animations) | Reads Assets.zip. |
 | `gen-vs-assets.py` | VS screen art: half backgrounds per color, the VS logo, battle kind titles, the "?" picture (`Common/Icons/MobBattle/Vs/`) | Pillow. `--unknown` writes only the "?". |
 | `gen-vs-ui.py` | The VS screen layouts (`Common/UI/Custom/MobBattle/VsScreen.ui`, `VsCols3.ui` to `VsCols8.ui`) | Slot positions live here; `--depth` prints the back-to-front slot orders VsScreen.java uses. |
+| `gen-creative-tab-icon.py` | The creative inventory tab icon, grey and gold (`Common/Icons/ItemCategories/MobBattle.png`, `MobBattleActive.png`) | Draws the Battle Wand in the style of the game's tab icons. Pillow + numpy. `--preview <png>` shows both. |
 | `gen-observed-kinds.py` | `observed-kinds.properties` (which game mobs really fight) from `/mobbattle test verify` reports | `python scripts/gen-observed-kinds.py report1.txt [report2.txt ...]` |
 | `hide-first-person.py` | Adds the invisible first-person particles to every effect | Run after any generator above or a new effect. Safe to run again. |
 

@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * readyTime (user, 2026-10-20): seconds to get in position before a battle's VS screen and countdown. Every battle is
+ * readyTime (playtest 2026-10-20): seconds to get in position before a battle's VS screen and countdown. Every battle is
  * started with a click on a mob, so whoever starts one stands next to it when the VS shows; with a ready time they can
  * first walk or fly to their seat (an arena's stands). Meanwhile the player who started it sees a big number with
  * "get in position, crouch to start" and hears a soft tick each second, and the fighters keep the countdown's truce.

@@ -2,7 +2,7 @@
 
 Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (`v1.0.0`, ...) and matches the file uploaded to CurseForge.
 
-## Unreleased
+## 1.2.0 "Showtime" (2026-10-30)
 
 ### New: cameras
 - **VS screen before battles** (`vsScreen on|off`, default on, per kind): a Smash-like screen with both sides' fighters and a big VS before the countdown. It adds 3 s to the countdown, and the intro camera keeps its full time after it. Up to three fighters a side show big, bigger sides as a crowd, a battle royale as one crowd across the screen, and 3 or more teams as one column per team (`vsTeamReps 1|2`). The pictures are drawn by the server from each mob's model, mods' mobs too; players show in their own skin.
@@ -18,7 +18,9 @@ Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (
 - **Film styles**: `/mobbattle filmStyle default|battle|action|cinematic` (four buttons in the panel) sets every battle film setting at once: the fight always in view, close on the fighters and their attacks, or open, slow, gliding shots.
 - **Time to get in position** (`readyTime <seconds>|off`, default off, per battle kind; 8 s in the `cinematic` preset): seconds to walk or fly to your spot (an arena's stands) before the VS screen and the countdown start. A big number counts down for you and the fighters wait; crouch to start at once.
 - **Watch glides between fighters.** Going to another fighter, the spectator camera now travels there, straight through hills and walls, and ends behind it (`watchTransition glide|cut`, default glide).
-- **Watch auto switch** (`watchAutoSwitch <seconds>|off`, default off): the watch goes on to the next fighter by itself every few seconds.
+- **Watch auto switch** (`watchAutoSwitch <seconds>|off`, default off): the watch goes on to the next fighter by itself every few seconds. **E** while watching turns it on or off for you alone.
+- **Watch stays on a fall.** When the fighter you watch dies, the camera stays on it for a moment before going to whoever killed it.
+- **Who sees what** (`vsScope owner|nearby|world`, default nearby; `scopeRadius <8-1024>`, default 64): the VS screen now reaches the players near the battle (as the titles and countdown do), not only those who get the cameras, and "nearby" has a distance you choose, for titles, countdown, timer, music, cameras, film and VS screen alike. Players fighting in a battle always see its VS screen and titles.
 - **Battle royale VS**: the fighters of a plain battle royale are no longer cut at the middle.
 - **VS screen sizes**: every fighter on one scale for the whole screen, measured on its own picture (a fire golem is no longer smaller than a hawk, small mobs are not blown up, giants tower over the rest with their head in view); each half uses the room it really has by the slanted split, so the left side's inner fighter is no longer cut; pictures show the whole width of wide mobs.
 - **Kill Wand: hold left click** to slam the ground and kill every mob around you (`killArea`, `killRadius` 12); your own army is spared, players only with `killAreaPlayers on` (default off).
@@ -37,7 +39,7 @@ Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (
 - **Clear teams.** `/mobbattle summon team all none`, or **Clear teams** under the list on the Summon list tab, takes every mob in the list out of its team and keeps the mobs.
 
 ### New: wands, names and pictures
-- **Morph Wand hologram.** While you hold the Morph Wand, a green hologram of the mob it copied floats over its gem (not for a copied player look). On for everyone.
+- **Morph Wand hologram.** While you hold the Morph Wand, a green hologram of the mob or player it copied floats over its gem. On for everyone.
 - **Mobs go by their in-game names.** Battle titles, chat, the HUD cards, the VS screen and the settings panel show each mob's name from the game, in your language, instead of its ID (`Dungeon_Goblin_Burner` shows as "Goblin Burner"). Commands still take the ID.
 - **One picture cache per machine.** Mob pictures (VS screen, panel icons, Morph Wand hologram) are drawn once and shared by every world and server on the computer, so a new world no longer draws them all again. Pictures of mobs no world has used for 30 days are deleted. See docs/server-setup.md.
 
@@ -49,12 +51,57 @@ Every version of Dackoro's Mob Battle, newest first. Each one is tagged in git (
 - **Six new film shots**: zenith (straight down), spiral, telephoto, crane down, from the ground and profile, with defaults that keep the showy ones a surprise. "Shots of you" now defaults to 20 %.
 - The landscape shot (from the land to the battle) is rarer and turns to the fight faster.
 
+### New: equipment and training dummies
+- **Equipment Wand.** Right click opens a panel with a mob's six slots (main hand, off hand, head, chest, hands, legs) and a picture gallery of items to search and pick; crouch + right click copies a mob's gear, left click pastes it, held left click pastes it on every mob around. Mobs that need their own weapon to attack keep it, and two-handed weapons empty the off hand, as for players. **Restore original** puts the mob's own gear back.
+- **Equipment kits.** Named sets of gear (each slot can list several items, one picked at random per mob): `/mobbattle kit list|show|save|set|remove`, applied with `apply <who> kit`, `army kit`, to a summon list row (`summon kit`, or the Kit dropdown on the Summon list tab) or to a team for its battles (`teams kit`).
+- **Combat profiles in kits.** A kit can also carry up to 4 runes and stats (`kit set <k> runes Rune_Fireball,Rune_Enrage`, `kit set <k> stat health|damage|defense|speed|size <value>`, or the Runes tab and the stat fields of the Equipment Wand page), on any mob: it casts its runes in a fight when its mana allows, with each rune's own cost and cooldown (`kit runes` lists them). Each rune can carry up to two support runes, as on the rune bench (`Rune_Fireball+Rune_Damage_Up`), and the Equipment Wand page has a Runes tab laid out like the bench. `runeCooldown` (default 200 %) keeps mobs from casting a rune again as soon as it is ready. Four kits come ready: tank, berserker, mage and rogue. Training dummies keep their own weapon and shield; a kit only gives them armor, runes and stats.
+- **The Equipment Wand page has four tabs**: Gear (with a **Random gear** button: a weapon, sometimes a shield, an armor set of one material and runes with fitting supports), Runes, Stats (the mob's own extra health, damage, defense, speed and size) and Kits (every kit with a summary: apply, overwrite or delete it, or save a new one). It reopens on the tab you used last. Copying and pasting a set now shows a blue or gold swirl, tint and ring with a sound, and the held click equips each mob as the ring reaches it.
+- **Runes and stats stay on a mob** when it is saved: leaving the world, unloading its area or a server restart no longer take them off.
+- **Armor protects mobs**, and with `equipWeaponDamage on|off` (default on) the weapon a mob holds also changes how hard it hits, compared with its own.
+- **13 training dummies**, one per weapon of the game: knight (sword and shield), archer (shortbow), mace, daggers, axe, battleaxe, club, flail, longsword, spear, crossbow, staff and spellbook. They fight with the player's own attacks of their weapon: the combo, the charged attack and the signature attack (which, as for players, needs full signature energy, filled by landing hits; the archer's 3-arrow volley and the crossbow's 3-bolt burst then come about every 15 s), and they raise their weapon's guard when a fighter comes close. They stay calm until a battle sets them against someone. Their health, damage, defense, speed and size are settings (`dummyHealth`, `dummyDamage`, `dummyDefense`, `dummySpeed`, `dummySize`; Battles tab of the panel) for the ones that spawn from then on.
+
+### New: slow motion and the film
+- **Slow motion at the end** (`endSlowMo <2-20>|off` times slower, `endSlowMoTime` seconds): the world slows down from the final blow, also when the last ones fall together or the battle is won when time runs out. With the battle film on, the film stays on a close-up of the winner while it lasts.
+- **The battle film flies you around.** While the film runs you are invulnerable and fly free, with no inventory; `/mobbattle film exit` ends it (the game sends no keys or clicks while a server camera films) and puts you back where you stood, in your own game mode. The chat says so when the film starts.
+- **Fighters left in the film bands** (`bandInfo off|top|bottom|box`, default bottom): with the clock in a band, the timer card's other lines ("12 fighters left · top: ...") go in a band too and the card goes away; `box` keeps the card without its clock.
+- **No loot from battle deaths** (`battleLoot on|off`, default off): mobs that die in a battle drop nothing, so the field stays clean after a big royale.
+- **Frozen summons** (`summonFrozen on|off`, default off): summons come out standing still with no AI, for screenshots and tests (the VS screen still shows); `/npc thaw --all` lets them go.
+- **`summon fill` up to 100 kinds of mob** at once (it was 40).
+- **Film bands carry the battle's title and time** (`bandTitle`, `bandTimer off|top|bottom`, default both in the top band, the time under the title). The timer card keeps its other lines without the clock, or goes when a scoreboard, duel card or all vs one card is already on the right; those cards then move up into its spot.
+- **Picture download per battle** (`serverVsPictures battle|boot`, admin, default battle): the VS pictures are sent to the players of a battle when it starts instead of at join, and the Morph Wand hologram of a mob the first time it is copied. Joining a server with many mods downloads much less.
+- **Creative inventory tab.** Every wand is in its own Mob Battle tab, grouped by use (battles, army, support, destruction) instead of the Weapons tab.
+
 ### Changes
+- **New defaults that show the update out of the box:** a 3 s countdown (with no countdown there is no VS screen or intro camera), the end camera on the winner, the duel card and the all vs one card on, weapons count for damage (`equipWeaponDamage`), summons wait calm until a battle (`summonCalm summons`), the battle royale's time-up judge weighs health, damage and kills (`judgeBy royale mix`), battle waves travel out from the wand, film shots last 6 s with fewer shots of you (5 %) and of the scenery (`filmShot landscape 10`), the Buff Wand also fills health, and team battles get an arena. `/mobbattle preset fight` still turns the show off.
+- **Battle music starts with the VS screen** instead of a few seconds after it.
+- **"Nobody can reach" waits for the fight.** Its countdown only starts after 20 s without a hit, so a slow start no longer ends a battle.
+- **Hiding no longer wins a battle royale.** When time runs out, fighters still standing that never dealt damage score nothing once someone standing has.
+- **No more flashing health bars.** The small hit Mob Battle gives a mob to turn it on a new target is now 0 damage, so health bars and hit numbers no longer flash in big battles.
+- **Fighters attack right at FIGHT!** The countdown's truce ends exactly at the start instead of up to a second later.
 - **Watch mode:** a left click on the first fighter goes round to the last one instead of saying there is no earlier fighter.
 - **The chat hides while the VS screen shows** and comes back when it ends.
 - **Every `summon add` makes its own entry**, even for a mob and team already listed (`Skeleton_Archer#2`); it no longer adds to that entry's count. Change a count with `summon modify` or in the panel row.
 
 ### Fixes
+- **Mob names in each player's language.** The VS screen, the timer card and film band, the scoreboard and the all vs one card used the language of the first player online for everyone; now each player reads the names in their own.
+- **The film keeps to the thick of the fight.** One mob wandering off, or fighters spread over a field, no longer push the camera back until everyone is a speck.
+- **No more world crash from Chain Hook.** A mob casting the Chain Hook rune crashed the whole world a second later (the game added its chain twice); mobs no longer cast it, and kits refuse it.
+- **A rune that ended invulnerability no longer leaves a mob immortal.** When an invulnerability shield (Endgame's Prismatic Aegis) was the mob's last effect, the game kept it unhurtable for good.
+- **The watched fighter gets hit again.** Arrows at the fighter you watch hit your invisible spectator body and were cancelled; they now reach the fighter. Two players watching no longer see each other's body among the fighters.
+- **Nobody hurts a mob waiting to fight.** During the countdown and the time to get in position, hits from players and outsiders and their effects (a burn) no longer damage the fighters.
+- **An army waits while its leader fights an isolated battle** (a duel) instead of following it into the arena and picking fights with the onlookers; it follows again when the battle ends.
+- **A mob wearing a player's look** (Morph Wand copy of a player) shows in that player's skin on the VS screen, not as a bare body.
+- **After the battle film or the watch you fly again** if you were flying before.
+- **Cameras stay inside the arena.** Film and intro shots no longer climb onto the roof, the stands or into corridors behind the walls; they step around columns instead of climbing over them, rise over the fighters at the lens in big crowds, never sit inside leaves or with a block right beside the lens, and cut to another shot when the view stays blocked.
+- **Better film shots.** Close-ups follow running fighters, stay on a fighter that falls for a moment, take turns between fighters and rise over a crowd to see the face; the landscape shot starts with the fight already on screen; push-in, telephoto and zenith no longer jump around in big battles; the profile shot swaps to the other side of a wall; the crane stops above an obstacle; the ground shot no longer goes into the floor.
+- **Team columns on the VS screen keep their pictures**, with no thin see-through line at the bottom, and an all vs one's lone fighter shows as big as in a duel.
+- **Stuck fighters are brought back.** A fighter stranded on a tower or a ledge is moved next to its opponent even while it keeps changing targets, and one that two shoves don't bring closer is moved too.
+- **Mobs fight back when hit from behind** while busy with an opponent they can't reach above or below them.
+- **After the film you land where you stood**, not under the floor.
+- **Players in battles.** Mobs set against a player now walk up to them and attack even if the player waits for them, and a player who dies mid-battle is out of it: the battle's mobs stop targeting them, and with battle isolation on neither side can hurt the other until the battle ends.
+- **A lone player who wins** gets their own name in the win title, not "<name>'s army".
+- **Winners calm down when a battle ends.** A mob that won no longer attacks the mobs summoned after the battle: its hostility toward the fallen opponents could pass on to whoever came next.
+- **Names on the VS screen** keep the word that matters when they are too long: "Caballero de entrenamiento" shows as CABALLERO (it showed "DE ENTRENAMIENTO") and the Gobliterator MkIIII as GOBLITERATOR.
 - VS screen: every fighter is drawn at one scale, so a mob with a banner, wings or a long body no longer looks smaller than a mob of the same height; wide mobs are only cut and faded on the side that does not fit. A "Preparing the battle..." notice shows while the screen loads.
 - VS screen: the two sides slide in and out smoothly, also with a big battle royale crowd (they used to pop in at once with the clash already on, after a freeze). The game's HUD stays until the screen appears.
 - The battle film's far shots no longer leave the fight as specks in the landscape.

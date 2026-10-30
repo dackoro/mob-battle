@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The card spot on the right of the screen (2026-10-16, user screenshot: a duel's card and a team battle's scoreboard
+ * The card spot on the right of the screen (2026-10-16, playtest screenshot: a duel's card and a team battle's scoreboard
  * drawn over each other when both ran at once): the scoreboard, the duel card and the focus card all sit there, so each
  * player gets the one of the battle nearest to them. A battle counts when it shows something in that spot (its
  * scoreboard, or the duel / focus card) and the player is one of its title viewers. Worked out once per second per

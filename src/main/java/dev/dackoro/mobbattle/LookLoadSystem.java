@@ -28,6 +28,8 @@ public class LookLoadSystem extends com.hypixel.hytale.component.system.RefSyste
         if (reason == AddReason.SPAWN) {
             // Pets and summons that appear mid-battle may join their owner's side (BattleManager.joinOwnersSide).
             BattleManager.noteSpawn(ref);
+            // Training dummies get the panel's stats (dummyHealth...).
+            TrainingDummies.onSpawn(ref, store);
             return;
         }
         if (reason != AddReason.LOAD) return;

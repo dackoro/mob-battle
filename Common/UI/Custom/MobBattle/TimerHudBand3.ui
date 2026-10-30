@@ -1,0 +1,66 @@
+// Same box as TimerHud3.ui without its clock: the time is in the film's black band (CinemaBars, bandTimer),
+// so only the title and the lines stay (2026-10-29, playtest: keep the card, just not the clock twice).
+// Mob Battle fight timer (TimerHud.java), 3 subtitle lines (generated from TimerHud.ui: keep them in sync). Same panel textures as the game's containers (Common.ui:
+// @DecoratedContainer header + ContainerPatch body). Paths are relative to this file. Edit and save: the dev
+// pack reloads it; a malformed property makes the client reject the whole HUD ("Failed to apply custom ui hud
+// commands"), so change one thing at a time.
+// Under the cinema bars (CinemaBars.shift, 2026-10-16, playtest): #ShiftBar takes the band's height and #ShiftPad
+// hides, so the card sits just under the top band while a camera films; without bars it is where it always was.
+Group #Shift {
+  Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+  LayoutMode: Top;
+
+  Group #ShiftBar { FlexWeight: 0; }
+  Group #ShiftRest {
+    FlexWeight: 1000;
+    LayoutMode: Top;
+
+    Group #ShiftPad { Anchor: (Height: 94); }
+    Group #ShiftSlot {
+      FlexWeight: 1;
+
+      Group {
+        Anchor: (Right: 24, Top: 16, Width: 250, Height: 110);
+        LayoutMode: Top;
+
+        Group #Header {
+          Anchor: (Height: 38);
+          Background: (TexturePath: "../Common/ContainerHeader.png", HorizontalBorder: 50, VerticalBorder: 0);
+          Padding: (Top: 7);
+
+          Label #Title {
+            Text: "";
+            Style: (FontSize: 15, FontName: "Secondary", TextColor: #ffd23e, RenderBold: true, RenderUppercase: true,
+                    HorizontalAlignment: Center, VerticalAlignment: Center);
+          }
+        }
+
+        Group #Body {
+          Anchor: (Height: 72);
+          LayoutMode: Top;
+          Padding: (Horizontal: 16, Vertical: 8);
+          Background: (TexturePath: "../Common/ContainerPatch.png", Border: 23);
+
+          Label #Sub {
+            Anchor: (Height: 18);
+            Text: "";
+            Style: (FontSize: 12, TextColor: #96a9be, RenderUppercase: true, RenderBold: true,
+                    HorizontalAlignment: Center, VerticalAlignment: Center);
+          }
+          Label #Sub2 {
+            Anchor: (Height: 18);
+            Text: "";
+            Style: (FontSize: 12, TextColor: #96a9be, RenderUppercase: true, RenderBold: true,
+                    HorizontalAlignment: Center, VerticalAlignment: Center);
+          }
+          Label #Sub3 {
+            Anchor: (Height: 18);
+            Text: "";
+            Style: (FontSize: 12, TextColor: #96a9be, RenderUppercase: true, RenderBold: true,
+                    HorizontalAlignment: Center, VerticalAlignment: Center);
+          }
+        }
+      }
+    }
+  }
+}

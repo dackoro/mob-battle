@@ -38,7 +38,7 @@ final class WandFx {
     static final String DEATH_SHIMMER = "Death_Shimmer_";
     /**
      * Shimmer death, step 2: Death_Shimmer_ only turns the body its color (0.5 s, then held); this bursts it into
-     * liquid (0.3 s), put on {@link #SHIMMER_BURST_MS} before the removal (user, 2026-10-12: the two-step test death).
+     * liquid (0.3 s), put on {@link #SHIMMER_BURST_MS} before the removal (playtest 2026-10-12: the two-step test death).
      */
     static final String DEATH_SHIMMER_BURST = "Death_ShimmerBurst_";
     private static final long SHIMMER_TURN_MS = 500;
@@ -72,6 +72,11 @@ final class WandFx {
     static final String BUFF_TAKE = "BuffTake";
     static final String ARMY_ADD = "ArmyAdd";
     static final String ARMY_REMOVE = "ArmyRemove";
+    /** Equipment Wand: gear copied (blue) / put on (gold), tint + burst ring like the Army Wand's. */
+    static final String EQUIP_COPY = "EquipCopy";
+    static final String EQUIP_PUT = "EquipPut";
+    /** Debug Wand: the mob is inspected (red), tint + burst ring like the Army Wand's. */
+    static final String DEBUG_MARK = "DebugMark";
     /**
      * Crown over the lone target, 20 s (/mobbattle crown): MobBattle_Fx_Crown_<Gold|Color>. Buffed mobs wear
      * CrownBuff_<Color> until their buff goes (Buffs). No tint, not in ALL_FX: new wand tints keep them.
@@ -96,7 +101,8 @@ final class WandFx {
 
     private static final String[] ALL_FX = java.util.stream.Stream.concat(
             java.util.stream.Stream.of(HEAL, CHARM, RAGE, LONE, BRAWL, MORPH, EFFECT,
-                    COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, UNSELECT_QUIET, BUFF_TAKE, ARMY_ADD, ARMY_REMOVE),
+                    COPY, UNMORPH, SUMMON_ADD, SUMMON_REMOVE, FAIL, UNSELECT, UNSELECT_QUIET, BUFF_TAKE, ARMY_ADD, ARMY_REMOVE,
+                    EQUIP_COPY, EQUIP_PUT, DEBUG_MARK),
             Teams.PALETTE.keySet().stream().flatMap(c -> java.util.stream.Stream.concat(
                     java.util.stream.Stream.of(MARK + c, DEATH_JADE + c, DEATH_SHIMMER + c, EFFECT + "_" + c),
                     java.util.Arrays.stream(LIGHT_HEIGHTS).mapToObj(h -> CLEANSE + c + heightSuffix(h)))))
@@ -115,7 +121,7 @@ final class WandFx {
      * The scale our sized particles (_S looks and crowns, _H lights) must make up for. A mob's model keeps its scale
      * under a size buff (only the entity scale grows, which attached particles ignore), so it is the entity scale. A
      * size-buffed player's model is rebuilt at their size (MorphWand.setPlayerSize) and the particles on it grow with
-     * the model: only what the model doesn't carry is left (user, 2026-10-12: at x10 the runes and light filled the
+     * the model: only what the model doesn't carry is left (playtest 2026-10-12: at x10 the runes and light filled the
      * arena, model x10 times _S300 times the rune factor).
      */
     static float particleScale(Ref<EntityStore> target, float scale) {
@@ -124,7 +130,7 @@ final class WandFx {
 
     /**
      * How much the buff particles (looks, runes, crowns) grow for a size: the square root, so they don't grow as much
-     * as the body (user, 2026-10-12: at big sizes they filled the arena). x4 -> x2, x10 -> x3.2 (mobs stop at _S300).
+     * as the body (playtest 2026-10-12: at big sizes they filled the arena). x4 -> x2, x10 -> x3.2 (mobs stop at _S300).
      */
     static float grown(float scale) {
         return scale <= 1f ? scale : (float) Math.sqrt(scale);
@@ -541,7 +547,7 @@ final class WandFx {
     /** Snap: the ash cloud left behind, carried off by the wind (Server/Particles/MobBattle/MobBattle_Ash_Drift). */
     static final String ASH_DRIFT = "MobBattle_Ash_Drift";
     /** It starts this soon after the snap, so the cloud rises while the body crumbles (starting 900 ms before the
-     * removal, i.e. 600 ms in, still only showed once the mob was gone: user, 2026-10-10). */
+     * removal, i.e. 600 ms in, still only showed once the mob was gone: 2026-10-10). */
     private static final long ASH_DELAY_MS = 100;
 
     /** Spawns the ash cloud at {@code target}'s position (re-read then) right after the snap starts. */

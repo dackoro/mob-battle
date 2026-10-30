@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A role's DisableDamageGroups while it fights in Mob Battle (2026-10-16, user: in a duel the Dungeon_Feastmaster_Boss
+ * A role's DisableDamageGroups while it fights in Mob Battle (2026-10-16, playtest: in a duel the Dungeon_Feastmaster_Boss
  * never hurt the Gobliterator; Debug Wand: it ran its Slam and Melee 3.3 blocks away and not one hit came out).
  * Vanilla Template_Dungeon_Feastmaster_Boss lists {@code "DisableDamageGroups": ["Goblin"]} so its slams spare its own
  * goblins, and CombatSupport.getCanCauseDamage (javap 0.7.2: disableDamageFlock, then the disableDamageGroups int[])

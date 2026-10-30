@@ -67,15 +67,52 @@ public class PlayerBattleDamageSystem extends DamageEventSystem {
         return true;
     }
 
+    /**
+     * A battle projectile that hit a watcher's invisible body: it sits on the fighter being watched (the follow
+     * camera's spot), so the shot was really at that fighter. The hit goes to it instead (2026-10-29, test duels: the
+     * watched archer never took an arrow, every one hit the spectator and was cancelled as an outsider's).
+     */
+    private static boolean toWatched(Ref<EntityStore> victim, Damage.ProjectileSource shot, Damage damage,
+                                     CommandBuffer<EntityStore> buffer) {
+        Ref<EntityStore> target = BattleWatch.watchedBy(victim, buffer);
+        Ref<EntityStore> shooter = shot.getRef();
+        if (target == null || !target.isValid() || shooter == null || shooter == target || !BattleManager.areEnemies(shooter, target)) {
+            return false;
+        }
+        damage.setCancelled(true);
+        // the hit as it was shot (its own cause, the amount before the watcher's armor and the shooter's effect bonus,
+        // which the fighter's pipeline applies again; audit 2026-10-29)
+        com.hypixel.hytale.server.core.modules.entity.damage.DamageSystems.executeDamage(target, buffer,
+                new Damage(shot, damage.getDamageCauseIndex(), damage.getInitialAmount()));
+        return true;
+    }
+
     @Override
     public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                        CommandBuffer<EntityStore> buffer, Damage damage) {
-        if (damage.getSource() instanceof Damage.ProjectileSource shot) Medium.sawProjectile(shot.getRef(), buffer);
-        if (!BattleManager.hasPlayerFighters() || !(damage.getSource() instanceof Damage.EntitySource source)) {
+        // the countdown / ready-time truce for a player waiting to fight (FightDamageSystem.waitingHit)
+        if (Countdown.anyWaiting() && !damage.isCancelled() && FightDamageSystem.waitingHit(damage, chunk.getReferenceTo(index))) {
+            damage.setCancelled(true);
+            return;
+        }
+        if (damage.getSource() instanceof Damage.ProjectileSource shot) {
+            Medium.sawProjectile(shot.getRef(), buffer);
+            // a hit sent on to the watched fighter counts there (FightDamageSystem), not twice
+            if (BattleWatch.any() && toWatched(chunk.getReferenceTo(index), shot, damage, buffer)) return;
+            if (!damage.isCancelled()) TrainingDummies.signatureHit(shot.getRef(), buffer);
+        }
+        if (!BattleManager.hasPlayerFighters() && !BattleManager.anyFallen()
+                || !(damage.getSource() instanceof Damage.EntitySource source)) {
             return;
         }
         Ref<EntityStore> victim = chunk.getReferenceTo(index);
         if (!BattleManager.isPlayerFighter(victim)) {
+            // Fell in a battle that goes on (an outsider of it now): with battleIsolation its mobs can't hurt him.
+            Ref<EntityStore> by = source.getRef();
+            if (by != null && by.isValid() && BattleManager.fallenApart(victim, by)
+                    && buffer.getComponent(by, NPCEntity.getComponentType()) != null) {
+                damage.setCancelled(true);
+            }
             return;
         }
         BattleManager.Battle battle = BattleManager.battleOf(victim);

@@ -61,7 +61,7 @@ final class Buffs {
     }
 
     enum Stat {
-        // 2026-10-13, user: higher caps (health/damage x100, defense 99% = takes 1/100; 100% would be unkillable)
+        // 2026-10-13, playtest: higher caps (health/damage x100, defense 99% = takes 1/100; 100% would be unkillable)
         // and speed as its own stat, on top of the speed a size buff already gives.
         SIZE("size", MAX_SIZE), HEALTH("health", 99900), DAMAGE("damage", 99900), DEFENSE("defense", 99), SPEED("speed", 4900);
 
@@ -87,13 +87,13 @@ final class Buffs {
 
     /**
      * Most extra size on one mob, all sources together (/mobbattle buff sizeMax, key buff.size.max). Default 200 (x3);
-     * above SIZE_SAFE the command and the panel warn (user, 2026-10-12): players don't fit under roofs and their camera
+     * above SIZE_SAFE the command and the panel warn (playtest 2026-10-12): players don't fit under roofs and their camera
      * ends up in blocks, and the buff looks (which grow with the square root of the size, WandFx.grown) sink into big heads.
      */
     static int sizeMax = 200;
 
     /**
-     * How much a size buff speeds up and raises the jump (2026-10-13, user: x4 at twice the speed looked slow, its
+     * How much a size buff speeds up and raises the jump (2026-10-13, playtest: x4 at twice the speed looked slow, its
      * steps four times longer): off, natural (default: speed x sqrt(size), jump height x size; calibrated in game),
      * strong, full (speed x size: the steps match the ground, but very fast). Keys buff.size.speed / buff.size.jump.
      */
@@ -185,7 +185,7 @@ final class Buffs {
     }
 
     /**
-     * How buff values are shown and typed (/mobbattle buff unit, key buff.unit, 2026-10-13, user): percent (default,
+     * How buff values are shown and typed (/mobbattle buff unit, key buff.unit, 2026-10-13): percent (default,
      * +100 % = double) or multiplier (x2 = double, decimals allowed; defense x2 = half the damage taken). Stored as
      * percent either way, so switching never changes a buff. Sources and stacks still add up as percent: two x2
      * sources = +200 % = x3, five Buff Wand clicks of x1.1 = x1.5.
@@ -225,7 +225,7 @@ final class Buffs {
     }
 
     /**
-     * For chat: the value in the current unit, the other one in brackets: "x2 (+100%)" or "+100% (x2)" (user,
+     * For chat: the value in the current unit, the other one in brackets: "x2 (+100%)" or "+100% (x2)" (playtest,
      * 2026-10-13: in multiplier mode the chat still spoke percent).
      */
     static String both(Stat st, int percent) {
@@ -278,13 +278,13 @@ final class Buffs {
     static final int MAX_STREAK = 1000;
     /**
      * Crown on streak, champion and wand-buffed mobs: Gold, a palette color, or off (default: the crown belongs to
-     * the everyone-vs-one target, user 2026-10-10).
+     * the everyone-vs-one target, playtest 2026-10-10).
      */
     static String crown = "off";
     /** Buff Wand: clicks that stack at most. */
     static int wandMax = 5;
     static final int MAX_WAND = 1000;
-    /** Per source: a new buff (lone: being picked) fills the health to its max (on) or leaves it (off, default). */
+    /** Per source: a new buff (lone: being picked) fills the health to its max (on) or leaves it (off; default on only for the wand). */
     private static final EnumMap<Source, Boolean> HEAL = new EnumMap<>(Source.class);
 
     private static final String MODIFIER_KEY = "MobBattle_Buff";
@@ -347,7 +347,8 @@ final class Buffs {
         multiplier = false;
         sizeSpeed = "natural";
         sizeJump = "natural";
-        for (Source s : Source.values()) HEAL.put(s, false);
+        // The Buff Wand's click fills the health it adds (2026-10-30, playtest: the bar was left short); the rest don't.
+        for (Source s : Source.values()) HEAL.put(s, s == Source.WAND);
         crown = "off";
     }
 
@@ -523,7 +524,7 @@ final class Buffs {
     }
 
     /**
-     * The entity scale a mob has without any size buff: its model's scale (2026-10-16, user: Souls-like Bosses'
+     * The entity scale a mob has without any size buff: its model's scale (2026-10-16, playtest: Souls-like Bosses'
      * Nightlord, model MinScale/MaxScale 2.5, shrank to x1.1 with a +10% buff and to x1 with Cleanse, because the
      * base was a fixed 1). Players: 1 (their buff rebuilds the model at the factor). A builder-tools scale is not
      * kept, as before: after a restart it can't be told apart from a size buff saved with the mob.
@@ -557,7 +558,7 @@ final class Buffs {
     /**
      * PlayerReadyEvent: a player who left while buffed comes back as a new entity with no buff state, but the game
      * saved their entity scale and health modifier, while vanilla rebuilds their model at 1 (so body, camera and
-     * jump disagreed; user, 2026-10-13). Their leftovers go, as on death. ❓ Untested in game.
+     * jump disagreed; 2026-10-13). Their leftovers go, as on death. ❓ Untested in game.
      */
     static void onPlayerReady(Ref<EntityStore> player) {
         if (player == null || !player.isValid() || STATES.containsKey(player)) return;
@@ -582,6 +583,8 @@ final class Buffs {
 
     /** Cleanse Wand (on its world thread, right now): every buff goes, model and health back. */
     static void clearNow(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
+        // A kit's runes go with its stats (combat profiles).
+        RuneCaster.remove(mob);
         State s = STATES.get(mob);
         if (s == null) {
             // Not tracked (e.g. buffed before a server restart: the modifier is saved with the mob, our state isn't):
@@ -616,6 +619,7 @@ final class Buffs {
     /** /mobbattle resetAll: every buff of every mob goes. */
     static int clearEverything() {
         FALLING.clear();
+        RuneCaster.clearAll();
         int n = 0;
         for (Ref<EntityStore> mob : new java.util.ArrayList<>(STATES.keySet())) {
             State s = STATES.get(mob);
@@ -660,7 +664,7 @@ final class Buffs {
         }
         // Size: the entity scale (mobs and players), from the one it had before the first buff. A player also gets
         // their model's scale (MorphWand.setPlayerSize): the client draws a player's body at the entity scale but puts
-        // their camera by the model's scale (user, 2026-10-12: each alone grew only one of them).
+        // their camera by the model's scale (playtest 2026-10-12: each alone grew only one of them).
         int size = total(s, Stat.SIZE);
         EntityScaleComponent scale = accessor.getComponent(mob, EntityScaleComponent.getComponentType());
         float scaleBefore = sizeScale(mob, accessor);
@@ -730,7 +734,7 @@ final class Buffs {
                 // A bigger value goes in a moment later: sent in the same tick as the new max, the client applied it
                 // first and cut it to the old max, so it thought the mob had less health than it has. Its predicted
                 // hits then "killed" it (death animation, no more hits sent) while the server still had health left
-                // (user, 2026-10-12: a Buff Wand skeleton froze dying at 8/84 and came back). A smaller one can't
+                // (playtest 2026-10-12: a Buff Wand skeleton froze dying at 8/84 and came back). A smaller one can't
                 // be cut, so it goes now.
                 if (target >= 0 && after != null && target > after.get() + 0.001f) {
                     setHealthLater(mob, after.get(), target);
@@ -779,6 +783,23 @@ final class Buffs {
         });
     }
 
+    /** Every direct amount on this mob (empty if none): MobExtras saves them. */
+    static Map<Stat, Integer> directAll(Ref<EntityStore> mob) {
+        State s = mob != null ? STATES.get(mob) : null;
+        return s == null || s.direct.isEmpty() ? Map.of() : new EnumMap<>(s.direct);
+    }
+
+    /** Mobs with any buff state (MobExtras looks for the ones with direct amounts). */
+    static java.util.Set<Ref<EntityStore>> withState() {
+        return STATES.keySet();
+    }
+
+    /** The direct amount (setDirect) of {@code st} on this mob, 0 if none. */
+    static int directOf(Ref<EntityStore> mob, Stat st) {
+        State s = mob != null ? STATES.get(mob) : null;
+        return s != null ? s.direct.getOrDefault(st, 0) : 0;
+    }
+
     /** A player bigger than this is told their reach doesn't grow. */
     private static final float REACH_WARN_SCALE = 2.01f;
 
@@ -810,7 +831,7 @@ final class Buffs {
             s.lookFx = look;
             if (look.startsWith(BUFF_SHIMMER)) {
                 // Each of the wand's short effects ending (light, swirl, mark) makes LookKeeper re-send the shimmer,
-                // which restarts its veins: it went on three times after a click (user, 2026-10-12). It goes on
+                // which restarts its veins: it went on three times after a click (playtest 2026-10-12). It goes on
                 // once they are over instead.
                 s.lookPending = true;
                 addLookLater(mob, s, look, resized ? WandFx.MODEL_SETTLE_MS : LOOK_CHECK_MS, 0);
@@ -1016,6 +1037,37 @@ final class Buffs {
         return any ? others * p : 1 + p;
     }
 
+    /**
+     * The mob's max health without our buff modifier (kits give health in hit points over it). Vanilla sums the
+     * MULTIPLICATIVE modifiers of a stat into one factor (see healthAmount): with ours (amount a) and others summing to
+     * S the max is base x (S + a), without ours base x S (alone: base x a vs base). 0 when it has no health stat.
+     */
+    static float baseMaxHealth(Ref<EntityStore> mob, ComponentAccessor<EntityStore> accessor) {
+        EntityStatMap stats = mob != null && mob.isValid() ? accessor.getComponent(mob, EntityStatMap.getComponentType()) : null;
+        EntityStatValue value = stats != null ? stats.get(DefaultEntityStatTypes.getHealth()) : null;
+        if (value == null || value.getMax() <= 0) return 0;
+        float ours = 0;
+        if (value.getModifier(MODIFIER_KEY) instanceof StaticModifier m && m.getTarget() == Modifier.ModifierTarget.MAX
+                && m.getCalculationType() == StaticModifier.CalculationType.MULTIPLICATIVE) {
+            ours = m.getAmount();
+        }
+        if (ours <= 0) return value.getMax();
+        float others = 0;
+        boolean any = false;
+        Map<String, Modifier> mods = value.getModifiers();
+        if (mods != null) {
+            for (Map.Entry<String, Modifier> e : mods.entrySet()) {
+                if (MODIFIER_KEY.equals(e.getKey()) || OLD_MODIFIER_KEY.equals(e.getKey())) continue;
+                if (e.getValue() instanceof StaticModifier m && m.getTarget() == Modifier.ModifierTarget.MAX
+                        && m.getCalculationType() == StaticModifier.CalculationType.MULTIPLICATIVE) {
+                    others += m.getAmount();
+                    any = true;
+                }
+            }
+        }
+        return any ? value.getMax() * others / (others + ours) : value.getMax() / ours;
+    }
+
     /** Puts our max health modifier for {@code percent} (healthAmount). False if it already had that amount. */
     private static boolean putHealth(EntityStatMap stats, int index, int percent) {
         EntityStatValue value = stats.get(index);
@@ -1110,7 +1162,7 @@ final class Buffs {
         // buff heal (one switch for every source, before buff <who> heal) loads into every source.
         String oldHeal = p.getProperty("buff.heal");
         for (Source s : Source.values()) {
-            HEAL.put(s, Boolean.parseBoolean(p.getProperty("buff." + s.key + ".heal", oldHeal != null ? oldHeal : "false").trim()));
+            HEAL.put(s, Boolean.parseBoolean(p.getProperty("buff." + s.key + ".heal", oldHeal != null ? oldHeal : String.valueOf(s == Source.WAND)).trim()));
         }
         String c = parseCrown(p.getProperty("buff.crown"));
         if (c != null) crown = c;

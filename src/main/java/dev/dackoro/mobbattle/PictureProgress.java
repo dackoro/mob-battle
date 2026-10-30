@@ -3,7 +3,7 @@ package dev.dackoro.mobbattle;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * What the picture run is drawing now (thumbnails, then VS pictures), for /mobbattle pictures (2026-10-17, user:
+ * What the picture run is drawing now (thumbnails, then VS pictures), for /mobbattle pictures (2026-10-17, playtest:
  * progress in chat while it redraws). Written by the run's threads, read by the command's progress timer.
  */
 final class PictureProgress {

@@ -27,7 +27,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Equipment Wand (2026-10-16, user): right click a mob opens {@link EquipPage} (hand, off hand, four armor slots),
+ * Equipment Wand (2026-10-16): right click a mob opens {@link EquipPage} (hand, off hand, four armor slots),
  * crouch + right click copies its set, left click pastes it, held left pastes it on every mob in {@link #RADIUS}. Mobs only. Weapons are
  * looks only (attacks come from the role); armor protects (vanilla resistances), measured with test duel.
  */
@@ -110,7 +110,7 @@ final class EquipWand {
     /**
      * Viewers get a mob's equipment (EquipmentUpdate: armor, right hand, left hand = active off hand item) only when
      * its Hotbar/Utility/Armor component is flagged outdated (vanilla InventorySystems.SyncEquipmentSystem, javap);
-     * writing an off hand slot did not flag it, so a shield put on by the wand never showed (user, 2026-10-16).
+     * writing an off hand slot did not flag it, so a shield put on by the wand never showed (playtest 2026-10-16).
      */
     static void markEquipment(Ref<EntityStore> mob, ComponentAccessor<EntityStore> acc) {
         var util = acc.getComponent(mob, com.hypixel.hytale.server.core.inventory.InventoryComponent.Utility.getComponentType());
@@ -187,9 +187,16 @@ final class EquipWand {
      */
     static List<Integer> apply(Ref<EntityStore> mob, String[] set, ComponentAccessor<EntityStore> acc) {
         boolean off = hasOffHand(mob, acc);
-        List<String>[] need = needed(nameOf(mob, acc));
+        String role = nameOf(mob, acc);
+        List<String>[] need = needed(role);
+        boolean fixed = fixedHands(role);
+        String[] now = fixed ? read(mob, acc) : null;
         List<Integer> kept = new ArrayList<>();
         for (int i = 0; i < SLOTS.length; i++) {
+            if (i < 2 && fixed) {
+                if (!java.util.Objects.equals(set[i], now[i])) kept.add(i);
+                continue;
+            }
             if (i == 1 && !off) continue;
             // The hand slot went first: a two-handed item there (pasted or kept) leaves the off hand empty.
             if (i == 1 && set[1] != null && twoHanded(read(mob, acc)[0])) continue;
@@ -383,6 +390,15 @@ final class EquipWand {
         });
     }
 
+    /**
+     * Roles whose hands never change: the training dummies (MobBattle_Dummy_*) fight with a combat config written for
+     * the weapon they spawn with (its attack interactions), so another item in hand breaks their attacks. Kits, paste
+     * and the panel leave both hands as they are and only change armor (kits: runes and stats too).
+     */
+    static boolean fixedHands(String role) {
+        return role != null && role.startsWith(TrainingDummies.ROLE_PREFIX);
+    }
+
     static void rolesChanged() {
         NEEDED.clear();
         ROLE_WEAPON.clear();
@@ -427,8 +443,34 @@ final class EquipWand {
         }
         String[] set = read(mob, acc);
         copy(player.getUuid(), set);
+        feedback(mob, "Blue", COPY_SOUND, acc);
         player.sendMessage(I18n.tr("chat.equip.copiedfrom").param("name", nameOf(mob, acc)).param("set", describe(set)).color("#55ff77"));
         return true;
+    }
+
+    /** Game sounds for a copy (armor picked up) and an equip (armor set down; the sword-draw one had a layer starting 1.2 s late). */
+    static final String COPY_SOUND = "SFX_Drag_Armor_Heavy", EQUIP_SOUND = "SFX_Drop_Armor_Heavy";
+
+    /** Feedback of an equip (yellow) or a copy (blue) on {@code mob}; the panel uses it too. World thread. */
+    static void feedback(Ref<EntityStore> mob, boolean equipped, ComponentAccessor<EntityStore> acc) {
+        if (equipped) feedback(mob, "Yellow", EQUIP_SOUND, acc);
+        else feedback(mob, "Blue", COPY_SOUND, acc);
+    }
+
+    /** Tint + burst ring (as the Army Wand's) after the swirl's own frame. */
+    private static void tint(Ref<EntityStore> mob, boolean equipped, ComponentAccessor<EntityStore> acc) {
+        WandFx.onTarget(mob, equipped ? WandFx.EQUIP_PUT : WandFx.EQUIP_COPY, acc);
+    }
+
+    /**
+     * What the player sees and hears on a click (2026-10-29, playtest: no feedback at all, unlike the Morph Wand): the swirl
+     * on the mob and a sound. Blue = copied, Yellow = equipped. No ring (playtest: too much for one mob).
+     */
+    private static void feedback(Ref<EntityStore> mob, String color, String sound, ComponentAccessor<EntityStore> acc) {
+        WandFx.swirlNow(mob, color, acc);
+        tint(mob, "Yellow".equals(color), acc);
+        Vector3d at = ChaosWand.positionOf(mob, acc);
+        if (at != null) WandFx.burst(null, sound, at, acc);
     }
 
     /** The copied set on one mob. */
@@ -443,6 +485,7 @@ final class EquipWand {
             return false;
         }
         List<Integer> kept = apply(mob, set, acc);
+        feedback(mob, "Yellow", EQUIP_SOUND, acc);
         player.sendMessage(I18n.tr("chat.equip.pasted").param("name", nameOf(mob, acc)).color("#55ff77"));
         if (!kept.isEmpty()) player.sendMessage(I18n.tr("chat.equip.kept").param("name", nameOf(mob, acc)).color("#ffcc55"));
         return true;
@@ -462,11 +505,28 @@ final class EquipWand {
         for (Ref<EntityStore> r : TargetUtil.getAllEntitiesInSphere(center, RADIUS, acc)) {
             if (r != null && r.isValid() && inventory(r, acc) != null) mobs.add(r);
         }
-        int kept = 0;
-        for (Ref<EntityStore> r : mobs) if (!apply(r, set, acc).isEmpty()) kept++;
-        FightFx.shockwave(center, RADIUS, "#ffd23e", acc);
+        mobs = WaveHit.filter(center, mobs, acc);
+        FightFx.shockwave(center, RADIUS, Teams.PALETTE.get("Yellow"), acc);
+        WandFx.burst(null, EQUIP_SOUND, center, acc);
         player.sendMessage(I18n.tr("chat.equip.area").param("n", mobs.size()).color("#55ff77"));
-        if (kept > 0) player.sendMessage(I18n.tr("chat.equip.areakept").param("n", kept).color("#ffcc55"));
+        // each mob is equipped as the ring reaches it, like the other wands' waves (2026-10-29, playtest: all of them
+        // changed at once); the "kept their hands" line comes once the ring is out to RADIUS
+        int[] kept = {0};
+        WaveHit.hit(center, RADIUS, mobs, acc, (group, a) -> {
+            for (Ref<EntityStore> r : group) {
+                if (!apply(r, set, a).isEmpty()) kept[0]++;
+                WandFx.swirlNow(r, "Yellow", a);
+                tint(r, true, a);
+            }
+        });
+        if (!mobs.isEmpty()) {
+            var store = me.getStore();
+            store.getExternalData().getWorld().scheduleAfter(() -> {
+                if (kept[0] > 0 && player.isValid()) {
+                    player.sendMessage(I18n.tr("chat.equip.areakept").param("n", kept[0]).color("#ffcc55"));
+                }
+            }, FightFx.waveReachMs(RADIUS, RADIUS) + 100, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
         return mobs.size();
     }
 
@@ -572,7 +632,12 @@ final class EquipWand {
             if (buffer == null) return;
             Ref<EntityStore> me = context.getEntity();
             PlayerRef player = buffer.getComponent(me, PlayerRef.getComponentType());
-            if (player != null) pasteArea(player, me, buffer);
+            if (player == null) return;
+            // the wave goes when the slam hits, as the other wands' held clicks
+            var store = me.getStore();
+            store.getExternalData().getWorld().scheduleAfter(() -> {
+                if (!store.isShutdown() && me.isValid()) pasteArea(player, me, store);
+            }, FxSettings.snapHitDelayMs, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
     }
 
@@ -628,7 +693,7 @@ final class EquipWand {
         return catalog;
     }
 
-    /** The game's item folders that make sense in a mob's hands in a battle (2026-10-16, user: no blocks or decor). */
+    /** The game's item folders that make sense in a mob's hands in a battle (2026-10-16, playtest: no blocks or decor). */
     private static final java.util.Set<String> BATTLE_TYPES = java.util.Set.of(
             "Weapon", "Tool", "Potion", "Food", "Fish", "Rune", "MISC", "Utility", "Gadget", "Glider", "Hypixel");
 
@@ -702,5 +767,23 @@ final class EquipWand {
         java.util.TreeSet<String> s = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         for (ItemInfo i : catalog()) if (i.mod() != null) s.add(i.mod());
         return new ArrayList<>(s);
+    }
+
+    /**
+     * The mods with something for this slot (playtest 2026-10-29: the head's mod list offered mods with no helmet, and
+     * picking one showed 0 items); "hytale" first when the game's own items have some.
+     */
+    static List<String> modsFor(int slot) {
+        java.util.TreeSet<String> s = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        boolean game = false;
+        for (ItemInfo i : catalog()) {
+            if (slot >= 2 ? i.armorSlot() != slot - 2 : i.armorSlot() >= 0) continue;
+            if (i.mod() == null) game = true;
+            else s.add(i.mod());
+        }
+        List<String> out = new ArrayList<>();
+        if (game) out.add("hytale");
+        out.addAll(s);
+        return out;
     }
 }

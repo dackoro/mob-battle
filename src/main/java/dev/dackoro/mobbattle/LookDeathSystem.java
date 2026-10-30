@@ -19,7 +19,7 @@ import java.util.Set;
 /**
  * A Jade or Shimmer mob dying a normal death (killed by another mob, a fall, lava...) shatters or melts as with the
  * Kill Wand. Vanilla clears every effect on death (DeathSystems.ClearEntityEffects), so the look just went and the
- * normal death played (user, 2026-10-12: a bear killed a jade goblin). Runs after that clear, else the death look
+ * normal death played (playtest 2026-10-12: a bear killed a jade goblin). Runs after that clear, else the death look
  * would be cleared too. Cost for any other dying NPC: one LookKeeper lookup.
  */
 public class LookDeathSystem extends RefChangeSystem<EntityStore, DeathComponent> {

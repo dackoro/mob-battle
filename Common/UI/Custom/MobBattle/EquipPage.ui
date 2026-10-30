@@ -1,10 +1,12 @@
 $C = "../Common.ui";
 
-// Equipment Wand panel (EquipPage.java). Left: the mob's six slots (Equip/EquipRow.ui), click one to edit it.
+// Equipment Wand panel (EquipPage.java). Left: four tabs (2026-10-29, playtest: the panel was cluttered): Gear (the mob's
+// six slots, Equip/EquipRow.ui), Runes (Equip/RuneLine.ui), Stats (its kit stats) and Kits (Equip/KitRow.ui).
 // Right: search, filters and a gallery of items (Equip/GridCell.ui, as the game's barter grid); a click puts it on.
+// In the Kits tab the gallery shows what the picked kit holds.
 $C.@DecoratedContainer {
   @CloseButton = true;
-  Anchor: (Width: 1120, Height: 840);
+  Anchor: (Width: 1120, Height: 960);
 
   #Title {
     Group {
@@ -20,78 +22,312 @@ $C.@DecoratedContainer {
     LayoutMode: Left;
 
     Group #Left {
-      Anchor: (Width: 360);
+      Anchor: (Width: 372);
       LayoutMode: Top;
       Padding: (Right: 12);
 
       Label #Mob {
-        Anchor: (Height: 30, Bottom: 6);
+        Anchor: (Height: 30);
         Text: "";
         Style: (FontSize: 20, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
       }
 
-      Group #Rows {
+      // One line under the name: why some hands are locked (training dummy, needed weapons, no off hand).
+      Label #Notice {
+        Anchor: (Height: 20, Bottom: 6);
+        Text: "";
+        Style: (FontSize: 12, TextColor: #ffcc55, VerticalAlignment: Center);
+      }
+
+      // Tabs in two rows of two (playtest: four in a row cut their names); the picked one framed in gold.
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Bottom: 6);
+        Group {
+          Anchor: (Width: 176, Height: 40, Right: 8);
+          LayoutMode: Full;
+
+          // the picked tab: a gold frame around its button (a layer under it, so hiding it moves nothing)
+          Group #TabGearMark {
+            Anchor: (Full: 0);
+            Background: #ffd23e;
+            Visible: false;
+          }
+          Group {
+            Anchor: (Full: 3);
+            LayoutMode: Full;
+
+            $C.@SecondaryTextButton #TabGear {
+              @Anchor = (Full: 0);
+              @Text = %server.mobbattle.equip.tab.gear;
+            }
+          }
+        }
+        Group {
+          Anchor: (Width: 176, Height: 40);
+          LayoutMode: Full;
+
+          // the picked tab: a gold frame around its button (a layer under it, so hiding it moves nothing)
+          Group #TabRunesMark {
+            Anchor: (Full: 0);
+            Background: #ffd23e;
+            Visible: false;
+          }
+          Group {
+            Anchor: (Full: 3);
+            LayoutMode: Full;
+
+            $C.@SecondaryTextButton #TabRunes {
+              @Anchor = (Full: 0);
+              @Text = %server.mobbattle.equip.tab.runes;
+            }
+          }
+        }
+      }
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Bottom: 10);
+        Group {
+          Anchor: (Width: 176, Height: 40, Right: 8);
+          LayoutMode: Full;
+
+          // the picked tab: a gold frame around its button (a layer under it, so hiding it moves nothing)
+          Group #TabStatsMark {
+            Anchor: (Full: 0);
+            Background: #ffd23e;
+            Visible: false;
+          }
+          Group {
+            Anchor: (Full: 3);
+            LayoutMode: Full;
+
+            $C.@SecondaryTextButton #TabStats {
+              @Anchor = (Full: 0);
+              @Text = %server.mobbattle.equip.tab.stats;
+            }
+          }
+        }
+        Group {
+          Anchor: (Width: 176, Height: 40);
+          LayoutMode: Full;
+
+          // the picked tab: a gold frame around its button (a layer under it, so hiding it moves nothing)
+          Group #TabKitsMark {
+            Anchor: (Full: 0);
+            Background: #ffd23e;
+            Visible: false;
+          }
+          Group {
+            Anchor: (Full: 3);
+            LayoutMode: Full;
+
+            $C.@SecondaryTextButton #TabKits {
+              @Anchor = (Full: 0);
+              @Text = %server.mobbattle.equip.tab.kits;
+            }
+          }
+        }
+      }
+
+      // ---- Gear: the six slots and what to do with the whole set ----
+      Group #GearBox {
         LayoutMode: Top;
-      }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 40, Top: 6);
-
-        $C.@SecondaryTextButton #Copy {
-          @Anchor = (Width: 170, Right: 8);
-          @Text = %server.mobbattle.equip.copy;
+        Group #Rows {
+          LayoutMode: Top;
         }
-        $C.@SecondaryTextButton #Paste {
-          @Anchor = (Width: 170);
-          @Text = %server.mobbattle.equip.paste;
-        }
-      }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 40, Top: 6);
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Top: 6);
 
-        $C.@SecondaryTextButton #Restore {
-          @Anchor = (Width: 170, Right: 8);
-          @Text = %server.mobbattle.equip.restore;
+          $C.@SecondaryTextButton #Copy {
+            @Anchor = (Width: 176, Right: 8);
+            @Text = %server.mobbattle.equip.copy;
+          }
+          $C.@SecondaryTextButton #Paste {
+            @Anchor = (Width: 176);
+            @Text = %server.mobbattle.equip.paste;
+          }
         }
-        $C.@SecondaryTextButton #ClearAll {
-          @Anchor = (Width: 170);
-          @Text = %server.mobbattle.equip.clearall;
-        }
-      }
 
-      // Kits: save this mob's set under a name, or put a saved kit on it.
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 40, Top: 12);
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Top: 6);
 
-        $C.@TextField #KitName {
-          @Anchor = (Width: 170, Top: 4, Right: 8);
-          PlaceholderText: %server.mobbattle.equip.kitname;
+          $C.@SecondaryTextButton #Restore {
+            @Anchor = (Width: 176, Right: 8);
+            @Text = %server.mobbattle.equip.restore;
+          }
+          $C.@SecondaryTextButton #ClearAll {
+            @Anchor = (Width: 176);
+            @Text = %server.mobbattle.equip.clearall;
+          }
         }
-        $C.@SecondaryTextButton #SaveKit {
-          @Anchor = (Width: 170);
-          @Text = %server.mobbattle.equip.savekit;
+
+        $C.@SecondaryTextButton #Random {
+          @Anchor = (Height: 40, Top: 6);
+          @Text = %server.mobbattle.equip.random;
         }
       }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 40, Top: 6);
+      // ---- Runes: up to four lines, a main rune and two supports each ----
+      Group #RuneBox {
+        LayoutMode: Top;
+        Visible: false;
 
-        $C.@DropdownBox #KitPick {
-          Anchor: (Width: 170, Top: 4, Height: 32, Right: 8);
+        Label #RuneHelp {
+          Anchor: (Bottom: 6);
+          Text: %server.mobbattle.equip.runes.help;
+          Style: (FontSize: 13, TextColor: #96a9be, Wrap: true);
         }
-        $C.@SecondaryTextButton #ApplyKit {
-          @Anchor = (Width: 170);
-          @Text = %server.mobbattle.equip.applykit;
+
+        Group #RuneLines {
+          LayoutMode: Top;
+        }
+      }
+
+      // ---- Stats: the mob's own kit stats (health in hit points, the rest in percent; 0 = none) ----
+      Group #StatBox {
+        LayoutMode: Top;
+        Visible: false;
+
+        Label #StatHelp {
+          Anchor: (Bottom: 8);
+          Text: %server.mobbattle.equip.stats.help;
+          Style: (FontSize: 13, TextColor: #96a9be, Wrap: true);
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Bottom: 6);
+          Label {
+            Anchor: (Width: 200);
+            Text: %server.mobbattle.equip.stat.health.long;
+            Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+          }
+          $C.@NumberField #StHealth {
+            @Anchor = (Width: 140);
+            Format: (MaxDecimalPlaces: 0, Step: 50);
+          }
+        }
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Bottom: 6);
+          Label {
+            Anchor: (Width: 200);
+            Text: %server.mobbattle.equip.stat.damage.long;
+            Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+          }
+          $C.@NumberField #StDamage {
+            @Anchor = (Width: 140);
+            Format: (MaxDecimalPlaces: 0, Step: 5);
+          }
+        }
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Bottom: 6);
+          Label {
+            Anchor: (Width: 200);
+            Text: %server.mobbattle.equip.stat.defense.long;
+            Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+          }
+          $C.@NumberField #StDefense {
+            @Anchor = (Width: 140);
+            Format: (MaxDecimalPlaces: 0, Step: 5);
+          }
+        }
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Bottom: 6);
+          Label {
+            Anchor: (Width: 200);
+            Text: %server.mobbattle.equip.stat.speed.long;
+            Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+          }
+          $C.@NumberField #StSpeed {
+            @Anchor = (Width: 140);
+            Format: (MaxDecimalPlaces: 0, Step: 5);
+          }
+        }
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Bottom: 10);
+          Label {
+            Anchor: (Width: 200);
+            Text: %server.mobbattle.equip.stat.size.long;
+            Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+          }
+          $C.@NumberField #StSize {
+            @Anchor = (Width: 140);
+            Format: (MaxDecimalPlaces: 0, Step: 5);
+          }
+        }
+
+        $C.@SecondaryTextButton #StatApply {
+          @Anchor = (Height: 40);
+          @Text = %server.mobbattle.equip.stats.apply;
+        }
+      }
+
+      // ---- Kits: saved kits (pick one, then apply, overwrite or delete it) and a new kit from this mob ----
+      Group #KitBox {
+        LayoutMode: Top;
+        Visible: false;
+
+        Group #KitScroll {
+          Anchor: (Height: 330);
+          LayoutMode: TopScrolling;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+          Group #KitList {
+            LayoutMode: Top;
+            Padding: (Right: 10);
+          }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Top: 8);
+
+          $C.@SecondaryTextButton #ApplyKit {
+            @Anchor = (Width: 176, Right: 8);
+            @Text = %server.mobbattle.equip.applykit;
+          }
+          $C.@SecondaryTextButton #OverwriteKit {
+            @Anchor = (Width: 176);
+            @Text = %server.mobbattle.equip.overwritekit;
+          }
+        }
+
+        $C.@SecondaryTextButton #DeleteKit {
+          @Anchor = (Height: 40, Top: 6);
+          @Text = %server.mobbattle.equip.deletekit;
+        }
+
+        Label {
+          Anchor: (Height: 24, Top: 14);
+          Text: %server.mobbattle.equip.newkit;
+          Style: (FontSize: 13, TextColor: #96a9be, VerticalAlignment: Center);
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 40, Top: 2);
+
+          $C.@TextField #KitName {
+            @Anchor = (Width: 176, Top: 4, Right: 8);
+            PlaceholderText: %server.mobbattle.equip.kitname;
+          }
+          $C.@SecondaryTextButton #SaveKit {
+            @Anchor = (Width: 176);
+            @Text = %server.mobbattle.equip.savekit;
+          }
         }
       }
 
       Label #Status {
-        Anchor: (Top: 8);
+        Anchor: (Top: 10);
         Text: "";
         Style: (FontSize: 13, TextColor: #ffd23e, Wrap: true);
       }
@@ -113,7 +349,7 @@ $C.@DecoratedContainer {
         Style: (FontSize: 16, TextColor: #ffd23e, RenderBold: true, VerticalAlignment: Center);
       }
 
-      Group {
+      Group #SearchRow {
         LayoutMode: Left;
         Anchor: (Height: 44);
 
@@ -132,6 +368,13 @@ $C.@DecoratedContainer {
       Group #Filters {
         LayoutMode: Top;
         Anchor: (Bottom: 4);
+      }
+
+      Label #SideHelp {
+        Anchor: (Top: 8);
+        Text: "";
+        Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
+        Visible: false;
       }
 
       Group #GridBox {

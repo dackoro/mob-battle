@@ -144,7 +144,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
     }
 
     /**
-     * Battle isolation for group calls (audit 2026-10-13, user: Outlanders in test duels went for other pairs). Trork
+     * Battle isolation for group calls (audit 2026-10-13, playtest: Outlanders in test duels went for other pairs). Trork
      * and Outlander roles shout "TrorkEnemySighted" (Kweebecs "Kweebec_All_Danger") to every NPC of their group in 30
      * blocks, and the call SETS the receiver's LockedTarget to the caller's target, whatever the attitudes say. Every
      * tick, a battle member drops calls whose target is not one of its own enemies in this battle; calls about a real
@@ -170,7 +170,7 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
 
     /**
      * The other half of {@link #dropOutsideBeacons}: an NPC outside every battle drops a group call whose target fights
-     * in an isolated battle (user, 2026-10-13: nearby Outlanders kept joining an Outlander duel). Runs only while a
+     * in an isolated battle (playtest 2026-10-13: nearby Outlanders kept joining an Outlander duel). Runs only while a
      * battle exists; one component read and a few message slots per NPC.
      */
     private static void dropCallsAboutFighters(Ref<EntityStore> self, CommandBuffer<EntityStore> buffer) {
@@ -276,6 +276,8 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
             if (!WandFx.isDying(self)) WandFx.kill(self, null, true, buffer);
             return;
         }
+        // Players who fell in this battle are outsiders now: let them go (FightManager.dropFallen).
+        if (!battle.fallen.isEmpty()) FightManager.dropFallen(self, battle, buffer);
         boolean[] changed = {BattleManager.selfDefense(battle, self, buffer)};
         Ref<EntityStore> target = BattleManager.currentTarget(battle, self, buffer, changed);
         if (target == null) {
@@ -286,12 +288,15 @@ public class FightTickSystem extends EntityTickingSystem<EntityStore> {
         }
         if (changed[0]) {
             // Previous target died: go for the next one. In a royale the old target stays an enemy, so it is not
-            // ignored for 30 s: after a few switches a mob ignored most of the arena and stood confused (user, 2026-10-12).
+            // ignored for 30 s: after a few switches a mob ignored most of the arena and stood confused (playtest 2026-10-12).
             FightManager.turnAgainst(self, target, buffer, !battle.royale);
             FightManager.provoke(self, target, buffer);
         } else {
             relock(self, target, buffer);
         }
+        // A player target never walks in and hits by itself as an enemy mob does: hostility, memory and the CAE's
+        // target are put again each check (FightManager.pressPlayerTarget).
+        if (BattleManager.isPlayerFighter(target)) FightManager.pressPlayerTarget(self, target, buffer);
         // Leash point here, and back on the chase when the target is out of its sight or it gave up (ChaseSupport).
         ChaseSupport.keep(self, target, buffer);
     }

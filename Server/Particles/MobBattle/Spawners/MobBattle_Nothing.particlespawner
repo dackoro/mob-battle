@@ -1,5 +1,5 @@
 {
-  "$Comment": "One fully transparent particle, once. MobBattle_Nothing uses it as the FirstPersonParticles of our looks, crowns and wand effects: an empty FirstPersonParticles list falls back to Particles (2026-10-12, user: the buff runes covered a buffed player's view).",
+  "$Comment": "One fully transparent particle, once. MobBattle_Nothing uses it as the FirstPersonParticles of our looks, crowns and wand effects: an empty FirstPersonParticles list falls back to Particles (2026-10-12, playtest: the buff runes covered a buffed player's view).",
   "SpawnRate": {
     "Min": 1,
     "Max": 1

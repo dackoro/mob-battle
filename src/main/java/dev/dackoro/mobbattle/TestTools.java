@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * /mobbattle test ... (admin, 2026-10-13, user: automate the feature tests from the server console, without /sudo
+ * /mobbattle test ... (admin, 2026-10-13, playtest: automate the feature tests from the server console, without /sudo
  * and without having to look at a mob). Everything works by coordinates and entity ids, so the console can run it:
  * <ul>
  *   <li>spawn &lt;role&gt; &lt;here|x y z&gt; [count] [world]: spawns and prints each id ({@code last} = the newest).</li>
@@ -81,10 +81,14 @@ final class TestTools {
     private static final int MAX_SCRIPT_LINES = 500;
     /** Script: pause after each command, so its world-thread part has run before the next line. */
     private static final long COMMAND_GAP_MS = 300;
+    /** waitbattle: how long a battle may take to start, and the pause after it ends (end camera, slow motion). */
+    private static final long BATTLE_START_GRACE_MS = 20_000, BATTLE_TAIL_MS = 4_000;
 
     /** Mobs spawned by these tests: UUID -> world name. */
     private static final Map<UUID, String> SPAWNED = new ConcurrentHashMap<>();
     private static volatile UUID last;
+    /** The test mob spawned before {@code last} ("prev": a duel between the last two spawns). */
+    private static volatile UUID prev;
 
     private TestTools() {
     }
@@ -99,6 +103,12 @@ final class TestTools {
         try {
             switch (sub) {
                 case "spawn" -> spawnCommand(ctx, a);
+                // test shotnames on|off: the film's shot names in the bottom band without debugLog (2026-10-29, playtest:
+                // see which shot plays during the capacity royales, where the debug log would weigh on the server)
+                case "shotnames" -> {
+                    CinemaBars.shotNames = a.length > 1 && a[1].equalsIgnoreCase("on");
+                    say(ctx.sender(), "Shot names in the film bands: " + (CinemaBars.shotNames ? "on" : "off") + ".", OK);
+                }
                 case "list" -> list(to);
                 case "clear" -> clear(to);
                 case "walk" -> walk(to, a);
@@ -125,6 +135,18 @@ final class TestTools {
                     else say(to, "Tick time in " + w.getName() + " over the last 10 s: " + tickStats(w) + ".", OK);
                 }
                 case "expect" -> expect(to, a);
+                case "expectkit" -> {
+                    // test expectkit <kit> exists|missing: one check, counted by the running script (a refused rune
+                    // leaves the kit unsaved)
+                    if (a.length < 3) {
+                        say(to, "Usage: /mobbattle test expectkit <kit> exists|missing", ERR);
+                    } else {
+                        boolean exists = Kits.get(a[1]) != null, want = !a[2].equalsIgnoreCase("missing");
+                        report(to, Script.current, "expectkit " + a[1] + " " + a[2], exists == want, exists ? "exists" : "missing");
+                    }
+                }
+                case "watchmouse" -> watchMouse(to, a);
+            case "statics" -> StaticsReport.run(to, a.length > 1 && "all".equalsIgnoreCase(a[1]));
                 case "camera" -> camera(to, a);
                 case "thumbnail" -> ThumbnailTest.command(ctx, a);
                 case "thumbnails" -> thumbnailsCommand(to, a);
@@ -191,7 +213,7 @@ final class TestTools {
     }
 
     /**
-     * test vsframes &lt;current|body&gt; [text] (2026-10-17, user: try framing the VS pictures by the body before changing
+     * test vsframes &lt;current|body&gt; [text] (2026-10-17, playtest: try framing the VS pictures by the body before changing
      * the real ones): VsScreen.testFrames into &lt;picture cache&gt;/vs-test/&lt;method&gt;/, in the background. Preview it
      * out of the game: python scripts/vs-preview.py columns 8 --folder &lt;that folder&gt;.
      */
@@ -201,7 +223,7 @@ final class TestTools {
             say(to, "Usage: /mobbattle test vsframes <current|body> [wide:<0.5-1>] [text]", ERR);
             return;
         }
-        // wide:<fit> (2026-10-18, user: a Glutton's arm was cut): how much of a wide mob's width the square keeps
+        // wide:<fit> (2026-10-18, playtest: a Glutton's arm was cut): how much of a wide mob's width the square keeps
         double fit = -1;
         String only = null;
         for (int i = 2; i < a.length; i++) {
@@ -243,16 +265,17 @@ final class TestTools {
 
     // ---- targets by id ----
 
-    /** "last", "id:&lt;uuid&gt;" or a bare UUID. */
+    /** "last", "prev" (the spawn before last), "id:&lt;uuid&gt;" or a bare UUID. */
     static boolean isIdWord(String word) {
         if (word == null) return false;
-        if (word.equalsIgnoreCase("last") || word.regionMatches(true, 0, "id:", 0, 3)) return true;
+        if (word.equalsIgnoreCase("last") || word.equalsIgnoreCase("prev") || word.regionMatches(true, 0, "id:", 0, 3)) return true;
         return parseUuid(word) != null;
     }
 
     private static UUID parseUuid(String word) {
         String w = word.regionMatches(true, 0, "id:", 0, 3) ? word.substring(3) : word;
         if (w.equalsIgnoreCase("last")) return last;
+        if (w.equalsIgnoreCase("prev")) return prev;
         try {
             return w.length() == 36 ? UUID.fromString(w) : null;
         } catch (IllegalArgumentException e) {
@@ -285,7 +308,7 @@ final class TestTools {
 
     private static void spawnCommand(CommandContext ctx, String[] a) {
         if (a.length < 3) {
-            say(ctx.sender(), "Usage: /mobbattle test spawn <role> <here|x y z> [count] [world] [calm]", ERR);
+            say(ctx.sender(), "Usage: /mobbattle test spawn <role> <here|x y z> [count] [world] [calm] [dx:<n>] [dz:<n>]", ERR);
             return;
         }
         String role = SummonList.findRole(a[1]);
@@ -300,12 +323,23 @@ final class TestTools {
         int n = count;
         // "calm": into SummonCalm as a summoned mob would be (needs summonCalm summons|all), to test calm summons.
         boolean calm = java.util.Arrays.stream(a).anyMatch("calm"::equalsIgnoreCase);
+        // "dx:<n>" / "dz:<n>": blocks off the spot, so two spawns "here" don't share one point (a duel of two mobs on
+        // one spot gave the duel camera no line between them, 2026-10-29)
+        double ox = 0, oz = 0;
+        for (String w : a) {
+            try {
+                if (w.regionMatches(true, 0, "dx:", 0, 3)) ox = Double.parseDouble(w.substring(3));
+                else if (w.regionMatches(true, 0, "dz:", 0, 3)) oz = Double.parseDouble(w.substring(3));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        double cx = place.pos.x + ox, cz = place.pos.z + oz;
         place.world.execute(() -> {
             Store<EntityStore> store = place.world.getEntityStore().getStore();
             List<String> ids = new ArrayList<>();
             for (int i = 0; i < n; i++) {
                 double ang = Math.PI * 2 * i / n, r = n == 1 ? 0 : 1.5 + n * 0.15;
-                Ref<EntityStore> mob = spawn(role, new Vector3d(place.pos.x + Math.cos(ang) * r, place.pos.y, place.pos.z + Math.sin(ang) * r),
+                Ref<EntityStore> mob = spawn(role, new Vector3d(cx + Math.cos(ang) * r, place.pos.y, cz + Math.sin(ang) * r),
                         (float) ang, store);
                 if (mob != null && calm) SummonCalm.add(mob, store);
                 if (mob != null) ids.add(idOf(mob, store) + " " + where(mob, store));
@@ -326,7 +360,7 @@ final class TestTools {
         var result = NPCPlugin.get().spawnNPC(store, role, null, at, new Rotation3f(0f, yaw, 0f));
         if (result == null || result.first() == null) return null;
         Ref<EntityStore> mob = result.first();
-        // Test mobs drop no loot when they die (user, 2026-10-13: the test field filled up with items).
+        // Test mobs drop no loot when they die (playtest 2026-10-13: the test field filled up with items).
         NPCEntity npc = store.getComponent(mob, NPCEntity.getComponentType());
         if (npc != null && npc.getRole() != null) npc.getRole().setDeathItemsDropped();
         // never saved with the chunk: a test mob left over after a crash or restart came back into later tests
@@ -334,6 +368,7 @@ final class TestTools {
         UUID id = idOf(mob, store);
         if (id != null) {
             SPAWNED.put(id, store.getExternalData().getWorld().getName());
+            if (last != null && !last.equals(id)) prev = last;
             last = id;
         }
         return mob;
@@ -375,6 +410,7 @@ final class TestTools {
         SPAWNED.forEach((id, w) -> byWorld.computeIfAbsent(w, k -> new ArrayList<>()).add(id));
         SPAWNED.clear();
         last = null;
+        prev = null;
         if (byWorld.isEmpty()) {
             say(to, "No test mobs.", INFO);
             return;
@@ -463,9 +499,10 @@ final class TestTools {
         place.world.execute(() -> {
             if (!mob.isValid()) return;
             Vector3d from = ChaosWand.positionOf(mob, store);
-            UUID keep = last;
+            UUID keep = last, keepPrev = prev;
             Ref<EntityStore> dummy = spawn(CHASE_DUMMY, place.pos, 0f, store);
             last = keep; // last stays the chaser, for the measure that follows
+            prev = keepPrev;
             if (from == null || dummy == null) {
                 say(to, "Could not place the dummy.", ERR);
                 return;
@@ -577,9 +614,15 @@ final class TestTools {
                     log.name(from), log.name(to), amount, cause, cancelled ? " CANCELLED" : provoke ? " provocation, not counted" : "", center, edge, health(victim, buffer));
         } else {
             log.other++;
-            line = String.format(Locale.ROOT, "%s hit by %s: %.2f (%s)%s", log.name(to >= 0 ? to : from),
-                    attacker == null ? "no entity" : from >= 0 ? "itself" : ChaosWand.nameOf(attacker, buffer), amount, cause,
-                    cancelled ? " CANCELLED" : "");
+            if (to < 0 && from >= 0) {
+                // a fighter hit someone outside the duel (an onlooker, a watcher's body): name who
+                line = String.format(Locale.ROOT, "%s hit outsider %s: %.2f (%s)%s", log.name(from),
+                        ChaosWand.nameOf(victim, buffer), amount, cause, cancelled ? " CANCELLED" : "");
+            } else {
+                line = String.format(Locale.ROOT, "%s hit by %s: %.2f (%s)%s", log.name(to >= 0 ? to : from),
+                        attacker == null ? "no entity" : attacker == victim ? "itself" : ChaosWand.nameOf(attacker, buffer), amount, cause,
+                        cancelled ? " CANCELLED" : "");
+            }
         }
         MobBattlePlugin.log("[test] hit " + line);
     }
@@ -686,7 +729,7 @@ final class TestTools {
     // ---- wand (wand actions as a player, on players or mobs, 2026-10-14) ----
 
     /**
-     * test wand &lt;owner&gt; &lt;duel|focus|brawl|kill|snap&gt; [target] [target2] (2026-10-14, user: test the mod with
+     * test wand &lt;owner&gt; &lt;duel|focus|brawl|kill|snap&gt; [target] [target2] (2026-10-14, playtest: test the mod with
      * players, two real players on the test server): what the owner's wand click would do, through the same code.
      * Targets: a player name, last, id:&lt;uuid&gt; or a bare UUID; duel takes two (a player vs a mob, two players...),
      * focus/kill one, brawl and snap a target or none (around the owner). Players still need playerFights for the
@@ -1012,6 +1055,54 @@ final class TestTools {
             return true;
         }
 
+        /**
+         * A "say N/M ..." line also shows as a big title to the player running the script (the chat hides during the VS
+         * screen and is easy to miss): "N/M" on top, the text up to its first colon under it.
+         */
+        private void blockTitle(String text) {
+            var m = java.util.regex.Pattern.compile("^(\\d+/\\d+)\\s+(.*)$").matcher(text);
+            if (!m.matches() || sender == null) return;
+            var player = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(sender.getUuid());
+            if (player == null || !player.isValid()) return;
+            String sub = m.group(2);
+            int colon = sub.indexOf(':');
+            if (colon > 0) sub = sub.substring(0, colon);
+            if (sub.length() > 70) sub = sub.substring(0, 67) + "...";
+            try {
+                com.hypixel.hytale.server.core.util.EventTitleUtil.showEventTitleToPlayer(player,
+                        Message.raw(name + " " + m.group(1)), Message.raw(sub), FxSettings.pickTitleStyle(), null, 3f, 0.3f, 0.5f);
+            } catch (RuntimeException e) {
+                MobBattlePlugin.log("[test] block title: " + e);
+            }
+        }
+
+        /** waitbattle: the battle to wait for has started once anything ran (seen); then it waits until nothing runs. */
+        private void waitBattle(long from, long max, boolean seen) {
+            if (stopped) return;
+            boolean busy = BattleManager.hasBattles() || Countdown.hasPending() || ReadyWait.any();
+            long now = System.currentTimeMillis();
+            if (busy && now - from < max) {
+                HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> waitBattle(from, max, true), 500, TimeUnit.MILLISECONDS);
+                return;
+            }
+            if (!seen && now - from < BATTLE_START_GRACE_MS) {
+                // the battle may not have started yet (spawns, VS screen): look again
+                HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> waitBattle(from, max, false), 500, TimeUnit.MILLISECONDS);
+                return;
+            }
+            if (busy) {
+                failed.incrementAndGet();
+                say(sender, String.format(Locale.ROOT, "%s: the battle was still running after %d s: going on.", name, max / 1000), ERR);
+            } else if (seen) {
+                passed.incrementAndGet();
+                say(sender, String.format(Locale.ROOT, "%s: battle over in %.0f s.", name, (now - from) / 1000.0), OK);
+            } else {
+                failed.incrementAndGet();
+                say(sender, name + ": no battle started.", ERR);
+            }
+            HytaleServer.SCHEDULED_EXECUTOR.schedule(this::step, busy ? 0 : BATTLE_TAIL_MS, TimeUnit.MILLISECONDS);
+        }
+
         /** Runs lines until a wait or the end; each command waits for the previous one to finish. */
         void step() {
             while (!stopped && at < lines.size()) {
@@ -1030,8 +1121,24 @@ final class TestTools {
                     return;
                 }
                 if (lower.startsWith("say ")) {
-                    say(sender, name + ": " + line.substring(4).trim(), INFO);
+                    String text = line.substring(4).trim();
+                    sayAlways(sender, name + ": " + text, INFO);
+                    blockTitle(text);
                     continue;
+                }
+                if (lower.startsWith("waitbattle")) {
+                    // Waits until the battle started above is over (no battle, countdown or ready time left), at most
+                    // the given seconds (default 120), then BATTLE_TAIL_MS more for the end camera and slow motion.
+                    long max;
+                    try {
+                        String rest = line.substring(10).trim().replace("s", "");
+                        max = rest.isEmpty() ? 120_000 : (long) (Double.parseDouble(rest) * 1000);
+                    } catch (NumberFormatException e) {
+                        say(sender, name + " line " + at + ": bad waitbattle \"" + line + "\".", ERR);
+                        continue;
+                    }
+                    waitBattle(System.currentTimeMillis(), Math.max(5_000, Math.min(1_800_000, max)), false);
+                    return;
                 }
                 String command = line.startsWith("/") ? line.substring(1) : line;
                 if (command.toLowerCase(Locale.ROOT).matches("(mobbattle|mb)\\s+test\\s+run\\b.*")) {
@@ -1051,7 +1158,7 @@ final class TestTools {
             if (current == this) current = null;
             if (!stopped) {
                 int ok = passed.get(), bad = failed.get();
-                say(sender, String.format(Locale.ROOT, "Script %s done: %d commands in %.1f s.%s", name, commands,
+                sayAlways(sender, String.format(Locale.ROOT, "Script %s done: %d commands in %.1f s.%s", name, commands,
                         (System.currentTimeMillis() - startedAt) / 1000.0,
                         ok + bad == 0 ? "" : " Checks: " + ok + " passed, " + bad + " failed."), bad > 0 ? ERR : OK);
             }
@@ -1247,7 +1354,7 @@ final class TestTools {
     /**
      * test roles [mod:&lt;name&gt;|mod:hytale] [type:&lt;fighters|defend|noattack|avoid&gt;] [text]: the spawnable mob roles
      * the settings panel's Show filters keep (PickLists), with their mod and type, so scripts and tests can pick mobs
-     * by what they are (2026-10-13, user).
+     * by what they are (2026-10-13).
      */
     private static void roles(CommandSender to, String[] a) {
         String mod = PickLists.ALL;
@@ -1324,7 +1431,7 @@ final class TestTools {
     private static final long VERIFY_SAMPLE_MS = 500;
 
     /**
-     * test verify &lt;here|x y z&gt; [mod:..] [type:..] [text] [time:&lt;s&gt;] [batch:&lt;n&gt;] (2026-10-13, user): every
+     * test verify &lt;here|x y z&gt; [mod:..] [type:..] [text] [time:&lt;s&gt;] [batch:&lt;n&gt;] (2026-10-13): every
      * role the filters keep is put next to a still training dummy and ordered to attack it (as a wand fight does),
      * a few at a time in a row along +X; after the time, did it land a hit? Fighters and Defend only should, No attack
      * should not (Avoid is skipped). Mismatches go to chat and every result to tests/verify_&lt;time&gt;.txt. It checks
@@ -1410,7 +1517,7 @@ final class TestTools {
         world.execute(() -> {
             Store<EntityStore> store = world.getEntityStore().getStore();
             List<VerifyPair> pairs = new ArrayList<>();
-            // A grid centred on the origin (user, 2026-10-13: one long row was slow and ran out of loaded chunks).
+            // A grid centred on the origin (playtest 2026-10-13: one long row was slow and ran out of loaded chunks).
             int cols = Math.min(VERIFY_COLUMNS, now.size()), rows = (now.size() + cols - 1) / cols;
             for (int i = 0; i < now.size(); i++) {
                 PickLists.Entry e = now.get(i);
@@ -1445,7 +1552,7 @@ final class TestTools {
                     VERIFY.remove(p.mob, p);
                     VERIFY.remove(p.dummy, p);
                     // An attack that did no damage still counts: copies of a role are often immune to their own
-                    // element (goblin burners to fire, seeker scaraks to poison; user, 2026-10-13).
+                    // element (goblin burners to fire, seeker scaraks to poison; 2026-10-13).
                     boolean hit = p.hits > 0 || p.attacking > 0;
                     boolean expected = p.kind != PickLists.Kind.NO_ATTACK;
                     String result = p.hits > 0 ? String.format(Locale.ROOT, "hit %d times, first after %.1f s", p.hits, (p.firstHit - p.startedAt) / 1000.0)
@@ -1458,7 +1565,7 @@ final class TestTools {
                         if (id != null) SPAWNED.remove(id);
                         if (r.isValid()) store.removeEntity(r, RemoveReason.REMOVE);
                     }
-                    // Anything a test mob left behind (a Void's tentacle, a summoned pet) goes too (user: a loose Void stayed).
+                    // Anything a test mob left behind (a Void's tentacle, a summoned pet) goes too (playtest: a loose Void stayed).
                     removeNpcsNear(p.at, VERIFY_SPACING / 2.0 - 1, store);
                 }
                 MobBattlePlugin.log("[test] verify: " + Math.min(picks.size(), from + per) + " of " + picks.size() + " checked");
@@ -1588,7 +1695,7 @@ final class TestTools {
 
     /**
      * test calls &lt;here|x y z&gt; [mod:..] [type:..] [text] [time:&lt;s&gt;] [batch:&lt;n&gt;] [watchers:&lt;n&gt;] (2026-10-14,
-     * user: goblins alarm each other too, check every mob that fights): for each role that fights (Fighters or Defend
+     * playtest: goblins alarm each other too, check every mob that fights): for each role that fights (Fighters or Defend
      * only, not the passive ones), a silent duel of two copies with onlookers of the same role 6 blocks away, outside
      * any battle. The fighters call for help (Trork/Outlander TrorkEnemySighted, goblins Goblin_Attack, skeletons
      * Under_Attack, Flock_Attack...) and the call sets the hearer's LockedTarget whatever the attitudes say. Fails when
@@ -1767,7 +1874,7 @@ final class TestTools {
     private static final int AI_PER_TICK = 8;
 
     /**
-     * test ai &lt;here|x y z&gt; [mod:..] [type:..] [text] (2026-10-13, user): every role the filters keep is spawned for
+     * test ai &lt;here|x y z&gt; [mod:..] [type:..] [text] (2026-10-13): every role the filters keep is spawned for
      * one tick, read with {@link ChaseSupport#describe} (the chase slot/state/range ChaseSupport will use in battles,
      * and the Leash sensor ranges per combat state = the soft leash) and removed. The JSON scan of Assets.zip
      * (docs/general/npcs.md) predicts these; this checks the server's built roles, mods included. Chat: counts and the
@@ -1981,7 +2088,7 @@ final class TestTools {
     private static final long SPEED_SAMPLE_MS = 100;
 
     /**
-     * test speed &lt;role&gt; &lt;here|x y z&gt; [sizes, e.g. 1+2+4] (2026-10-14, user: see the size speed, not only read it):
+     * test speed &lt;role&gt; &lt;here|x y z&gt; [sizes, e.g. 1+2+4] (2026-10-14, playtest: see the size speed, not only read it):
      * one lane per size, side by side along +Z, each a mob at the start and a still dummy SPEED_LANE blocks away along
      * +X; all start together, ordered at their dummy (as test chase), with that size buff (Buffs.setDirect SIZE). Per
      * lane: the time to get within 3 blocks of its dummy and the average speed over the lane, plus the top speed over
@@ -2036,7 +2143,7 @@ final class TestTools {
             world.scheduleAfter(() -> {
                 for (int i = 0; i < n; i++) {
                     if (mobs[i] != null && mobs[i].isValid() && dummies[i] != null && dummies[i].isValid()) {
-                        // A silent duel with its dummy (user, 2026-10-14: the zombies only walked, a mob ordered
+                        // A silent duel with its dummy (playtest 2026-10-14: the zombies only walked, a mob ordered
                         // outside a battle does not chase a target past its sight): the battle's chase makes it run.
                         BattleManager.detach(List.of(mobs[i], dummies[i]));
                         FightManager.turnAgainst(mobs[i], dummies[i], store);
@@ -2128,7 +2235,7 @@ final class TestTools {
     }
 
     /**
-     * test jump &lt;role&gt; &lt;here|x y z&gt; [sizes, e.g. 1+2+3+4] [time:&lt;s&gt;] (2026-10-13, user): mobs only jump when their
+     * test jump &lt;role&gt; &lt;here|x y z&gt; [sizes, e.g. 1+2+3+4] [time:&lt;s&gt;] (2026-10-13): mobs only jump when their
      * path needs it, so it builds steps 1..8 blocks high (3x3 platforms of the ground's block, 8 blocks apart along +X)
      * with a still dummy on each, then for each size puts one mob 5 blocks west of each step with that size buff
      * (direct, as /mobbattle apply size) and orders it at the dummy; it samples the mob's height every 250 ms for the
@@ -2422,6 +2529,7 @@ final class TestTools {
             case "team" -> battle == null ? "none" : String.valueOf(battle.team(r));
             case "calm" -> String.valueOf(SummonCalm.isCalm(r));
             case "army" -> String.valueOf(Army.ownerOf(r) != null);
+            case "runes" -> String.valueOf(RuneCaster.runesOf(r).size());
             case "morphed" -> String.valueOf(MorphWand.originalOf(r) != null);
             case "model" -> {
                 MorphWand.Copy c = MorphWand.read(r, acc);
@@ -2445,7 +2553,7 @@ final class TestTools {
     }
 
     static final String EXPECT_FIELDS = "alive, health, maxhealth, healthpct, size, buff.<size|health|damage|defense|speed>, effect, battle,"
-            + " team, calm, army, morphed, model, x, y, z";
+            + " team, calm, army, runes, morphed, model, x, y, z";
 
     /** test expect &lt;id|last&gt; &lt;field&gt; &lt;op&gt; &lt;value&gt;: one check, counted by the running script. */
     private static void expect(CommandSender to, String[] a) {
@@ -2689,8 +2797,52 @@ final class TestTools {
 
     /** To the sender and the server log ("[test] ..."). */
     static void say(CommandSender to, String text, String color) {
+        // while a script runs, its player only sees the block lines, failures and the end summary (2026-10-29, playtest:
+        // the spawn lists and settings echoes buried the block being tested); the rest stays in the server log
+        if (to != null && (ERR.equals(color) || !quietFor(to.getUuid()))) to.sendMessage(Message.raw(text).color(color));
+        MobBattlePlugin.log("[test] " + text);
+    }
+
+    /**
+     * test watchmouse [none|any|block|entity] [cursor on|off] [turn N]: what the watch glide's camera asks the client for
+     * (mouse target, cursor) and how far one unit of mouse motion turns it, plus how many mouse events arrived.
+     */
+    private static void watchMouse(CommandSender to, String[] a) {
+        for (int i = 1; i < a.length; i++) {
+            String w = a[i].toLowerCase(Locale.ROOT);
+            try {
+                switch (w) {
+                    case "none" -> BattleWatch.mouseTarget = com.hypixel.hytale.protocol.MouseInputTargetType.None;
+                    case "any" -> BattleWatch.mouseTarget = com.hypixel.hytale.protocol.MouseInputTargetType.Any;
+                    case "block" -> BattleWatch.mouseTarget = com.hypixel.hytale.protocol.MouseInputTargetType.Block;
+                    case "entity" -> BattleWatch.mouseTarget = com.hypixel.hytale.protocol.MouseInputTargetType.Entity;
+                    case "cursor" -> BattleWatch.mouseCursor = i + 1 < a.length && a[++i].equalsIgnoreCase("on");
+                    case "turn" -> BattleWatch.mouseTurn = Float.parseFloat(a[++i]);
+                    default -> {
+                        say(to, "Usage: /mobbattle test watchmouse [none|any|block|entity] [cursor on|off] [turn N]", ERR);
+                        return;
+                    }
+                }
+            } catch (RuntimeException e) {
+                say(to, "Usage: /mobbattle test watchmouse [none|any|block|entity] [cursor on|off] [turn N]", ERR);
+                return;
+            }
+        }
+        sayAlways(to, "Watch mouse: target " + BattleWatch.mouseTarget + ", cursor " + (BattleWatch.mouseCursor ? "on" : "off")
+                + ", turn " + BattleWatch.mouseTurn + " | mouse events so far " + BattleWatch.MOUSE_EVENTS.get()
+                + " (last " + BattleWatch.lastMouse + ")", INFO);
+    }
+
+    /** Always to chat (a script's block lines and its summary). */
+    private static void sayAlways(CommandSender to, String text, String color) {
         if (to != null) to.sendMessage(Message.raw(text).color(color));
         MobBattlePlugin.log("[test] " + text);
+    }
+
+    /** A script runs for this player: command replies stay out of their chat (they go to the server log). */
+    static boolean quietFor(java.util.UUID player) {
+        Script s = Script.current;
+        return s != null && !s.stopped && s.sender != null && player != null && player.equals(s.sender.getUuid());
     }
 
     /** Plugin shutdown: scripts and duel logs end. */

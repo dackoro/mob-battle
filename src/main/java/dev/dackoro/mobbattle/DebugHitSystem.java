@@ -28,6 +28,12 @@ public class DebugHitSystem extends DamageEventSystem {
     private final Set<Dependency<EntityStore>> dependencies = Set.of(
             new SystemDependency<>(Order.AFTER, BuffDamageSystem.class));
 
+    /** Cancelled hits too: a hit vanilla cancelled (and we did not restore) must show in test duels and the wand. */
+    @Override
+    protected boolean shouldProcessEvent(Damage damage) {
+        return true;
+    }
+
     @Override
     public SystemGroup<EntityStore> getGroup() {
         return DamageModule.get().getFilterDamageGroup();
@@ -54,7 +60,7 @@ public class DebugHitSystem extends DamageEventSystem {
         String causeId = cause != null ? cause.getId() : "?";
         if (wand) DebugWand.onHit(attacker, victim, damage.getAmount(), causeId, damage.isCancelled(), buffer);
         // test verify isolation: a checked mob takes damage only from its own copy (area attacks of bosses hit the
-        // neighbouring pairs, map-spawned mobs got in; user, 2026-10-13).
+        // neighbouring pairs, map-spawned mobs got in; 2026-10-13).
         if (test && TestTools.verifyBlocks(attacker, victim)) damage.setCancelled(true);
         // /mobbattle test duel: every hit of its two fighters.
         if (test) TestTools.onHit(attacker, victim, damage.getAmount(), causeId, damage.isCancelled(), buffer);

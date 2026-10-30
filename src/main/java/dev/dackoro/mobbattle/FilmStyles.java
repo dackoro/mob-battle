@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Properties;
 
 /**
- * Battle film styles (2026-10-16, user: presets for the film shots, "one so the battle shows all the time and less of the
+ * Battle film styles (2026-10-16, playtest: presets for the film shots, "one so the battle shows all the time and less of the
  * player, one very close so attacks and mobs are seen all the time, a more cinematic one with open shots, plus the
  * default as it is now"). A style only writes the film keys (camera.film.*: player and far shares, shot length and
  * variation, pace, transition, every shot weight); everything else stays. The values are a starting point: each one

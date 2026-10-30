@@ -1,0 +1,299 @@
+{
+  "$Comment": "Mob Battle training archer's combat: two of the game's NPC bow shots, a quick one (Skeleton_Archer_Bow_Shoot) and a second one (Outlander_Hunter_Bow_Shoot), and the shortbow's guard (Root_Weapon_Shortbow_Secondary_Guard) after taking damage. The player's own shortbow shots are not used: fired by an NPC, their arrow's miss chain threw \"Simulation and server tick are not in sync\" and the game removed the shooter (InteractionSystems.TickInteractionManagerSystem). No signature for the same reason. Used by MobBattle_Dummy_Archer, which keeps 5-14.5 blocks away. Volley: the signature rebuilt from NPC-safe pieces (the energy check and cost as the game's knight signature, then a Parallel of LaunchProjectile like Skeleton_Archer_Bow_Shoot), picked only with full SignatureEnergy (6). Guard only against a fighter within 5 blocks and at most every 6 s (2026-10-29, playtest video: hit by arrows at range it raised its guard every 2 s, the arrows were blocked and it hardly shot back).",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.8,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "QuickShot": {
+        "Type": "Ability",
+        "Description": "Half-drawn shot of the shortbow (0.6 s draw = the player's strength 2 arrow)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          4,
+          15
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "FailureTimeout": 4,
+        "Ability": "Skeleton_Archer_Bow_Shoot",
+        "Conditions": [
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.6,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "ResponseCurve": "Linear",
+              "XRange": [
+                0,
+                2
+              ]
+            }
+          }
+        ]
+      },
+      "ChargedShot": {
+        "Type": "Ability",
+        "Description": "Fully drawn shot of the shortbow (1.2 s draw = the player's strength 4 arrow)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          4,
+          15
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "FailureTimeout": 5,
+        "Ability": "Outlander_Hunter_Bow_Shoot",
+        "Conditions": [
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.7,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "ResponseCurve": "Linear",
+              "XRange": [
+                0,
+                4
+              ]
+            }
+          }
+        ]
+      },
+      "Guard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          5
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "Ability": "Root_Weapon_Shortbow_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 6
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Guard_Start_StaminaCost": {
+            "Interactions": [
+              {
+                "$Comment": "The amount of stamina consumed upon starting guarding",
+                "Type": "ChangeStat",
+                "StatModifiers": {
+                  "Stamina": -0.5
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Shortbow_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          },
+          "Guard_Bash": {
+            "Interactions": [
+              {
+                "Type": "ApplyEffect",
+                "EffectId": "Stamina_Broken_Immune"
+              },
+              {
+                "$Comment": "Effects and stamina consumed upon a guard bash",
+                "Parent": "Weapon_Shortbow_Secondary_Guard_Bash"
+              }
+            ]
+          },
+          "Guard_Bash_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Shortbow_Secondary_Guard_Bash_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Projectile": 0
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_T1_Impact_Blunt",
+                  "LocalSoundEventId": "SFX_T1_Impact_Blunt"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "Volley": {
+        "Type": "Ability",
+        "Description": "Signature: three arrows at once like the player's volley (their NPC arrows, one after another 0.06 s apart), once its signature energy is full (each arrow that hits gives 1, TrainingDummies.signatureHit) and then about every 14 s",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          4,
+          15
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "FailureTimeout": 4,
+        "Ability": {
+          "Interactions": [
+            {
+              "Type": "Simple",
+              "Effects": {
+                "ItemPlayerAnimationsId": "Skeleton_Bow",
+                "ItemAnimationId": "Shoot"
+              },
+              "RunTime": 0.5,
+              "Next": {
+                "Type": "Parallel",
+                "Interactions": [
+                  {
+                    "Interactions": [
+                      {
+                        "Type": "Simple",
+                        "RunTime": 0.01,
+                        "Next": {
+                          "Type": "LaunchProjectile",
+                          "RunTime": 0.1,
+                          "ProjectileId": "Skeleton_Archer_Arrow"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "Interactions": [
+                      {
+                        "Type": "Simple",
+                        "RunTime": 0.07,
+                        "Next": {
+                          "Type": "LaunchProjectile",
+                          "RunTime": 0.1,
+                          "ProjectileId": "Skeleton_Archer_Arrow"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "Interactions": [
+                      {
+                        "Type": "Simple",
+                        "RunTime": 0.13,
+                        "Next": {
+                          "Type": "LaunchProjectile",
+                          "RunTime": 0.1,
+                          "ProjectileId": "Skeleton_Archer_Arrow"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 5.5
+            }
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 14
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "Actions": [
+          "QuickShot",
+          "Volley",
+          "ChargedShot",
+          "Guard"
+        ]
+      }
+    }
+  }
+}

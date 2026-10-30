@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Where a battle mob can move and whom it can reach (2026-10-14, user: the unstick pulled fish out of the water, and
+ * Where a battle mob can move and whom it can reach (2026-10-14, playtest: the unstick pulled fish out of the water, and
  * walkers that chase a fish into a lake drown). Test on server-mobbattle: Zombie, wolf, Trork and Golem_Firesteel sank
  * 66 blocks and drowned within 15 s, a Skeleton_Soldier walked the bottom unharmed, a Scarak_Seeker hovered over it.
  * <ul>

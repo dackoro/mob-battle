@@ -1,0 +1,469 @@
+{
+  "$Comment": "Mob Battle training crossbow shooter's combat: the game's NPC crossbow shot (Skeleton_Ranger_Crossbow_Shoot) and the crossbow's guard (Root_Weapon_Crossbow_Secondary_Guard) after taking damage. The player's own crossbow shots are not used: fired by an NPC, their arrow's miss chain threw \"Simulation and server tick are not in sync\" and the game removed the shooter. No signature for the same reason. BigArrow: the signature rebuilt from NPC-safe pieces (the energy check and cost as the game's knight signature, then a Parallel of LaunchProjectile like Skeleton_Archer_Bow_Shoot), picked only with full SignatureEnergy (5). Guard only against a fighter within 5 blocks and at most every 6 s (2026-10-29, playtest video: hit by arrows at range it raised its guard every 2 s, the arrows were blocked and it hardly shot back).",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.8,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Shoot": {
+        "Type": "Ability",
+        "Description": "Crossbow shot (the player's primary: shoots while it has ammo, reloads to full when empty)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          4,
+          15
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "FailureTimeout": 5,
+        "Ability": "Skeleton_Ranger_Crossbow_Shoot",
+        "Conditions": [
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.7,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "ResponseCurve": "Linear",
+              "XRange": [
+                0,
+                1
+              ]
+            }
+          }
+        ]
+      },
+      "Guard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          5
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "Ability": "Root_Weapon_Crossbow_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 6
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Arrow_Inventory_Condition": {
+            "Interactions": [
+              {
+                "Type": "ModifyInventory",
+                "RequiredGameMode": "Adventure",
+                "ItemToRemove": {
+                  "Id": "Weapon_Arrow_Crude",
+                  "Quantity": 1
+                }
+              }
+            ]
+          },
+          "Standard_Projectile_Launch": {
+            "Interactions": [
+              {
+                "$Comment": "Launching the standard projectile",
+                "Parent": "Weapon_Crossbow_Shot_Standard_Projectile",
+                "Effects": {
+                  "ItemAnimationId": "Shoot"
+                }
+              }
+            ]
+          },
+          "Standard_Projectile_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Crossbow_Damage_Standard_Projectile",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Projectile": 10
+                  }
+                }
+              }
+            ]
+          },
+          "Standard_Projectile_Impact": {
+            "Interactions": [
+              {
+                "$Comment": "When the standard projectile hits an entity",
+                "Parent": "Weapon_Crossbow_Effects_Standard_Projectile_Impact",
+                "Effects": {
+                  "LocalSoundEventId": "SFX_Arrow_FullCharge_Hit",
+                  "WorldSoundEventId": "SFX_Arrow_FullCharge_Hit"
+                }
+              }
+            ]
+          },
+          "Standard_Projectile_Miss": {
+            "Interactions": [
+              {
+                "$Comment": "When the standard projectile hits the ground",
+                "Parent": "Common_Projectile_Miss",
+                "Effects": {
+                  "LocalSoundEventId": "SFX_Arrow_FullCharge_Miss",
+                  "WorldSoundEventId": "SFX_Arrow_FullCharge_Miss"
+                }
+              }
+            ]
+          },
+          "No_Ammo_Effects": {
+            "Interactions": [
+              {
+                "Parent": "Common_Bow_No_Ammo",
+                "Effects": {
+                  "ItemAnimationId": "Interact",
+                  "WorldSoundEventId": "SFX_Bow_No_Ammo",
+                  "LocalSoundEventId": "SFX_Bow_No_Ammo"
+                }
+              }
+            ]
+          },
+          "Combo_Projectile_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Crossbow_Damage_Combo_Projectile",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Projectile": 13
+                  }
+                }
+              }
+            ]
+          },
+          "Overcharge_Start": {
+            "Interactions": [
+              {
+                "$Comment": "This is played at the start of the Overcharge ability, before loading arrows",
+                "Parent": "Weapon_Crossbow_Primary_Overcharge_Start",
+                "Effects": {
+                  "ItemAnimationId": "ReloadReady",
+                  "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start",
+                  "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start_Local"
+                }
+              }
+            ]
+          },
+          "Overcharge_Projectile_Launch": {
+            "Interactions": [
+              {
+                "$Comment": "Launching the overcharge projectile",
+                "Parent": "Weapon_Crossbow_Shot_Standard_Projectile"
+              }
+            ]
+          },
+          "Reload_Start": {
+            "Parent": "Root_Common_StatAmmoReload_Entry",
+            "Interactions": [
+              {
+                "Parent": "Common_StatAmmoReload_Entry",
+                "Rules": {
+                  "Blocking": [
+                    "SwapFrom",
+                    "Primary",
+                    "Secondary"
+                  ]
+                },
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start",
+                  "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Reload_Start_Local"
+                }
+              }
+            ]
+          },
+          "Reload_ItemConsume": {
+            "Interactions": [
+              {
+                "$Comment": "The item to consume for every iteration of reloading",
+                "Parent": "Common_StatAmmoReload_ItemConsume",
+                "ItemToRemove": {
+                  "Id": "Weapon_Arrow_Crude",
+                  "Quantity": 1
+                }
+              }
+            ]
+          },
+          "Reload_Effects": {
+            "Interactions": [
+              {
+                "$Comment": "The effects to trigger for every iteration of reloading",
+                "Parent": "Common_StatAmmoReload_Effects",
+                "HorizontalSpeedMultiplier": 0.75,
+                "Effects": {
+                  "ItemAnimationId": "Reload",
+                  "WorldSoundEventId": "SFX_Hand_Crossbow_T2_Load",
+                  "LocalSoundEventId": "SFX_Hand_Crossbow_T2_Load_Local"
+                }
+              }
+            ]
+          },
+          "Reload_StatModifier": {
+            "Interactions": [
+              {
+                "$Comment": "The stat modification to perform for every iteration of reloading",
+                "Parent": "Common_StatAmmoReload_StatModifier",
+                "HorizontalSpeedMultiplier": 0.75,
+                "EffectId": {
+                  "StatModifiers": {
+                    "Ammo": 1
+                  }
+                }
+              }
+            ]
+          },
+          "Signature_Activate_Effects": {
+            "Interactions": [
+              {
+                "Type": "Simple",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Bow_T2_Signature_Nock",
+                  "LocalSoundEventId": "SFX_Bow_T2_Signature_Nock_Local"
+                }
+              }
+            ]
+          },
+          "Signature_BigArrow_Launch": {
+            "Interactions": [
+              {
+                "$Comment": "Signature BigArrow - Fast, flat trajectory with big impact",
+                "Parent": "Weapon_Crossbow_Signature_BigArrow_Shot"
+              }
+            ]
+          },
+          "Signature_BigArrow_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Crossbow_Damage_Signature_Projectile",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Projectile": 78
+                  }
+                }
+              }
+            ]
+          },
+          "Signature_BigArrow_Miss": {
+            "Interactions": [
+              {
+                "Parent": "Common_Projectile_Miss",
+                "Effects": {
+                  "LocalSoundEventId": "SFX_Arrow_FullCharge_Miss",
+                  "WorldSoundEventId": "SFX_Arrow_FullCharge_Miss"
+                }
+              }
+            ]
+          },
+          "Guard_Start_StaminaCost": {
+            "Interactions": [
+              {
+                "$Comment": "The amount of stamina consumed upon starting guarding",
+                "Type": "ChangeStat",
+                "StatModifiers": {
+                  "Stamina": -0.5
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Crossbow_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          },
+          "Guard_Bash": {
+            "Interactions": [
+              {
+                "Type": "ApplyEffect",
+                "EffectId": "Stamina_Broken_Immune"
+              },
+              {
+                "$Comment": "Effects and stamina consumed upon a guard bash",
+                "Parent": "Weapon_Crossbow_Secondary_Guard_Bash"
+              }
+            ]
+          },
+          "Guard_Bash_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Crossbow_Secondary_Guard_Bash_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 0
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_T1_Impact_Blunt",
+                  "LocalSoundEventId": "SFX_T1_Impact_Blunt"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "BigArrow": {
+        "Type": "Ability",
+        "Description": "Signature: a burst of 3 bolts, once its signature energy is full (each bolt that hits gives 1, TrainingDummies.signatureHit) and then about every 16 s",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          4,
+          15
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "FailureTimeout": 5,
+        "Ability": {
+          "Interactions": [
+            {
+              "Type": "Simple",
+              "Effects": {
+                "ItemPlayerAnimationsId": "Skeleton_Crossbow",
+                "ItemAnimationId": "Shoot"
+              },
+              "RunTime": 0.5,
+              "Next": {
+                "Type": "Parallel",
+                "Interactions": [
+                  {
+                    "Interactions": [
+                      {
+                        "Type": "Simple",
+                        "RunTime": 0.01,
+                        "Next": {
+                          "Type": "LaunchProjectile",
+                          "RunTime": 0.1,
+                          "ProjectileId": "Skeleton_Ranger_Arrow"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "Interactions": [
+                      {
+                        "Type": "Simple",
+                        "RunTime": 0.26,
+                        "Next": {
+                          "Type": "LaunchProjectile",
+                          "RunTime": 0.1,
+                          "ProjectileId": "Skeleton_Ranger_Arrow"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "Interactions": [
+                      {
+                        "Type": "Simple",
+                        "RunTime": 0.51,
+                        "Next": {
+                          "Type": "LaunchProjectile",
+                          "RunTime": 0.1,
+                          "ProjectileId": "Skeleton_Ranger_Arrow"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 4.5
+            }
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 16
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "Actions": [
+          "Shoot",
+          "BigArrow",
+          "Guard"
+        ]
+      }
+    }
+  }
+}

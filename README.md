@@ -4,7 +4,7 @@
 
 A Hytale mod by **Dackoro**: wands that make mobs fight using their existing AI. Supports vanilla NPCs and modded NPCs with compatible combat behavior; player-only attacks and encounter-specific mechanics may need adaptations.
 
-Hytale **0.7.0** (release and the 0.7 pre-release: `ServerVersion >=0.7.0-pre <0.8.0`).
+Hytale **0.7** (any 0.7 release, tested on 0.7.5: `ServerVersion >=0.7.0-pre <0.8.0`).
 
 [![Watch every wand in action (YouTube playlist)](https://img.youtube.com/vi/qorX35UQVe0/maxresdefault.jpg)](https://www.youtube.com/playlist?list=PLbSYS5J690io)
 
@@ -13,12 +13,14 @@ Hytale **0.7.0** (release and the 0.7 pre-release: `ServerVersion >=0.7.0-pre <0
 ## Features at a glance
 
 - **Four battle kinds:** duels, everyone vs one, battle royale and team battles, all driven by the mobs' own AI.
-- **Thirteen wands** to start battles, summon mobs, build teams and armies, heal, kill, buff, morph, recolor and inspect mobs. Hold the click on the Heal, Cleanse, Effect and Morph wands to slam the ground and hit everyone around you.
+- **Fourteen wands** to start battles, summon mobs, build teams and armies, dress mobs, heal, kill, buff, morph, recolor and inspect mobs. Hold the click on the Heal, Cleanse, Effect and Morph wands to slam the ground and hit everyone around you.
 - **Land, air and water:** fish stay in the water, walkers don't drown chasing them, and only fliers and ranged mobs go for targets up in the air.
 - **Players can fight too**, side by side with mobs or against them (never in Creative).
 - **Armies:** recruit mobs for yourself, for another player or for a leader mob.
 - **Random battles:** `summon fill` picks mobs that fight, of similar strength, in balanced teams if you like.
 - **Arenas and timers:** walls that keep fighters in, closing royale zones, time limits with judging by health, damage or kills, scoreboards.
+- **VS screen and battle film (1.2 "Showtime"):** a Smash-like VS screen before every battle (pictures drawn from each mob's model, players in their own skin), a movie-like film of the whole battle with styles and per-shot settings, and slow motion on the final blow.
+- **Training dummies and kits:** 13 dummies, one per weapon of the game, fighting with the player's attacks; kits of gear, runes and stats for any mob, with the Equipment Wand to dress mobs by hand.
 - **Presentation:** countdowns, big titles, intro and end cameras, battle music, a spectator mode to watch any fighter, duel, all vs one and watch cards. ▶ [Duel cameras](https://youtu.be/eYbRIGjnRyw) · [royale cameras and spectator mode](https://youtu.be/urVVfprhp3o)
 - **Looks:** Jade and Shimmer looks with their own death effects, crowns, buff shimmer, team tints and every color from a 14-color palette.
 - **Settings panel** (`/mobbattle config`) with every setting, presets, resets and undo; settings are saved per world. English and Spanish.
@@ -26,7 +28,7 @@ Hytale **0.7.0** (release and the 0.7 pre-release: `ServerVersion >=0.7.0-pre <0
 
 ## Wands
 
-Get all thirteen with `/mobbattle give` (admin), from the creative inventory, or with `/give <item ID>`. Each wand's tooltip explains what it does. Full details, sounds and quirks: [docs/wands.md](docs/wands.md).
+Get all fourteen with `/mobbattle give` (admin), from the creative inventory, or with `/give <item ID>`. Each wand's tooltip explains what it does. Full details, sounds and quirks: [docs/wands.md](docs/wands.md).
 
 ![Battle Wand](docs/images/cards/MobBattle_Wand_card.png)
 
@@ -75,6 +77,10 @@ Get all thirteen with `/mobbattle give` (admin), from the creative inventory, or
 ![Buff Wand](docs/images/cards/MobBattle_BuffWand_card.png)
 
 `MobBattle_BuffWand` · ▶ [Watch it](https://youtu.be/69zD_VQW_-Q) · [details](docs/wands.md#buff-wand-mobbattle_buffwand)
+
+![Equipment Wand](docs/images/cards/MobBattle_EquipWand_card.png)
+
+`MobBattle_EquipWand` · [details](docs/wands.md#equipment-wand-mobbattle_equipwand) · [kits](docs/wands.md#equipment-kits)
 
 **Debug Wand** (`MobBattle_DebugWand`, for mod makers, admin only): left click writes a full report on the mob, then follows it for a while; right click stops following. [Details](docs/wands.md#debug-wand-mobbattle_debugwand)
 

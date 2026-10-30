@@ -48,6 +48,7 @@ final class Scoreboard extends CustomUIHud {
     protected void build(UICommandBuilder builder) {
         builder.append(UI);
         CinemaBars.shift(builder, getPlayerRef());
+        builder.set("#TimerGap.Visible", TimerHud.boxShown(getPlayerRef()));
     }
 
     static boolean any() {
@@ -56,7 +57,7 @@ final class Scoreboard extends CustomUIHud {
 
     /**
      * A 1v1 duel with the duel card, or an all vs one with the focus card: the card takes the board's place on the right
-     * and says the same and more, so the board is not shown (user, 2026-10-13).
+     * and says the same and more, so the board is not shown (playtest 2026-10-13).
      */
     static boolean cardShown(BattleManager.Battle b) {
         return (b.kind == BattleManager.Kind.DUEL && FxSettings.duelCard && b.teamOf.size() <= 2)
@@ -125,7 +126,7 @@ final class Scoreboard extends CustomUIHud {
             hud = new Scoreboard(player);
             huds.addCustomHud(player, hud);
         }
-        List<Row> rows = rows(battle, store);
+        List<Row> rows = rows(battle, store, player.getLanguage());
         UICommandBuilder b = new UICommandBuilder();
         b.set("#Title.TextSpans", title(battle));
         for (int i = 0; i < ROWS; i++) {
@@ -152,7 +153,7 @@ final class Scoreboard extends CustomUIHud {
     }
 
     /** The rows of a battle (at most ROWS). Counted, not collected: battles can hold hundreds of mobs. */
-    private static List<Row> rows(BattleManager.Battle battle, Store<EntityStore> store) {
+    private static List<Row> rows(BattleManager.Battle battle, Store<EntityStore> store, String lang) {
         List<Row> out = new ArrayList<>();
         switch (battle.kind) {
             case TEAMS -> {
@@ -173,8 +174,8 @@ final class Scoreboard extends CustomUIHud {
                 }
                 int[] one = sides.getOrDefault(1, new int[2]);
                 out.add(new Row(one[0] > 0 && target != null
-                        ? I18n.tr("hud.score.hp").param("name", pretty(battle.focusName)).param("pct", health(target, store))
-                        : I18n.tr("hud.score.down").param("name", pretty(battle.focusName)), "#ffd23e"));
+                        ? I18n.tr("hud.score.hp").param("name", pretty(battle.focusName, lang)).param("pct", health(target, store))
+                        : I18n.tr("hud.score.down").param("name", pretty(battle.focusName, lang)), "#ffd23e"));
                 int[] crowd = sides.getOrDefault(0, new int[2]);
                 out.add(new Row(I18n.tr("hud.score.attackers").param("alive", crowd[0]).param("total", crowd[1]), "#ff6b5e"));
             }
@@ -186,14 +187,14 @@ final class Scoreboard extends CustomUIHud {
                 int[] places = BattleManager.places(top, battle.sharedPlaces());
                 for (int i = 0; i < top.size(); i++) {
                     BattleManager.Kills k = top.get(i);
-                    out.add(new Row(I18n.tr("hud.score.place").param("place", places[i]).param("name", pretty(k.name()))
+                    out.add(new Row(I18n.tr("hud.score.place").param("place", places[i]).param("name", pretty(k.name(), lang))
                             .param("kills", k.count()), places[i] == 1 ? "#ffd23e" : "#c8e6ff"));
                 }
             }
             case DUEL -> {
                 for (Ref<EntityStore> m : battle.members()) {
                     boolean up = BattleManager.isAlive(m, store);
-                    String who = pretty(ChaosWand.nameOf(m, store));
+                    String who = pretty(ChaosWand.nameOf(m, store), lang);
                     out.add(new Row(up ? I18n.tr("hud.score.hp").param("name", who).param("pct", health(m, store))
                             : I18n.tr("hud.score.down").param("name", who), up ? "#ffffff" : "#888888"));
                     if (out.size() >= 2) break;
@@ -222,7 +223,8 @@ final class Scoreboard extends CustomUIHud {
         return (int) Math.round(Math.max(0, Math.min(1, h.get() / h.getMax())) * 100);
     }
 
-    private static String pretty(String name) {
-        return MobNames.shared(name);
+    /** A role's name in {@code lang} (the viewer's), players' names as they are. */
+    private static String pretty(String name, String lang) {
+        return MobNames.text(name, lang);
     }
 }

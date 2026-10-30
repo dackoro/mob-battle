@@ -10,7 +10,40 @@ Group #Bars {
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
     LayoutMode: Top;
 
-    Group #BarTop { FlexWeight: 0; Background: #000000; }
+    Group #BarTop {
+      FlexWeight: 0;
+      Background: #000000;
+
+      // bandTimer / bandTitle top: the battle's title and its time left (CinemaBars.bandText, 2026-10-29, playtest).
+      // Two rows (2026-10-29, playtest): the title above the time when both are in this band; a hidden row
+      // collapses and the other stays centred between the spacers.
+      Group #BandTop {
+        Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+        LayoutMode: Top;
+
+        Group { FlexWeight: 1; }
+        Label #BandTopTitle {
+          Anchor: (Left: 0, Right: 0, Height: 30);
+          Text: "";
+          Visible: false;
+          Style: (FontSize: 22, TextColor: #ffd23e, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        Label #BandTopClock {
+          Anchor: (Left: 0, Right: 0, Height: 36);
+          Text: "";
+          Visible: false;
+          Style: (FontSize: 30, TextColor: #ffffff, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        // bandInfo: the timer box's other lines ("2 fighters left", the teams) under the time (2026-10-29, playtest)
+        Label #BandTopInfo {
+          Anchor: (Left: 0, Right: 0, Height: 26);
+          Text: "";
+          Visible: false;
+          Style: (FontSize: 18, TextColor: #d8d8e0, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        Group { FlexWeight: 1; }
+      }
+    }
     Group #TopRest { FlexWeight: 1000; }
   }
 
@@ -23,11 +56,50 @@ Group #Bars {
       FlexWeight: 0;
       Background: #000000;
 
-      // debugLog on: the name of the shot playing now (CinemaBars.shotName, 2026-10-16, user).
-      Label #ShotName {
+      // bandTimer / bandTitle bottom: the battle's title and its time left (CinemaBars.bandText).
+      // Two rows (2026-10-29, playtest): the title above the time when both are in this band; a hidden row
+      // collapses and the other stays centred between the spacers.
+      Group #BandBottom {
         Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+        LayoutMode: Top;
+
+        Group { FlexWeight: 1; }
+        Label #BandBottomTitle {
+          Anchor: (Left: 0, Right: 0, Height: 30);
+          Text: "";
+          Visible: false;
+          Style: (FontSize: 22, TextColor: #ffd23e, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        Label #BandBottomClock {
+          Anchor: (Left: 0, Right: 0, Height: 36);
+          Text: "";
+          Visible: false;
+          Style: (FontSize: 30, TextColor: #ffffff, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        // bandInfo: the timer box's other lines ("2 fighters left", the teams) under the time (2026-10-29, playtest)
+        Label #BandBottomInfo {
+          Anchor: (Left: 0, Right: 0, Height: 26);
+          Text: "";
+          Visible: false;
+          Style: (FontSize: 18, TextColor: #d8d8e0, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        // debugLog / test shotnames: the shot playing now, centred, under the title and time when they share this band
+        // (2026-10-29, playtest: it sat over the game's key hints at the right end)
+        Label #BandBottomShot {
+          Anchor: (Left: 0, Right: 0, Height: 24);
+          Text: "";
+          Visible: false;
+          Style: (FontSize: 18, TextColor: #ffd23e, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+        Group { FlexWeight: 1; }
+      }
+
+      // debugLog on: the name of the shot playing now (CinemaBars.shotName, 2026-10-16, playtest); at the right end so
+      // it never covers #BandBottom.
+      Label #ShotName {
+        Anchor: (Left: 0, Right: 32, Top: 0, Bottom: 0);
         Text: "";
-        Style: (FontSize: 18, TextColor: #ffd23e, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+        Style: (FontSize: 18, TextColor: #ffd23e, RenderBold: true, HorizontalAlignment: End, VerticalAlignment: Center);
       }
     }
   }

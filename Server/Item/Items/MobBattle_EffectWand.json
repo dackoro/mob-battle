@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_EffectWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Support",
   "Icon": "Icons/Items/MobBattle/EffectWand.png",
   "Quality": "Legendary",
   "ItemLevel": 1,

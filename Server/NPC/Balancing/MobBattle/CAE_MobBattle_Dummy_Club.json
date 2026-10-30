@@ -1,0 +1,542 @@
+{
+  "$Comment": "Mob Battle training club fighter's combat with the player's own iron club attacks (the older weapon set: no signature energy). Basic = Club_Attack (swing left, swing right); the player's club has no held attack. Guard = Club_Block after taking damage. Every action carries Weapon_Club_Iron's interaction vars, plus Club_Block_Damage with the game's own default. Kept distances: the role's MaintainDistance takes its range from each action's PostExecuteDistanceRange, so they all stay inside the basic attack's reach (strafe 2.5-4 kept it out of reach, staring at its rival); basic attack Timeout 0.5 lets it finish aiming instead of losing the try and waiting a cooldown.",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            10
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.9,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Default": {
+        "Type": "State",
+        "Description": "Change to the Default state",
+        "State": "Combat",
+        "SubState": "Default",
+        "PostExecuteDistanceRange": [
+          1.7,
+          1.7
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "Strafe": {
+        "Type": "State",
+        "Description": "Change to the strafe state",
+        "State": "Combat",
+        "SubState": "Strafe",
+        "PostExecuteDistanceRange": [
+          1.6,
+          2.2
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "Guard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          5
+        ],
+        "PostExecuteDistanceRange": [
+          1.7,
+          1.7
+        ],
+        "Ability": "Club_Block",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Club_Swing_Left_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Left_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Left_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.1
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Right_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Right_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Right_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.1
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Down_Charged_Effect": "Club_Swing_Down_Charged_Effect",
+          "Club_Swing_Down_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Down_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 34
+                  },
+                  "Type": "Absolute",
+                  "RandomPercentageModifier": 0.1
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                }
+              }
+            ]
+          },
+          "Club_Block_Damage": {
+            "Interactions": [
+              "Club_Block_Damage"
+            ]
+          }
+        }
+      },
+      "StrafeGuard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          9
+        ],
+        "PostExecuteDistanceRange": [
+          1.6,
+          2.2
+        ],
+        "Ability": "Club_Block",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Club_Swing_Left_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Left_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Left_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.1
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Right_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Right_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Right_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.1
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                }
+              }
+            ]
+          },
+          "Club_Swing_Down_Charged_Effect": "Club_Swing_Down_Charged_Effect",
+          "Club_Swing_Down_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Club_Swing_Down_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 34
+                  },
+                  "Type": "Absolute",
+                  "RandomPercentageModifier": 0.1
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                }
+              }
+            ]
+          },
+          "Club_Block_Damage": {
+            "Interactions": [
+              "Club_Block_Damage"
+            ]
+          }
+        }
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Club_Attack"
+          ],
+          "InteractionVars": {
+            "Club_Swing_Left_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Left_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Left_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.1
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Right_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Right_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Right_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.1
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Down_Charged_Effect": "Club_Swing_Down_Charged_Effect",
+            "Club_Swing_Down_Charged_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Down_Charged_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 34
+                    },
+                    "Type": "Absolute",
+                    "RandomPercentageModifier": 0.1
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                  }
+                }
+              ]
+            },
+            "Club_Block_Damage": {
+              "Interactions": [
+                "Club_Block_Damage"
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 2.5,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.1,
+            0.3
+          ]
+        },
+        "Actions": [
+          "Guard",
+          "Strafe"
+        ]
+      },
+      "Strafe": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Club_Attack"
+          ],
+          "InteractionVars": {
+            "Club_Swing_Left_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Left_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Left_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.1
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Right_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Right_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Swing"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Right_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.1
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                  }
+                }
+              ]
+            },
+            "Club_Swing_Down_Charged_Effect": "Club_Swing_Down_Charged_Effect",
+            "Club_Swing_Down_Charged_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Club_Swing_Down_Charged_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 34
+                    },
+                    "Type": "Absolute",
+                    "RandomPercentageModifier": 0.1
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Club_Steel_Impact"
+                  }
+                }
+              ]
+            },
+            "Club_Block_Damage": {
+              "Interactions": [
+                "Club_Block_Damage"
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 2.5,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.1,
+            0.3
+          ]
+        },
+        "Actions": [
+          "StrafeGuard",
+          "Default"
+        ]
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 """Gives every Mob Battle effect with particles the invisible first-person version (MobBattle_Nothing), so a player
 wearing a look, crown, buff light or wand effect doesn't get it in their own camera; everyone else still sees it.
 
-An empty "FirstPersonParticles": [] is not enough: the client falls back to Particles (2026-10-12, user: the Buff
+An empty "FirstPersonParticles": [] is not enough: the client falls back to Particles (2026-10-12, playtest: the Buff
 Wand runes and the jade eyes covered a buffed player's view). Vanilla does the same with its own FP systems
 (Hazard_Electric_Stun -> Hazard_Electric_Stun_FirstPerson).
 

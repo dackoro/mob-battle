@@ -1,5 +1,5 @@
 {
-  "$Comment": "Morph Wand: played at the player when they switch to the wand in the hotbar (omnitrix activation). Mono, trimmed, -20 dB mean, Volume -8 (user: too loud). Small random pitch.",
+  "$Comment": "Morph Wand: played at the player when they switch to the wand in the hotbar (omnitrix activation). Mono, trimmed, -20 dB mean, Volume -8 (playtest: too loud). Small random pitch.",
   "Layers": [
     {
       "Files": [

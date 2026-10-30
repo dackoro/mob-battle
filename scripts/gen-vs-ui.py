@@ -1,36 +1,36 @@
 """Writes Common/UI/Custom/MobBattle/VsScreen.ui (VS screen layout, 2026-10-16). Run: python scripts/gen-vs-ui.py
 
 Fighters hang on each half's inner edge (the slant), placed for a 1920x1080 screen. Each slot has three sizes (TIERS),
-one shown per fighter by its real height against the tallest fighter on screen (user: a skeleton came out as big as
+one shown per fighter by its real height against the tallest fighter on screen (playtest: a skeleton came out as big as
 the Gobliterator): VsScreen.tierOf. The slant and backgrounds come from scripts/gen-vs-assets.py.
 """
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent.parent / "Common/UI/Custom/MobBattle/VsScreen.ui"
 BOX = 1920 * 0.58          # a half's box at rest (FlexWeight 580 of 1000)
-# VsScreen.tierOf: picture size per tier, by (height / tallest) ^ 0.5 (user, 2026-10-17 after offline previews: with a
+# VsScreen.tierOf: picture size per tier, by (height / tallest) ^ 0.5 (playtest, 2026-10-17 after offline previews: with a
 # 60 % floor a chicken or a pig stood as big as a bear; 100/85/72/60 % until then)
 TIERS = [1.0, 0.75, 0.55, 0.38]
 # slot: (center x in the left half's screen coords, feet y, full size); index = strength order
-NAMED = [(500, 1080, 880), (250, 1080, 720), (800, 1080, 640)]   # all on the bottom edge (user: no gap under the first)
+NAMED = [(500, 1080, 880), (250, 1080, 720), (800, 1080, 640)]   # all on the bottom edge (playtest: no gap under the first)
 NAMED_DRAW = [0, 1, 2]
-# a crowd (user, 2026-10-17: a jumbled group filling the half, not a perfect triangle with empty corners): rows front
+# a crowd (playtest, 2026-10-17: a jumbled group filling the half, not a perfect triangle with empty corners): rows front
 # to back, each clearly smaller and higher than the one in front, each spread from the screen edge to the slanted
 # split (the narrower of the two halves, since the right half uses the same slots mirrored), every mob nudged and
 # resized by a fixed pseudo-random amount (the same layout every time). (feet y, size, how many) per row; 24 in all.
-# Then (user, 2026-10-17: too much empty space, they should interleave; the back rows too small for mobs that are not
+# Then (playtest, 2026-10-17: too much empty space, they should interleave; the back rows too small for mobs that are not
 # that big): six rows close together, each staggered half a place from the one in front, so the back ones show in
 # the gaps, and a soft perspective (the last row 80 % of the first).
-# Then (user, 2026-10-17: a tall Kweebec Rootbreaker at the back still looked small and covered): an even softer
+# Then (playtest, 2026-10-17: a tall Kweebec Rootbreaker at the back still looked small and covered): an even softer
 # perspective (the last row 88 % of the first) and the back rows a little higher, so the front rows cover them less.
 CROWD_ROWS = [(1080, 470, 5), (1006, 460, 4), (936, 450, 5), (871, 440, 4), (811, 422, 3), (756, 414, 3)]
 CROWD_EDGE = 10           # room left at the screen edge
 CROWD_SPLIT_ROOM = 40     # room left before the split (a mob there is cut by the half's mask)
 SPLIT_TOP, SPLIT_BOTTOM = 1100, 820   # gen-vs-assets.py TOP / BOTTOM: the split's screen x at the top and the bottom
-# 4-9 fighters (VsScreen.MEDIUM; user 2026-10-16: small crowds looked tiny next to a big mob): big, spread over the
+# 4-9 fighters (VsScreen.MEDIUM; playtest 2026-10-16: small crowds looked tiny next to a big mob): big, spread over the
 # half in two loose rows; index = fill order (strongest at the front center), drawn back row first
-# (user, 2026-10-16: as big as the team columns; overlapping and cut at the edges is fine)
-# rows well apart in height (user, 2026-10-16: they covered each other's faces); VsScreen puts the tallest mobs in the
+# (playtest, 2026-10-16: as big as the team columns; overlapping and cut at the edges is fine)
+# rows well apart in height (playtest, 2026-10-16: they covered each other's faces); VsScreen puts the tallest mobs in the
 # back slots (BACK_FIRST below), so their heads show over the ones in front
 MEDIUM = [(450, 1080, 760), (200, 1080, 680), (720, 1080, 680), (330, 900, 600), (610, 900, 600),
           (80, 960, 560), (850, 960, 540), (480, 730, 520), (230, 720, 490)]
@@ -180,7 +180,7 @@ def half(S):
     side_mode = "Left" if S == "L" else "Right"
     return f"""    Group #{S}Half {{
       FlexWeight: 1;
-      // each half cut at the slant (user, 2026-10-17: as Smash; overlapping fighters crossed into the other
+      // each half cut at the slant (playtest, 2026-10-17: as Smash; overlapping fighters crossed into the other
       // half): white where the half shows, stretched to the box like its background (gen-vs-assets.py --masks)
       {HALF_MASK_LINE.format(S=S)}
 
@@ -219,7 +219,7 @@ def half(S):
 """
 
 
-# 3+ teams (user, 2026-10-16: like Smash's 4-8 player screen): one column per team, 3 to 8 columns, each its team's
+# 3+ teams (playtest, 2026-10-16: like Smash's 4-8 player screen): one column per team, 3 to 8 columns, each its team's
 # color (set by the code) under ColumnOverlay.png, a header (small colored "P1 · TEAM", the representative's name) and
 # the representative big at the bottom, at one of the four sizes. Panels start hidden and are revealed one by one.
 COLUMN_COUNTS = range(3, 9)
@@ -230,11 +230,11 @@ def column_size(n):
     return 1100 if n <= 4 else 1000
 
 
-# the picture stands on the column's bottom edge (user, 2026-10-16: centered on the head with the feet at the bottom;
+# the picture stands on the column's bottom edge (playtest, 2026-10-16: centered on the head with the feet at the bottom;
 # VsScreen.columnFrame puts the feet on the picture's bottom edge and pushes a tall mob down until its head is clear of
 # the header, fliers float at a fixed height). It is one face-framed square per mob, wider than the column: the column's
 # #..Clip group has a mask (MaskTexturePath, white = keep), and a Group with a mask hides whatever its children draw
-# outside it (user test 2026-10-17). It replaced six pre-cut widths per mob (VsScreen.COLUMN_CROP, ~38 MB per client);
+# outside it (playtest test 2026-10-17). It replaced six pre-cut widths per mob (VsScreen.COLUMN_CROP, ~38 MB per client);
 # a scrolling container did NOT clip (2026-10-16).
 CLIP_MASK = "Masks/Clip.png"   # relative to the .ui: Common/UI/Custom/MobBattle/Masks/Clip.png
 
@@ -249,13 +249,15 @@ def columns(counts=COLUMN_COUNTS):
             p = f"C{n}P{i}"   # ids are letters and digits only (an underscore broke the parse)
             panels.append(f"""      Group #{p} {{
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #{p}In {{
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #{p}Pad {{ FlexWeight: 1000; }}
@@ -263,27 +265,23 @@ def columns(counts=COLUMN_COUNTS):
             FlexWeight: 1;
             Background: #000000;
             Group {{
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // {size} tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #{p}Clip {{
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "{CLIP_MASK}";
-                LayoutMode: Top;
-                Group {{ Anchor: (Height: {max(0, 1080 - size)}); }}
-                Group {{
-                  Anchor: (Height: {size});
-                  LayoutMode: Center;
-                  AssetImage #{p}Pic {{ Anchor: (Width: {size}, Height: {size}); Visible: false; }}
-                }}
+                AssetImage #{p}Pic {{ Anchor: (Left: 0, Right: 0, Top: {max(0, 1086 - size)}, Height: {size}); Visible: false; }}
               }}
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {{
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group {{ Anchor: (Height: {1080 - round(1920 / n)}); }}
+                Group {{ Anchor: (Height: {1086 - round(1920 / n)}); }}
                 Group {{
                   Anchor: (Height: {round(1920 / n)});
                   LayoutMode: Center;
@@ -316,7 +314,7 @@ def columns(counts=COLUMN_COUNTS):
       }}
 """)
         # Right -8: the client floors each FlexWeight width, so n columns left up to n-1 px of the world showing at the
-        # right edge (user screenshots 2026-10-17, 6 and 7 teams); the last column now runs a few px past the screen
+        # right edge (playtest screenshots 2026-10-17, 6 and 7 teams); the last column now runs a few px past the screen
         # (negative anchors as vanilla Common.ui)
         out.append(f"""    Group #Cols{n} {{
       Anchor: (Left: 0, Right: -8, Top: 0, Bottom: 0);
@@ -335,7 +333,7 @@ def columns(counts=COLUMN_COUNTS):
 
 def back_first():
     """Slot indices in drawing order (first = furthest back, last = on top), for VsScreen.MEDIUM_BACK_FIRST /
-    GROUND_BACK_FIRST: the tallest fighters take the first ones, the smallest end up in front (user, 2026-10-17: big
+    GROUND_BACK_FIRST: the tallest fighters take the first ones, the smallest end up in front (playtest, 2026-10-17: big
     mobs behind, small ones in front; sorting by row only put the tallest of a row on top of its neighbours)."""
     medium = list(MEDIUM_DRAW)
     ground = [i for i in CROWD_DRAW if i < GROUND_COUNT]
@@ -344,7 +342,7 @@ def back_first():
 
 # The column screens moved to VsCols<n>.ui (2026-10-16), but a server already running the older code still appends
 # VsScreen.ui and sets #Cols/#ColTitle in it: with dev mode the .ui goes live at once, and a missing id disconnects the
-# player ("Failed to apply CustomUI HUD commands", user 2026-10-16). Keep them here until every server runs the new
+# player ("Failed to apply CustomUI HUD commands", playtest 2026-10-16). Keep them here until every server runs the new
 # code, then set this to False and run the script again.
 LEGACY_COLUMNS_IN_MAIN = False
 
@@ -397,7 +395,7 @@ def write_slots():
 def main():
     ui = f"""// Mob Battle VS screen (VsScreen.java; vsScreen in the countdown, /mobbattle test vs). GENERATED by
 // scripts/gen-vs-ui.py: edit that and run it again. Look of the VS card made for the clip
-// (art-source/Renders/VS/vs_card.py, user 2026-10-16): two halves split on a slant, each in its team color with light
+// (art-source/Renders/VS/vs_card.py, playtest 2026-10-16): two halves split on a slant, each in its team color with light
 // streaks and floating particles, a dark name bar on top, the fighters big and overlapping, a big VS.
 // Layers on top of each other (no LayoutMode = overlay): each layer splits the width by FlexWeight between its half
 // (0 -> 580 thousandths while sliding in, so the halves overlap where the slant is) and a transparent rest. Fighters
@@ -416,7 +414,7 @@ Group #Vs {{
     MaskTexturePath: "Masks/Hidden.png";
 {preload()}  }}
 
-  // "Preparing the battle..." while the client loads the screen (2026-10-18, user: during the wait the player could
+  // "Preparing the battle..." while the client loads the screen (2026-10-18, playtest: during the wait the player could
   // think nothing happened); VsScreen hides it when the screen comes in
   Group #Loading {{
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
@@ -444,7 +442,7 @@ Group #Vs {{
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
     Visible: false;
 
-  // a plain battle royale: one background for the whole screen (Bg_Royale.png, the halves' own ones hidden; user
+  // a plain battle royale: one background for the whole screen (Bg_Royale.png, the halves' own ones hidden; playtest
   // 2026-10-16: no sides, so no split), the two crowds slide in over it
   AssetImage #RoyaleBg {{ Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0); Visible: false; }}
 
@@ -464,7 +462,7 @@ Group #Vs {{
 
 {half("R")}  }}
 
-{legacy_columns()}  // a plain battle royale: one centered title in the top bar instead of each half's names (user, 2026-10-17: the
+{legacy_columns()}  // a plain battle royale: one centered title in the top bar instead of each half's names (playtest, 2026-10-17: the
   // two names read like two teams); shown with the clash, as the names
   Group #RoyaleHead {{
     Anchor: (Left: 0, Right: 0, Top: 0, Height: 118);
@@ -483,7 +481,7 @@ Group #Vs {{
     Visible: false;
   }}
 
-  // the battle kind in the VS's own style, right under it (Kind_<kind>_<lang>.png, set by the code; user 2026-10-16)
+  // the battle kind in the VS's own style, right under it (Kind_<kind>_<lang>.png, set by the code; playtest 2026-10-16)
   Group #Title {{
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
     LayoutMode: Top;
@@ -508,14 +506,14 @@ Group #Vs {{
     OUT.write_text(ui, encoding="utf-8", newline="\n")
     print(OUT, len(ui.splitlines()), "lines")
     # a plain battle royale (one background, no sides): the same screen with the halves not cut at the slant, so the
-    # fighters cross the middle (user, 2026-10-18: the cut looked wrong with no seam to cut at). VsScreen picks it.
+    # fighters cross the middle (playtest, 2026-10-18: the cut looked wrong with no seam to cut at). VsScreen picks it.
     royale = ui
     for S in ("L", "R"):
         royale = royale.replace(f'MaskTexturePath: "Masks/Half{S}.png";', "// not cut at the slant: a plain battle royale has no seam")
     royale_out = OUT.with_name("VsRoyale.ui")
     royale_out.write_text(royale, encoding="utf-8", newline="\n")
     print(royale_out, len(royale.splitlines()), "lines")
-    # 3+ teams: one small document per column count (VsScreen appends only the one it shows; user 2026-10-16: with
+    # 3+ teams: one small document per column count (VsScreen appends only the one it shows; playtest 2026-10-16: with
     # everything in one file the client built ~570 pictures' worth of elements for every VS and froze)
     for n in COLUMN_COUNTS:
         cols = f"""// Mob Battle VS screen, {n} team columns (VsScreen.java). GENERATED by scripts/gen-vs-ui.py: edit that and run it
@@ -524,7 +522,7 @@ Group #Vs {{
   Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
 
 {columns([n])}
-  // "Preparing the battle..." while the client loads the screen (2026-10-18, user: during the wait the player could
+  // "Preparing the battle..." while the client loads the screen (2026-10-18, playtest: during the wait the player could
   // think nothing happened); VsScreen hides it when the screen comes in
   Group #Loading {{
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
@@ -551,7 +549,7 @@ Group #Vs {{
     Visible: false;
   }}
 
-  // the kind's title right under the column headers, over the space above the faces (user, 2026-10-16: in the middle
+  // the kind's title right under the column headers, over the space above the faces (playtest, 2026-10-16: in the middle
   // it covered them)
   Group #ColTitle {{
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);

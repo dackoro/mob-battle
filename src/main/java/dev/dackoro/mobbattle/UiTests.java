@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 
 /**
  * Dev tests of what the custom UI can do before redesigning the team columns and the player pictures (2026-10-17,
- * user: "vamos a testear esto"). Both show a full-screen HUD for {@code seconds} (default 25), then take it off.
+ * playtest: "vamos a testear esto"). Both show a full-screen HUD for {@code seconds} (default 25), then take it off.
  * <ul>
  *   <li>{@code /mobbattle test mask [seconds]} (MaskTest.ui): does {@code MaskTexturePath} hide what lies outside an
  *   element? Row A: 300-wide groups holding a picture twice as wide (it spills over unless the group clips it), with no

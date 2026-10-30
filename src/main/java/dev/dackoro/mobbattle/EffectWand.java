@@ -117,7 +117,7 @@ public final class EffectWand {
 
     /**
      * Palette color of the burst on a mob that gets {@code effect} (Fx/Effect/MobBattle_Fx_Effect_<Color>,
-     * scripts/gen-effectburst.py; 2026-10-13, user: chat and wave took the effect's color, the burst stayed purple):
+     * scripts/gen-effectburst.py; 2026-10-13, playtest: chat and wave took the effect's color, the burst stayed purple):
      * a jade/shimmer look's own color, else the palette color nearest to its chat color (no tint = light grey).
      */
     static String burstColor(EntityEffect effect) {
@@ -131,7 +131,7 @@ public final class EffectWand {
 
     /**
      * The tint an effect paints the entity with (its ApplicationEffects EntityTopTint, else EntityBottomTint), brightened
-     * so its strongest channel is at least 0xC0 to read on the chat, or null if it has none (2026-10-13, user: other
+     * so its strongest channel is at least 0xC0 to read on the chat, or null if it has none (2026-10-13, playtest: other
      * mods' effects were all grey). The fields have no getter: read by reflection once per effect.
      */
     private static String tintOf(EntityEffect effect) {

@@ -1,11 +1,16 @@
 package dev.dackoro.mobbattle;
 
+import com.hypixel.hytale.component.ComponentAccessor;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -21,18 +26,50 @@ final class SlowMo {
     private static final Map<String, Integer> ACTIVE = new ConcurrentHashMap<>();
     private static int gen;
 
-    /** Called from checkWinner when a battle ended with a winner. */
+    /** Battles whose slow motion already started at the final blow (finalBlow), so checkWinner does not restart it. */
+    private static final Set<BattleManager.Battle> STARTED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+    /** Battles whose world really went slow (not skipped for another battle there): the film's winner shot asks. */
+    private static final Set<BattleManager.Battle> SLOWED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+
+    /** Whether this battle's end really slowed its world (FilmCamera.winnerShot, audit 2026-10-29). */
+    static boolean slowed(BattleManager.Battle battle) {
+        return battle != null && SLOWED.contains(battle);
+    }
+
+    /**
+     * A battle fighter died (KillTracker, PlayerDeathSystem, same tick as the killing hit): when only one side is left
+     * standing, or none, slow motion starts now. checkWinner only looks once a second, so the slow motion came after the
+     * death animation (playtest 2026-10-29). Cheap: one pass over the battle's members per death, only with endSlowMo.
+     */
+    static void finalBlow(BattleManager.Battle battle, Ref<EntityStore> victim, ComponentAccessor<EntityStore> buffer) {
+        if (FxSettings.endSlowMo < 2 || battle == null || battle.over || STARTED.contains(battle)) return;
+        int side = Integer.MIN_VALUE;
+        for (Map.Entry<Ref<EntityStore>, Integer> e : battle.teamOf.entrySet()) {
+            if (e.getKey() == victim || !BattleManager.isAlive(e.getKey(), buffer)) continue;
+            if (side == Integer.MIN_VALUE) side = e.getValue();
+            else if (side != e.getValue()) return;
+        }
+        // one side left (a win) or none (the last ones fell together: a draw)
+        afterLastHit(battle);
+    }
+
+    /**
+     * Called when a battle ends with a winner or a fought draw (checkWinner, the time-up path); started already if
+     * finalBlow saw the last death.
+     */
     static void afterLastHit(BattleManager.Battle battle) {
-        int pct = FxSettings.endSlowMo;
-        if (pct <= 0 || pct >= 100 || battle.store == null || battle.store.isShutdown()) return;
+        int times = FxSettings.endSlowMo;
+        if (times < 2 || battle.store == null || battle.store.isShutdown()) return;
+        if (!STARTED.add(battle)) return;
         for (BattleManager.Battle other : BattleManager.battles()) {
             if (other != battle && other.store == battle.store) return;
         }
+        SLOWED.add(battle);
         World world = battle.store.getExternalData().getWorld();
         int mine;
         synchronized (SlowMo.class) { mine = ++gen; }
         ACTIVE.put(world.getName(), mine);
-        float factor = Math.max(0.05f, pct / 100f);
+        float factor = Math.max(0.05f, 1f / times);
         world.execute(() -> set(battle.store, factor));
         world.scheduleAfter(() -> {
             if (ACTIVE.remove(world.getName(), mine)) set(battle.store, 1f);

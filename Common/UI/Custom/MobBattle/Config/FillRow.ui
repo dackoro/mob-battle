@@ -1,6 +1,6 @@
 $C = "../../Common.ui";
 
-// Summon list random fill in one row (2026-10-16, user: the two Fill buttons did the same; let me choose how many mob
+// Summon list random fill in one row (2026-10-16, playtest: the two Fill buttons did the same; let me choose how many mob
 // types, how many of each and into how many teams). ConfigPage sets the labels and the last values used.
 Group {
   LayoutMode: Top;

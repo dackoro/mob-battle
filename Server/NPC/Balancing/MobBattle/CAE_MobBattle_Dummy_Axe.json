@@ -1,0 +1,838 @@
+{
+  "$Comment": "Mob Battle training axe fighter's combat with the player's own iron axe attacks (the older weapon set: no signature energy). Basic = Axe_Attack (swing down-left, swing up-right). Charged = the same Axe_Attack held: ChargeFor 1.39 = its only charge key (Axe_Swing_Left_Charged). Guard = Axe_Block after taking damage. Every action carries Weapon_Axe_Iron's interaction vars, plus Axe_Block_Damage with the game's own default. Kept distances: the role's MaintainDistance takes its range from each action's PostExecuteDistanceRange, so they all stay inside the basic attack's reach (strafe 2.5-4 kept it out of reach, staring at its rival); basic attack Timeout 0.5 lets it finish aiming instead of losing the try and waiting a cooldown.",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            10
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.9,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Default": {
+        "Type": "State",
+        "Description": "Change to the Default state",
+        "State": "Combat",
+        "SubState": "Default",
+        "PostExecuteDistanceRange": [
+          1.7,
+          1.7
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 5
+            }
+          }
+        ]
+      },
+      "Strafe": {
+        "Type": "State",
+        "Description": "Change to the strafe state",
+        "State": "Combat",
+        "SubState": "Strafe",
+        "PostExecuteDistanceRange": [
+          1.6,
+          2.2
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 5
+            }
+          }
+        ]
+      },
+      "Charged": {
+        "Type": "Ability",
+        "Description": "Axe charged swing: the player's held primary (Axe_Swing_Left_Charged)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          0.5,
+          1.8
+        ],
+        "PostExecuteDistanceRange": [
+          1.7,
+          1.7
+        ],
+        "Ability": "Axe_Attack",
+        "ChargeFor": 1.39,
+        "InteractionVars": {
+          "Axe_Swing_Down_Left_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Weapon_Charge_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 34
+                  },
+                  "Type": "Absolute",
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Block_Damage": {
+            "Interactions": [
+              "Axe_Block_Damage"
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 8
+            }
+          }
+        ]
+      },
+      "StrafeCharged": {
+        "Type": "Ability",
+        "Description": "Axe charged swing: the player's held primary (Axe_Swing_Left_Charged)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          0.5,
+          1.8
+        ],
+        "PostExecuteDistanceRange": [
+          1.6,
+          2.2
+        ],
+        "Ability": "Axe_Attack",
+        "ChargeFor": 1.39,
+        "InteractionVars": {
+          "Axe_Swing_Down_Left_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Weapon_Charge_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 34
+                  },
+                  "Type": "Absolute",
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Block_Damage": {
+            "Interactions": [
+              "Axe_Block_Damage"
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 8
+            }
+          }
+        ]
+      },
+      "Guard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          5
+        ],
+        "PostExecuteDistanceRange": [
+          1.7,
+          1.7
+        ],
+        "Ability": "Axe_Block",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Axe_Swing_Down_Left_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Weapon_Charge_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 34
+                  },
+                  "Type": "Absolute",
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Block_Damage": {
+            "Interactions": [
+              "Axe_Block_Damage"
+            ]
+          }
+        }
+      },
+      "StrafeGuard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          9
+        ],
+        "PostExecuteDistanceRange": [
+          1.6,
+          2.2
+        ],
+        "Ability": "Axe_Block",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Axe_Swing_Down_Left_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Up_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Up_Right_Damage",
+                "DamageCalculator": {
+                  "Type": "Absolute",
+                  "BaseDamage": {
+                    "Physical": 17
+                  },
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Effect": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Effect",
+                "Effects": {
+                  "WorldSoundEventId": "SFX_Weapon_Charge_Swing"
+                }
+              }
+            ]
+          },
+          "Axe_Swing_Left_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Axe_Swing_Left_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 34
+                  },
+                  "Type": "Absolute",
+                  "RandomPercentageModifier": 0.2
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                }
+              }
+            ]
+          },
+          "Axe_Block_Damage": {
+            "Interactions": [
+              "Axe_Block_Damage"
+            ]
+          }
+        }
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Axe_Attack"
+          ],
+          "InteractionVars": {
+            "Axe_Swing_Down_Left_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Down_Left_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Down_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Down_Left_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.2
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Up_Right_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Up_Right_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Up_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Up_Right_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.2
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Left_Charged_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Left_Charged_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Weapon_Charge_Swing"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Left_Charged_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Left_Charged_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 34
+                    },
+                    "Type": "Absolute",
+                    "RandomPercentageModifier": 0.2
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                  }
+                }
+              ]
+            },
+            "Axe_Block_Damage": {
+              "Interactions": [
+                "Axe_Block_Damage"
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 2.5,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.1,
+            0.3
+          ]
+        },
+        "Actions": [
+          "Charged",
+          "Guard",
+          "Strafe"
+        ]
+      },
+      "Strafe": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Axe_Attack"
+          ],
+          "InteractionVars": {
+            "Axe_Swing_Down_Left_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Down_Left_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Down_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Down_Left_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.2
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Up_Right_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Up_Right_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Swing"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Up_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Up_Right_Damage",
+                  "DamageCalculator": {
+                    "Type": "Absolute",
+                    "BaseDamage": {
+                      "Physical": 17
+                    },
+                    "RandomPercentageModifier": 0.2
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Left_Charged_Effect": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Left_Charged_Effect",
+                  "Effects": {
+                    "WorldSoundEventId": "SFX_Weapon_Charge_Swing"
+                  }
+                }
+              ]
+            },
+            "Axe_Swing_Left_Charged_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Axe_Swing_Left_Charged_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 34
+                    },
+                    "Type": "Absolute",
+                    "RandomPercentageModifier": 0.2
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Axe_Iron_Impact"
+                  }
+                }
+              ]
+            },
+            "Axe_Block_Damage": {
+              "Interactions": [
+                "Axe_Block_Damage"
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 2.5,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.1,
+            0.3
+          ]
+        },
+        "Actions": [
+          "StrafeCharged",
+          "StrafeGuard",
+          "Default"
+        ]
+      }
+    }
+  }
+}

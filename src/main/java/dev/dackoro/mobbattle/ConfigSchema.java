@@ -461,6 +461,7 @@ final class ConfigSchema {
                 toggle("wintitle.enabled"),
                 choice("title.style", ConfigSchema::titleStyles),
                 choice("title.scope", FxSettings.TITLE_SCOPES),
+                number("title.scope.radius", FxSettings.MIN_SCOPE_RADIUS, FxSettings.MAX_SCOPE_RADIUS),
                 section("musicfx"),
                 toggle("battle.music"),
                 choice("battle.music.track", ConfigSchema::musicTracks),
@@ -478,7 +479,12 @@ final class ConfigSchema {
                 number("camera.time", 0, KindFx.MAX_CAMERA_TIME),
                 number("camera.shots", 1, FxSettings.MAX_MOBS_LIMIT),
                 choice("camera.scope", FxSettings.TITLE_SCOPES),
+                choice("camera.vs.scope", FxSettings.TITLE_SCOPES),
                 choice("camera.hud", FxSettings.CAMERA_HUDS),
+                choice("camera.bands.timer", FxSettings.BAND_PLACES),
+                choice("camera.bands.title", FxSettings.BAND_PLACES),
+                choice("camera.bands.rows", new String[] {"1", "2"}),
+                choice("camera.bands.info", FxSettings.BAND_INFO_PLACES),
                 toggle("camera.face"),
                 choice("camera.bars", KindFx.CAMERA_BARS),
                 choice("camera.blur", KindFx.CAMERA_BLURS),
@@ -512,7 +518,7 @@ final class ConfigSchema {
                 toggle("camera.autowatch"),
                 choice("camera.watch.transition", FxSettings.WATCH_TRANSITIONS),
                 number("camera.watch.autoswitch", 0, FxSettings.MAX_WATCH_AUTO_SWITCH),
-                number("camera.slowmo", 0, 99),
+                number("camera.slowmo.times", 0, FxSettings.MAX_SLOW_MO_TIMES),
                 number("camera.slowmo.time", 1, FxSettings.MAX_SLOW_MO_SECONDS),
                 toggle("battle.duelCard"),
                 toggle("battle.focusCard"),
@@ -524,6 +530,7 @@ final class ConfigSchema {
                 toggle("battle.pvp"),
                 toggle("army.friendlyfire"),
                 toggle("equip.weapon.damage"),
+                toggle("battle.loot"),
                 toggle("battle.unstick"),
                 number("battle.standoff", 0, FxSettings.MAX_STANDOFF_SECONDS),
                 number("battle.passivewin", 0, FxSettings.MAX_PASSIVE_WIN_SECONDS),
@@ -545,10 +552,20 @@ final class ConfigSchema {
                 section("ties"),
                 note("ties"),
                 choice("battle.tiebreak", KindFx.TIE_BREAKS),
-                choice("battle.killtiebreak", KindFx.KILL_TIE_BREAKS)
+                choice("battle.killtiebreak", KindFx.KILL_TIE_BREAKS),
+                section("dummies"),
+                note("dummies"),
+                number("dummy.health", FxSettings.DUMMY_BASE_HEALTH, FxSettings.MAX_DUMMY_HEALTH),
+                number("dummy.damage", 0, 9900),
+                number("dummy.defense", 0, 99),
+                number("dummy.speed", 0, 900),
+                number("dummy.size", 0, 900),
+                section("runes"),
+                note("runes"),
+                number("rune.cooldown", FxSettings.MIN_RUNE_COOLDOWN, FxSettings.MAX_RUNE_COOLDOWN)
         ), null, false));
 
-        // One tab per battle kind: its presentation overrides, rules, arena and timer together (user, 2026-10-12:
+        // One tab per battle kind: its presentation overrides, rules, arena and timer together (playtest 2026-10-12:
         // a royale took three tabs to set up). The settings of every kind share their texts (id without the kind).
         for (BattleManager.Kind k : BattleManager.Kind.values()) {
             List<Item> tab = new ArrayList<>();
@@ -640,10 +657,10 @@ final class ConfigSchema {
         buffs.add(choice("buff.size.speed", Buffs.SIZE_EFFECTS.toArray(new String[0])));
         buffs.add(choice("buff.size.jump", Buffs.SIZE_EFFECTS.toArray(new String[0])));
         buffs.add(buffNumber("buff.size.max", Buffs.MIN_SIZE, Buffs.MAX_SIZE, Buffs.Stat.SIZE).p("size", Buffs.SIZE_SAFE));
-        // Buff Wand first (user, 2026-10-13: the lone target section on top was taken for the wand's).
+        // Buff Wand first (playtest 2026-10-13: the lone target section on top was taken for the wand's).
         for (Buffs.Source s : List.of(Buffs.Source.WAND, Buffs.Source.LONE, Buffs.Source.STREAK, Buffs.Source.CHAMPION)) {
             buffs.add(section("buff." + s.key));
-            // How clicks add up: on the mob's base value, never on what it already has (user, 2026-10-13).
+            // How clicks add up: on the mob's base value, never on what it already has (playtest 2026-10-13).
             if (s == Buffs.Source.WAND) buffs.add(note("buffwand.stack"));
             for (Buffs.Stat st : Buffs.Stat.values()) {
                 buffs.add(buffNumber("buff." + s.key + "." + st.key, 0, st.max, st).id("buff.stat." + st.key));
@@ -653,7 +670,7 @@ final class ConfigSchema {
                 buffs.add(number("buff.streak.maxkills", 1, Buffs.MAX_STREAK));
             }
             if (s == Buffs.Source.WAND) {
-                // Everything about the Buff Wand in one place (user, 2026-10-12).
+                // Everything about the Buff Wand in one place (playtest 2026-10-12).
                 buffs.add(number("buff.wand.maxstacks", 1, Buffs.MAX_WAND));
                 buffs.add(choice("wand.buff.color", ConfigSchema::palette));
                 buffs.add(choice("wand.buff.look", "shimmer", "runes", "off"));
@@ -731,6 +748,7 @@ final class ConfigSchema {
                 choice("summon.exit", "disintegrate", "vanish", "shatter"),
                 section("whenspawn"),
                 choice("summon.calm", "off", "summons", "all"),
+                toggle("summon.frozen"),
                 toggle("summon.army"),
                 toggle("summon.jade"),
                 choice("summon.jade.color", ConfigSchema::palette)
@@ -755,6 +773,11 @@ final class ConfigSchema {
             FieldItem f = toggle(key);
             f.field().admin = true;
             admin.add(f);
+            if (key.equals("server.vs")) {
+                FieldItem when = choice(FxSettings.VS_PICTURES_KEY, FxSettings.VS_PICTURES);
+                when.field().admin = true;
+                admin.add(when);
+            }
         }
         pages.add(new Page("admin", admin, "admin", true));
 

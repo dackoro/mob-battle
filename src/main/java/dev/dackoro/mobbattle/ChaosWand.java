@@ -111,7 +111,7 @@ public final class ChaosWand {
     }
 
     /**
-     * battleBelow / battleAbove (2026-10-14, user): a royale or all vs one takes mobs only this far below / above its
+     * battleBelow / battleAbove (2026-10-14): a royale or all vs one takes mobs only this far below / above its
      * center (0 = no limit), so a surface battle leaves a deep cave's mobs alone. True if {@code r} is inside the band.
      */
     static boolean inBand(Vector3d center, Ref<EntityStore> r, ComponentAccessor<EntityStore> buffer) {

@@ -13,7 +13,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Where the generated pictures live (thumbnails, VS pictures, holograms, icons, saved player skins): ONE folder per
- * machine shared by every world and server, not one per world (user, 2026-10-16: each new single-player world redrew
+ * machine shared by every world and server, not one per world (playtest 2026-10-16: each new single-player world redrew
  * everything for 1-2 minutes, and the test server's copy reached ~300 MB). Every file's key (render version + asset
  * hashes) or name (version folders) already says what drew it, so sharing is safe; two servers may use it at once, so
  * every write goes to a temp file first and is renamed into place.

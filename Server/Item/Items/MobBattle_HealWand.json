@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_HealWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Support",
   "Icon": "Icons/Items/MobBattle/HealWand.png",
   "Quality": "Uncommon",
   "ItemLevel": 1,

@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_ChaosWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Battles",
   "Icon": "Icons/Items/MobBattle/ChaosWand.png",
   "Quality": "Epic",
   "ItemLevel": 1,

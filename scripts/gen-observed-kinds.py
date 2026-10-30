@@ -7,7 +7,7 @@ Defend only), or becomes Fighters if the guess was No attack. A role that never 
 NO_ATTACK. Only roles whose observed kind differs from the guess are written; PickLists uses them for the game's own
 roles instead of its JSON guess. Reports: "role | guessed kind | order X | result [| MISMATCH]".
 
-Kickers (2026-10-14, user: cows kick players who hit them): a role that never attacked but has AttackWhenStartled and
+Kickers (2026-10-14, playtest: cows kick players who hit them): a role that never attacked but has AttackWhenStartled and
 an Attack in its role chain (Template_Animal_Neutral: kicks an attacker standing behind it within AttackRange, else
 flees) is written as DEFENDS,passive: Defend only on the panel, yet it never starts a fight (passiveWin). The chain is
 read from the game's Assets.zip.

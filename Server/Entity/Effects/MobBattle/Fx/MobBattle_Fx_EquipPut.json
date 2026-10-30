@@ -1,0 +1,22 @@
+{
+  "$Comment": "Equipment Wand: gear put on the mob (gold tint, gold burst ring; sound played by the code).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#ffd23e",
+    "EntityBottomTint": "#8a5a0a",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Mark_Burst_Yellow",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

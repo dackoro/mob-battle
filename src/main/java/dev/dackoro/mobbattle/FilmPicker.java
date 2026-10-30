@@ -12,7 +12,7 @@ import java.util.function.ToIntFunction;
 
 /**
  * Which shot the battle film plays next (FilmCamera). Plain logic with no game classes, so FilmPickerSim runs it
- * offline. 2026-10-16, user: wide and landscape came one after the other again and again ("design a weights algorithm
+ * offline. 2026-10-16, playtest: wide and landscape came one after the other again and again ("design a weights algorithm
  * so a shot doesn't repeat that much; sometimes it looks fine, but it gets monotonous").
  * <p>
  * Each shot's chance = its base weight for this fight (fighters, spread) x the player's filmShot percent, then:
@@ -101,7 +101,9 @@ final class FilmPicker {
 
         // Player shots: filmPlayerShots percent, never two in a row, balanced over the fight.
         pendingPlayer = -1;
-        if (!players.isEmpty() && !s.first()) {
+        // the first shot is a battle shot, unless there is none to pick (2026-10-29, playtest: only player shots on, a wide
+        // shot opened the film)
+        if (!players.isEmpty() && (!s.first() || battle.isEmpty())) {
             double share = battle.isEmpty() ? 1 : Math.min(1, playerShare / 100.0);
             double p = share * balance(playerOwed);
             if ("player".equals(families.peekFirst()) && !battle.isEmpty()) p = 0;

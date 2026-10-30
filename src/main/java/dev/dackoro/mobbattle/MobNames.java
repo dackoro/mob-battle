@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Mob names as players see them (2026-10-16, user: the win title said "Goblin_Burner WINS!" while the VS said "GOBLIN
+ * Mob names as players see them (2026-10-16, playtest: the win title said "Goblin_Burner WINS!" while the VS said "GOBLIN
  * BURNER"; show the game's own name, not the ID). A role's name is its NameTranslationKey (role JSON chain:
  * "server.npcRoles.Goblin_Burner.name" = "Goblin Burner" / "Quemador Goblin"); a role without one reads as its ID
  * with spaces ("Test Dummy"). Anything that is not a role (a player's name, a team name) stays as it is.
@@ -59,17 +59,18 @@ final class MobNames {
      * screen): the language of the first player online (a local or small server mostly has one), else English.
      */
     static String shared(String idOrName) {
-        String lang = null;
+        return text(idOrName, sharedLang());
+    }
+
+    /** The language of the first player online (null = English), for text built once for several players. */
+    static String sharedLang() {
         try {
             for (var p : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
-                if (p != null && p.isValid() && p.getLanguage() != null) {
-                    lang = p.getLanguage();
-                    break;
-                }
+                if (p != null && p.isValid() && p.getLanguage() != null) return p.getLanguage();
             }
         } catch (RuntimeException ignored) {
         }
-        return text(idOrName, lang);
+        return null;
     }
 
     /**
@@ -108,7 +109,7 @@ final class MobNames {
             // The key exactly as the game holds it: chat and titles send it to the client, which only knows real keys.
             // A mod's own .lang file is its own namespace (MajorDungeons.lang -> "MajorDungeons.npcRoles.Baron.name",
             // no "server."), and the "server." put in front of every key showed it raw in the countdown and the FIGHT
-            // title (user screenshot, 2026-10-17; the VS screen, translated on the server, looked fine).
+            // title (playtest screenshot, 2026-10-17; the VS screen, translated on the server, looked fine).
             String named = PickLists.nameKeyOf(r);
             java.util.List<String> tries = new java.util.ArrayList<>();
             if (!named.isEmpty()) {

@@ -53,14 +53,21 @@ final class PlayerFighters {
      */
     static boolean inWave(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
         return isPlayer(ref, accessor) && BattleManager.isAlive(ref, accessor)
-                && !com.hypixel.hytale.server.core.modules.entity.component.Spectating.isSpectating(ref, accessor);
+                && !com.hypixel.hytale.server.core.modules.entity.component.Spectating.isSpectating(ref, accessor)
+                && !inFilm(ref, accessor);
     }
 
-    /** True if {@code ref} is a player in Creative or spectating (/spectate, /mobbattle watch): they never fight. */
+    /** In the battle film's own game mode (FilmMode): a viewer, as a spectator is (audit 2026-10-29). */
+    private static boolean inFilm(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
+        return FilmMode.isFilmMode(com.hypixel.hytale.server.core.modules.entity.gamemode.GameModeTypes.getCurrentTypeId(ref, accessor));
+    }
+
+    /** True if {@code ref} is a player in Creative, spectating (/spectate, /mobbattle watch) or in the film: they never fight. */
     static boolean isCreative(Ref<EntityStore> ref, ComponentAccessor<EntityStore> accessor) {
         Player p = ref != null && ref.isValid() ? accessor.getComponent(ref, Player.getComponentType()) : null;
         return p != null && (p.getGameMode() == GameMode.Creative
-                || com.hypixel.hytale.server.core.modules.entity.component.Spectating.isSpectating(ref, accessor));
+                || com.hypixel.hytale.server.core.modules.entity.component.Spectating.isSpectating(ref, accessor)
+                || inFilm(ref, accessor));
     }
 
     /**

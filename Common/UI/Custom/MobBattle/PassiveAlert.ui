@@ -1,7 +1,7 @@
 // Mob Battle alert, bottom left (PassiveAlert.java): only mobs that can't fight back are left, so the battle
 // ends after /mobbattle passiveWin seconds without a hit. Same panel textures as TimerHud.ui; paths relative to
 // this file. A malformed property makes the client reject the whole HUD, so change one thing at a time.
-// Over the cinema bars (CinemaBars.shift, 2026-10-16, user): #ShiftBar takes the band's height and #ShiftPad
+// Over the cinema bars (CinemaBars.shift, 2026-10-16, playtest): #ShiftBar takes the band's height and #ShiftPad
 // hides, so the alert sits just over the bottom band while a camera films; without bars it is where it always was.
 Group #Shift {
   Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);

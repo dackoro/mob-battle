@@ -175,7 +175,7 @@ final class Arena {
     /**
      * True when {@code pos} is clearly outside the walled arena of {@code battle} right now (horizontal distance).
      * False with no arena, a shown-only one or no position. Target picking (BattleManager.reach): a skeleton chasing
-     * a duck flown off past the wall walked against it for the whole battle (user, 2026-10-12).
+     * a duck flown off past the wall walked against it for the whole battle (playtest 2026-10-12).
      */
     static boolean outside(BattleManager.Battle battle, Vector3d pos) {
         if (pos == null || ARENAS.isEmpty()) return false;
@@ -346,6 +346,9 @@ final class Arena {
         double radius = s.radius(System.currentTimeMillis());
         for (Ref<EntityStore> npc : s.battle.members()) {
             if (!npc.isValid() || !BattleManager.isAlive(npc, store)) continue;
+            // A player who fell is an outsider of the battle: no wall, no teleport back. BattleManager.fall already takes
+            // him out of members(); this keeps it so if he is ever put back in it.
+            if (!s.battle.fallen.isEmpty() && s.battle.fallen.containsKey(npc)) continue;
             Vector3d p = ChaosWand.positionOf(npc, store);
             if (p == null) continue;
             if (MobBattlePlugin.debugging()) watchFall(s, npc, p, store);
@@ -395,7 +398,7 @@ final class Arena {
                 continue;
             }
             double ox = dx / d, oz = dz / d;   // outward
-            // Medium (2026-10-14, user): a water mob's lake is its zone. It is only moved into water inside the
+            // Medium (2026-10-14): a water mob's lake is its zone. It is only moved into water inside the
             // arena; with none there it stays where it is, never pushed onto land (the others can't reach it either,
             // so passiveWin ends the battle on health). A walker that drowns is only moved onto dry land.
             Medium.Can can = Medium.of(npc, store);
@@ -403,7 +406,7 @@ final class Arena {
             FightFx.Spot spot = Medium.spotFor(can);
             // Still outside the edge after MAX_PUSHES pushes: the knockback can't move it (e.g. the closing wall
             // passed a mob wedged in rock). An edge mob just inside the margin is never counted.
-            // Only pushes that got it nowhere count (2026-10-14, user: with a closing arena the wall kept pushing a wolf
+            // Only pushes that got it nowhere count (2026-10-14, playtest: with a closing arena the wall kept pushing a wolf
             // that was walking in with it, it hit MAX_PUSHES, was teleported 3 blocks inside, met the wall again: a
             // ping-pong). Moving in since the last pass starts the count over.
             Double before = s.edgeDist.put(npc, d);
@@ -517,7 +520,7 @@ final class Arena {
     }
 
     /**
-     * How long a water mob may wait outside the arena once no water is left inside it (2026-10-14, user: a zombie
+     * How long a water mob may wait outside the arena once no water is left inside it (2026-10-14, playtest: a zombie
      * can't leave the arena to get at it either, so hiding in a lake out there must not win the battle).
      */
     private static final long STRANDED_MS = 10_000;
@@ -536,7 +539,7 @@ final class Arena {
 
     /**
      * arenaVertical (default 0 = no limit): a fighter farther above or below the arena's center height is brought back
-     * (cave shafts, cliffs). Separate from battleBelow/Above, which only choose who joins (user, 2026-10-14).
+     * (cave shafts, cliffs). Separate from battleBelow/Above, which only choose who joins (playtest 2026-10-14).
      */
     private static boolean beyondBand(double dy) {
         return FxSettings.arenaVertical > 0 && Math.abs(dy) > FxSettings.arenaVertical;
@@ -614,7 +617,7 @@ final class Arena {
 
     /** Knockback toward the center (the game's own, as "/knockback apply" sets it). */
     private static void push(Ref<EntityStore> npc, double ox, double oz, double over, boolean blocked, Store<EntityStore> store) {
-        // Gentle at the edge, harder the farther out it is (2026-10-14, user: the fixed push was too rough). One that
+        // Gentle at the edge, harder the farther out it is (2026-10-14, playtest: the fixed push was too rough). One that
         // the last push did not move (a step of the colosseum stands) gets the full lift, to hop up instead of being
         // teleported after MAX_PUSHES (test 2026-10-14: 9 teleports on the stands).
         double strength = Math.max(PUSH_MIN, Math.min(PUSH, PUSH_MIN + PUSH_PER_BLOCK * over));
@@ -641,10 +644,15 @@ final class Arena {
             }
             return;
         }
-        java.util.List<com.hypixel.hytale.server.core.Message> sub = subtitle(s.battle, store);
+        // the lines per language: mob names are written in each viewer's (2026-10-30, playtest: the band read "TOP:
+        // LUCHADOR ESQUELETO" to an English player while a Spanish one was online)
+        java.util.Map<String, java.util.List<com.hypixel.hytale.server.core.Message>> byLang = new java.util.HashMap<>();
         for (UUID id : s.viewers) {
             PlayerRef p = Universe.get().getPlayer(id);
-            if (p != null && p.isValid()) TimerHud.show(p, store, s.titleKey, sub, left);
+            if (p == null || !p.isValid()) continue;
+            String lang = p.getLanguage();
+            TimerHud.show(p, store, s.titleKey,
+                    byLang.computeIfAbsent(String.valueOf(lang), k -> subtitle(s.battle, store, lang)), left);
         }
     }
 
@@ -656,7 +664,8 @@ final class Arena {
      * "5 attackers vs X", "6 fighters left" + the top killer. A line that would not fit by its names goes on two.
      */
     private static java.util.List<com.hypixel.hytale.server.core.Message> subtitle(BattleManager.Battle battle,
-                                                                                    ComponentAccessor<EntityStore> buffer) {
+                                                                                    ComponentAccessor<EntityStore> buffer,
+                                                                                    String lang) {
         // Counted, not collected: this runs every second for battles of hundreds of mobs.
         int alive = 0;
         Ref<EntityStore> first = null, second = null;
@@ -667,8 +676,8 @@ final class Arena {
             alive++;
         }
         if (battle.kind == BattleManager.Kind.DUEL && alive == 2) {
-            String a = pretty(ChaosWand.nameOf(first, buffer));
-            String b = pretty(ChaosWand.nameOf(second, buffer));
+            String a = MobNames.text(ChaosWand.nameOf(first, buffer), lang);
+            String b = MobNames.text(ChaosWand.nameOf(second, buffer), lang);
             if (a.length() + b.length() + 4 <= LINE_CHARS) {
                 return java.util.List.of(I18n.tr("hud.timer.vs").param("a", a).param("b", b));
             }
@@ -676,7 +685,7 @@ final class Arena {
         }
         if (battle.kind == BattleManager.Kind.ALL_VS_ONE && battle.focusName != null) {
             int n = Math.max(0, alive - 1);
-            String name = pretty(battle.focusName);
+            String name = MobNames.text(battle.focusName, lang);
             if (name.length() + 14 <= LINE_CHARS) {
                 return java.util.List.of(I18n.tr("hud.timer.attackers.vs").param("count", n).param("name", name));
             }
@@ -713,14 +722,10 @@ final class Arena {
         if (leader == null) return java.util.List.of(count);
         return java.util.List.of(count, tied > 1
                 ? I18n.tr("hud.timer.top.tied").param("tied", tied).param("n", leader.count())
-                : I18n.tr("hud.timer.top").param("name", pretty(leader.name())).param("n", leader.count()));
+                : I18n.tr("hud.timer.top").param("name", MobNames.text(leader.name(), lang)).param("n", leader.count()));
     }
 
     /** Role ids read better in the box without underscores: "Test_Dummy" -> "Test Dummy". */
-    private static String pretty(String name) {
-        return MobNames.shared(name);
-    }
-
     /** Removes the timer box (portal: an UpdatePortal with no state and no definition, as PortalTrackerSystems does). */
     private static void clearTimer(State s) {
         if (s.seconds <= 0) return;

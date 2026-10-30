@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * /mobbattle apply &lt;who&gt; &lt;action&gt; [value] (2026-10-13, user: wand actions on a chosen player or mob, for quick
+ * /mobbattle apply &lt;who&gt; &lt;action&gt; [value] (2026-10-13, playtest: wand actions on a chosen player or mob, for quick
  * setting tests and for server admins). Admin only, with a real grant: it acts on other players.
  * <ul>
  *   <li>who: a player name, {@code me}, {@code look} (the mob or player you look at, up to LOOK_RANGE), {@code near
@@ -101,7 +101,7 @@ final class ApplyCommand {
             reply(ctx, problem.chat(), problem.log(), ERR);
             return;
         }
-        // army add <owner> (2026-10-14, user): into another player's army, or a mob's (that mob leads it). Looked up
+        // army add <owner> (2026-10-14): into another player's army, or a mob's (that mob leads it). Looked up
         // here, on the command thread: TestTools.resolve blocks on the world thread.
         Ref<EntityStore> owner = null;
         String[] armyWords = action.equals("army") && value != null ? value.trim().split("\s+") : new String[0];
@@ -183,14 +183,21 @@ final class ApplyCommand {
                 if (skippedMsgs.size() > 5) list.add(Message.raw("..."));
                 chat = Message.join(chat, Message.raw(" "), I18n.tr("cmd.apply.skipped").param("list", Message.join(list.toArray(new Message[0]))));
             }
-            reply(ctx, chat, (done > 0 ? "Applied " + action + (value != null ? " " + value : "") + " to " + names + detail(action, value) + "." : "Nothing applied.")
+            // Training dummies keep their hands under a kit (only armor, runes and stats go on): say so.
+            Kits.Kit kitUsed = action.equals("kit") ? Kits.get(value) : null;
+            // only when the kit has something for the hands (audit 2026-10-29: the default kits are armor only)
+            boolean kitHands = kitUsed != null && (!kitUsed.slots().get(0).isEmpty() || !kitUsed.slots().get(1).isEmpty());
+            boolean dummyHands = kitHands && done > 0 && targets.stream()
+                    .anyMatch(t -> t.isValid() && EquipWand.fixedHands(EquipWand.nameOf(t, store)));
+            if (dummyHands) chat = Message.join(chat, Message.raw(" "), I18n.tr("cmd.kit.dummyhands"));
+            reply(ctx, chat, (dummyHands ? "(training dummies kept their hands) " : "") + (done > 0 ? "Applied " + action + (value != null ? " " + value : "") + " to " + names + detail(action, value) + "." : "Nothing applied.")
                     + (skipped.isEmpty() ? "" : " Skipped: " + String.join(", ", skipped.subList(0, Math.min(5, skipped.size())))
                     + (skipped.size() > 5 ? "..." : "")), done > 0 ? OK : ERR);
         });
     }
 
     /**
-     * What the buff actions amount to, as the Buff Wand's chat line does (user, 2026-10-13: "applied buff 1" said
+     * What the buff actions amount to, as the Buff Wand's chat line does (playtest 2026-10-13: "applied buff 1" said
      * nothing about how much): ": 1/5 stacks (size x2 (+100%), ...)" or ": size x3 (+200%)". Empty for the rest.
      */
     private static Message detailMsg(String action, String value) {
@@ -445,7 +452,7 @@ final class ApplyCommand {
                 WandFx.onTarget(t, WandFx.MORPH, store);
             }
             case "kit" -> {
-                if (!Kits.apply(t, Kits.get(value), store)) return "not a mob";
+                if (Kits.apply(t, Kits.get(value), store) == null) return "not a mob";
             }
             case "equip", "unequip" -> {
                 NPCEntity mob = store.getComponent(t, NPCEntity.getComponentType());
@@ -534,9 +541,11 @@ final class ApplyCommand {
      * its hand), or with item null empties its hand and armor. World thread.
      */
     private static String equip(Ref<EntityStore> t, NPCEntity mob, String item, Store<EntityStore> store) {
-        // The Equipment Wand's slots (every slot of a hand, so a role switching slots keeps showing it).
+        // The Equipment Wand's slots (every slot of a hand, so a role switching slots keeps showing it). A training
+        // dummy's hands stay: its attacks are written for its own weapon.
+        boolean fixed = EquipWand.fixedHands(mob.getRoleName());
         if (item == null) {
-            for (int i = 0; i < EquipWand.SLOTS.length; i++) {
+            for (int i = fixed ? 2 : 0; i < EquipWand.SLOTS.length; i++) {
                 if (i != 1 || EquipWand.hasOffHand(t, store)) EquipWand.set(t, i, null, store);
             }
             return null;
@@ -544,6 +553,7 @@ final class ApplyCommand {
         var asset = com.hypixel.hytale.server.core.asset.type.item.config.Item.getAssetMap().getAsset(item);
         int slot = asset != null && asset.getArmor() != null && asset.getArmor().getArmorSlot() != null
                 ? 2 + asset.getArmor().getArmorSlot().ordinal() : 0;
+        if (slot < 2 && fixed) return "keeps its hands";
         return EquipWand.set(t, slot, item, store) == null ? null : "can't hold it";
     }
 
@@ -556,6 +566,7 @@ final class ApplyCommand {
             case "can't wear it" -> "cantwear";
             case "not morphed" -> "notmorphed";
             case "can't hold it" -> "canthold";
+            case "keeps its hands" -> "dummyhands";
             case "not a mob" -> "notmob";
             case "you are in another world" -> "otherworld";
             case "already in that army" -> "inarmy";

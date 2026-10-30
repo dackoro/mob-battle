@@ -2,7 +2,6 @@ package dev.dackoro.mobbattle;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.protocol.packets.setup.RequestCommonAssetsRebuild;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.asset.common.CommonAsset;
 import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
@@ -42,7 +41,7 @@ import java.util.concurrent.TimeUnit;
  * quad over the wand's gem, hanging on {@code R-Attachment}, the bone the held item's root sits on, so it moves with
  * the wand) is one more ModelAttachment on the player's model, with the mob's hologram texture.
  * <p>
- * After the user's test (2026-10-16): (1) the player lost their clothes: a player's look comes from their skin, so
+ * After a playtest (2026-10-16): (1) the player lost their clothes: a player's look comes from their skin, so
  * the model is rebuilt from it ({@code CosmeticsModule.createModel}, as vanilla /model reset, then the skin is sent
  * again); (2) the panel showed with any item: it is now only there while the Morph Wand is in hand (hotbar change in
  * WandEquipSoundSystem, a new copy in MorphWand.setCopy, and a check every second); (3) the wrist variant was hard to
@@ -58,14 +57,14 @@ final class MorphHologram {
     private static final String OK = "#7dff8a";
     private static final String ERR = "#ff6b6b";
     /**
-     * The panel model, one per yaw of the panel around the wand (2026-10-16, user: in first person the panel was seen at
+     * The panel model, one per yaw of the panel around the wand (2026-10-16, playtest: in first person the panel was seen at
      * an angle). The first one shipped copied the wand's own 34 degree turn; MobBattle_Hologram_Y{m90,m60,m56,m30,0,34}
      * (m = minus) turn the panel quad that many degrees about Y. Default {@link #DEFAULT_YAW}; `test hologram yaw <deg>`
      * tries the others live (per player, memory only). ❓ Which one faces the first-person camera is a guess.
      */
     static final String HOLO_PREFIX = "Items/MobBattle/MorphWand/MobBattle_Hologram";
     static final int[] YAWS = {-90, -60, -56, -30, 0, 34};
-    static final int DEFAULT_YAW = -30;   // user, 2026-10-16: -30 faces the first-person camera
+    static final int DEFAULT_YAW = -30;   // 2026-10-16: -30 faces the first-person camera
     static final String HOLO_MODEL = modelForYaw(DEFAULT_YAW);
     private static final Map<UUID, Integer> YAW = new ConcurrentHashMap<>();
     /**
@@ -94,8 +93,11 @@ final class MorphHologram {
     static final String WAND = "MobBattle_MorphWand";
     /** A texture Mob Battle ships, to learn whether the registry names common files with a "Common/" prefix. */
     private static final String KNOWN_TEXTURE = "Items/MobBattle/MorphWand/MobBattle_MorphWand_Texture.png";
-    /** Hologram texture size (256 since 2026-10-16: 128 looked blocky on the panel; the panel quad is 256 units). */
-    static final int TEX = 256;
+    /**
+     * Hologram texture size, the panel quad's units (MobBattle_Hologram_Y*.blockymodel). 256 from 2026-10-16 (128 looked
+     * blocky), back to 128 on 2026-10-28 to try it: each one is a quarter of the client's shared entity texture atlas.
+     */
+    static final int TEX = 128;
     private static final long LIVE_APPLY_DELAY_MS = 1500;
     private static final long CHECK_MS = 1000;
 
@@ -107,13 +109,15 @@ final class MorphHologram {
     /** Live-registered textures this session (a model the boot cache did not have). */
     private static final Set<String> LIVE = ConcurrentHashMap.newKeySet();
     private static volatile boolean checking;
+    /** Plugin shutdown happened: a picture finishing late must not start the 1 s loop again (audit 2026-10-29). */
+    private static volatile boolean stopped;
 
     /*
-     * How the panel reaches the client (2026-10-16, user tests): the game's player Model is the bare "Player" body and
+     * How the panel reaches the client (2026-10-16, playtest tests): the game's player Model is the bare "Player" body and
      * the client puts the clothes on from the PlayerSkin; a Model with attachments of its own replaces them (panel
      * without clothes), and sending the skin again replaces the panel (clothes without panel). So "wand" (default)
      * sends a Model that carries every skin part as an attachment (PlayerLook, built on the server, cached per skin)
-     * plus the panel, and never the skin. "hud" = no panel, the picture in a HUD corner (works, user test).
+     * plus the panel, and never the skin. "hud" = no panel, the picture in a HUD corner (works, playtest test).
      */
     static final String PANEL = "wand", HUD = "hud";
     private static final Set<String> STYLES = Set.of(PANEL, HUD);
@@ -218,11 +222,17 @@ final class MorphHologram {
         String modelId = null;
         if (!off(player) && holdsWand(ref, store)) {
             MorphWand.Copy copy = MorphWand.copyOf(player);
-            modelId = copy != null && copy.skin() == null ? copy.modelId() : null;
+            // a copied player look gets its own hologram, keyed by its skin (2026-10-29, playtest: copied players had none)
+            modelId = copy == null ? null : copy.skin() == null ? copy.modelId()
+                    : VsScreen.PLAYER_PREFIX + PlayerSkins.idOf(copy.skin());
             want = modelId != null ? ThumbnailCache.hologramTexture(modelId) : null;
+            if (want == null && modelId != null && copy.skin() != null) {
+                onDemandSkin(player, modelId, copy.skin());
+                modelId = null;
+            }
         }
         if (want == null && modelId != null && !off(player)) {
-            liveTexture(player, modelId);   // not in the boot cache: made now, put on when ready
+            onDemand(player, modelId);   // registered the first time someone copies this mob, put on when ready
         }
         String style = STYLE.getOrDefault(player, PANEL);
         PlayerRef pr = store.getComponent(ref, PlayerRef.getComponentType());
@@ -278,7 +288,7 @@ final class MorphHologram {
 
     /** Every second while someone wears a panel: the wand may have left the hand without a hotbar change (drop, move). */
     private static void startChecks() {
-        if (checking) return;
+        if (checking || stopped) return;
         checking = true;
         HytaleServer.SCHEDULED_EXECUTOR.schedule(MorphHologram::check, CHECK_MS, TimeUnit.MILLISECONDS);
     }
@@ -418,35 +428,14 @@ final class MorphHologram {
     }
 
     /**
-     * Registers a hologram PNG in the mod's asset pack, silently ({@code rebuild} false at boot: nobody is connected,
-     * so no client reloads anything). Returns the plain path the model uses.
+     * On demand (2026-10-28, playtest: players with many mods): no hologram is registered at boot any more. Every model's
+     * texture went to every joining client and into the client's entity texture atlas, which the textures of ~45 mods
+     * already fill (rejected textures, broken items). Now a mob's hologram is registered the first time someone
+     * copies it: read from the picture cache (drawn now if missing), put in the registry without the per-file toast,
+     * pushed to the players online with one asset rebuild (a short hitch, once per model per session) and added to
+     * the list clients joining later get. Then the player is refreshed. One try per model per session.
      */
-    static String register(String modelId, byte[] png, boolean rebuild) {
-        String plain = texturePath(modelId);
-        ThumbnailCache.addAsset(new RuntimeAsset(registryPrefix() + plain, png));
-        return registered(plain, rebuild);
-    }
-
-    /** The same for a hologram read from the picture cache: its bytes are only held softly (RuntimeCommonAsset). */
-    static String register(String modelId, byte[] png, java.nio.file.Path file) {
-        String plain = texturePath(modelId);
-        ThumbnailCache.addAsset(new RuntimeCommonAsset(registryPrefix() + plain, png, file));
-        return registered(plain, false);
-    }
-
-    private static String registered(String plain, boolean rebuild) {
-        if (rebuild) Universe.get().broadcastPacketNoCache(new RequestCommonAssetsRebuild());
-        return plain;
-    }
-
-    /**
-     * Fallback for a model the boot cache did not have: renders and registers its hologram now (the clients reload
-     * their assets once), then refreshes the player. One per model per session.
-     */
-    private static void liveTexture(UUID player, String modelId) {
-        // never in game (user, 2026-10-16: no "Reloaded assets" toast, ever): the boot run writes every model's
-        // hologram to disk and the next boot registers it; until then this copy shows no panel
-        if (!ThumbnailCache.mayRegister()) return;
+    private static void onDemand(UUID player, String modelId) {
         if (!LIVE.add(modelId)) return;
         ModelAsset asset = ModelAsset.getAssetMap().getAsset(modelId);
         if (asset == null) return;
@@ -455,10 +444,23 @@ final class MorphHologram {
         ThumbnailCache.PoseChoice pose = ThumbnailCache.poseOf(model, "auto", null);
         CompletableFuture.runAsync(() -> {
             try {
-                BufferedImage shot = ThumbnailCache.render(pieces, ThumbnailCache.load(pose), ModelThumbnail.THREE_QUARTER, TEX - 16, true);
-                if (shot == null) return;
-                ThumbnailCache.markHologram(modelId, register(modelId, encode(hologram(shot)), true));
-                MobBattlePlugin.log("Hologram texture for " + modelId + " made live (not in the boot cache): clients reloaded their assets.");
+                long t0 = System.nanoTime();
+                java.nio.file.Path file = ThumbnailCache.holoFileOf(modelId);
+                byte[] png = file != null && java.nio.file.Files.exists(file) ? java.nio.file.Files.readAllBytes(file) : null;
+                if (png == null) {
+                    BufferedImage shot = ThumbnailCache.render(pieces, ThumbnailCache.load(pose), ModelThumbnail.THREE_QUARTER, TEX - 8, true);
+                    if (shot == null) return;
+                    png = encode(hologram(shot));
+                    if (file != null) PictureCache.write(file, png);
+                }
+                String plain = texturePath(modelId);
+                CommonAsset made = file != null && java.nio.file.Files.exists(file)
+                        ? new RuntimeCommonAsset(registryPrefix() + plain, png, file)
+                        : new RuntimeAsset(registryPrefix() + plain, png);
+                ThumbnailCache.registerOnline(made);
+                ThumbnailCache.markHologram(modelId, plain, png.length);
+                MobBattlePlugin.log("Hologram texture for " + modelId + " registered on demand (" + MobBattlePlugin.size(png.length)
+                        + ", " + MobBattlePlugin.took(t0) + ").");
                 HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> refresh(player), LIVE_APPLY_DELAY_MS, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
                 MobBattlePlugin.log("Hologram texture for " + modelId + " failed: " + e);
@@ -466,13 +468,48 @@ final class MorphHologram {
         });
     }
 
-    /** 128x128: the picture fitted at the bottom, tinted green by its brightness, scanlines, outline, corner brackets. */
+    /** onDemand for a copied player look: the skin drawn as VS pictures draw it (bare body + every skin part). */
+    private static void onDemandSkin(UUID player, String id, com.hypixel.hytale.protocol.PlayerSkin skin) {
+        if (off(player) || !LIVE.add(id)) return;
+        Model model = com.hypixel.hytale.server.core.cosmetics.CosmeticsModule.get().createModel(skin, 1f);
+        if (model == null) return;
+        List<ThumbnailCache.Piece> pieces = new java.util.ArrayList<>();
+        for (var a : PlayerLook.attachments(skin)) ThumbnailCache.addPiece(pieces, a);
+        if (pieces.isEmpty()) return;
+        ThumbnailCache.PoseChoice pose = ThumbnailCache.poseOf(model, "idle", null);
+        CompletableFuture.runAsync(() -> {
+            try {
+                long t0 = System.nanoTime();
+                java.nio.file.Path file = ThumbnailCache.holoFileOf(id);
+                byte[] png = file != null && java.nio.file.Files.exists(file) ? java.nio.file.Files.readAllBytes(file) : null;
+                if (png == null) {
+                    BufferedImage shot = ThumbnailCache.render(pieces, ThumbnailCache.load(pose), ModelThumbnail.THREE_QUARTER, TEX - 8, true);
+                    if (shot == null) return;
+                    png = encode(hologram(shot));
+                    if (file != null) PictureCache.write(file, png);
+                }
+                String plain = texturePath(id);
+                CommonAsset made = file != null && java.nio.file.Files.exists(file)
+                        ? new RuntimeCommonAsset(registryPrefix() + plain, png, file)
+                        : new RuntimeAsset(registryPrefix() + plain, png);
+                ThumbnailCache.registerOnline(made);
+                ThumbnailCache.markHologram(id, plain, png.length);
+                MobBattlePlugin.log("Hologram texture for a player look registered on demand (" + MobBattlePlugin.size(png.length)
+                        + ", " + MobBattlePlugin.took(t0) + ").");
+                HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> refresh(player), LIVE_APPLY_DELAY_MS, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                MobBattlePlugin.log("Hologram texture for a player look failed: " + e);
+            }
+        });
+    }
+
+    /** TEX x TEX: the picture fitted at the bottom, tinted green by its brightness, faint scanlines, a glow around it. */
     static BufferedImage hologram(BufferedImage shot) {
         BufferedImage out = new BufferedImage(TEX, TEX, BufferedImage.TYPE_INT_ARGB);
-        int max = TEX - 24;
+        int max = TEX - TEX * 24 / 256;   // margins tuned at 256, kept in proportion
         double k = Math.min((double) max / shot.getWidth(), (double) max / shot.getHeight());
         int w = Math.max(1, (int) Math.round(shot.getWidth() * k)), h = Math.max(1, (int) Math.round(shot.getHeight() * k));
-        int ox = (TEX - w) / 2, oy = TEX - 12 - h;
+        int ox = (TEX - w) / 2, oy = TEX - TEX * 12 / 256 - h;
         if (k < 1) {
             // area average (a 384 thumbnail sampled one pixel in three lost its details)
             shot = shrink(shot, w, h);
@@ -506,7 +543,7 @@ final class MorphHologram {
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 if (!solid[y][x]) continue;
-                // green-scale (user, 2026-10-16: like the Omnitrix hologram, not old-TV lines): the picture's own
+                // green-scale (playtest 2026-10-16: like the Omnitrix hologram, not old-TV lines): the picture's own
                 // brightness range mapped from deep green to bright lime
                 double v = Math.pow((lum[y][x] - lo) / span, 0.85);
                 boolean edge = x == 0 || y == 0 || x == w - 1 || y == h - 1
@@ -522,11 +559,11 @@ final class MorphHologram {
         return out;
     }
 
-    // brighter than the first green-scale (user, 2026-10-16: glow like the wand's gem): bright colors on the fullbright
+    // brighter than the first green-scale (playtest 2026-10-16: glow like the wand's gem): bright colors on the fullbright
     // panel are what makes it glow
     private static final int[] DARK = {26, 124, 34}, LIME = {214, 255, 128};
-    private static final int GLOW_RGB = 0xB4FF6E, GLOW_ALPHA = 150, BODY_ALPHA = 240, GLOW_PX = 5;
-    private static final int SCANLINE_EVERY = 8;
+    private static final int GLOW_RGB = 0xB4FF6E, GLOW_ALPHA = 150, BODY_ALPHA = 240, GLOW_PX = Math.max(2, 5 * TEX / 256);
+    private static final int SCANLINE_EVERY = Math.max(4, 8 * TEX / 256);
     private static final double SCANLINE_DIM = 0.9;
 
     /** Distance to the nearest solid pixel within {@code r} (r + 1 when none). */
@@ -587,6 +624,7 @@ final class MorphHologram {
     /** Plugin shutdown: forget who had it on. */
     static void clear() {
         DISABLED.clear();
+        stopped = true;
         checking = false;
         SHOWN.clear();
         LIVE.clear();

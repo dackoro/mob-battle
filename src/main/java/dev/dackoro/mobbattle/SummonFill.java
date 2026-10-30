@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * /mobbattle summon fill (2026-10-14, user: summon mobs that make good battles at random, with the same classifier as
+ * /mobbattle summon fill (2026-10-14, playtest: summon mobs that make good battles at random, with the same classifier as
  * the panel's mob list): fills the summon list with random roles that fight, of similar strength (their MaxHealth,
  * PickLists.maxHealthOf), optionally dealt into balanced teams. The Summon Wand or /mobbattle summon then spawns them.
  */

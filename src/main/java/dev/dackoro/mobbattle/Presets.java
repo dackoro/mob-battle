@@ -36,7 +36,7 @@ final class Presets {
     /** Presentation keys a built-in preset first puts back to default (with every per-kind override). */
     private static final String[] PRESENTATION_KEYS = {
             "fight.countdown", "fight.ready", "fight.camera", "camera.style", "camera.time", "camera.shots", "camera.end",
-            "camera.end.time", "camera.autowatch", "camera.watch.transition", "camera.watch.autoswitch", "camera.bars", "camera.blur", "camera.autofilm", "camera.vsscreen", "camera.vs.teamreps", "camera.film.player", "camera.film.wide", "camera.face", "camera.hud", "camera.film.shot", "camera.film.variation", "camera.film.pace", "camera.film.transition", "camera.film.weight.wide", "camera.film.weight.track", "camera.film.weight.arc", "camera.film.weight.pushin", "camera.film.weight.closeup", "camera.film.weight.landscape", "camera.film.weight.playerback", "camera.film.weight.playerclose", "camera.film.weight.zenith", "camera.film.weight.spiral", "camera.film.weight.telephoto", "camera.film.weight.descent", "camera.film.weight.groundrise", "camera.film.weight.profile", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
+            "camera.end.time", "camera.autowatch", "camera.watch.transition", "camera.watch.autoswitch", "camera.bars", "camera.blur", "camera.autofilm", "camera.vsscreen", "camera.vs.teamreps", "camera.film.player", "camera.film.wide", "camera.face", "camera.hud", "camera.bands.timer", "camera.bands.title", "camera.bands.rows", "camera.bands.info", "camera.film.shot", "camera.film.variation", "camera.film.pace", "camera.film.transition", "camera.film.weight.wide", "camera.film.weight.track", "camera.film.weight.arc", "camera.film.weight.pushin", "camera.film.weight.closeup", "camera.film.weight.landscape", "camera.film.weight.playerback", "camera.film.weight.playerclose", "camera.film.weight.zenith", "camera.film.weight.spiral", "camera.film.weight.telephoto", "camera.film.weight.descent", "camera.film.weight.groundrise", "camera.film.weight.profile", "title.enabled", "wintitle.enabled", "battle.music", "battle.music.track",
             "laser.enabled", "chaos.area", "fx.runes", "fx.crown", "battle.duelCard", "battle.focusCard"
     };
 
@@ -54,6 +54,9 @@ final class Presets {
                 m.put("fight.countdown", "0");
                 m.put("fight.camera", "false");
                 m.put("camera.end", "off");
+                // the cards are on by default since 2026-10-30; "just the fights" keeps the screen clear
+                m.put("battle.duelCard", "false");
+                m.put("battle.focusCard", "false");
                 m.put("title.enabled", "false");
                 m.put("wintitle.enabled", "false");
                 m.put("battle.music", "false");
@@ -75,7 +78,7 @@ final class Presets {
             }
             case "effects" -> {
                 // Fights with all the show but no cameras: countdown, timer, titles, music, runes, area (the laser
-                // is debug only, user 2026-10-12).
+                // is debug only, playtest 2026-10-12).
                 m.put("fight.countdown", "3");
                 m.put("fight.camera", "false");
                 m.put("camera.end", "off");
@@ -86,7 +89,7 @@ final class Presets {
                 m.put("fx.runes", "true");
                 Properties defaults = FxSettings.defaults();
                 for (BattleManager.Kind k : BattleManager.Kind.values()) {
-                    // The royale keeps its own 3 min and judge (user, 2026-10-12); the rest get 2 min, health.
+                    // The royale keeps its own 3 min and judge (playtest 2026-10-12); the rest get 2 min, health.
                     boolean royale = k == BattleManager.Kind.ROYALE;
                     m.put("battle.timer." + k.key, royale ? defaults.getProperty("battle.timer." + k.key, "180") : "120");
                     m.put("battle.timeup." + k.key, royale ? defaults.getProperty("battle.timeup." + k.key, "judge") : "health");
@@ -101,7 +104,7 @@ final class Presets {
                 m.put("chaos.area", "wall");
                 m.put("fx.runes", "true");
                 m.put("team.fx", "both");
-                // Everything to read while testing: the duel card and every scoreboard (user, 2026-10-12).
+                // Everything to read while testing: the duel card and every scoreboard (playtest 2026-10-12).
                 m.put("battle.duelCard", "true");
                 m.put("battle.focusCard", "true");
                 for (BattleManager.Kind k : BattleManager.Kind.values()) {
@@ -113,7 +116,7 @@ final class Presets {
             }
             case "cinematic" -> {
                 m.put("fight.countdown", "5");
-                // Time to get in position before the VS (user, 2026-10-20: the preset for filming; crouch starts it)
+                // Time to get in position before the VS (playtest 2026-10-20: the preset for filming; crouch starts it)
                 m.put("fight.ready", "8");
                 m.put("fight.camera", "true");
                 m.put("camera.style", "auto");
@@ -128,7 +131,7 @@ final class Presets {
                 m.put("battle.music", "true");
                 m.put("laser.enabled", "false");
                 m.put("fx.runes", "false");
-                // The area and the waves keep their defaults (user, 2026-10-12); no border glow in the shots. The
+                // The area and the waves keep their defaults (playtest 2026-10-12); no border glow in the shots. The
                 // mob looks and the crown stay.
                 for (ActionFx.Action a : ActionFx.Action.values()) {
                     m.put("glow." + a.key, ActionFx.OFF);
@@ -272,7 +275,7 @@ final class Presets {
 
     /** summon.* keys that are settings, not part of the summon list (they go in presets and resets). */
     private static final java.util.Set<String> SUMMON_SETTINGS = java.util.Set.of(
-            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit", "summon.calm", "summon.jade", "summon.jade.color", "summon.army",
+            "summon.radius", "summon.despawn", "summon.lifetime", "summon.exit", "summon.calm", "summon.frozen", "summon.jade", "summon.jade.color", "summon.army",
             // The random count range is a setting too (panel "Save changes"), not part of the list.
             "summon.min", "summon.max", "summon.atleastone");
 
@@ -286,7 +289,7 @@ final class Presets {
      */
     private static boolean isSecurityKey(String key) {
         return FxSettings.PERMISSIONS_KEY.equals(key) || "debug".equals(key) || "debug.record".equals(key)
-                || java.util.Arrays.asList(FxSettings.SERVER_KEYS).contains(key);
+                || java.util.Arrays.asList(FxSettings.SERVER_KEYS).contains(key) || FxSettings.VS_PICTURES_KEY.equals(key);
     }
 
     /** /mobbattle reset groups, in help order. */
@@ -315,7 +318,7 @@ final class Presets {
                 || key.startsWith("battle.music")) return "titles";
         if (key.startsWith("battle.arena.") || key.startsWith("battle.timer") || key.startsWith("battle.timeup.")
                 || key.startsWith("battle.judgeby.") || key.startsWith("battle.shrink") || key.startsWith("battle.scoreboard.") || key.equals("battle.tiebreak") || key.equals("battle.killtiebreak")
-                || key.equals("battle.unstick") || key.startsWith("battle.wave.") || key.equals("battle.standoff") || key.equals("battle.below") || key.equals("battle.above") || key.startsWith("battle.passivewin") || key.equals("battle.idleend") || key.equals("battle.maxtime") || key.equals("battle.duelCard") || key.equals("battle.focusCard")) return "arenas";
+                || key.equals("battle.unstick") || key.equals("battle.loot") || key.startsWith("battle.wave.") || key.equals("battle.standoff") || key.equals("battle.below") || key.equals("battle.above") || key.startsWith("battle.passivewin") || key.equals("battle.idleend") || key.equals("battle.maxtime") || key.equals("battle.duelCard") || key.equals("battle.focusCard")) return "arenas";
         if (key.startsWith("kill.") || key.startsWith("snap.") || key.startsWith("morph.") || key.startsWith("cleanse.") || key.equals("effect.id") || key.startsWith("effect.area") || key.startsWith("heal.area") || key.startsWith("wand.wave.")
                 || key.equals("wand.debug.track")) return "wands";
         return "rules";

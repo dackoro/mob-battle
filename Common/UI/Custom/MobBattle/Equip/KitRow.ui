@@ -1,0 +1,49 @@
+$C = "../../Common.ui";
+
+// One saved kit in the Kits tab (EquipPage): its name and what it holds; #Mark shows the kit picked.
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 52, Bottom: 4);
+
+  Group #Mark {
+    Anchor: (Width: 4);
+    Background: #ffd23e;
+    Visible: false;
+  }
+
+  ItemSlotButton #Pick {
+    FlexWeight: 1;
+    LayoutMode: Full;
+    Padding: (Left: 10, Right: 6);
+    Style: (
+      Default: (
+        Background: #1c2835,
+      ),
+      Hovered: (
+        Background: #2c3c4c,
+      ),
+      Pressed: (
+        Background: #a08040,
+      ),
+      Disabled: (
+        Background: #14181d,
+      ),
+      Sounds: $C.@ButtonSounds,
+    );
+
+    Group {
+      Anchor: (Full: 0);
+      LayoutMode: Top;
+
+      Label #Name {
+        Anchor: (Height: 26);
+        Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      }
+
+      Label #Info {
+        Anchor: (Height: 20);
+        Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Center);
+      }
+    }
+  }
+}

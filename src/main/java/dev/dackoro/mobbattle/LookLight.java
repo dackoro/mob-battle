@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Steady: every mob LookKeeper guards (Jade/Shimmer looks and the buff's shimmer) glows with
  *       {@code FxSettings.lookGlow} (0-15, like block light), in the look's color. It goes when the look goes.</li>
  *   <li>Flash: Kill Wand disintegrations start at {@code FxSettings.deathGlow} and fade to nothing by the time the
- *       mob is removed, in the death look's color (soul rip purple otherwise). Snap's ash gives no flash (user).</li>
+ *       mob is removed, in the death look's color (soul rip purple otherwise). Snap's ash gives no flash.</li>
  * </ul>
  * A light the entity already had (builder tools) is put back when ours goes. Everything runs on the mob's world
  * thread, from {@link LookKeeper#tick} (every tick while {@link #any()} or a look is kept).
@@ -29,7 +29,7 @@ final class LookLight {
 
     /**
      * Jade lights at this share of lookGlow (rounded, at least 1): the jade look is already fullbright with bloom over
-     * the whole model, so the same light made it glare (user, 2026-10-12). Shimmer and the buff keep the full level.
+     * the whole model, so the same light made it glare (playtest 2026-10-12). Shimmer and the buff keep the full level.
      */
     static final float JADE_GLOW = 0.6f;
 

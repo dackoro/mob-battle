@@ -1,0 +1,228 @@
+{
+  "$Comment": "Mob Battle training dagger fighter: the training knight's role (mannequin body, Neutral, fights what a battle turns it against within 30 blocks) with iron daggers in both hands and no shield. CAE_MobBattle_Dummy_Daggers gives it the player's dagger attacks: the swing and stab combo, the pounce and the Razorstrike signature. Keeps 1.2-1.8 blocks from its target (dagger reach 2). No armor. Keeps 1-1.7 blocks from its rival: the daggers combo reaches 2, and at the knight's 2-3 it only pounced. Circles its rival in short bursts (0.6-1.2 s every 1.5-3 s, 1-1.8 s every 0.8-1.6 s in Strafe) and turns its head quicker (0.7): two dagger fighters circling nonstop never got their aim on each other.",
+  "Type": "Generic",
+  "Appearance": "Mannequin",
+  "CombatConfig": "CAE_MobBattle_Dummy_Daggers",
+  "HotbarItems": [
+    "Weapon_Daggers_Iron"
+  ],
+  "DefaultPlayerAttitude": "Neutral",
+  "DefaultNPCAttitude": "Neutral",
+  "StartState": "Idle",
+  "MotionControllerList": [
+    {
+      "Type": "Walk",
+      "MaxWalkSpeed": 15,
+      "Gravity": 10,
+      "MaxFallSpeed": 20,
+      "Acceleration": 10
+    }
+  ],
+  "MaxHealth": {
+    "Compute": "MaxHealth"
+  },
+  "Parameters": {
+    "MaxHealth": {
+      "Value": 100,
+      "Description": "Max health for the NPC"
+    }
+  },
+  "Instructions": [
+    {
+      "Instructions": [
+        {
+          "Sensor": {
+            "Type": "State",
+            "State": "Idle"
+          },
+          "Instructions": [
+            {
+              "Sensor": {
+                "Type": "Mob",
+                "Range": 80,
+                "GetPlayers": true,
+                "Filters": [
+                  {
+                    "Type": "Attitude",
+                    "Attitudes": [
+                      "Hostile",
+                      "Friendly"
+                    ]
+                  }
+                ],
+                "Collector": {
+                  "Type": "CombatTargets"
+                }
+              },
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Combat"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Sensor": {
+            "Type": "State",
+            "State": "Combat"
+          },
+          "Instructions": [
+            {
+              "Sensor": {
+                "Type": "Or",
+                "Sensors": [
+                  {
+                    "Type": "Mob",
+                    "Range": 80,
+                    "GetPlayers": true,
+                    "LockOnTarget": false,
+                    "Filters": [
+                      {
+                        "Type": "Attitude",
+                        "Attitudes": [
+                          "Hostile",
+                          "Friendly"
+                        ]
+                      }
+                    ],
+                    "Collector": {
+                      "Type": "CombatTargets"
+                    }
+                  },
+                  {
+                    "Type": "HasHostileTargetMemory"
+                  }
+                ]
+              },
+              "Instructions": [
+                {
+                  "Sensor": {
+                    "Type": "Or",
+                    "Sensors": [
+                      {
+                        "Type": "State",
+                        "State": ".Default"
+                      }
+                    ]
+                  },
+                  "Instructions": [
+                    {
+                      "Sensor": {
+                        "Type": "CombatActionEvaluator",
+                        "TargetInRange": true
+                      },
+                      "HeadMotion": {
+                        "Type": "Aim",
+                        "RelativeTurnSpeed": 0.7
+                      },
+                      "BodyMotion": {
+                        "Type": "MaintainDistance",
+                        "DesiredDistanceRange": [
+                          1,
+                          1.7
+                        ],
+                        "MoveThreshold": 0.1,
+                        "RelativeForwardsSpeed": 0.45,
+                        "RelativeBackwardsSpeed": 0.38,
+                        "StrafingFrequencyRange": [
+                          1.5,
+                          3
+                        ],
+                        "StrafingDurationRange": [
+                          0.6,
+                          1.2
+                        ]
+                      },
+                      "Actions": [
+                        {
+                          "Type": "CombatAbility"
+                        }
+                      ]
+                    },
+                    {
+                      "Sensor": {
+                        "Type": "CombatActionEvaluator",
+                        "TargetInRange": false
+                      },
+                      "BodyMotion": {
+                        "Type": "Seek",
+                        "SlowDownDistance": 1,
+                        "StopDistance": 1,
+                        "RelativeSpeed": 0.45
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Sensor": {
+                    "Type": "State",
+                    "State": ".Strafe",
+                    "IgnoreMissingSetState": true
+                  },
+                  "Instructions": [
+                    {
+                      "Sensor": {
+                        "Type": "CombatActionEvaluator",
+                        "TargetInRange": true
+                      },
+                      "HeadMotion": {
+                        "Type": "Aim",
+                        "RelativeTurnSpeed": 0.7
+                      },
+                      "BodyMotion": {
+                        "Type": "MaintainDistance",
+                        "DesiredDistanceRange": [
+                          1,
+                          1.7
+                        ],
+                        "StrafingFrequencyRange": [
+                          0.8,
+                          1.6
+                        ],
+                        "StrafingDurationRange": [
+                          1,
+                          1.8
+                        ],
+                        "MoveThreshold": 0.1,
+                        "RelativeForwardsSpeed": 0.45,
+                        "RelativeBackwardsSpeed": 0.38
+                      },
+                      "Actions": [
+                        {
+                          "Type": "CombatAbility"
+                        }
+                      ]
+                    },
+                    {
+                      "Sensor": {
+                        "Type": "CombatActionEvaluator",
+                        "TargetInRange": false
+                      },
+                      "BodyMotion": {
+                        "Type": "Seek",
+                        "SlowDownDistance": 1,
+                        "StopDistance": 1,
+                        "RelativeSpeed": 0.45
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Idle"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "NameTranslationKey": "server.npcRoles.MobBattle_Dummy_Daggers.name"
+}

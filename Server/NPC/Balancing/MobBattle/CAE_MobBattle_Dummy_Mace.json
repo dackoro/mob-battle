@@ -1,0 +1,596 @@
+{
+  "$Comment": "Mob Battle training mace fighter's combat, laid out like CAE_MobBattle_Dummy_Knight but with the player's own iron mace attacks. Basic attacks = Root_Weapon_Mace_Primary (the left, right, up-left combo). Charged = Weapon_Mace_Primary_Swing_Left/Right_Charged straight away (the player's 0.167 s stamina-check charge is skipped), ChargeFor 1.667 = that interaction's highest charge key. Signature = Root_Weapon_Mace_Signature_Groundslam, only picked with full SignatureEnergy (a held mace raises its max to 8; hits fill it). Damage vars are the ones of Weapon_Mace_Iron. The mace is two-handed, so no ability sets an off hand (OffhandSlot -1 by default). Guard = Root_Weapon_Mace_Secondary_Guard (the player's right click), raised after taking damage like the knight's shield. Kept distances: the role's MaintainDistance takes its range from each action's PostExecuteDistanceRange, so they all stay inside the basic attack's reach (strafe 2.5-4 kept it out of reach, staring at its rival); basic attack Timeout 0.5 lets it finish aiming instead of losing the try and waiting a cooldown.",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            10
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.9,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Default": {
+        "Type": "State",
+        "Description": "Change to the Default state",
+        "State": "Combat",
+        "SubState": "Default",
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "MaceCharged": {
+        "Type": "Ability",
+        "Description": "Charged left swing of the mace (the player's held primary attack)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Ability": {
+          "Interactions": [
+            "Weapon_Mace_Primary_Swing_Left_Charged"
+          ]
+        },
+        "ChargeFor": 1.667,
+        "InteractionVars": {
+          "Swing_Left_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Mace_Primary_Swing_Left_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 41
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                  "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 8
+            }
+          }
+        ]
+      },
+      "MaceSignature": {
+        "Type": "Ability",
+        "Description": "Mace signature: Groundslam (jump and slam, needs full signature energy)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Ability": "Root_Weapon_Mace_Signature_Groundslam",
+        "InteractionVars": {
+          "Groundslam_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Mace_Signature_Groundslam_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 93
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                  "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 7.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      },
+      "Strafe": {
+        "Type": "State",
+        "Description": "Change to the strafe state",
+        "State": "Combat",
+        "SubState": "Strafe",
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "MaceStrafeCharged": {
+        "Type": "Ability",
+        "Description": "Charged right swing of the mace (the player's held primary attack)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Ability": {
+          "Interactions": [
+            "Weapon_Mace_Primary_Swing_Right_Charged"
+          ]
+        },
+        "ChargeFor": 1.667,
+        "InteractionVars": {
+          "Swing_Right_Charged_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Mace_Primary_Swing_Right_Charged_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 41
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                  "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 8
+            }
+          }
+        ]
+      },
+      "MaceStrafeSignature": {
+        "Type": "Ability",
+        "Description": "Mace signature: Groundslam (jump and slam, needs full signature energy)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Ability": "Root_Weapon_Mace_Signature_Groundslam",
+        "InteractionVars": {
+          "Groundslam_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Mace_Signature_Groundslam_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 93
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                  "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 7.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      },
+      "Guard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          5
+        ],
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Ability": "Root_Weapon_Mace_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Mace_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "StrafeGuard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          9
+        ],
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Ability": "Root_Weapon_Mace_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Mace_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Root_Weapon_Mace_Primary"
+          ],
+          "InteractionVars": {
+            "Swing_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Mace_Primary_Swing_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                    "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Mace_Primary_Swing_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                    "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Up_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Mace_Primary_Swing_Up_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                    "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                  }
+                }
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 3,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.2,
+            0.5
+          ]
+        },
+        "Actions": [
+          "MaceCharged",
+          "MaceSignature",
+          "Guard",
+          "Strafe"
+        ]
+      },
+      "Strafe": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Root_Weapon_Mace_Primary"
+          ],
+          "InteractionVars": {
+            "Swing_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Mace_Primary_Swing_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                    "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Mace_Primary_Swing_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                    "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Up_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Mace_Primary_Swing_Up_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Mace_T2_Impact",
+                    "LocalSoundEventId": "SFX_Mace_T2_Impact"
+                  }
+                }
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 3,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.2,
+            0.5
+          ]
+        },
+        "Actions": [
+          "MaceStrafeCharged",
+          "MaceStrafeSignature",
+          "StrafeGuard",
+          "Default"
+        ]
+      }
+    }
+  }
+}

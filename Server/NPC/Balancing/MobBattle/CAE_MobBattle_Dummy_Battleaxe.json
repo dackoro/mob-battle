@@ -1,0 +1,1178 @@
+{
+  "$Comment": "Mob Battle training battleaxe fighter's combat, laid out like CAE_MobBattle_Dummy_Mace with the player's own iron battleaxe attacks. Basic = Root_Weapon_Battleaxe_Primary (down-left, down-right, down combo). Charged = Weapon_Battleaxe_Primary_Downstrike straight away (the player's 0.174 s tap-or-hold charge is skipped), ChargeFor 0.572 = its highest charge key. Signature = Root_Weapon_Battleaxe_Signature_Whirlwind, only picked with full SignatureEnergy (a held battleaxe raises its max to 9). Guard = Root_Weapon_Battleaxe_Secondary_Guard after taking damage. Every action carries Weapon_Battleaxe_Iron's interaction vars. Two-handed: no off hand. Kept distances: the role's MaintainDistance takes its range from each action's PostExecuteDistanceRange, so they all stay inside the basic attack's reach (strafe 2.5-4 kept it out of reach, staring at its rival); basic attack Timeout 0.5 lets it finish aiming instead of losing the try and waiting a cooldown.",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            10
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.9,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Default": {
+        "Type": "State",
+        "Description": "Change to the Default state",
+        "State": "Combat",
+        "SubState": "Default",
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "Strafe": {
+        "Type": "State",
+        "Description": "Change to the strafe state",
+        "State": "Combat",
+        "SubState": "Strafe",
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "Charged": {
+        "Type": "Ability",
+        "Description": "Battleaxe downstrike: the player's charged primary (jump and strike down)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Ability": {
+          "Interactions": [
+            "Weapon_Battleaxe_Primary_Downstrike"
+          ]
+        },
+        "ChargeFor": 0.572,
+        "InteractionVars": {
+          "Swing_Down_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 36
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 18
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 23
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Downstrike_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 29
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Signature_Whirlwind_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 14
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 8
+            }
+          }
+        ]
+      },
+      "StrafeCharged": {
+        "Type": "Ability",
+        "Description": "Battleaxe downstrike: the player's charged primary (jump and strike down)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Ability": {
+          "Interactions": [
+            "Weapon_Battleaxe_Primary_Downstrike"
+          ]
+        },
+        "ChargeFor": 0.572,
+        "InteractionVars": {
+          "Swing_Down_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 36
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 18
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 23
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Downstrike_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 29
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Signature_Whirlwind_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 14
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 8
+            }
+          }
+        ]
+      },
+      "Signature": {
+        "Type": "Ability",
+        "Description": "Battleaxe signature: Whirlwind (needs full signature energy)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Ability": "Root_Weapon_Battleaxe_Signature_Whirlwind",
+        "InteractionVars": {
+          "Swing_Down_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 36
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 18
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 23
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Downstrike_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 29
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Signature_Whirlwind_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 14
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 8.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      },
+      "StrafeSignature": {
+        "Type": "Ability",
+        "Description": "Battleaxe signature: Whirlwind (needs full signature energy)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Ability": "Root_Weapon_Battleaxe_Signature_Whirlwind",
+        "InteractionVars": {
+          "Swing_Down_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 36
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 18
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 23
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Downstrike_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 29
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Signature_Whirlwind_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 14
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 8.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      },
+      "Guard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          5
+        ],
+        "PostExecuteDistanceRange": [
+          2.25,
+          2.25
+        ],
+        "Ability": "Root_Weapon_Battleaxe_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Swing_Down_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 36
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 18
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 23
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Downstrike_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 29
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Signature_Whirlwind_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 14
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "StrafeGuard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          9
+        ],
+        "PostExecuteDistanceRange": [
+          2.0,
+          2.7
+        ],
+        "Ability": "Root_Weapon_Battleaxe_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Swing_Down_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 36
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Left_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 18
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Swing_Down_Right_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 23
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Downstrike_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 29
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 2
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Signature_Whirlwind_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 14
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                  "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                }
+              }
+            ]
+          },
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Root_Weapon_Battleaxe_Primary"
+          ],
+          "InteractionVars": {
+            "Swing_Down_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 36
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Down_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 18
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Down_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 23
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Downstrike_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "EntityStatsOnHit": [
+                    {
+                      "EntityStatId": "SignatureEnergy",
+                      "Amount": 2
+                    }
+                  ],
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Signature_Whirlwind_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 14
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Guard_Wield": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                  "StaminaCost": {
+                    "Value": 10,
+                    "CostType": "Damage"
+                  }
+                }
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 3,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.2,
+            0.5
+          ]
+        },
+        "Actions": [
+          "Charged",
+          "Signature",
+          "Guard",
+          "Strafe"
+        ]
+      },
+      "Strafe": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Root_Weapon_Battleaxe_Primary"
+          ],
+          "InteractionVars": {
+            "Swing_Down_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 36
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Down_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 18
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Swing_Down_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Swing_Down_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 23
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Downstrike_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Primary_Downstrike_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 29
+                    }
+                  },
+                  "EntityStatsOnHit": [
+                    {
+                      "EntityStatId": "SignatureEnergy",
+                      "Amount": 2
+                    }
+                  ],
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Signature_Whirlwind_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Signature_Whirlwind_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 14
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Battleaxe_T2_Impact",
+                    "LocalSoundEventId": "SFX_Battleaxe_T2_Impact"
+                  }
+                }
+              ]
+            },
+            "Guard_Wield": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Battleaxe_Secondary_Guard_Wield",
+                  "StaminaCost": {
+                    "Value": 10,
+                    "CostType": "Damage"
+                  }
+                }
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 3,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.2,
+            0.5
+          ]
+        },
+        "Actions": [
+          "StrafeCharged",
+          "StrafeSignature",
+          "StrafeGuard",
+          "Default"
+        ]
+      }
+    }
+  }
+}

@@ -23,7 +23,7 @@ import java.util.TreeSet;
 
 /**
  * The settings panel's long pick lists (summon mobs, Morph Wand models, Effect Wand effects) with what their filters
- * need (2026-10-13, user: filter by mod and by kind of mob instead of a "[mod]" tag on every name):
+ * need (2026-10-13, playtest: filter by mod and by kind of mob instead of a "[mod]" tag on every name):
  * <ul>
  *   <li>each entry's mod (null = the game's own assets), from the asset pack its file lives in;</li>
  *   <li>for mobs, a {@link Kind} read from the role JSON and the templates it references (attack, default attitude
@@ -32,7 +32,7 @@ import java.util.TreeSet;
  * Built once, the first time a list is asked for, and kept until the game reloads those assets: the NPC builder's
  * reload listener (a role file changed), LoadedAssetsEvent / RemovedAssetsEvent for models and effects (registered in
  * MobBattlePlugin), /mobbattle reload (the panel's Reload button), or a different number of entries. Opening the panel
- * never scans again (user: "que cargue una única vez"; first build of 887 roles took 53 ms). Any thread; a rebuild just
+ * never scans again (playtest: "que cargue una única vez"; first build of 887 roles took 53 ms). Any thread; a rebuild just
  * replaces the list.
  */
 final class PickLists {
@@ -56,7 +56,7 @@ final class PickLists {
     static final String ALL = "all";
     static final String HYTALE = "hytale";
     /** Marks a modded entry while every mod is shown. */
-    // "*", not a star: the game's font has no ★ and drew "?" (user, 2026-10-16).
+    // "*", not a star: the game's font has no ★ and drew "?" (playtest 2026-10-16).
     private static final String MOD_MARK = "* ";
 
     private record Cached(int signature, List<Entry> entries) {
@@ -103,7 +103,7 @@ final class PickLists {
             } catch (RuntimeException ignored) {
             }
             // The game's own test roles (Server/NPC/Roles/_Core/Tests/...): Static..Static4 are hitbox-test Trorks that
-            // only play an animation (no walk, no attack), yet fell to the Fighters guess (user, 2026-10-13).
+            // only play an animation (no walk, no attack), yet fell to the Fighters guess (playtest 2026-10-13).
             boolean coreTest = path != null && path.toString().replace('\\', '/').contains("/_Core/Tests/");
             Kind seen = mod == null ? observed().get(r) : null;
             out.add(new Entry(r, ConfigSchema.categoryLabel(category, r, null), mod,
@@ -213,12 +213,12 @@ final class PickLists {
     /**
      * Same; with {@code lang}, mob labels get the game's name in that language when it differs from the ID
      * ("Dungeon Goblin Burner (Quemador Goblin)"), made per viewer: a label built once kept the first player's language
-     * after a language change (2026-10-16, user).
+     * after a language change (2026-10-16).
      */
     static List<ConfigSchema.Opt> filter(List<Entry> all, String mod, String kind, String group, String lang) {
         List<ConfigSchema.Opt> out = new ArrayList<>();
         boolean every = mod == null || ALL.equals(mod);
-        // One group picked: the "Group - " part would say it again on every line (user, 2026-10-13), so it goes.
+        // One group picked: the "Group - " part would say it again on every line (playtest 2026-10-13), so it goes.
         boolean oneGroup = group != null && !ALL.equals(group) && !OTHER.equals(group);
         for (Entry e : all) {
             if (!keeps(e, mod, kind) || !inGroup(e, group)) continue;
@@ -252,7 +252,7 @@ final class PickLists {
     }
 
     /**
-     * Group filter choices (2026-10-13, user): every group, then each group with entries left by the mod and type
+     * Group filter choices (2026-10-13): every group, then each group with entries left by the mod and type
      * filters (so it depends on them), then "Other" when some have no group.
      */
     static List<ConfigSchema.Opt> groupChoices(List<Entry> all, String mod, String kind) {
@@ -296,7 +296,7 @@ final class PickLists {
     }
 
     /**
-     * Type filter choices for mobs: every type, then only the types the mod filter has mobs of (user, 2026-10-16: a
+     * Type filter choices for mobs: every type, then only the types the mod filter has mobs of (playtest 2026-10-16: a
      * mod with no passive mobs still offered "No attack", and the list below came out empty).
      */
     static List<ConfigSchema.Opt> kindChoices(List<Entry> all, String mod) {
@@ -343,7 +343,7 @@ final class PickLists {
      * called 63 roles that cannot attack (fish, birds, carriers, crystals) and ~45 that never do (cows, frogs, tamed
      * animals) fighters. Roles from mods are not in it and keep the guess. A value with ",passive" (e.g.
      * {@code Cow=DEFENDS,passive}) is a kicker: Template_Animal_Neutral with AttackWhenStartled only kicks an attacker
-     * standing behind it within AttackRange and otherwise flees (user, 2026-10-14: cows kick players who hit them), so
+     * standing behind it within AttackRange and otherwise flees (playtest 2026-10-14: cows kick players who hit them), so
      * it shows as Defend only yet never starts a fight.
      */
     /** A game role that never starts a fight, even ordered at a copy of itself (verify data; kickers included). */
@@ -389,7 +389,7 @@ final class PickLists {
         if (isTrue(lookup(chain, "Invulnerable")) || low.startsWith("temple_") || low.startsWith("cinematic_")
                 || low.startsWith("test_") || low.contains("_spectator")) return Kind.AVOID;
         // No AI at all (the game's Empty_Role: one empty instruction, a mannequin): it would stand there, so Avoid
-        // (user, 2026-10-13: it showed under Fighters through the "else" guess below).
+        // (playtest 2026-10-13: it showed under Fighters through the "else" guess below).
         if (noInstructions(lookup(chain, "Instructions"))) return Kind.AVOID;
         JsonElement attack = lookup(chain, "Attack");
         if (attack != null && !isSet(attack)) return Kind.NO_ATTACK;
@@ -397,7 +397,7 @@ final class PickLists {
         String a = attitude != null && attitude.isJsonPrimitive() ? attitude.getAsString() : "";
         if (a.equalsIgnoreCase("Hostile")) return Kind.FIGHTS;
         // Neutral to players but hostile to other groups attacks them on its own: a Kweebec Razorleaf goes for Trorks
-        // (user, 2026-10-13: it showed under Defend only). Prey animals have hostile groups too, but their template
+        // (playtest 2026-10-13: it showed under Defend only). Prey animals have hostile groups too, but their template
         // (Template_Animal_Neutral) flees from them, so they stay Defend only.
         JsonElement group = lookup(chain, "AttitudeGroup");
         boolean flees = chainNames(role, files).stream().anyMatch(n -> n.contains("Animal_Neutral"));

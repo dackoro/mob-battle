@@ -1,0 +1,47 @@
+{
+  "$Comment": "Mob Battle training spellbook caster: the training archer's role (the game's intelligent template with the mannequin body, Neutral to players) with a fire spellbook. UseCombatActionEvaluator + CAE_MobBattle_Dummy_Spellbook: the player's attacks of that weapon (see its $Comment). DesiredAttackDistanceRange keeps it 5-14.5 blocks from its target, so it backs off when one comes closer.",
+  "Type": "Variant",
+  "Reference": "Template_Intelligent",
+  "Parameters": {
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.MobBattle_Dummy_Spellbook.name",
+      "Description": "Translation key for NPC name display"
+    }
+  },
+  "Modify": {
+    "Appearance": "Mannequin",
+    "MaxHealth": 100,
+    "DefaultPlayerAttitude": "Neutral",
+    "Weapons": [
+      "Weapon_Spellbook_Fire"
+    ],
+    "OffHand": [],
+    "DropList": "Empty",
+    "WakingPeriod": [
+      0,
+      24
+    ],
+    "WanderRadius": 3,
+    "Patrol": false,
+    "FollowPatrolPath": false,
+    "HearingRange": 8,
+    "ViewSector": 270,
+    "HitInterruptEnabled": true,
+    "KnockbackScale": 0.3,
+    "CombatBackOffAfterAttack": false,
+    "AttackDistance": 15,
+    "CombatFleeIfTooCloseDistance": 4,
+    "DesiredAttackDistanceRange": [
+      5,
+      14.5
+    ],
+    "CombatBehaviorDistance": 15,
+    "TargetRange": 15,
+    "LeashMinPlayerDistance": 18,
+    "NameTranslationKey": {
+      "Compute": "NameTranslationKey"
+    },
+    "UseCombatActionEvaluator": true,
+    "_CombatConfig": "CAE_MobBattle_Dummy_Spellbook"
+  }
+}

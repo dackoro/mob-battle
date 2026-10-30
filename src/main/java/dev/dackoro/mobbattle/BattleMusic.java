@@ -25,7 +25,7 @@ final class BattleMusic {
 
     /**
      * Mob Battle's own music container (Server/Audio/MusicContainers/MobBattle/MobBattle_Battle_Music.json, 2026-10-16,
-     * user: no battle music, or very quiet): the game's goblin boss battle song, +6 volume and looping until the battle
+     * playtest: no battle music, or very quiet): the game's goblin boss battle song, +6 volume and looping until the battle
      * ends. The game's Track_Z1D_Goblin_Boss_Battle has no volume boost and plays once (LoopCount 1, 0.7.2), so a
      * setting still naming it plays this one (OLD_DEFAULT_TRACK).
      */
@@ -74,7 +74,7 @@ final class BattleMusic {
         }
         if (kind != null) KINDS.put(session, kind);
         STARTED.put(session, System.currentTimeMillis());
-        // 2026-10-16, user: no music heard on the test server; this says whether it started and for whom.
+        // 2026-10-16, playtest: no music heard on the test server; this says whether it started and for whom.
         if (MobBattlePlugin.debugging()) {
             MobBattlePlugin.debug("music: " + track + " (index " + index + ") for " + listeners.size() + " of " + viewers.size() + " viewer(s)");
         }

@@ -33,7 +33,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- * Thumbnails of every model asset, made once and kept on disk (2026-10-16, user: generate them when the server
+ * Thumbnails of every model asset, made once and kept on disk (2026-10-16, playtest: generate them when the server
  * starts, cache them, regenerate in the background with a command; for a Smash-like VS screen with any mob).
  * <ul>
  *   <li>{@link #startup()} (BootEvent, before players join) queues every ModelAsset; a model whose key is unchanged and
@@ -49,10 +49,9 @@ import java.util.function.Predicate;
  * bind), three-quarter, looking toward the right of the picture; the pose set, its time and its file hash are in the
  * key. The other side of a VS screen can mirror the image.
  * Morph Wand hologram (2026-10-16): each thumbnail also gets its hologram texture ({@code thumbnails/holo/<id>.png},
- * {@link MorphHologram#hologram}), made from the cached thumbnail when only that one is missing. They are registered
- * as common assets of the mod at boot, before anyone joins ({@link #registerHolograms}), so clients get them with the
- * other assets and no asset rebuild (the hitch the user saw) is needed. Ones made later wait for the next boot unless
- * nobody is online. Cost: every joining client downloads them (~600 small PNGs). ❓ Untested in game.
+ * {@link MorphHologram#hologram}), made from the cached thumbnail when only that one is missing. Since 2026-10-28 none
+ * is registered at boot: MorphHologram registers a mob's texture the first time someone copies it ({@link #registerOnline},
+ * one asset rebuild for the players online), since all of them (~400-700) filled the client's entity texture atlas.
  * Next step (not done): show the thumbnails in the VS screen.
  */
 final class ThumbnailCache {
@@ -65,12 +64,12 @@ final class ThumbnailCache {
      */
     static final int RENDER_VERSION = 7;
     /**
-     * Pictures are drawn this many times bigger and box-averaged down (2026-10-16, user: the VS pictures and the
+     * Pictures are drawn this many times bigger and box-averaged down (2026-10-16, playtest: the VS pictures and the
      * hologram looked dithered: a big model's texels are smaller than a pixel, so nearest-texel sampling picked noise).
      */
     static final int SUPERSAMPLE = 2;
-    /** Bump when MorphHologram.hologram's look changes (2 = green-scale, no corner brackets, faint scanlines, 3 = 256 px, brighter, 4 = palette PNG). */
-    static final int HOLO_VERSION = 4;
+    /** Bump when MorphHologram.hologram's look changes (2 = green-scale, no corner brackets, faint scanlines, 3 = 256 px, brighter, 4 = palette PNG, 5 = 128 px). */
+    static final int HOLO_VERSION = 5;
     /** Longest side of a cached thumbnail (px). */
     static final int SIZE = 384;
     /** Decoded textures kept between models (an LRU: big ones are 1024x1024, 4 MB each). */
@@ -84,7 +83,7 @@ final class ThumbnailCache {
     });
     private static final AtomicBoolean RUNNING = new AtomicBoolean();
     private static volatile Future<?> current;
-    /** Settings panel icons (2026-10-16, user: every mob without a game icon gets one): side in px. */
+    /** Settings panel icons (2026-10-16, playtest: every mob without a game icon gets one): side in px. */
     static final int ICON = 64;
     /** Not under UI/Custom: the client packs that folder into one UI atlas, which these filled (2026-10-16). */
     static final String ICON_FOLDER = "Icons/MobBattle/Panel/";
@@ -122,7 +121,7 @@ final class ThumbnailCache {
     }
 
     /**
-     * Sets tried for "auto" (user, 2026-10-16: idle front views look odd, make them epic), most dynamic first. A model
+     * Sets tried for "auto" (playtest 2026-10-16: idle front views look odd, make them epic), most dynamic first. A model
      * with none of them is drawn in its bind pose.
      */
     static final String[] AUTO_POSES = {"Sprint", "Run", "JumpRun", "Jump", "Walk", "Idle"};
@@ -185,7 +184,7 @@ final class ThumbnailCache {
     /**
      * Whether runtime assets (holograms, mob icons, VS pictures) may be registered now: only before any client has
      * started connecting this session. A registration with someone online showed a "Reloaded assets for Common" toast
-     * per file (user, 2026-10-16), and one a few seconds before a join finished never reached that client (a skeleton's
+     * per file (playtest 2026-10-16), and one a few seconds before a join finished never reached that client (a skeleton's
      * icon drew a red X): the player list alone does not show a client still connecting. Anything made later is
      * registered at the next boot.
      */
@@ -259,7 +258,8 @@ final class ThumbnailCache {
         // sent to every joining client for nothing (audit 2026-10-17); every model if the role list is not ready
         List<String> mobs = VsScreen.fighterModels();
         List<String> holoIds = mobs.isEmpty() ? all : mobs;
-        registerHolograms(holoIds);
+        // holograms are only drawn here; each one is registered the first time someone copies that mob
+        // (MorphHologram.onDemand, 2026-10-28): all of them filled the client's entity texture atlas next to many mods
         registerIcons(all);
         VsScreen.registerAtBoot();
         MorphHologram.startAtBoot();
@@ -270,13 +270,10 @@ final class ThumbnailCache {
         }
         // holograms first, from the thumbnails already on disk (a few seconds), and registered before players join:
         // after a hologram look change (HOLO_VERSION) the long thumbnail run below made them one by one, and a player
-        // who joined meanwhile got each copied mob live, with an asset reload for everyone (user, 2026-10-16)
+        // who joined meanwhile got each copied mob live, with an asset reload for everyone (playtest 2026-10-16)
         EXEC.submit(() -> {
             try {
-                if (FxSettings.serverHolograms) {
-                    quickHolograms(holoIds);
-                    registerHolograms(holoIds);
-                }
+                if (FxSettings.serverHolograms) quickHolograms(holoIds);
             } catch (Throwable e) {   // a game API change (LinkageError) must not vanish into the Future
                 MobBattlePlugin.log("Holograms failed: " + e);
             }
@@ -286,19 +283,18 @@ final class ThumbnailCache {
             // every hologram of this look is on disk now: older looks' folders go (they were the stand-ins until now)
             deleteOtherFolders(folder(), "holo", "holo" + HOLO_VERSION);
             boolean someoneCame = !mayRegister();
-            // shared cache upkeep (user, 2026-10-16): mark this world's models as used now, drop what no world used in
+            // shared cache upkeep (playtest 2026-10-16): mark this world's models as used now, drop what no world used in
             // UNUSED_DAYS (never because THIS world lacks a mod: another world may still have it)
             int[] upkeep = markUsedAndClean(all);
-            registerHolograms(holoIds, true);
             registerIcons(all, true);
             VsScreen.prepareInBackground();
             PictureProgress.end();
             lateDone("pictures (holograms, icons, VS)");
-            // a framed block like the server's own "Hytale Server Booted!" one (user, 2026-10-16: the numbers got lost
+            // a framed block like the server's own "Hytale Server Booted!" one (playtest 2026-10-16: the numbers got lost
             // among the boot log)
             Path dir = folder();
             long vs = VsScreen.registeredBytes(), holo = HOLO_BYTES.get(), icons = ICON_BYTES.get();
-            // green like the server's own "Hytale Server Booted!" block (user, 2026-10-16: not obvious enough)
+            // green like the server's own "Hytale Server Booted!" block (playtest 2026-10-16: not obvious enough)
             String green = "\u001b[0;32m", plain = "\u001b[m";
             String rule = green + "=".repeat(96) + plain;
             MobBattlePlugin.log(rule);
@@ -306,7 +302,7 @@ final class ThumbnailCache {
             MobBattlePlugin.log("        Thumbnails:  " + report.total() + " models, "
                     + MobBattlePlugin.onDisk(dir == null ? null : dir.resolve("models")));
             MobBattlePlugin.log("        VS pictures: " + VsScreen.cacheSummary());
-            MobBattlePlugin.log("        Holograms:   " + HOLOGRAMS.size() + ", "
+            MobBattlePlugin.log("        Holograms:   sent when a mob is first copied, "
                     + MobBattlePlugin.onDisk(dir == null ? null : dir.resolve("holo" + HOLO_VERSION)));
             MobBattlePlugin.log("        Each joining player downloads " + MobBattlePlugin.size(vs + holo + icons)
                     + " (VS " + MobBattlePlugin.size(vs) + ", holograms " + MobBattlePlugin.size(holo)
@@ -325,7 +321,7 @@ final class ThumbnailCache {
     private static final java.util.concurrent.atomic.AtomicLong ICON_BYTES = new java.util.concurrent.atomic.AtomicLong();
 
     /**
-     * Cache clean-up after a look or render change (2026-10-16, user: a server that already had pictures cached must
+     * Cache clean-up after a look or render change (2026-10-16, playtest: a server that already had pictures cached must
      * redraw them with the new rules, and the old ones should go): deletes the folders in {@code dir} named {@code prefix}
      * plus anything (holo, holo2, p384, p384r5...) except {@code keep}. Only our own cache folders, only called once the
      * current version's files are all on disk; a folder in use by another process is left for the next boot.
@@ -410,7 +406,7 @@ final class ThumbnailCache {
 
     /** A model's VS files: pose pairs, column crops (every rule so far) and the face-framed square. */
     private static String vsFiles(String safe) {
-        return java.util.regex.Pattern.quote(safe) + "_(v-?[0-9]+_[LR]|k[0-9]+|fit[0-9]+|cut[0-9]+|crop[0-9]+|col|sq)\\.png";
+        return java.util.regex.Pattern.quote(safe) + "_(v-?[0-9]+_[LR]|k[0-9]+|fit[0-9]+|cut[0-9]+|crop[0-9]+|col[0-9]*|sq)\\.png";
     }
 
     /** Deletes the files named {@code fileRegex} in every subfolder of {@code dir} named {@code folderRegex}. */
@@ -493,42 +489,51 @@ final class ThumbnailCache {
         return modelId == null ? null : HOLOGRAMS.get(modelId);
     }
 
-    /** A hologram texture registered elsewhere (MorphHologram's live fallback). */
-    static void markHologram(String modelId, String path) {
+    /** A hologram texture MorphHologram registered on demand ({@code bytes}: what joining clients now download more). */
+    static void markHologram(String modelId, String path, long bytes) {
         HOLOGRAMS.put(modelId, path);
+        HOLO_BYTES.addAndGet(bytes);
     }
 
     /**
-     * Registers the hologram PNGs on disk of these models that are not registered yet, silently. Only while nobody is
-     * online: a client already connected would not get them without an asset rebuild (MorphHologram falls back to a
-     * live one for a model it needs).
+     * Registers one runtime file while players may be online, without the game's per-file "Reloaded assets" toast:
+     * into the registry only, then the game's own push to everyone online (asset packets + one rebuild request, no
+     * notification; javap 0.7.4 CommonAssetModule.sendAssets), and the module's cached asset list is dropped so
+     * clients joining later get it in their list too (what CommonAssetModule.addCommonAsset does besides the toast).
      */
-    static void registerHolograms(List<String> ids) {
-        registerHolograms(ids, false);
+    static void registerOnline(com.hypixel.hytale.server.core.asset.common.CommonAsset asset) {
+        registerOnline(List.of(asset), true);
     }
 
-    static void registerHolograms(List<String> ids, boolean late) {
-        if (!FxSettings.serverHolograms) return;   // server feature off (/mobbattle serverHolograms)
-        if (!mayRegister() && !late) return;
-        long t0 = System.nanoTime(), bytes = 0;
-        int n = 0;
-        for (String id : ids) {
-            if (HOLOGRAMS.containsKey(id)) continue;
-            Path f = holoFileOf(id);
-            if (f == null || !Files.exists(f)) continue;
-            try {
-                byte[] png = Files.readAllBytes(f);
-                if (!mayRegister(late)) continue;
-                HOLOGRAMS.put(id, MorphHologram.register(id, png, f));
-                bytes += png.length;
-                HOLO_BYTES.addAndGet(png.length);
-                n++;
-            } catch (Exception e) {
-                MobBattlePlugin.log("Hologram texture of " + id + " not registered: " + e);
+    /**
+     * Several files at once. {@code rebuild}: also ask the clients to rebuild their assets (one for all of them). A
+     * model texture needs it (the entity atlas); a UI picture under Icons/ does not, and the rebuild cleared the VS
+     * pictures already on screen (playtest 2026-10-29: team columns showed their pictures a moment, then empty).
+     */
+    static void registerOnline(List<com.hypixel.hytale.server.core.asset.common.CommonAsset> assets, boolean rebuild) {
+        if (assets.isEmpty()) return;
+        var module = com.hypixel.hytale.server.core.asset.common.CommonAssetModule.get();
+        for (var a : assets) com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry.addCommonAsset(EyeRecolor.PACK, a);
+        invalidateJoinList(module);
+        if (!Universe.get().getPlayers().isEmpty()) module.sendAssets(assets, rebuild);
+    }
+
+    private static volatile java.lang.reflect.Field joinList;
+
+    /** CommonAssetModule's private cached asset list (the one sent to joining clients); a no-op if it moved. */
+    private static void invalidateJoinList(Object module) {
+        try {
+            java.lang.reflect.Field f = joinList;
+            if (f == null) {
+                f = module.getClass().getDeclaredField("assets");
+                f.setAccessible(true);
+                joinList = f;
             }
+            Object cached = f.get(module);
+            cached.getClass().getMethod("invalidate").invoke(cached);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            MobBattlePlugin.log("Asset list for joining players not refreshed (" + e + "): they get the file from the next restart.");
         }
-        if (n > 0) MobBattlePlugin.log("Thumbnails: " + n + " hologram textures registered (" + MobBattlePlugin.size(bytes)
-                + ") in " + MobBattlePlugin.took(t0) + ".");
     }
 
     /**
@@ -592,7 +597,7 @@ final class ThumbnailCache {
         // redrawn model without a panel icon until then (test thumbnails rebuild; audit 2026-10-17)
     }
 
-    private static Path holoFileOf(String modelId) {
+    static Path holoFileOf(String modelId) {
         Path dir = folder();
         // own folder per hologram look: a new look (HOLO_VERSION) draws them all again at the next boot
         return dir == null ? null : dir.resolve("holo" + HOLO_VERSION).resolve(safe(modelId) + ".png");
@@ -609,7 +614,7 @@ final class ThumbnailCache {
 
     /**
      * Makes the thumbnails of the models {@code which} accepts, in the background; {@code force} redraws even the
-     * up-to-date ones. False if a run is already going (the caller tells the user). {@code done} gets the report on
+     * up-to-date ones. False if a run is already going (the caller tells the playtest). {@code done} gets the report on
      * the background thread.
      */
     static boolean rebuild(Predicate<String> which, boolean force, Consumer<Report> done) {
@@ -642,7 +647,7 @@ final class ThumbnailCache {
     }
 
     /**
-     * /mobbattle pictures rebuild (2026-10-17, user: redraw everything from the game, with progress and a summary):
+     * /mobbattle pictures rebuild (2026-10-17, playtest: redraw everything from the game, with progress and a summary):
      * the boot run again, in the background. Thumbnails (with their holograms and mob icons), then the VS pictures;
      * {@code force} redraws the up-to-date ones too (the VS files of this world's models are deleted first, so they
      * are drawn again). New files are registered at once (one asset reload for players online); a redrawn file that
@@ -651,12 +656,9 @@ final class ThumbnailCache {
     static boolean rebuildAll(boolean force, Consumer<Summary> done) {
         long t0 = System.nanoTime();
         List<String> all = new ArrayList<>(ModelAsset.getAssetMap().getAssetMap().keySet());
-        List<String> mobs = VsScreen.fighterModels();
-        List<String> holoIds = mobs.isEmpty() ? all : mobs;
         return rebuild(id -> true, force, report -> {
             try {
                 if (force) for (String id : all) VsScreen.dropPictures(id);
-                registerHolograms(holoIds, true);
                 registerIcons(all, true);
                 VsScreen.Prepared vs = VsScreen.prepareInBackground();
                 int sent;
@@ -802,7 +804,7 @@ final class ThumbnailCache {
     /**
      * A model as a thumbnail draws it: unit scale, and for each random attachment set (goblin hats, trork gear,
      * kweebec leaves, animal coats: 56 vanilla models) its first option by name, so the picture always has the gear and
-     * is the same every time (user, 2026-10-16: an empty map drew them without any of it).
+     * is the same every time (playtest 2026-10-16: an empty map drew them without any of it).
      */
     static Model modelOf(ModelAsset asset) {
         Map<String, String> ids = new java.util.TreeMap<>();
@@ -919,7 +921,7 @@ final class ThumbnailCache {
         }
         BufferedImage grey = texture(p.texture());
         // a model's own gradient can be inherited (MajorDungeons' Baron has Parent Player, so Skin/02 came with it) on
-        // a colored texture the game does not tint (user, 2026-10-16: the silver Baron came out gold): only a mostly
+        // a colored texture the game does not tint (playtest 2026-10-16: the silver Baron came out gold): only a mostly
         // grey texture takes it (the player body 94 %, the Baron 25 %). Attachment gradients are always applied.
         if (p.modelLevel() && greyShare(grey) < MODEL_TINT_GREY) return grey;
         String strip = gradientTexture(p.gradientSet(), p.gradientId());

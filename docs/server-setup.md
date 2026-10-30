@@ -205,7 +205,7 @@ These settings decide who can do what, what gets logged and which parts of the m
 - `permissions.mode`;
 - `debug` (`debugLog`);
 - `debug.record` (`debugRecord`);
-- `server.vs`, `server.hologram`, `server.icons` (`serverVs`, `serverHolograms`, `serverIcons`).
+- `server.vs`, `server.vs.pictures`, `server.hologram`, `server.icons` (`serverVs`, `serverVsPictures`, `serverHolograms`, `serverIcons`).
 
 These are kept out of everything that bulk-changes settings, so loading a preset can never quietly open the server or switch logging on:
 - Built-in presets, saved presets and `reset <group>` never change them.
@@ -272,10 +272,10 @@ Plugins can start the same events from code. See [plugin-api.md](plugin-api.md).
 ### How ownerless events are shown
 
 An event has no owner, so viewers are chosen around its world and center:
-- `titleScope nearby` (the default) reaches players within 64 blocks.
+- `titleScope nearby` (the default) reaches players within 64 blocks (`scopeRadius` changes the distance).
 - `world` reaches the whole world.
 - `owner` falls back to the same 64-block range.
-- `cameraScope` uses the same rules and defaults to `owner`.
+- `cameraScope` uses the same rules and defaults to `owner`; `vsScope` (the VS screen) too, default `nearby`.
 
 Countdown, titles, cameras, timers and music follow the usual settings for the battle kind (see [battles.md](battles.md)).
 
@@ -293,4 +293,4 @@ What each joining player downloads: the pictures of every mob the server has loa
 
 `/mobbattle pictures status` (admin, console too) says where the cache is, how many pictures of each kind there are, how much they weigh on disk and what each joining player downloads. `/mobbattle pictures rebuild` draws the missing or outdated pictures now, in the background, with progress in chat every few seconds and a summary at the end (time and size of each group); the game keeps running. `rebuild force` draws every picture again. New pictures are sent to the players online at once (one asset reload); pictures that were already in use and got redrawn are used from the next restart. The settings panel's Admin tab has both as buttons.
 
-**Lighter joins: turn picture features off.** On a server that does not want them, `/mobbattle serverVs off` (no VS screen), `serverHolograms off` (no Morph Wand hologram) and `serverIcons off` (the panel shows the game's own icons or a "?") stop those features at once, and from the next server restart their pictures are neither drawn nor sent: the VS screen alone is most of the download (about 35-50 MB with big mod packs). With all three off, the server draws no pictures at all at boot. Admins can also switch them on the settings panel's Admin tab, under Server features.
+**Lighter joins: turn picture features off.** On a server that does not want them, `/mobbattle serverVs off` (no VS screen), `serverHolograms off` (no Morph Wand hologram) and `serverIcons off` (the panel shows the game's own icons or a "?") stop those features at once, and from the next server restart their pictures are neither drawn nor sent: the VS screen alone is most of the download (about 35-50 MB with big mod packs). Or keep the VS screen and send its pictures per battle: `/mobbattle serverVsPictures battle` sends none at join; each battle sends the pictures of its own mobs to everyone online during its countdown (a short hitch the first time a mob shows up in this session, none after that). Morph Wand holograms are not sent at join: each one goes to the players online the first time someone copies that mob (a short hitch, once per mob per session), so they never fill the client's model texture atlas, which many big mods already crowd. With all three off, the server draws no pictures at all at boot. Admins can also switch them on the settings panel's Admin tab, under Server features.

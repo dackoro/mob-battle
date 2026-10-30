@@ -1,0 +1,1184 @@
+{
+  "$Comment": "Mob Battle training dagger fighter's combat, laid out like CAE_MobBattle_Dummy_Knight but with the player's own iron dagger attacks. Basic attacks = Root_Weapon_Daggers_Primary (swing left, swing right, stab left, stab right). Pounce = Weapon_Daggers_Primary_Pounce straight away (the player's 0.2 s tap-or-hold charge is skipped), ChargeFor 0.4 = its highest charge key. Signature = Root_Weapon_Daggers_Signature_Razorstrike, only picked with full SignatureEnergy (held daggers raise its max to 27; hits fill it). Damage vars are the ones of Weapon_Daggers_Iron. Daggers are drawn in both hands from the main hand, so no off hand is set. Guard = Root_Weapon_Daggers_Secondary_Guard (the player's right click), raised after taking damage like the knight's shield. Kept distances: the role's MaintainDistance takes its range from each action's PostExecuteDistanceRange, so they all stay inside the basic attack's reach (strafe 2.5-4 kept it out of reach, staring at its rival); basic attack Timeout 0.5 lets it finish aiming instead of losing the try and waiting a cooldown.",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            10
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.9,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Default": {
+        "Type": "State",
+        "Description": "Change to the Default state",
+        "State": "Combat",
+        "SubState": "Default",
+        "PostExecuteDistanceRange": [
+          1.5,
+          1.5
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "DaggersPounce": {
+        "Type": "Ability",
+        "Description": "Dagger pounce: the player's charged primary (leap, then a sweep or a stab)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          3,
+          7
+        ],
+        "PostExecuteDistanceRange": [
+          1.5,
+          1.5
+        ],
+        "Ability": {
+          "Interactions": [
+            "Weapon_Daggers_Primary_Pounce"
+          ]
+        },
+        "ChargeFor": 0.4,
+        "InteractionVars": {
+          "Pounce_Sweep_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Primary_Pounce_Sweep_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 31
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 1
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 2,
+                          "Z": -3
+                        },
+                        "Type": "Force",
+                        "Force": 6,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 47
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "Pounce_Stab_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Primary_Pounce_Stab_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 39
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 6
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 1,
+                          "Z": -2
+                        },
+                        "Type": "Force",
+                        "Force": 5,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 59
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 9
+            }
+          }
+        ]
+      },
+      "DaggersSignature": {
+        "Type": "Ability",
+        "Description": "Dagger signature: Razorstrike (slash, sweep and lunge, needs full signature energy)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          1.5,
+          1.5
+        ],
+        "Ability": "Root_Weapon_Daggers_Signature_Razorstrike",
+        "InteractionVars": {
+          "Razorstrike_Slash_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Signature_Razorstrike_Slash_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 25
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 1,
+                          "Z": -2
+                        },
+                        "Type": "Force",
+                        "Force": 7,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 38
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "Razorstrike_Sweep_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Signature_Razorstrike_Sweep_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 31
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 1,
+                          "Z": -1
+                        },
+                        "Type": "Force",
+                        "Force": 7,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 47
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "Razorstrike_Lunge_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Signature_Razorstrike_Lunge_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 37
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 2,
+                          "Z": -3
+                        },
+                        "Type": "Force",
+                        "Force": 12,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 56
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 26.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      },
+      "Strafe": {
+        "Type": "State",
+        "Description": "Change to the strafe state",
+        "State": "Combat",
+        "SubState": "Strafe",
+        "PostExecuteDistanceRange": [
+          1.2,
+          1.8
+        ],
+        "Target": "Hostile",
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 10
+            }
+          }
+        ]
+      },
+      "DaggersStrafePounce": {
+        "Type": "Ability",
+        "Description": "Dagger pounce: the player's charged primary (leap, then a sweep or a stab)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          3,
+          7
+        ],
+        "PostExecuteDistanceRange": [
+          1.5,
+          1.5
+        ],
+        "Ability": {
+          "Interactions": [
+            "Weapon_Daggers_Primary_Pounce"
+          ]
+        },
+        "ChargeFor": 0.4,
+        "InteractionVars": {
+          "Pounce_Sweep_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Primary_Pounce_Sweep_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 31
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 1
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 2,
+                          "Z": -3
+                        },
+                        "Type": "Force",
+                        "Force": 6,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 47
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "Pounce_Stab_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Primary_Pounce_Stab_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 39
+                  }
+                },
+                "EntityStatsOnHit": [
+                  {
+                    "EntityStatId": "SignatureEnergy",
+                    "Amount": 6
+                  }
+                ],
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 1,
+                          "Z": -2
+                        },
+                        "Type": "Force",
+                        "Force": 5,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 59
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "TargetDistance",
+            "Curve": {
+              "ResponseCurve": "SimpleDescendingLogistic",
+              "XRange": [
+                0,
+                10
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 9
+            }
+          }
+        ]
+      },
+      "DaggersStrafeSignature": {
+        "Type": "Ability",
+        "Description": "Dagger signature: Razorstrike (slash, sweep and lunge, needs full signature energy)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          1.5,
+          3
+        ],
+        "PostExecuteDistanceRange": [
+          1.5,
+          1.5
+        ],
+        "Ability": "Root_Weapon_Daggers_Signature_Razorstrike",
+        "InteractionVars": {
+          "Razorstrike_Slash_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Signature_Razorstrike_Slash_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 25
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 1,
+                          "Z": -2
+                        },
+                        "Type": "Force",
+                        "Force": 7,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 38
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "Razorstrike_Sweep_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Signature_Razorstrike_Sweep_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 31
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 1,
+                          "Z": -1
+                        },
+                        "Type": "Force",
+                        "Force": 7,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 47
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "Razorstrike_Lunge_Damage": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Signature_Razorstrike_Lunge_Damage",
+                "DamageCalculator": {
+                  "BaseDamage": {
+                    "Physical": 37
+                  }
+                },
+                "DamageEffects": {
+                  "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                  "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                },
+                "AngledDamage": [
+                  {
+                    "Angle": 180,
+                    "AngleDistance": 80,
+                    "DamageEffects": {
+                      "Knockback": {
+                        "Direction": {
+                          "X": 0,
+                          "Y": 2,
+                          "Z": -3
+                        },
+                        "Type": "Force",
+                        "Force": 12,
+                        "VelocityType": "Set",
+                        "VelocityConfig": {
+                          "AirResistance": 0.99,
+                          "AirResistanceMax": 0.98,
+                          "GroundResistance": 0.94,
+                          "GroundResistanceMax": 0.3,
+                          "Threshold": 3.0,
+                          "Style": "Linear"
+                        }
+                      },
+                      "WorldParticles": [
+                        {
+                          "SystemId": "Impact_Critical",
+                          "Scale": 1,
+                          "RotationOffset": {
+                            "Yaw": 180,
+                            "Pitch": 0,
+                            "Roll": 0
+                          }
+                        }
+                      ],
+                      "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                      "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                    },
+                    "DamageCalculator": {
+                      "BaseDamage": {
+                        "Physical": 56
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "SignatureEnergy",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 26.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.9,
+            "MaxValue": 1
+          }
+        ]
+      },
+      "Guard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          5
+        ],
+        "PostExecuteDistanceRange": [
+          1.5,
+          1.5
+        ],
+        "Ability": "Root_Weapon_Daggers_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "StrafeGuard": {
+        "Type": "Ability",
+        "Description": "Raise the weapon's guard after taking damage (the player's right click)",
+        "Target": "Hostile",
+        "AbilityType": "Secondary",
+        "WeaponSlot": 0,
+        "AttackDistanceRange": [
+          0.5,
+          9
+        ],
+        "PostExecuteDistanceRange": [
+          1.5,
+          1.5
+        ],
+        "Ability": "Root_Weapon_Daggers_Secondary_Guard",
+        "SubState": "Default",
+        "ChargeFor": 1,
+        "WeightCoefficient": 1.25,
+        "Conditions": [
+          {
+            "Type": "RecentSustainedDamage",
+            "Curve": {
+              "ResponseCurve": "InverseExponential",
+              "XRange": [
+                0,
+                6
+              ]
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.4,
+            "MaxValue": 0.8
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "Type": "Switch",
+              "SwitchPoint": 2
+            }
+          }
+        ],
+        "InteractionVars": {
+          "Guard_Wield": {
+            "Interactions": [
+              {
+                "Parent": "Weapon_Daggers_Secondary_Guard_Wield",
+                "StaminaCost": {
+                  "Value": 10,
+                  "CostType": "Damage"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Root_Weapon_Daggers_Primary"
+          ],
+          "InteractionVars": {
+            "Swing_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Swing_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 6
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            },
+            "Swing_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Swing_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 6
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            },
+            "Stab_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Stab_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 8
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            },
+            "Stab_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Stab_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 12
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 2,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.05,
+            0.2
+          ]
+        },
+        "Actions": [
+          "DaggersPounce",
+          "DaggersSignature",
+          "Guard",
+          "Strafe"
+        ]
+      },
+      "Strafe": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Root_Weapon_Daggers_Primary"
+          ],
+          "InteractionVars": {
+            "Swing_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Swing_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 6
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            },
+            "Swing_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Swing_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 6
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Slash_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Slash_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            },
+            "Stab_Left_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Stab_Left_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 8
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            },
+            "Stab_Right_Damage": {
+              "Interactions": [
+                {
+                  "Parent": "Weapon_Daggers_Primary_Stab_Right_Damage",
+                  "DamageCalculator": {
+                    "BaseDamage": {
+                      "Physical": 12
+                    }
+                  },
+                  "DamageEffects": {
+                    "WorldSoundEventId": "SFX_Daggers_T2_Stab_Impact",
+                    "LocalSoundEventId": "SFX_Daggers_T2_Stab_Impact"
+                  },
+                  "AngledDamage": []
+                }
+              ]
+            }
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 2,
+          "Timeout": 0.5,
+          "CooldownRange": [
+            0.05,
+            0.2
+          ]
+        },
+        "Actions": [
+          "DaggersStrafePounce",
+          "DaggersStrafeSignature",
+          "StrafeGuard",
+          "Default"
+        ]
+      }
+    }
+  }
+}

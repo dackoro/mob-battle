@@ -119,10 +119,14 @@ public final class FightManager {
         Double custom = STOP_SECONDS.remove(self);
         double seconds = custom != null ? custom : HOSTILE_SECONDS;
         if (others == null || !BattleManager.isAlive(self, accessor)) return;
+        // Already in a new battle or wand fight (a re-duel started in the same tick, the countdown 0 default): that one
+        // set its own attitudes; dropping its HOSTILE and its target here left the mob idle for a second (audit 2026-10-29).
+        if (BattleManager.isManaged(self) || isFighter(self)) return;
         ChaseSupport.restoreLeash(self, accessor);
         WorldSupport world = WorldSupport.get(self, accessor);
         StateSupport state = StateSupport.get(self, accessor);
         if (world != null) {
+            dropHostileOverrides(world);
             for (Ref<EntityStore> other : others) {
                 if (other.isValid() && other.getStore() == self.getStore() && !same(self, other)) {
                     tryOverride(world, other, Attitude.IGNORE, seconds, combatStateOf(state) != null);
@@ -132,9 +136,31 @@ public final class FightManager {
         releaseTarget(self, state, accessor);
     }
 
+    /**
+     * Every HOSTILE override out of {@code world}'s memory (its battle is over). Vanilla keys overrides by entity index
+     * (WorldSupport.overrideAttitude: target.getIndex()) and a removed entity's index goes to another one (the store
+     * moves its last entity into the hole, new spawns take free ones), so an override toward a fallen opponent made
+     * the winner go for mobs summoned after the battle, for up to HOSTILE_SECONDS (playtest 2026-10-29: a dummy that had
+     * already fought attacked the ones just summoned). Battles renew the HOSTILE they need every few seconds.
+     */
+    private static void dropHostileOverrides(WorldSupport world) {
+        if (overrideMemoryUnreadable || !ensureOverrideMemory(world, false)) return;
+        try {
+            if (overrideMemoryField.get(world) instanceof it.unimi.dsi.fastutil.ints.Int2ObjectMap<?> memory) {
+                memory.values().removeIf(e -> e instanceof AttitudeMemoryEntry entry && entry.getAttitudeOverride() == Attitude.HOSTILE);
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            MobBattlePlugin.log("Could not clear the attitude memory: " + e);
+        }
+    }
+
     private static void releaseTarget(Ref<EntityStore> self, StateSupport state, ComponentAccessor<EntityStore> accessor) {
         MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
-        if (marked != null) marked.setMarkedEntity(TARGET_SLOT, null);
+        if (marked != null) {
+            marked.setMarkedEntity(TARGET_SLOT, null);
+            // the CAE keeps its own slot until its next action pick (an opponent still standing after a draw)
+            if (marked.getMarkedEntityRef(CAE_TARGET_SLOT) != null) marked.setMarkedEntity(CAE_TARGET_SLOT, null);
+        }
         forgetHostiles(self, accessor);
         if (state != null && state.getStateHelper().getStateIndex("Idle") >= 0) {
             state.setState(self, "Idle", null, accessor);
@@ -387,7 +413,13 @@ public final class FightManager {
     }
 
     /** Damage of the opening "provocation" hit. Tiny: it's only there to trigger reactions. */
-    public static final float PROVOKE_DAMAGE = 0.01f;
+    /**
+     * A provocation hits for 0 (2026-10-29, playtest video: in a royale of 100 the health bars kept flashing, ~270 retarget
+     * provocations of 0.01 healed 300 ms later). Vanilla still records a 0 hit and its attacker (DamageData.onSufferedDamage,
+     * SensorDamage falls back to getAnyAttacker), so the mob reacts as before, while EntityUIEvents (health bar, damage
+     * number), HitAnimation and ReticleEvents skip hits of 0 or less (decompiled 0.7.4). Nothing to heal back.
+     */
+    public static final float PROVOKE_DAMAGE = 0f;
 
     /**
      * Makes {@code attacker} "hit" {@code victim} for a tiny amount through the normal damage
@@ -408,7 +440,8 @@ public final class FightManager {
         int cause = DamageCause.getAssetMap().getIndex("Physical");
         DamageSystems.executeDamage(victim, buffer,
                 new Damage(new Damage.EntitySource(attacker), cause, PROVOKE_DAMAGE));
-        // Give the health back a moment later, once the damage pipeline has applied it.
+        // Give the health back a moment later, once the damage pipeline has applied it (none with a 0 provocation).
+        if (PROVOKE_DAMAGE <= 0) return;
         PENDING_HEALS.merge(victim, new PendingHeal(victim, PROVOKE_DAMAGE, System.currentTimeMillis() + HEAL_DELAY_MS),
                 (old, add) -> new PendingHeal(victim, old.amount() + add.amount(), add.at()));
     }
@@ -620,6 +653,97 @@ public final class FightManager {
             return true;
         } catch (NullPointerException e) {
             return false;
+        }
+    }
+
+    /**
+     * A player fell in {@code battle} (BattleManager.fall) and is an outsider from now on: {@code self} lets him go.
+     * Its battle HOSTILE override toward him lasts HOSTILE_SECONDS and a royale switch never ignores the old target, so
+     * without this the mob's own sensors (CombatTargetCollector adds every Hostile one to TargetMemory) and its CAE
+     * kept picking him after the respawn. Isolation on: IGNORE renewed every check, his LockedTarget and hostile memory
+     * cleared each time (like an outsider, ignoreOutsiders). Isolation off: once per mob, the HOSTILE override runs out
+     * at once (the role's own attitude again) and he leaves its target and memory; whatever he starts later is normal.
+     * FightTickSystem, once a second per battle mob, only while the battle has fallen players.
+     */
+    static void dropFallen(Ref<EntityStore> self, BattleManager.Battle battle, ComponentAccessor<EntityStore> accessor) {
+        boolean isolated = FxSettings.isolated(battle.kind);
+        for (Map.Entry<Ref<EntityStore>, java.util.Set<Ref<EntityStore>>> e : battle.fallen.entrySet()) {
+            Ref<EntityStore> player = e.getKey();
+            if (!player.isValid() || player.getStore() != self.getStore()) continue;
+            if (!isolated && !e.getValue().add(self)) continue;
+            WorldSupport world = WorldSupport.get(self, accessor);
+            if (world == null) return;
+            StateSupport state = StateSupport.get(self, accessor);
+            boolean hasCombat = combatStateOf(state) != null;
+            if (isolated) {
+                tryOverride(world, player, Attitude.IGNORE, OUTSIDER_IGNORE_SECONDS, hasCombat);
+            } else if (world.getOverriddenAttitude(player) != null) {
+                // Ours (HOSTILE from the battle): a tiny IGNORE in its place expires right away (as Countdown.endTruce).
+                tryOverride(world, player, Attitude.IGNORE, 0.05, false);
+            }
+            forgetTarget(self, player, accessor);
+        }
+    }
+
+    /**
+     * Battle over (BattleManager.cleanUp, world thread): {@code self} drops the players who fell in it, as dropFallen
+     * does without isolation: our HOSTILE replaced by an IGNORE that expires at once, and out of its targets.
+     */
+    static void releaseFallen(Ref<EntityStore> self, List<Ref<EntityStore>> players, ComponentAccessor<EntityStore> accessor) {
+        WorldSupport world = WorldSupport.get(self, accessor);
+        if (world == null) return;
+        for (Ref<EntityStore> player : players) {
+            if (!player.isValid() || player.getStore() != self.getStore()) continue;
+            if (world.getOverriddenAttitude(player) != null) tryOverride(world, player, Attitude.IGNORE, 0.05, false);
+            forgetTarget(self, player, accessor);
+        }
+    }
+
+    /** {@code other} out of {@code self}'s LockedTarget and CAE hostile memory (known hostiles, closest hostile). */
+    private static void forgetTarget(Ref<EntityStore> self, Ref<EntityStore> other, ComponentAccessor<EntityStore> accessor) {
+        MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
+        if (marked != null && marked.getMarkedEntityRef(TARGET_SLOT) == other) marked.setMarkedEntity(TARGET_SLOT, null);
+        // the CAE keeps its own slot until its next action pick (audit 2026-10-29)
+        if (marked != null && marked.getMarkedEntityRef(CAE_TARGET_SLOT) == other) marked.setMarkedEntity(CAE_TARGET_SLOT, null);
+        TargetMemory memory = accessor.getComponent(self, TargetMemory.getComponentType());
+        if (memory != null) {
+            memory.getKnownHostiles().remove(other.getIndex());
+            memory.getKnownHostilesList().removeIf(r -> r == other);
+            if (memory.getClosestHostile() == other) memory.setClosestHostile(null);
+        }
+    }
+
+    /** CAE roles' own target slot (BuilderSensorCombatActionEvaluator: support.getTargetSlot("CAETargetSlot")). */
+    private static final String CAE_TARGET_SLOT = "CAETargetSlot";
+
+    /**
+     * A battle mob whose target is a player (FightTickSystem, once a second): everything that makes it go for him is
+     * put again. Against a mob the opponent's own AI walks in and hits, which feeds the CAE (closest hostile within
+     * basic attack range, RecentSustainedDamage for the guard actions), so a mob that only half engaged still ends up
+     * fighting; a player who waits gives the CAE nothing of that. Neutral roles (training dummies: DefaultPlayerAttitude
+     * Neutral, Mob sensors filtered on Hostile|Friendly) see him only through our HOSTILE override, which was otherwise
+     * renewed every 5 s and only while he was the LockedTarget (refreshBattleIsolation); any IGNORE meanwhile (a late
+     * truce, retarget ignore) left them standing. Now: the override, the hostile memory (closest hostile), the
+     * LockedTarget, the CAE target slot when the CAE has none (its Combat sensors then seek him: SensorCombatActionEvaluator
+     * reads that slot), and the combat state if the mob dropped back to Idle.
+     */
+    static void pressPlayerTarget(Ref<EntityStore> self, Ref<EntityStore> player, ComponentAccessor<EntityStore> accessor) {
+        WorldSupport world = WorldSupport.get(self, accessor);
+        if (world == null || !player.isValid() || player.getStore() != self.getStore()) return;
+        StateSupport state = StateSupport.get(self, accessor);
+        String combatState = combatStateOf(state);
+        tryOverride(world, player, Attitude.HOSTILE, HOSTILE_SECONDS, combatState != null);
+        rememberAsHostile(self, player, accessor);
+        MarkedEntitySupport marked = MarkedEntitySupport.get(self, accessor);
+        if (marked != null) {
+            if (marked.getMarkedEntityRef(TARGET_SLOT) != player) marked.setMarkedEntity(TARGET_SLOT, player);
+            // setMarkedEntity(String) does nothing for a role without that slot (not a CAE role).
+            if (marked.getMarkedEntityRef(CAE_TARGET_SLOT) == null) marked.setMarkedEntity(CAE_TARGET_SLOT, player);
+        }
+        // only out of a state that gave up (Idle, Search...): forcing it out of a chase or a flee state every second
+        // fought ChaseSupport and reset the CAE's running action (audit 2026-10-29)
+        if (combatState != null && ChaseSupport.gaveUp(state) && state.getStateHelper().getStateIndex(combatState) != state.getStateIndex()) {
+            state.setState(self, combatState, combatSubStateOf(state.getStateHelper(), combatState), accessor);
         }
     }
 

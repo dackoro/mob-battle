@@ -114,7 +114,7 @@ None of the exits drop loot. Summons are tracked while the server runs: a summon
 
 ### Calm summons
 
-`summonCalm off|summons|all` (default off) keeps new summons from fighting as soon as they appear, so you can summon a Feastmaster and 100 skeletons and set up the battle first.
+`summonCalm off|summons|all` (default summons) keeps new summons from fighting as soon as they appear, so you can summon a Feastmaster and 100 skeletons and set up the battle first.
 - `summons`: summons ignore each other.
 - `all`: they also ignore players and other mobs nearby.
 - A summon stays calm until a battle, a wand fight or your army takes it. Then the battle decides who it fights.

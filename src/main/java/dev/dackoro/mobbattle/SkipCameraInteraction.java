@@ -31,7 +31,7 @@ public class SkipCameraInteraction extends SimpleInstantInteraction {
         PlayerRef player = buffer != null ? buffer.getComponent(context.getEntity(), PlayerRef.getComponentType()) : null;
         if (player == null) return;
         boolean cut = FightCamera.cancel(player);
-        // Q not cutting the camera (user, 2026-10-13): tells whether the client sent Ability1 at all.
+        // Q not cutting the camera (playtest 2026-10-13): tells whether the client sent Ability1 at all.
         if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("Q (Ability1) from " + player.getUsername() + (cut ? ": camera cut" : ": no camera running"));
     }
 }

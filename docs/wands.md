@@ -1,6 +1,6 @@
 # Wands
 
-Dackoro's Mob Battle adds thirteen wands. Each one uses the mobs' own AI: the wands only tell mobs who to fight, change how they look, or help you set up and inspect battles. This page covers every wand: what each click does, what you see and hear, which settings change it, and the quirks worth knowing.
+Dackoro's Mob Battle adds fourteen wands. Each one uses the mobs' own AI: the wands only tell mobs who to fight, change how they look, or help you set up and inspect battles. This page covers every wand: what each click does, what you see and hear, which settings change it, and the quirks worth knowing.
 
 ▶ Every clip in one place: [the Mob Battle playlist](https://www.youtube.com/playlist?list=PLbSYS5J690io).
 
@@ -11,7 +11,7 @@ Settings are named as chat commands (`/mobbattle <setting>`). They are all descr
 Each wand's tooltip explains what it does, in English and Spanish.
 
 - `/mobbattle give` gives you one of each wand, placed in your inventory the normal way. If some don't fit, the chat lists the ones you didn't get. It needs the `dackoro.mob_battle.admin` permission. The **Admin** page of the settings panel has the same button.
-- Every wand is also in the creative inventory (Weapons), and you can get one with `/give <item ID>`.
+- Every wand is also in the creative inventory, in its own **Mob Battle** tab (Wands, grouped as Battles, Army and summons, Support and Destruction; the Debug Wand under Dev tools), and you can get one with `/give <item ID>`.
 - In `server` permission mode, using a wand needs `dackoro.mob_battle.use`. Two clicks change shared settings instead, so they need `dackoro.mob_battle.config`: the Effect Wand right click and the Summon Wand left click. The Debug Wand needs `dackoro.mob_battle.admin` in both modes. See [server-setup.md](server-setup.md).
 
 ## At a glance
@@ -25,7 +25,7 @@ Each wand's tooltip explains what it does, in English and Spanish.
 | `MobBattle_ArmyWand` | Army Wand | Rare | Add or remove a mob in your army (crouch: recruit for a mob leader or another player) | Disband that army | No |
 | `MobBattle_MorphWand` | Morph Wand | Uncommon | Give the mob the copied model (hold: every mob around) | Copy a model or a player's look (in the air: show the copied one; hold: the mobs around swap looks) | Yes, with `morphPlayers` |
 | `MobBattle_HealWand` | Heal Wand | Uncommon | Back to full health (hold: everyone around you) | None | Yes |
-| `MobBattle_EquipWand` | Equipment Wand | Uncommon | Weapon, off hand and armor on a mob (copy and paste sets) | Opens its panel (crouch: copy) | No |
+| `MobBattle_EquipWand` | Equipment Wand | Legendary | Weapon, off hand and armor on a mob (copy and paste sets) | Opens its panel (crouch: copy) | No |
 | `MobBattle_KillWand` | Kill Wand | Epic | Kill it (soul rip, then removal) | None | Yes, with `killPlayers` |
 | `MobBattle_SnapWand` | Snap Wand | Legendary | Half of the fighters turn to dust | None | Yes, with `snapPlayers` |
 | `MobBattle_EffectWand` | Effect Wand | Legendary | Give the selected effect (hold: everyone around you) | Next effect in the list | Yes |
@@ -225,15 +225,18 @@ With `healLight off` or `wandFx off` there is no light, and the heal lands at on
 
 Put weapons, an off hand item and armor on mobs.
 
-- **Right click a mob:** its equipment panel.
-  - Left side: the mob's six slots (hand, off hand, head, chest, hands, legs) with the item drawn. Click a slot to choose what goes in it; Empty takes it off.
-  - Right side: a search box (item id or its name in your language), filters by mod, type (Weapon, Tool, Potion...) and group (Sword, Staff, Shield...), and a gallery of items. Click one to put it on. The hand opens on weapons; armor slots show only that slot's pieces.
-  - Buttons: Copy, Paste, Restore (the gear the mob's role gives it) and Empty all.
-- **Crouch + right click a mob:** copies its set.
-- **Left click a mob:** puts the copied set on it.
-- **Hold left (1.5 s):** puts the copied set on every mob within 12 blocks (never players).
+- **Right click a mob:** its equipment panel, in four tabs (the one you used last opens again on the next mob):
+  - **Gear:** the mob's six slots (hand, off hand, head, chest, hands, legs) with the item drawn. Click a slot to choose what goes in it; Empty takes it off. Buttons: Copy set, Paste set, Restore (the gear the mob's role gives it), Empty all and **Random gear** (a weapon, sometimes a shield, an armor set of one material and one or two runes with fitting supports).
+  - **Runes:** four lines laid out like the rune bench (see [combat profiles](#combat-profiles-runes-and-stats)).
+  - **Stats:** the mob's own extra health, damage, defense, speed and size; **Apply to the mob** puts them on, 0 takes one off.
+  - **Kits:** every saved kit with a summary. Click one to see its items, then Apply kit, Overwrite (with this mob's gear, runes and stats) or Delete kit; type a new name and **Save as kit** to make one.
+  - On the right: a search box (item id or its name in your language), filters by mod, type (Weapon, Tool, Potion...) and group (Sword, Staff, Shield...), and a gallery of items. Click one to put it on. The hand opens on weapons; armor slots show only that slot's pieces, and the mod filter only lists mods that have items for that slot.
+- **Crouch + right click a mob:** copies its set (blue swirl, tint and ring).
+- **Left click a mob:** puts the copied set on it (the same in gold, with an armor sound).
+- **Hold left (1.5 s):** you slam the ground and the copied set goes on every mob within 12 blocks as the ring reaches it (never players).
+- A mob keeps its runes and stats when it is saved: leaving the world, unloading its area or restarting the server don't take them off.
 - Only items that make sense in a fight are listed: weapons, tools, potions, food, fish, runes, bombs, torches and lanterns, and any mod item that is not a block.
-- Weapons are only a look by default: a mob still attacks with its role's own attacks and damage. Turn on `/mobbattle equipWeaponDamage on` (Battles page of the panel) and its hits are scaled by the weapon's power against its role's own weapon (a skeleton with an adamantite sword instead of its rusty axe hits x1.45, with a crude sword x0.58; x0.25 to x3). Mobs without a weapon of their own count as a fist; staffs, wands and spellbooks give no bonus. Armor protects it with the game's normal resistances (a full adamantite Trork took 18% less damage in a test duel).
+- A mob still attacks with its role's own attacks, but by default (`/mobbattle equipWeaponDamage on`, Battles page of the panel) its hits are scaled by the weapon's power against its role's own weapon (a skeleton with an adamantite sword instead of its rusty axe hits x1.45, with a crude sword x0.58; x0.25 to x3). Mobs without a weapon of their own count as a fist; staffs, wands and spellbooks give no bonus. With `equipWeaponDamage off` weapons are only a look. Armor always protects it with the game's normal resistances (a full adamantite Trork took 18% less damage in a test duel).
 - Two-handed items (battleaxes, longswords, maces, spears, staffs, bows, daggers, spellbooks) empty and lock the off hand, as for players.
 - Some mobs only attack with their own weapon in hand (the Goblin Guardians and the Dungeon Goblin Mace, and mod mobs built the same way). Their hands are locked in the panel, and Copy/Paste keep their weapon, so they keep fighting.
 - The off hand only works on mobs whose role has one; on the rest it is locked.
@@ -243,12 +246,26 @@ Put weapons, an off hand item and armor on mobs.
 
 A kit is a named set for the six slots. Each slot can hold several items: every mob gets one of them at random. A slot can also say `-` (empty it) or be left out (the mob keeps what it has).
 
-- **Make one:** the panel's "Save as kit" saves the mob's current set; `/mobbattle kit save <name>` saves the set you copied with the wand (or `kit save <name> look` the mob you look at); `/mobbattle kit set <name> <slot> <item|item2|->` sets one slot's options (`none` = leave it alone). `kit list`, `kit show <name>`, `kit remove <name>`.
+- **Make one:** "Save as kit" on the panel's Kits tab saves the mob's current set, runes and stats; `/mobbattle kit save <name>` saves the set you copied with the wand (or `kit save <name> look` the mob you look at); `/mobbattle kit set <name> <slot> <item|item2|->` sets one slot's options (`none` = leave it alone). `kit list`, `kit show <name>`, `kit remove <name>`.
 - **Summon list:** `/mobbattle summon kit <mob> <kit|none>`, or the Kit dropdown on each row of the panel's Summon list. Those mobs spawn wearing it.
 - **Battle teams:** `/mobbattle teams kit <team> <kit|none>`, or the Kit dropdown on the Teams page. When a team battle starts, that team's mobs put it on, and they get their own gear back when it ends.
 - **Your army:** `/mobbattle army kit <kit>` puts it on every mob of your army now.
-- **Any mob:** the panel's "Apply kit", or `/mobbattle apply <who> kit <kit>`.
+- **Any mob:** "Apply kit" on the panel's Kits tab, or `/mobbattle apply <who> kit <kit>`.
 - Kits follow the wand's rules: mobs that need their own weapon keep it, two-handed items empty the off hand.
+- **Training dummies** (`MobBattle_Dummy_*`) always keep their own weapon and off hand: their attacks are made for the weapon they spawn with. A kit only changes their armor, runes and stats (the chat says so), and their hands are locked in the panel.
+
+#### Combat profiles: runes and stats
+
+A kit can also give **runes** and **stats**, so a mob of any kind spawns ready to fight its way (for example a "tank" with iron armor, 500 health, +20% defense and Enrage).
+
+- **Runes:** `/mobbattle kit set <name> runes <Rune_A,Rune_B>` (up to 4; `-` = none). `/mobbattle kit runes` lists them with their cost, cooldown and range. In a fight (a battle, or a Battle Wand duel) the mob casts a rune when its target is in range (projectile runes such as Fireball and Charged Shot up to 16 blocks, Ground Slam 6, self buffs such as Enrage, Poison Imbue and Wind Strike 8), the rune is ready again and it has the mana. It pays the rune's mana cost like a player; mobs regenerate mana over time (1 point every 0.3 s). One rune at a time, never in the middle of one of its own attacks. Mods' runes work too. Chain Hook is the one rune mobs can't use: its chain crashed the world when a mob cast it.
+- **Supports:** as on the rune bench, each rune can carry up to two support runes (Damage Up, Fork, Ricochet, Thrift, Quickening, the element conversions...): join them with `+`, e.g. `kit set mage runes Rune_Fireball+Rune_Damage_Up+Rune_Fork,Rune_WindStrike`. They change the rune's damage, area, splits, element, cost and cooldown the same way they do for a player. A support only goes with the main runes it fits (`kit runes` lists which).
+- **Pace:** a mob casts a rune as soon as it is ready, so [`runeCooldown`](settings.md) makes it wait longer than a player between two casts of one rune: 200 (default) = twice the rune's cooldown, 100 = as a player.
+- **Stats:** `/mobbattle kit set <name> stat <health|damage|defense|speed|size> <value>` (`-` takes it out). Health is in hit points: the mob's max health becomes that number (a mob that already has more keeps its own). Damage, defense, speed and size are extra percent, as with the Buff Wand.
+- **In the panel:** the Equipment Wand's panel has a **Runes** tab laid out like the rune bench: four lines, each a main rune and two supports. Click a hole and pick in the gallery (it only shows the supports that fit that line's rune; "No rune" empties the hole); the mob gets it at once. The **Stats** tab sets the mob's own stats. "Save as kit" on the Kits tab saves the mob's gear, runes and stats.
+- `kit show <name>` lists everything the kit holds. Saving gear over a kit with `kit save` keeps its runes and stats.
+- The Cleanse Wand (or `apply <who> unbuff`) takes a kit's runes and stats off again. Team kits lose them when the team battle ends.
+- **Ready-made kits:** `tank` (iron armor, 300 health, +30% defense, Enrage), `berserker` (light leather armor, +40% damage, +20% speed, Enrage and Ground Slam), `mage` (no armor, Fireball and Wind Strike) and `rogue` (soft leather armor, +15% damage, +30% speed, Poison Imbue). None of them touch the hands, so every mob keeps attacking with its own weapon. They are added once: change or delete them freely, they are not put back.
 
 ## Kill Wand (`MobBattle_KillWand`)
 

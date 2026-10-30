@@ -17,7 +17,7 @@ import java.util.Map;
  * <p>
  * Why: the game's player Model is only the bare "Player" body (CosmeticsModule.createModel, javap); the client puts the
  * clothes, hair and face on from the PlayerSkin. A Model with attachments of its own (the hologram panel) makes the
- * client show those instead of the skin's (user test: panel without clothes), and sending the skin again brings the
+ * client show those instead of the skin's (playtest test: panel without clothes), and sending the skin again brings the
  * clothes back without the panel. So the panel goes in a Model that also carries every skin part as an attachment,
  * and only the model is sent. Same idea as Adventure time's sheath (feature/vaina-cosmetic), which worked in game;
  * this resolver is our own, written from the vanilla data (CosmeticRegistry, PlayerSkinPart, Cosmetics/CharacterCreator
@@ -67,7 +67,7 @@ final class PlayerLook {
         CosmeticRegistry reg = CosmeticsModule.get().getRegistry();
         List<ModelAttachment> out = new ArrayList<>();
         // Face, mouth and ears are just an id in the skin (no color) and use the Skin gradient: they take the body's
-        // skin tone (user, 2026-10-16: the face came out white). Hair-tinted parts without a color take the haircut's.
+        // skin tone (playtest 2026-10-16: the face came out white). Hair-tinted parts without a color take the haircut's.
         Tones tones = new Tones(colorOf(skin.bodyCharacteristic), colorOf(skin.haircut));
         add(out, tones, reg.getBodyCharacteristics(), skin.bodyCharacteristic);
         add(out, tones, reg.getUnderwear(), skin.underwear);

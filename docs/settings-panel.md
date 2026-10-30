@@ -122,7 +122,7 @@ VS screen and intro camera before the fight, end camera on the winner, the battl
 | Battle film | Auto film | Camera viewers get the battle film (`/mobbattle film`) from the battle start, after the intro. Wins over Auto watch. Per kind. |
 | | Shots of you | Percent of film shots that show you watching the battle (default 20, 0 = only the battle). |
 | | Far wide shots | Percent of battle shots filmed wide and from far away, so big attacks show whole; +15 while a mob over 4 blocks tall fights (default 30). |
-| | Shot length | Seconds each film shot lasts (default 8). |
+| | Shot length | Seconds each film shot lasts (default 6). |
 | | Shot length variation | Each shot up to this percent longer or shorter, at random (default 25). |
 | | Camera pace | How far the camera moves in a shot, in percent (default 100). |
 | | Between shots | Cut or Glide to the next shot (default cut). |
@@ -152,7 +152,7 @@ What every battle kind shares. Each kind has its own tab for its presentation, r
 | | Never ends against | Roles that keep Win against passive mobs from starting while one is alive (default the test dummies). |
 | | End when nobody fights | A battle where no fighter hurts an enemy for this long ends in a draw (seconds, 0 = never, default 150 = 2.5 min). |
 | | Longest battle | A battle with no winner ends anyway after this long (minutes, default 15). 0 = infinite: only a winner, End when nobody fights, the passive rule or Stop ends it. |
-| Battle waves | Reach as the ring arrives | Snap Wand (without a battle): the dust starts when the ring gets to each mob. Royale and all vs one: each mob's mark comes with the ring (default off). |
+| Battle waves | Reach as the ring arrives | Snap Wand (without a battle): the dust starts when the ring gets to each mob. Royale and all vs one: each mob's mark comes with the ring (default on). |
 | | Ground only | Only mobs within 3 blocks above or below the wave are snapped or join; fliers and caves stay out (default off). |
 | Arenas & timers | Timer box | Custom (Mob Battle's timer box) or Portal (the game's portal timer). |
 | | Arena size (duels, teams) | Radius of duel and team arenas (blocks; 0 = auto, around the fighters). Range preview. |
@@ -256,7 +256,7 @@ Each source has a section, in this order: **Buff Wand (per click)**, **Lone targ
 | Damage | Extra damage (up to +9900 % = x100). |
 | Defense | Less damage taken (up to 99 % = x100: takes a hundredth; never 100 %, that would be unkillable). |
 | Speed | Extra walking speed (up to +900 % = x10), on top of what a size buff already gives. |
-| Heal when given | Fill the new max health when the buff is given (for the lone target: heal it when it is picked). |
+| Heal when given | Fill the new max health when the buff is given (for the lone target: heal it when it is picked). Default off, on for the Buff Wand. |
 
 Extra fields:
 
@@ -338,7 +338,7 @@ The Summon Wand list. Add, remove, clear, Fill and loading a saved list apply at
 | Leaving | Summons leave | Never (they stay), Battle end (the surviving summons of a battle go when it ends) or Timer (each goes Summon lifetime seconds after it spawned). |
 | | Summon lifetime | How long a summon lives with Summons leave = Timer (seconds). |
 | | How they leave | Disintegrate (the Kill Wand's soul rip), Vanish (removed at once) or Shatter (breaks like jade glass). None drop loot. |
-| When they spawn | Calm until a battle | Off (default): they act as usual. Summons: summons ignore each other until a battle, wand fight or army takes them. All: they also ignore players and other mobs. A hit lets one fight back its attacker only. Only summons made after it is turned on. |
+| When they spawn | Calm until a battle | Off: they act as usual. Summons (default): summons ignore each other until a battle, wand fight or army takes them. All: they also ignore players and other mobs. A hit lets one fight back its attacker only. Only summons made after it is turned on. |
 | | Summons join my army | Summoned mobs join your army, as if added with the Army Wand (not when they spawn into a team). |
 | | Summons in jade | Summons come out wearing the jade look, as if given by the Effect Wand. |
 | | Summon jade color | Color of the summons' jade. |
@@ -350,7 +350,7 @@ Below the settings:
 - **Show pictures** opens a gallery over the panel: a picture of every mob the Show filters keep, with its in-game name, a search box (name or ID, accents and case ignored) and the same mod, type and group filters (changing them there changes the Show row too). Click a picture to put that mob in the Add a mob row (count and team stay as they were), then **Add**. **Close** shuts the gallery.
 - **Fill** (random battle): how many mob **Types**, how many of each (**Per type**) and how many **Teams** (0 = none, else 2-14), then **Fill**. It replaces the list with random mob types that fight, of similar strength, dealt into balanced teams if you asked for teams, and it follows the Show filters (mod, type, group). Same as `/mobbattle summon fill`. Your last numbers are remembered until the server restarts.
 - **Clear list** (confirm) and **Summon** (summons the list around you now).
-- **Saved lists:** keep several summon lists. Type a name (letters, digits, `-` and `_`, up to 32) and press **Save list**: it saves the list as last saved (mobs, counts, team rules and the teams' names and colors; Save changes first if you edited rows). Each saved list has a row: click its name to load it (it replaces the list and the teams at once; **Undo last change** brings the old one back) or **Delete** it (confirm). Same as `/mobbattle summon save|load|delete <name>`.
+- **Saved lists:** keep several summon lists. Type a name (letters, digits, `-` and `_`, up to 32) and press **Save list**: it saves the list as last saved (mobs, counts, team rules and the teams' names and colors; Save changes first if you edited rows). Each saved list has a row: click its name to load it (it replaces the list and the teams at once; **Undo last change** brings the old one back) or **Delete** it (confirm). They show newest first; a button switches to sorted by name. With more than 8 they scroll in their own box. Same as `/mobbattle summon save|load|delete <name>`.
 
 ### Presets & reset
 

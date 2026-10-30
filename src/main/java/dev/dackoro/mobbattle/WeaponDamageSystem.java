@@ -19,7 +19,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.Set;
 
 /**
- * Weapon damage bonus (equipWeaponDamage, 2026-10-16, user: a mob's weapon only changed its look): a mob's hits are
+ * Weapon damage bonus (equipWeaponDamage, 2026-10-16, playtest: a mob's weapon only changed its look): a mob's hits are
  * scaled by {@link EquipWand#weaponFactor} = the held weapon's power over its role's own weapon. Off by default; with
  * it off this returns at the first check. Provocations (FightManager.PROVOKE_DAMAGE) are never scaled, or they would
  * count as real hits.

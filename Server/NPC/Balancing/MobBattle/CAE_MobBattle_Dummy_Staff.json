@@ -1,0 +1,131 @@
+{
+  "$Comment": "Casts cost 15 mana here (the player pays 50: mana refills 1 per 0.3 s, so at 50 the dummy stood idle 15 s between casts). Mob Battle training staff caster's combat with the player's own iron staff (older weapon set: no signature energy). Basic = Staff_Primary tapped (spear-style swings) when a target is in reach. Cast = Staff_Primary held: ChargeFor 1 = its cast key (Staff_Cast_Summon_Charged, the Skeleton_Mage_Corruption_Orb projectile, Weapon_Staff_Iron's 50 mana cost), only picked with 50+ mana (NPCs have the Mana stat and regenerate it like players). No guard: the staff's right click is the same attack. Close swing = Spear_Swing_Left directly (the player's Staff_Primary is an indefinite-hold Charging an NPC never releases).",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.8,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Cast": {
+        "Type": "Ability",
+        "Description": "Staff cast: the player's held primary (Staff_Cast_Summon_Charged launches the orb, 50 mana)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          4,
+          15
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "FailureTimeout": 5,
+        "Ability": "Staff_Primary",
+        "ChargeFor": 1,
+        "InteractionVars": {
+          "Staff_Cast_Summon_Cost": {
+            "Interactions": [
+              {
+                "Parent": "Staff_Cast_Cost",
+                "StatModifiers": {
+                  "Mana": -15
+                }
+              }
+            ]
+          },
+          "Staff_Cast_Summon_Launch": "Staff_Cast_Launch",
+          "Staff_Cast_Summon_Effect": "Staff_Cast_Effect",
+          "Staff_Cast_Summon_Fail": "Staff_Cast_Fail",
+          "Spear_Swing_Left_Damage": "Spear_Swing_Left_Damage",
+          "Spear_Swing_Right_Damage": "Spear_Swing_Right_Damage",
+          "Spear_Swing_Left_Effect": "Spear_Swing_Left_Effect",
+          "Spear_Swing_Right_Effect": "Spear_Swing_Right_Effect"
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "Mana",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 14.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.7,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "ResponseCurve": "Linear",
+              "XRange": [
+                0,
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Spear_Swing_Left"
+          ],
+          "InteractionVars": {
+            "Staff_Cast_Summon_Cost": {
+              "Interactions": [
+                {
+                  "Parent": "Staff_Cast_Cost",
+                  "StatModifiers": {
+                    "Mana": -15
+                  }
+                }
+              ]
+            },
+            "Staff_Cast_Summon_Launch": "Staff_Cast_Launch",
+            "Staff_Cast_Summon_Effect": "Staff_Cast_Effect",
+            "Staff_Cast_Summon_Fail": "Staff_Cast_Fail",
+            "Spear_Swing_Left_Damage": "Spear_Swing_Left_Damage",
+            "Spear_Swing_Right_Damage": "Spear_Swing_Right_Damage",
+            "Spear_Swing_Left_Effect": "Spear_Swing_Left_Effect",
+            "Spear_Swing_Right_Effect": "Spear_Swing_Right_Effect"
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 3,
+          "Timeout": 0.001,
+          "CooldownRange": [
+            0.2,
+            0.5
+          ]
+        },
+        "Actions": [
+          "Cast"
+        ]
+      }
+    }
+  }
+}

@@ -42,13 +42,33 @@ public class MobBattlePlugin extends JavaPlugin {
     static <T extends java.util.concurrent.ScheduledFuture<?>> T track(T task) {
         if (instance != null && task != null) {
             try {
-                instance.getTaskRegistry().registerTask((java.util.concurrent.ScheduledFuture<Void>) task);
+                TRACKED.put(task, instance.getTaskRegistry().registerTask((java.util.concurrent.ScheduledFuture<Void>) task));
             } catch (Exception e) {
                 log("Task not registered: " + e);
             }
         }
         return task;
     }
+
+    /**
+     * Cancels a {@link #track}ed task and takes it out of the registry (audit 2026-10-29: the registry keeps every
+     * registration until unregister, so a measure's lambda, holding its world's Store and Refs, stayed for good).
+     */
+    static void untrack(java.util.concurrent.Future<?> task) {
+        if (task == null) return;
+        task.cancel(false);
+        var reg = TRACKED.remove(task);
+        if (reg != null) {
+            try {
+                reg.unregister();
+            } catch (Exception ignored) {
+                // already gone with the plugin
+            }
+        }
+    }
+
+    private static final java.util.Map<java.util.concurrent.Future<?>, com.hypixel.hytale.server.core.task.TaskRegistration> TRACKED =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Writes to the server log (Saves/&lt;world&gt;/logs), and to the debug recorder when it is on. */
     public static void log(String message) {
@@ -164,6 +184,8 @@ public class MobBattlePlugin extends JavaPlugin {
                 .register(WatchInteraction.Prev.TYPE, WatchInteraction.Prev.class, WatchInteraction.Prev.CODEC)
                 .register(WatchInteraction.Next.TYPE, WatchInteraction.Next.class, WatchInteraction.Next.CODEC)
                 .register(WatchInteraction.Exit.TYPE, WatchInteraction.Exit.class, WatchInteraction.Exit.CODEC)
+                .register(WatchInteraction.Auto.TYPE, WatchInteraction.Auto.class, WatchInteraction.Auto.CODEC)
+                .register(FilmMode.Exit.TYPE, FilmMode.Exit.class, FilmMode.Exit.CODEC)
                 .register(DebugInspectInteraction.TYPE, DebugInspectInteraction.class, DebugInspectInteraction.CODEC)
                 .register(DebugTrackInteraction.TYPE, DebugTrackInteraction.class, DebugTrackInteraction.CODEC);
         getEntityStoreRegistry().registerSystem(new FightDamageSystem());
@@ -172,6 +194,7 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new BuffDamageSystem());
         getEntityStoreRegistry().registerSystem(new WeaponDamageSystem());
         getEntityStoreRegistry().registerSystem(new DebugHitSystem());
+        getEntityStoreRegistry().registerSystem(new ArrowDebugSystem());
         getEntityStoreRegistry().registerSystem(new PlayerDeathSystem());
         getEntityStoreRegistry().registerSystem(new KillTracker());
         getEntityStoreRegistry().registerSystem(new BattleUnloadSystem());
@@ -180,26 +203,42 @@ public class MobBattlePlugin extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new WandEquipSoundSystem());
         getEntityStoreRegistry().registerSystem(new LookLoadSystem());
         getEntityStoreRegistry().registerSystem(new LookDeathSystem());
+        getEntityStoreRegistry().registerSystem(new WatchDetachSystem());
         getEntityStoreRegistry().registerSystem(new LookGuardSystem());
         getEntityStoreRegistry().registerSystem(new SkinRespawnSystem());
+        getEntityStoreRegistry().registerSystem(new WatcherHideSystem());
         getEntityStoreRegistry().registerSystem(new BuffJump());
         FxSettings.load(getDataDirectory());
         // Armies saved before the last stop: each mob rejoins as its chunk loads.
         Army.loadSaved(getDataDirectory());
+        // Mob runes and kit stats saved before the last stop (or a crashed world): back as each mob loads.
+        MobExtras.loadSaved(getDataDirectory());
         getCommandRegistry().registerCommand(new MobBattleCommand());
         listenAssetReloads();
         // Model thumbnails (2026-10-16): once the server has booted, before players join; missing or outdated ones
         // only, on ThumbnailCache's own background thread.
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.BootEvent.class,
-                event -> ThumbnailCache.startup());
+                event -> {
+                    try {
+                        FxSettings.reloadKits();
+                    } catch (RuntimeException e) {   // never stops the pictures below (audit 2026-10-29)
+                        log("Kits not reloaded at boot: " + e);
+                    }
+                    ThumbnailCache.startup();
+                });
         // from the first client that starts connecting, no more runtime assets this session (ThumbnailCache.mayRegister)
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerSetupConnectEvent.class,
                 event -> ThumbnailCache.clientConnecting());
         // One chat hint per player and server session, only in Creative (the mod is a creative tool).
+        // the watch's glide and fall hold turn with the mouse (BattleWatch.onMouse)
+        getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerMouseMotionEvent.class,
+                BattleWatch::onMouse);
         getEventRegistry().registerGlobal(com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent.class,
                 event -> {
                     // Left while watching a battle: back from our saved spectator game mode.
                     BattleWatch.onReady(event.getPlayerRef());
+                    // The same for a battle film (its own game mode, so Q leaves it).
+                    FilmMode.onReady(event.getPlayerRef());
                     // Came back with a size buff's leftovers (scale and health modifier are saved, our state isn't).
                     Buffs.onPlayerReady(event.getPlayerRef());
                     // Their own skin in the VS screen: saved, drawn and registered in the background when new.
@@ -235,6 +274,7 @@ public class MobBattlePlugin extends JavaPlugin {
     protected void shutdown() {
         // Player-side state first (spectator mode, cameras, forced music, HUDs); onReady covers anyone missed.
         BattleWatch.exitAll();
+        FilmMode.exitAll();
         MeasureTool.stopAll();
         TestTools.stopAll();
         FightCamera.stopAll();

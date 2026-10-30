@@ -14,11 +14,11 @@ import javax.annotation.Nonnull;
 
 /**
  * The /mobbattle watch controls, bound by our game mode Server/Entity/GameMode/MobBattle_Spectator.json:
- * previous fighter (E, left click), next fighter (R, right click), exit (Q). One type per action.
+ * previous fighter (left click), next fighter (right click), exit (Q), auto switch on/off (E). One type per action.
  */
 abstract class WatchInteraction extends SimpleInstantInteraction {
 
-    /** -1 previous, +1 next, 0 exit. */
+    /** -1 previous, +1 next, 0 exit, 2 auto switch on/off. */
     abstract int direction();
 
     @Override
@@ -33,6 +33,8 @@ abstract class WatchInteraction extends SimpleInstantInteraction {
         }
         if (direction() == 0) {
             BattleWatch.exit(player, context.getEntity(), buffer);
+        } else if (direction() == 2) {
+            BattleWatch.toggleAuto(player);
         } else {
             BattleWatch.cycle(player, context.getEntity(), buffer, direction());
         }
@@ -74,6 +76,19 @@ abstract class WatchInteraction extends SimpleInstantInteraction {
         @Override
         int direction() {
             return 0;
+        }
+    }
+
+    public static final class Auto extends WatchInteraction {
+        public static final String TYPE = "MobBattle_WatchAuto";
+        public static final BuilderCodec<Auto> CODEC = BuilderCodec
+                .builder(Auto.class, Auto::new, SimpleInstantInteraction.CODEC)
+                .documentation("/mobbattle watch: turn the automatic switch between fighters on or off for this viewer.")
+                .build();
+
+        @Override
+        int direction() {
+            return 2;
         }
     }
 }

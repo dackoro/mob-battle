@@ -1,5 +1,5 @@
 {
-  "$Comment": "Mob Battle training archer: the game's intelligent template (as Skeleton_Archer) with the mannequin body and an iron shortbow. Shoots real arrows (Skeleton_Archer_Bow_Shoot) at hostile mobs and players from 5-15 blocks and backs off when they come within 4.",
+  "$Comment": "Mob Battle training archer: the game's intelligent template (as Skeleton_Archer) with the mannequin body and an iron shortbow. Neutral to players (the template ignores mobs). UseCombatActionEvaluator + CAE_MobBattle_Dummy_Archer: it draws and shoots the player's own shortbow arrows (half and full draw) and fires the Volley signature when its signature energy is full. DesiredAttackDistanceRange keeps it 5-14.5 blocks from its target, so it backs off when one comes closer. Attack (Skeleton_Archer_Bow_Shoot) is only used with the evaluator off.",
   "Type": "Variant",
   "Reference": "Template_Intelligent",
   "Parameters": {
@@ -11,6 +11,7 @@
   "Modify": {
     "Appearance": "Mannequin",
     "MaxHealth": 100,
+    "DefaultPlayerAttitude": "Neutral",
     "Weapons": [
       "Weapon_Shortbow_Iron"
     ],
@@ -40,6 +41,8 @@
     "LeashMinPlayerDistance": 18,
     "NameTranslationKey": {
       "Compute": "NameTranslationKey"
-    }
+    },
+    "UseCombatActionEvaluator": true,
+    "_CombatConfig": "CAE_MobBattle_Dummy_Archer"
   }
 }

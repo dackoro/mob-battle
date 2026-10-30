@@ -45,6 +45,10 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private final java.util.Map<Store<EntityStore>, Long> nextDebugWand =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextExtras =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final java.util.Map<Store<EntityStore>, Long> nextRunes =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     @Override
     public void tick(float delta, int index, Store<EntityStore> store) {
@@ -108,6 +112,16 @@ public final class BattleLifecycleSystem extends TickingSystem<EntityStore> {
             nextCalm.put(store, now + SummonCalm.REFRESH_MS);
             // Attitude overrides and a sphere query per calm summon: on the world thread, outside the iteration.
             store.getExternalData().getWorld().execute(() -> SummonCalm.tick(store));
+        }
+        if ((RuneCaster.any() || MobExtras.any()) && now >= nextExtras.getOrDefault(store, 0L)) {
+            nextExtras.put(store, now + MobExtras.PASS_MS);
+            // Runes and kit stats saved per mob UUID (MobExtras): components read on the world thread.
+            store.getExternalData().getWorld().execute(() -> MobExtras.pass(store));
+        }
+        if (RuneCaster.any() && now >= nextRunes.getOrDefault(store, 0L)) {
+            nextRunes.put(store, now + RuneCaster.TICK_MS);
+            // Rune casts start interaction chains (a plain list in the InteractionManager): on the world thread.
+            store.getExternalData().getWorld().execute(() -> RuneCaster.tick(store));
         }
         if (Arena.any() && now >= nextArena.getOrDefault(store, 0L)) {
             nextArena.put(store, now + ARENA_MS);

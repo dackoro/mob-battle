@@ -31,6 +31,7 @@ items.MobBattle_BuffWand.description = Clic izquierdo en un mob o jugador: un bu
 mobbattle.watch.prev = Luchador anterior
 mobbattle.watch.next = Luchador siguiente
 mobbattle.watch.exit = Dejar de mirar
+mobbattle.film.exit = Dejar la película
 # --- interactions ---
 mobbattle.chat.army.none = No tienes ejército. Haz clic izquierdo en mobs con la Varita de Ejército para reclutarlos.
 mobbattle.chat.army.disbanded = Ejército disuelto: {count, plural, one {1 mob volvió} other {{count} mobs volvieron}} a su propia IA.
@@ -149,7 +150,7 @@ mobbattle.chat.morph.nocopy = Aún no has copiado ningún modelo. Haz clic derec
 mobbattle.chat.death.self = Caíste: estás fuera de la batalla.
 mobbattle.chat.death.other = {name} cayó y está fuera de la batalla.
 mobbattle.chat.death.someone = Un jugador cayó y está fuera de la batalla.
-mobbattle.chat.plugin.welcome = Mob Battle de Dackoro: /mobbattle help explica las varitas y los comandos. /mobbattle give te da las trece varitas. Todo es configurable (efectos, cámaras, temporizadores, reglas, equipos, lista de invocación, presets) en la ventana de ajustes: /mobbattle config, o con comandos.
+mobbattle.chat.plugin.welcome = Mob Battle de Dackoro: /mobbattle help explica las varitas y los comandos. /mobbattle give te da las trece varitas. Todo es configurable (efectos, cámaras, temporizadores, reglas, equipos, lista de invocación, presets) en la ventana de ajustes: /mobbattle config, o con comandos. ¿Quieres ver la batalla como una película? Activa Filmar automáticamente o Modo espectador automático en /mobbattle config > Cámaras; del film se sale con /mobbattle film exit.
 mobbattle.chat.buffs.reach = Pasas de x2: las armas y herramientas no alcanzan más lejos con tu tamaño (el juego mide el alcance desde tus ojos), así que los mobs justo a tus pies pueden quedar fuera de alcance.
 mobbattle.chat.buffs.sizewarn = El límite de tamaño {limit} supera el recomendado {safe}: los jugadores grandes no caben bajo techos ni en cuevas, su cámara puede quedar dentro de los bloques, y las runas y coronas de los mobs grandes pueden quedar dentro de su cabeza (los efectos del buff crecen menos que el cuerpo).
 mobbattle.chat.teams.list = Equipos ({count}/{max}): {list}
@@ -246,20 +247,20 @@ mobbattle.battle.watch.fighting = Estás peleando en una batalla: no puedes verl
 mobbattle.battle.watch.spectating = Ya estás de espectador (primero /spectate exit).
 mobbattle.battle.watch.none = No hay ninguna batalla que ver en este mundo.
 mobbattle.battle.watch.cant.start = No se puede empezar a ver ahora mismo.
-mobbattle.battle.watch.help = Viendo la batalla: clic derecho = luchador más cercano, clic izquierdo = volver al anterior, ratón = girar la cámara, Q = salir (o /mobbattle watch exit).
+mobbattle.battle.watch.help = Viendo la batalla: clic derecho = luchador más cercano, clic izquierdo = volver al anterior, ratón = girar la cámara, E = cambio automático de luchador, Q = salir (o /mobbattle watch exit).
 mobbattle.battle.watch.not = No estás viendo ninguna batalla. Q sale del modo espectador.
 mobbattle.battle.watch.noearlier = No hay otro luchador al que cambiar.
 mobbattle.battle.watch.notwatching = No estás viendo ninguna batalla.
 mobbattle.battle.watch.cant.stop = No se puede dejar de ver ahora mismo.
 mobbattle.battle.watch.stopped = Dejaste de ver la batalla.
-mobbattle.battle.film.already = Ya estás filmando una batalla. Agáchate o /mobbattle film exit para parar.
+mobbattle.battle.film.already = Ya estás filmando una batalla. Para salir, escribe /mobbattle film exit
 mobbattle.battle.film.none = No hay ninguna batalla que filmar en este mundo.
 mobbattle.battle.film.not = No estás filmando ninguna batalla.
 mobbattle.battle.film.stopped = Has dejado de filmar.
 mobbattle.battle.film.fighting = Estás luchando en una batalla: no puedes filmarla.
 mobbattle.battle.film.watching = Estás observando una batalla: primero /mobbattle watch exit.
 mobbattle.battle.film.cant = No se puede filmar ahora mismo.
-mobbattle.battle.film.help = Filmando la batalla hasta que termine. Agáchate o /mobbattle film exit para parar.
+mobbattle.battle.film.help = Filmando la batalla hasta que termine. Para salir de la película, escribe /mobbattle film exit
 mobbattle.hud.duel = Duelo
 mobbattle.hud.allvsone = Todos contra uno
 mobbattle.hud.watching = Viendo
@@ -522,18 +523,18 @@ mobbattle.help.wands.14 = clic derecho de la Varita de Efectos: siguiente efecto
 mobbattle.help.wands.15 = Varita del Chasquido: la mitad de los mobs se vuelve polvo (los de la batalla del mob pulsado, o todos los mobs a menos de snapRadius, peleen o no)
 mobbattle.help.wands.16 = Varita de Depuración (admin): clic izquierdo en un mob: informe completo (chat, registro del servidor, archivo en debug/), luego su objetivo, estado de IA, salud y efectos durante debugTrack segundos en el mismo archivo; clic derecho: dejar de seguirlo
 mobbattle.help.titles.1 = Títulos y cámaras (globales, o por tipo: <opción> <duel|allVsOne|royale|teams|all> <valor>; <tipo> default = sigue el global)
-mobbattle.help.titles.2 = countdown <segundos> - 3, 2, 1 antes de que empiece una pelea (0 = al instante)
+mobbattle.help.titles.2 = countdown <segundos> - 3, 2, 1 antes de que empiece una pelea (0 = al instante, por defecto 3; con menos de 2 s no hay pantalla VS ni cámara de intro)
 mobbattle.help.titles.34 = readyTime <segundos>|off - tiempo para ir a tu sitio antes de la pantalla VS y la cuenta: un número grande cuenta para ti, los luchadores esperan y agacharte empieza ya; nunca si peleas tú en ella (0-60, por defecto apagado; también por tipo de batalla)
 mobbattle.help.titles.3 = startTitle on|off - título cuando empieza una pelea
 mobbattle.help.titles.4 = winTitle on|off - título con el ganador
 mobbattle.help.titles.5 = titleStyle default|major|goblinBreach|voidEviction|random
-mobbattle.help.titles.6 = titleScope owner|nearby|world - quién ve los títulos de pelea
-mobbattle.help.titles.7 = cameraScope owner|nearby|world - quién ve las cámaras (un luchador nunca recibe la intro)
+mobbattle.help.titles.6 = titleScope owner|nearby|world - quién ve los títulos de pelea (por defecto nearby); scopeRadius <8-1024> - hasta dónde llega nearby, en bloques, para títulos, cámaras y pantalla VS (por defecto 64)
+mobbattle.help.titles.7 = cameraScope owner|nearby|world - quién ve las cámaras (un luchador nunca recibe la intro); vsScope owner|nearby|world - quién ve la pantalla VS (por defecto nearby; los jugadores que pelean siempre)
 mobbattle.help.titles.8 = camera on|off - cámara de intro durante la cuenta atrás (o cameraTime)
 mobbattle.help.titles.9 = cameraStyle auto|orbit|duel|showcase|teams|focus|drone|spotlight - auto: duelo western, allVsOne foco, equipos y royale spotlight
 mobbattle.help.titles.10 = cameraTime <segundos> - duración de la cámara de intro; 0 = la cuenta atrás; >0 graba incluso con countdown 0
 mobbattle.help.titles.11 = cameraShots <n> - showcase y spotlight: a cuántos luchadores muestran de cerca (de 1 a maxMobs; un plano de showcase necesita 1,2 s de cameraTime, uno de spotlight 1,1 s)
-mobbattle.help.titles.12 = endCamera off|winner|lastHit - graba al ganador o a quien dio el golpe final, con su número de muertes
+mobbattle.help.titles.12 = endCamera off|winner|lastHit - graba al ganador o a quien dio el golpe final, con su número de muertes (por defecto winner)
 mobbattle.help.titles.13 = endCameraTime <segundos> - duración de la cámara final
 mobbattle.help.titles.14 = agáchate mientras suena una cámara, o skipCamera, para terminarla; una intro también termina cuando acaba su batalla
 mobbattle.help.titles.15 = skipCamera - termina ahora tu cámara de intro o final
@@ -546,19 +547,22 @@ mobbattle.help.titles.21 = cameraBlur off|soft|strong - desenfoca lo que queda d
 mobbattle.help.titles.22 = autoFilm on|off - quienes ven las cámaras reciben la película de la batalla (ver film) desde que empieza, tras la intro, hasta que termina; gana a autoWatch (por defecto off)
 mobbattle.help.titles.30 = vsScreen on|off - una pantalla VS estilo Smash antes de la cuenta atrás: los dos lados entran con las imágenes de sus luchadores (grandes, o en multitud si el lado es grande; una columna por equipo con 3 equipos o más) y un VS grande. Suma 3 s a cualquier cuenta atrás mayor que 0; la cámara de intro conserva todo su tiempo después (por defecto on)
 mobbattle.help.titles.31 = vsTeamReps 1|2 - pantalla VS con 3 equipos o más: luchadores por equipo (una columna cada uno) cuando hay 4 equipos o menos (por defecto 2)
-mobbattle.help.titles.23 = filmPlayerShots <0-100> - % de planos de la película que te muestran mirando (por defecto 20); filmShotTime <3-60> - segundos por plano (por defecto 8)
+mobbattle.help.titles.23 = filmPlayerShots <0-100> - % de planos de la película que te muestran mirando (por defecto 5); filmShotTime <3-60> - segundos por plano (por defecto 8)
 mobbattle.help.titles.24 = filmShotVariation <0-90> - cada plano dura ese % más o menos al azar (por defecto 25); filmPace <25-300> - cuánto se mueve la cámara en un plano, % (por defecto 100)
 mobbattle.help.titles.25 = filmTransition cut|glide - saltar al siguiente plano o deslizarse hasta él (por defecto cut); filmShots all|battle|<lista> - atajo de filmShot: los planos de la lista encendidos y todos los demás a 0 (battle = todos menos los planos tuyos); los 14 planos: wide, track, arc, pushin, closeup, landscape, playerback, playerclose, zenith, spiral, telephoto, descent, groundrise, profile
 mobbattle.help.titles.26 = cameraHud hide|show - oculta la interfaz del juego (barra de objetos, brújula, barra del jefe...) mientras filma una cámara, dejando el chat y los títulos (por defecto hide)
+mobbattle.help.titles.35 = bandTimer off|top|bottom, bandTitle off|top|bottom - durante la película de la batalla, el tiempo que queda y el título de la batalla en la banda negra de arriba o de abajo (por defecto los dos arriba; el recuadro del temporizador se queda con sus líneas, sin el reloj)
+mobbattle.help.titles.36 = bandRows 1|2 - título y tiempo en la misma banda: en una línea o en dos filas (por defecto 2)
+mobbattle.help.titles.37 = bandInfo off|top|bottom|box - con el tiempo en una banda, las demás líneas del recuadro del temporizador (luchadores que quedan, equipos) van en la banda de arriba o de abajo y el recuadro se quita; off = en ningún sitio; box = el recuadro se queda sin el reloj (por defecto bottom)
 mobbattle.help.titles.29 = cameraFace on|off - los primeros planos se ponen delante de la cara del mob mire donde mire; off = hacia la batalla o el rival (por defecto on)
-mobbattle.help.titles.33 = watchTransition cut|glide - cómo pasa la cámara de observar a otro luchador: de golpe, o viajando hasta él a través de los bloques (por defecto glide); watchAutoSwitch <3-600>|off - segundos en cada luchador antes de que el watch pase solo al siguiente, como un clic derecho (por defecto off); endSlowMo <5-99>|off - cámara lenta tras el golpe final, velocidad del mundo en porcentaje; frena todo el mundo, no se aplica si hay otra batalla en él (por defecto off); endSlowMoTime <1-20> - sus segundos (por defecto 3)
-mobbattle.help.titles.28 = filmShot <plano> <0-300> - cada cuánto usa la película ese plano, % de lo normal: 0 = nunca, 200 = el doble (por defecto: 100, landscape y groundrise 50, zenith 40, spiral 80, telephoto y descent 70; filmShots <lista> = esos encendidos, el resto apagados; filmShots default = todos a su valor por defecto)
+mobbattle.help.titles.33 = watchTransition cut|glide - cómo pasa la cámara de observar a otro luchador: de golpe, o viajando hasta él a través de los bloques (por defecto glide); watchAutoSwitch <3-600>|off - segundos en cada luchador antes de que el watch pase solo al siguiente, como un clic derecho (por defecto off); endSlowMo <2-20>|off - cámara lenta tras el golpe final: cuántas veces más lento va el mundo (4 = cuatro veces más lento); frena todo el mundo, no se aplica si hay otra batalla en él (por defecto off); endSlowMoTime <1-20> - sus segundos (por defecto 3)
+mobbattle.help.titles.28 = filmShot <plano> <0-300> - cada cuánto usa la película ese plano, % de lo normal: 0 = nunca, 200 = el doble (por defecto: 100, groundrise 50, zenith 40, landscape 10, spiral 80, telephoto y descent 70; filmShots <lista> = esos encendidos, el resto apagados; filmShots default = todos a su valor por defecto)
 mobbattle.help.titles.27 = filmWideShots <0-100> - % de planos de la película que son generales y lejanos, para ver de lejos los ataques grandes; +15 con un mob de más de 4 bloques (por defecto 30)
 mobbattle.help.titles.32 = filmStyle default|battle|action|cinematic - todos los ajustes de la película de una vez: battle = la pelea siempre a la vista, poco de ti; action = cerca de los luchadores y sus ataques; cinematic = planos abiertos, lentos y deslizados; default = como viene (luego puedes cambiar cada valor)
 mobbattle.help.chaos.1 = Área del Caos
 mobbattle.help.chaos.2 = areaStyle border|disc|discBorder|wall|off - qué dibujan áreas y arenas: border (solo el brillo del borde, por defecto), disc (un disco en el suelo), discBorder (ambos), wall (disco + muro translúcido) u off
 mobbattle.help.chaos.3 = areaColor <color>|random - color de la paleta
-mobbattle.help.chaos.4 = battleWaveTravel on|off - ondas de Chasquido, royale y todos contra uno: cada mob es alcanzado cuando el anillo llega a él (por defecto off)
+mobbattle.help.chaos.4 = battleWaveTravel on|off - ondas de Chasquido, royale y todos contra uno: cada mob es alcanzado cuando el anillo llega a él (por defecto on)
 mobbattle.help.chaos.5 = battleWaveGroundOnly on|off - las ondas de Chasquido, royale y todos contra uno solo alcanzan mobs cerca del suelo (por defecto off)
 mobbattle.help.chaos.6 = areaRadius <bloques> - tamaño del área
 mobbattle.help.chaos.7 = areaHeight <bloques> - altura del muro de la zona (3-512)
@@ -572,7 +576,7 @@ mobbattle.help.battles.5 = debugDump - (admin) escribe lo que guardó el grabado
 mobbattle.help.battles.6 = duelMode exclusive|accumulate - sustituir un duelo o mantener peleas conectadas
 mobbattle.help.battles.7 = buff lone|streak|champion size|health|damage|defense|speed|all|off <porcentaje> - buffs de batalla: lone = objetivo de todos contra uno, streak = por muerte (hasta buff streak maxKills, por defecto 5), champion = los ganadores hasta que mueren o los limpian (por defecto 0 = ninguno)
 mobbattle.help.battles.8 = buff wand size|health|damage|defense|speed|all|off <porcentaje> - Varita de Buff, por clic (por defecto size 10, health 20, damage 10, defense 5; se acumulan hasta buff wand maxStacks, por defecto 5)
-mobbattle.help.battles.9 = buff lone|streak|champion|wand heal on|off - ese buff también rellena la salud (lone: cura al objetivo al elegirlo, incluso sin buff lone); por defecto off: la salud mantiene la misma proporción del nuevo máximo
+mobbattle.help.battles.9 = buff lone|streak|champion|wand heal on|off - ese buff también rellena la salud (lone: cura al objetivo al elegirlo, incluso sin buff lone); por defecto off (wand on): la salud mantiene la misma proporción del nuevo máximo
 mobbattle.help.battles.10 = buff crown gold|<color>|off - corona en mobs de streak, champion y Varita de Buff (por defecto off: la corona es del objetivo de todos contra uno)
 mobbattle.help.battles.11 = buff unit percent|multiplier - cómo se muestran y escriben los valores de buff: percent (por defecto, +100% = doble) o multiplier (x2 = doble, con decimales como x1.5; defensa x2 = mitad del daño recibido). x2 o 50% siempre funcionan
 mobbattle.help.battles.12 = buff sizeMax <50-9900> - máximo de tamaño extra en un mob o jugador, todos los buffs juntos (por defecto 200 = x3; más funciona pero no se recomienda: los jugadores grandes no caben bajo techos y su cámara acaba dentro de los bloques). Los saltos crecen con el tamaño
@@ -587,7 +591,7 @@ mobbattle.help.battles.20 = playerFights <duel|allVsOne|royale|teams|all> on|off
 mobbattle.help.battles.21 = las varitas funcionan con jugadores igual que con mobs; agáchate + Varita de Batalla en un mob: él contra ti
 mobbattle.help.battles.22 = chaos me - todos los mobs del área te atacan (playerFights allVsOne on)
 mobbattle.help.battles.23 = battlePvp on|off - los jugadores enemigos de una batalla se hieren entre sí aunque el PvP del mundo esté desactivado
-mobbattle.help.battles.24 = arena <tipo|all> on|show|wall|off - área dibujada toda la pelea (show), nadie sale de ella (wall), ambas (on)
+mobbattle.help.battles.24 = arena <tipo|all> on|show|wall|off - área dibujada toda la pelea (show), nadie sale de ella (wall), ambas (on); por defecto on en allVsOne, royale y teams, off en duelos
 mobbattle.help.battles.25 = arenaSize <bloques>|auto - radio de la arena de duelos y batallas de equipos (Varita del Caos: areaRadius)
 mobbattle.help.battles.26 = timer <tipo|all> <tiempo>|off - límite de tiempo con caja de temporizador: 90, 2m, 1m30s, --minutes=2 --seconds=30
 mobbattle.help.battles.27 = scoreboard <tipo|all> on|off - HUD con una fila por bando: equipos vivos/total y muertes, salud del objetivo contra atacantes, royale restantes + mejores asesinos, salud del duelo (por defecto teams on)
@@ -611,9 +615,9 @@ mobbattle.help.battles.44 = standoffTime <segundos>|off - un mob en el nivel de 
 mobbattle.help.battles.45 = passiveWinIgnore <rol,rol*,...>|none - roles que nunca dejan que passiveWin termine una batalla mientras uno siga vivo, p. ej. muñecos de entrenamiento (por defecto Test_Dummy*; * = cualquier final)
 mobbattle.help.battles.46 = idleEnd <segundos>|off - una batalla donde ningún luchador hiere a un enemigo durante este tiempo termina en empate (0-3600, por defecto 150 = 2,5 min, 0 = off)
 mobbattle.help.battles.47 = passiveWin <segundos>|off - cuando solo un bando puede seguir luchando (el resto son mobs pasivos), gana tras este tiempo sin golpes; nadie puede luchar = empate; abajo a la izquierda sale un aviso (0-3600, por defecto 15, 0 = off)
-mobbattle.help.battles.48 = duelCard on|off - tarjeta de solo lectura con las estadísticas de ambos luchadores (salud, ataque, defensa, tamaño, con sus buffs) en un duelo 1 contra 1, desde la cuenta atrás hasta el final (por defecto off)
-mobbattle.help.battles.49 = focusCard on|off - tarjeta de solo lectura en un todos contra uno: estadísticas del objetivo (salud, ataque, defensa, tamaño, muertes) y atacantes restantes, su salud y quien más daño hace (por defecto off)
-mobbattle.help.battles.50 = judgeBy <tipo|all> health|damage|kills|mix - qué puntúa timeUp health/judge: % de salud restante (por defecto), parte del daño o de las muertes (por luchador, para que los bandos grandes no ganen por tamaño), o las tres promediadas
+mobbattle.help.battles.48 = duelCard on|off - tarjeta de solo lectura con las estadísticas de ambos luchadores (salud, ataque, defensa, tamaño, con sus buffs) en un duelo 1 contra 1, desde la cuenta atrás hasta el final (por defecto on)
+mobbattle.help.battles.49 = focusCard on|off - tarjeta de solo lectura en un todos contra uno: estadísticas del objetivo (salud, ataque, defensa, tamaño, muertes) y atacantes restantes, su salud y quien más daño hace (por defecto on)
+mobbattle.help.battles.50 = judgeBy <tipo|all> health|damage|kills|mix - qué puntúa timeUp health/judge: % de salud restante (por defecto), parte del daño o de las muertes (por luchador, para que los bandos grandes no ganen por tamaño), o las tres promediadas (por defecto en royale)
 mobbattle.help.battles.51 = tieBreak [tipo] damage|kills|random|draw - quién gana cuando la puntuación de judgeBy está igualada al acabar el tiempo (el mismo que judgeBy, damage o kills, toma el otro; por defecto damage, también por tipo de batalla)
 mobbattle.help.battles.52 = killTieBreak [tipo] damage|alive|first|shared - orden de la tabla de muertes para luchadores con las mismas muertes: más daño hecho (por defecto), los que siguen en pie primero, quien llegó antes, o un puesto compartido (también por tipo de batalla)
 mobbattle.help.battles.53 = snap - la mitad de los mobs a menos de snapRadius (peleen o no) se vuelve polvo, como la Varita del Chasquido
@@ -626,9 +630,9 @@ mobbattle.help.battles.59 = snapPlayers on|off - el chasquido también se lleva 
 mobbattle.help.battles.60 = timerStyle custom|portal - nuestra propia caja de temporizador (por defecto) o la caja del portal del Vacío del juego
 mobbattle.help.battles.61 = timeUp <tipo|all> draw|kill|continue|health|judge - cuando termina el temporizador (health: gana la mejor puntuación de judgeBy, por defecto más salud en %; judge: y los perdedores mueren, los ganadores se curan)
 mobbattle.help.battles.62 = watch - observa la batalla en curso más cercana (primero la tuya), incluso después de empezar: la cámara sigue a un luchador
-mobbattle.help.battles.63 = clic derecho: luchador más cercano (aún no visto), clic izquierdo: volver al anterior, ratón: girar la cámara, Q o watch exit: salir
+mobbattle.help.battles.63 = clic derecho: luchador más cercano (aún no visto), clic izquierdo: volver al anterior, ratón: girar la cámara, E: cambio automático, Q o watch exit: salir
 mobbattle.help.battles.64 = cuando muere el luchador la cámara pasa a su asesino; una tarjeta muestra sus estadísticas; tras la batalla vuelves
-mobbattle.help.battles.74 = film - una cámara de película lenta filma la batalla en curso más cercana (la tuya primero) hasta que termina: planos generales, paneos, arcos, acercamientos y planos tuyos mirando; agáchate o film exit para parar
+mobbattle.help.battles.74 = film - una cámara de película lenta filma la batalla en curso más cercana (la tuya primero) hasta que termina: planos generales, paneos, arcos, acercamientos y planos tuyos mirando; escribe film exit para parar
 mobbattle.help.battles.65 = stop - termina todas las batallas, cuentas atrás, cajas de temporizador, arenas, planos de cámara, música de batalla y observación
 mobbattle.help.battles.66 = skipTimer - todos los temporizadores en marcha saltan a 0: las batallas terminan por su regla timeUp (draw, judge...)
 mobbattle.help.battles.67 = army clearAll - disuelve el ejército de todos los jugadores
@@ -666,12 +670,13 @@ mobbattle.help.summon.10 = summon atLeastOne true|false - los tipos aleatorios s
 mobbattle.help.summon.11 = summonDespawn never|battleEnd|timer - las invocaciones se van solas: never (por defecto, se quedan), battleEnd (las invocaciones que sobreviven a una batalla se van al terminar), timer (cada una se va summonLifetime segundos después de aparecer)
 mobbattle.help.summon.12 = summonLifetime <segundos> - cuánto vive una invocación con summonDespawn timer (5-3600, por defecto 60)
 mobbattle.help.summon.13 = summonExit disintegrate|vanish|shatter - cómo se van las invocaciones: disintegrate como la Varita de Muerte (arranca el alma, sin botín, por defecto), vanish al instante (sin botín) o shatter como cristal de jade (sin botín)
-mobbattle.help.summon.14 = summonCalm off|summons|all - las invocaciones esperan tranquilas hasta que una batalla, pelea de varita o ejército las toma: summons = se ignoran entre sí, all = también jugadores y otros mobs; un golpe deja que uno devuelva el golpe a su atacante (por defecto off)
+mobbattle.help.summon.14 = summonCalm off|summons|all - las invocaciones esperan tranquilas hasta que una batalla, pelea de varita o ejército las toma: summons = se ignoran entre sí, all = también jugadores y otros mobs; un golpe deja que uno devuelva el golpe a su atacante (por defecto summons)
 mobbattle.help.summon.15 = summonArmy on|off - los mobs invocados se unen a tu ejército, como la Varita de Ejército (por defecto off)
 mobbattle.help.summon.16 = summonJade on|off - las invocaciones salen con el aspecto de jade, como el de la Varita de Efectos (por defecto off)
 mobbattle.help.summon.17 = summonJadeColor <color> - el color de jade de las invocaciones, un color de la paleta (por defecto verde)
 mobbattle.help.summon.18 = summon fill <tipos> [each:<n>] [teams:<n>] [mod:..] [type:..] [group:..] [add] - mobs al azar que pelean, de fuerza parecida (vida máxima), a la lista; teams:2 los reparte en equipos equilibrados; reemplaza la lista salvo con add
 mobbattle.help.summon.19 = summon lists / save <nombre> / load <nombre> / delete <nombre> - listas de invocación guardadas: los mobs, cantidades, equipos y sus colores, para cambiar entre tus listas
+mobbattle.help.summon.20 = summonFrozen on|off - las invocaciones salen congeladas: quietas y sin IA, para capturas y pruebas; /npc thaw --all las suelta (por defecto off)
 mobbattle.help.morph.1 = Transformación y efectos
 mobbattle.help.morph.2 = morph <modelo> - fija el modelo de la Varita de Transformación
 mobbattle.help.morph.3 = morph list [texto] - busca IDs de modelos
@@ -746,6 +751,7 @@ mobbattle.help.server.32 = event list [radio] - muestra los UUID de NPC cercanos
 mobbattle.help.server.33 = pictures status | rebuild [force] - las fotos del VS, miniaturas, hologramas e iconos: qué hay en caché y qué se envía, o volver a dibujarlas en segundo plano con el progreso en el chat (admin; force = todas, no solo las que faltan o están desactualizadas)
 mobbattle.help.server.34 = serverVs|serverHolograms|serverIcons on|off - (admin) funciones del servidor: apaga la pantalla VS, el holograma de la Varita de Morph o las imágenes de mobs del panel en este servidor; apagadas, sus imágenes dejan de enviarse a los jugadores que entran desde el próximo reinicio (por defecto on)
 mobbattle.help.server.35 = p. ej. serverVs off: sin pantallas VS y unos 35-50 MB menos para cada jugador que entra
+mobbattle.help.server.36 = serverVsPictures boot|battle - (admin) cuándo llegan las imágenes de la VS a los jugadores: boot = todas al entrar, battle = ninguna al entrar, cada batalla manda las suyas en su cuenta atrás (un tirón corto la primera vez que sale un mob; por defecto battle)
 mobbattle.help.config.1 = Panel de configuración
 mobbattle.help.config.2 = /mobbattle config o /mobbattle panel - abre el panel de ajustes; ambos comandos son públicos para leer.
 mobbattle.help.config.3 = Menú izquierdo: Presentación, Cámaras, Batallas, una pestaña por tipo de batalla (Duelo, Todos contra uno, Royale, Batallas de equipos),
@@ -826,11 +832,19 @@ mobbattle.cmd.desc.fight_start_title_on_off_per = Título de inicio de pelea on/
 mobbattle.cmd.desc.winner_title_on_off_per_batt = Título del ganador on/off (también por tipo de batalla)
 mobbattle.cmd.desc.battle_music_on_off_or_a_mus = Música de batalla: on, off o el ID de una pista (por defecto MobBattle_Battle_Music)
 mobbattle.cmd.desc.intro_camera_during_the_coun = Cámara de intro durante la cuenta atrás: órbita del área de la Varita del Caos, planos western de un duelo (también por tipo de batalla)
-mobbattle.cmd.desc.who_sees_fight_titles_owner = Quién ve los títulos de pelea: owner, nearby (por defecto, 64 bloques) o world
+mobbattle.cmd.desc.who_sees_fight_titles_owner = Quién ve los títulos de pelea: owner, nearby (por defecto, a scopeRadius bloques) o world
 mobbattle.cmd.desc.title_scope = Alcance de los títulos
-mobbattle.cmd.desc.who_sees_the_fight_cameras_o = Quién ve las cámaras de pelea: owner (por defecto), nearby (64 bloques) o world; un luchador nunca recibe la intro
+mobbattle.cmd.desc.who_sees_the_fight_cameras_o = Quién ve las cámaras de pelea: owner (por defecto), nearby (a scopeRadius bloques) o world; un luchador nunca recibe la intro
 mobbattle.cmd.desc.camera_hud = Interfaz del juego mientras filma una cámara: hide (por defecto) o show
+mobbattle.cmd.desc.band_timer = Tiempo que queda en una banda negra durante la película: off, top (por defecto) o bottom
+mobbattle.cmd.desc.band_title = Título de la batalla en una banda negra durante la película: off, top (por defecto) o bottom
+mobbattle.cmd.desc.band_rows = Título y tiempo en la misma banda: 1 línea o 2 filas (por defecto)
+mobbattle.cmd.desc.band_info = Luchadores que quedan durante la película: banda top, bottom (por defecto), off o box
 mobbattle.cmd.desc.camera_scope = Alcance de las cámaras
+mobbattle.cmd.desc.vs_scope_who = Quién ve la pantalla VS: owner, nearby (por defecto) o world; los jugadores que pelean siempre la ven
+mobbattle.cmd.desc.vs_scope = Alcance de la VS
+mobbattle.cmd.desc.scope_radius_who = Hasta dónde llega "nearby" para títulos, cámaras y pantalla VS, en bloques (por defecto 64)
+mobbattle.cmd.desc.scope_radius = Bloques
 mobbattle.cmd.desc.title_style = Estilo del título
 mobbattle.cmd.desc.laser_line_between_fighters = Línea láser entre luchadores al empezar la pelea on/off (también por tipo de batalla)
 mobbattle.cmd.desc.color_of_the_fighter_laser_a = Color del láser de los luchadores: un color de la paleta o random
@@ -888,13 +902,14 @@ mobbattle.cmd.desc.seconds_a_battle_mob_may_sta = Segundos que un mob de batalla
 mobbattle.cmd.desc.roles_that_never_let_passive = Roles que nunca dejan que passiveWin termine una batalla (lista separada por comas, * = cualquier final; por defecto Test_Dummy*; none = sin excepción)
 mobbattle.cmd.desc.seconds_with_no_fighter_hurt = Segundos sin que ningún luchador hiera a un enemigo antes de que la batalla termine en empate (0-3600, por defecto 150 = 2,5 min, 0 = off)
 mobbattle.cmd.desc.seconds_without_a_hit_before = Segundos sin golpes antes de que gane el único bando que puede pelear contra mobs pasivos (0-3600, por defecto 15, 0 = off)
+mobbattle.cmd.desc.battle_loot = Los mobs que mueren en una batalla sueltan su botín: on u off (por defecto)
 mobbattle.cmd.desc.battle_below = Bloques bajo el centro de los que un royale o todos contra uno toma mobs (por defecto 50, off = sin límite)
 mobbattle.cmd.desc.battle_above = Bloques sobre el centro de los que un royale o todos contra uno toma mobs (por defecto 40, off = sin límite)
 mobbattle.cmd.desc.arena_vertical = Cuánto puede alejarse un luchador por encima o por debajo del nivel del ruedo antes de que el muro lo devuelva (por defecto off)
-mobbattle.cmd.desc.read_only_card_with_both_fig = Tarjeta de solo lectura con las estadísticas de ambos luchadores (salud, ataque, defensa, tamaño) en un duelo 1 contra 1 (por defecto off)
+mobbattle.cmd.desc.read_only_card_with_both_fig = Tarjeta de solo lectura con las estadísticas de ambos luchadores (salud, ataque, defensa, tamaño) en un duelo 1 contra 1 (por defecto on)
 mobbattle.cmd.desc.show_the_card_from_the_count = Muestra la tarjeta desde la cuenta atrás hasta el final del duelo
 mobbattle.cmd.desc.no_card = Sin tarjeta
-mobbattle.cmd.desc.read_only_all_vs_one_card_th = Tarjeta de solo lectura de todos contra uno: estadísticas del objetivo solitario y atacantes restantes (por defecto off)
+mobbattle.cmd.desc.read_only_all_vs_one_card_th = Tarjeta de solo lectura de todos contra uno: estadísticas del objetivo solitario y atacantes restantes (por defecto on)
 mobbattle.cmd.desc.show_the_card_while_an_all_v = Muestra la tarjeta mientras dura un todos contra uno
 mobbattle.cmd.desc.who_wins_when_the_judgeby_sc = Quién gana cuando la puntuación de judgeBy está igualada al acabar el tiempo: damage (por defecto), kills, random o draw (también por tipo de batalla)
 mobbattle.cmd.desc.kill_table_order_for_fighter = Orden de la tabla de muertes para luchadores con las mismas muertes: damage (más daño hecho, por defecto), alive (los que siguen en pie primero), first (quien llegó antes) o shared (mismo puesto) (también por tipo de batalla)
@@ -1051,7 +1066,7 @@ mobbattle.cmd.desc.wand_waves_each_mob_is_hit_w = Ondas de varitas: cada mob es 
 mobbattle.cmd.desc.wave_travel = Avance de la onda
 mobbattle.cmd.desc.wand_waves_only_hit_mobs_nea = Las ondas de varitas solo golpean mobs cerca del suelo, los voladores y las cuevas se libran (por defecto off)
 mobbattle.cmd.desc.wave_ground_only = Onda solo a ras de suelo
-mobbattle.cmd.desc.snap_royale_and_all_vs_one_w = Ondas de Chasquido, royale y todos contra uno: cada mob es alcanzado cuando el anillo llega a él (por defecto off)
+mobbattle.cmd.desc.snap_royale_and_all_vs_one_w = Ondas de Chasquido, royale y todos contra uno: cada mob es alcanzado cuando el anillo llega a él (por defecto on)
 mobbattle.cmd.desc.battle_wave_travel = Avance de la onda de batalla
 mobbattle.cmd.desc.snap_royale_and_all_vs_one_w.2 = Las ondas de Chasquido, royale y todos contra uno solo alcanzan mobs cerca del suelo (por defecto off)
 mobbattle.cmd.desc.battle_wave_ground_only = Onda de batalla solo a ras de suelo
@@ -1068,6 +1083,7 @@ mobbattle.cmd.desc.normal_log_default = Registro normal (por defecto)
 mobbattle.cmd.desc.keep_the_last_5_min_of_log_a = Guarda en memoria los últimos 5 min de registro y líneas [debug] para debugDump
 mobbattle.cmd.desc.server_vs = Función del servidor: la pantalla VS antes de las batallas y sus imágenes (admin, por defecto on)
 mobbattle.cmd.desc.server_holograms = Función del servidor: el holograma de la Varita de Morph y sus imágenes (admin, por defecto on)
+mobbattle.cmd.desc.server_vs_pictures = Función del servidor: cuándo se envían las imágenes de la VS, todas al entrar o por batalla (admin, por defecto battle)
 mobbattle.cmd.desc.server_icons = Función del servidor: las imágenes de mobs del panel (admin, por defecto on)
 mobbattle.cmd.server.feature.restart = Guardado. La función se activa o apaga ya; sus imágenes se envían a los jugadores que entran (o dejan de enviarse) desde el próximo reinicio del servidor.
 mobbattle.cmd.desc.record_saved_stays_on = Grabar (guardado: sigue activado)
@@ -1089,12 +1105,13 @@ mobbattle.cmd.desc.leave = Se van
 mobbattle.cmd.desc.seconds_a_summon_lives_with = Segundos que vive una invocación con summonDespawn timer (5-3600, por defecto 60)
 mobbattle.cmd.desc.how_summons_leave_disintegra = Cómo se van las invocaciones: disintegrate (arrancar el alma de la Varita de Muerte, sin botín, por defecto), vanish (desaparecen al instante, sin botín) o shatter (se rompen como cristal de jade, sin botín)
 mobbattle.cmd.desc.exit = Salida
-mobbattle.cmd.desc.summons_wait_calm_until_a_ba = Las invocaciones esperan tranquilas hasta que una batalla, pelea de varita o ejército las toma: off (por defecto), summons (se ignoran entre sí) o all (jugadores y otros mobs también)
+mobbattle.cmd.desc.summons_wait_calm_until_a_ba = Las invocaciones esperan tranquilas hasta que una batalla, pelea de varita o ejército las toma: off, summons (se ignoran entre sí, por defecto) o all (jugadores y otros mobs también)
 mobbattle.cmd.desc.calm = Calma
 mobbattle.cmd.desc.summoned_mobs_join_your_army = Los mobs invocados se unen a tu ejército, como la Varita de Ejército (por defecto off)
 mobbattle.cmd.desc.summons_join_your_army = Las invocaciones se unen a tu ejército
 mobbattle.cmd.desc.summons_stay_wild_default = Las invocaciones se quedan salvajes (por defecto)
 mobbattle.cmd.desc.summons_come_out_wearing_the = Las invocaciones salen con el aspecto de jade (por defecto off)
+mobbattle.cmd.desc.summon_frozen = Las invocaciones salen congeladas, quietas (por defecto off)
 mobbattle.cmd.desc.summons_in_jade = Invocaciones de jade
 mobbattle.cmd.desc.normal_summons_default = Invocaciones normales (por defecto)
 mobbattle.cmd.desc.army_mobs_wear_a_tint_while = Los mobs del ejército llevan un tinte mientras están en tu ejército (por defecto off)
@@ -1155,7 +1172,7 @@ mobbattle.cmd.desc.buffstat = Porcentaje de esta estadística (0 = off)
 mobbattle.cmd.desc.buffstat.kill = Porcentaje de esta estadística, por muerte (0 = off)
 mobbattle.cmd.desc.buffstat.click = Porcentaje de esta estadística, por clic (0 = off)
 mobbattle.cmd.desc.heal.lone = Cura al objetivo al máximo cuando se elige (por defecto off)
-mobbattle.cmd.desc.heal.other = Este buff también rellena la salud (por defecto off: la salud mantiene la misma proporción del nuevo máximo)
+mobbattle.cmd.desc.heal.other = Este buff también rellena la salud (por defecto off, Buff Wand on; off: la salud mantiene la misma proporción del nuevo máximo)
 mobbattle.cmd.desc.only.duel = Solo batallas de duelo
 mobbattle.cmd.desc.only.allvsone = Solo batallas de todos contra uno
 mobbattle.cmd.desc.only.royale = Solo batallas royale
@@ -1177,7 +1194,7 @@ mobbattle.cmd.desc.apply.army = Entra o sale de tu ejército (mobs)
 mobbattle.cmd.desc.apply.team = A uno de tus equipos de la Varita de Equipos, o a ninguno
 # --- panel ---
 mobbattle.panel.field.fight.countdown.label = Cuenta atrás
-mobbattle.panel.field.fight.countdown.tip = Títulos 3, 2, 1 antes de que empiece una pelea.
+mobbattle.panel.field.fight.countdown.tip = Títulos 3, 2, 1 antes de que empiece una pelea (por defecto 3). Con menos de 2 s no hay pantalla VS ni cámara de intro.
 mobbattle.panel.field.fight.countdown.hint = segundos, 0 = empezar ya
 mobbattle.panel.field.fight.ready.label = Tiempo para ir a tu sitio
 mobbattle.panel.field.fight.ready.tip = Segundos para llegar a tu sitio (la grada de una arena) antes de la pantalla VS y la cuenta. Un número grande cuenta para ti, los luchadores esperan el inicio y agacharte lo empieza ya. Nunca si peleas tú en la batalla (por defecto apagado).
@@ -1189,7 +1206,7 @@ mobbattle.panel.field.wintitle.enabled.tip = Título grande cuando termina una b
 mobbattle.panel.field.title.style.label = Estilo de los títulos
 mobbattle.panel.field.title.style.tip = Aspecto de los títulos grandes.
 mobbattle.panel.field.title.scope.label = Quién ve los títulos
-mobbattle.panel.field.title.scope.tip = owner = quien la inició, nearby = 64 bloques alrededor, world = todo el mundo.
+mobbattle.panel.field.title.scope.tip = owner = quien la inició, nearby = los jugadores dentro de la distancia "cerca", world = todo el mundo.
 mobbattle.panel.field.battle.music.label = Música de batalla
 mobbattle.panel.field.battle.music.tip = Música desde la cuenta atrás hasta el final de la batalla.
 mobbattle.panel.field.battle.music.track.label = Pista de música
@@ -1211,16 +1228,29 @@ mobbattle.panel.field.camera.shots.label = Primeros planos
 mobbattle.panel.field.camera.shots.tip = Cuántos luchadores muestran de cerca los estilos showcase y spotlight.
 mobbattle.panel.field.camera.shots.hint = luchadores mostrados (hasta Máx. de mobs)
 mobbattle.panel.field.camera.scope.label = Quién ve las cámaras
-mobbattle.panel.field.camera.scope.tip = owner, jugadores cerca (64 bloques) o todo el mundo. Los luchadores nunca reciben intro.
+mobbattle.panel.field.camera.scope.tip = owner, jugadores cerca (la distancia "cerca") o todo el mundo. Los luchadores nunca reciben intro.
+mobbattle.panel.field.title.scope.radius.label = Distancia "cerca" (bloques)
+mobbattle.panel.field.title.scope.radius.hint = por defecto 64
+mobbattle.panel.field.title.scope.radius.tip = Hasta dónde llega "cerca" para quién ve los títulos, las cámaras y la pantalla VS.
+mobbattle.panel.field.camera.vs.scope.label = Quién ve la pantalla VS
+mobbattle.panel.field.camera.vs.scope.tip = owner, jugadores cerca o todo el mundo. Los jugadores que pelean en la batalla siempre la ven.
 mobbattle.panel.field.camera.hud.label = Interfaz del juego al filmar
 mobbattle.panel.field.camera.hud.tip = hide = la barra de objetos, la brújula, la vida y la barra del jefe se ocultan en el intro, el final y la película (el chat y los títulos se quedan); show = se quedan.
+mobbattle.panel.field.camera.bands.timer.label = Temporizador en las bandas
+mobbattle.panel.field.camera.bands.timer.tip = Durante la película de la batalla, el tiempo que queda va en la banda negra de arriba o de abajo; el recuadro del temporizador se queda con sus líneas, sin el reloj. off = el reloj en el recuadro, como siempre.
+mobbattle.panel.field.camera.bands.title.label = Título en las bandas
+mobbattle.panel.field.camera.bands.title.tip = Durante la película de la batalla, el título de la batalla (Duelo, Battle Royale...) en la banda negra de arriba o de abajo. Si el temporizador va en la misma banda, la comparten.
+mobbattle.panel.field.camera.bands.rows.label = Filas si comparten banda
+mobbattle.panel.field.camera.bands.rows.tip = Cuando el título y el temporizador van en la misma banda: 1 = en una línea (TÍTULO 0:16), 2 = el título encima del tiempo. Una banda con solo uno de los dos lo muestra centrado igual.
+mobbattle.panel.field.camera.bands.info.label = Luchadores que quedan en las bandas
+mobbattle.panel.field.camera.bands.info.tip = Con el temporizador en una banda, las demás líneas del recuadro (luchadores que quedan, los equipos) van en la banda de arriba o de abajo y el recuadro se quita. off = no se muestran; box = el recuadro se queda con ellas, sin el reloj.
 mobbattle.panel.field.camera.end.label = Cámara final
-mobbattle.panel.field.camera.end.tip = Filma al ganador o a quien dio el último golpe cuando termina una batalla.
+mobbattle.panel.field.camera.end.tip = Filma al ganador o a quien dio el último golpe cuando termina una batalla (por defecto winner).
 mobbattle.panel.field.camera.end.time.label = Duración de la cámara final
 mobbattle.panel.field.camera.end.time.tip = Cuánto filma la cámara final.
 mobbattle.panel.field.camera.end.time.hint = segundos
-mobbattle.panel.field.camera.autowatch.label = Ver automáticamente
-mobbattle.panel.field.camera.autowatch.tip = Quienes ven las cámaras empiezan a mirar (cámara de espectador) en cuanto empieza una batalla.
+mobbattle.panel.field.camera.autowatch.label = Modo espectador automático
+mobbattle.panel.field.camera.autowatch.tip = Al empezar cada batalla, quienes ven las cámaras entran a mirarla como espectadores (lo mismo que /mobbattle watch): la cámara sigue a un luchador y con clic cambias de luchador.
 mobbattle.panel.field.camera.watch.transition.label = Observar: cambio de luchador
 mobbattle.panel.field.camera.watch.transition.tip = Cut = la cámara salta al siguiente luchador; glide = viaja hasta él, atravesando colinas y paredes (por defecto glide).
 mobbattle.panel.field.camera.watch.autoswitch.label = Observar: siguiente luchador cada
@@ -1238,7 +1268,7 @@ mobbattle.panel.field.camera.vs.teamreps.label = Luchadores VS por equipo
 mobbattle.panel.field.camera.vs.teamreps.tip = Con 3 o 4 equipos la pantalla VS puede mostrar dos luchadores de cada equipo, juntos y en su color; 1 = solo uno por equipo. Con 5 equipos o más siempre muestra uno (por defecto 2).
 mobbattle.panel.field.camera.vs.teamreps.hint = 1 o 2
 mobbattle.panel.field.camera.film.player.label = Planos tuyos
-mobbattle.panel.field.camera.film.player.tip = Parte de los planos que te muestran mirando la batalla: por encima de tu hombro, o cerca de ti con la batalla desenfocada detrás (por defecto 20).
+mobbattle.panel.field.camera.film.player.tip = Parte de los planos que te muestran mirando la batalla: por encima de tu hombro, o cerca de ti con la batalla desenfocada detrás (por defecto 5).
 mobbattle.panel.field.camera.film.player.hint = porcentaje, 0 = solo la batalla
 mobbattle.panel.field.camera.face.label = Primeros planos de frente
 mobbattle.panel.field.camera.face.tip = Los primeros planos de la intro, el duelo y la película se ponen delante de la cara del mob, mire donde mire. Apagado = desde el lado de la batalla o del rival, como antes. En los dos casos esquivan paredes y otros mobs (por defecto encendido).
@@ -1288,7 +1318,7 @@ mobbattle.panel.field.camera.film.wide.label = Planos lejanos
 mobbattle.panel.field.camera.film.wide.tip = Parte de los planos de la batalla que se filman abiertos y desde lejos, para ver enteros los ataques grandes; un mob de más de 4 bloques suma 15 (por defecto 30).
 mobbattle.panel.field.camera.film.wide.hint = porcentaje, 0 = nunca
 mobbattle.panel.field.camera.film.shot.label = Duración del plano
-mobbattle.panel.field.camera.film.shot.tip = Cuánto dura cada plano de la película antes del siguiente (por defecto 8).
+mobbattle.panel.field.camera.film.shot.tip = Cuánto dura cada plano de la película antes del siguiente (por defecto 6).
 mobbattle.panel.field.camera.film.shot.hint = segundos
 mobbattle.panel.field.camera.film.variation.label = Variación de la duración
 mobbattle.panel.field.camera.film.variation.tip = Cada plano dura hasta esto más o menos, al azar, para que los cortes no lleguen como un reloj (por defecto 25).
@@ -1299,9 +1329,9 @@ mobbattle.panel.field.camera.film.pace.hint = porcentaje de lo normal
 mobbattle.panel.field.camera.film.transition.label = Entre planos
 mobbattle.panel.field.camera.film.transition.tip = Cut = el siguiente plano empieza de golpe; glide = la cámara viaja hasta él (por defecto cut).
 mobbattle.panel.field.battle.duelcard.label = Tarjeta de duelo
-mobbattle.panel.field.battle.duelcard.tip = Tarjeta con las estadísticas de ambos luchadores en los duelos 1 contra 1, a la derecha; sustituye al marcador del duelo.
+mobbattle.panel.field.battle.duelcard.tip = Tarjeta con las estadísticas de ambos luchadores en los duelos 1 contra 1, a la derecha; sustituye al marcador del duelo. Activada por defecto.
 mobbattle.panel.field.battle.focuscard.label = Tarjeta de todos contra uno
-mobbattle.panel.field.battle.focuscard.tip = Tarjeta con las estadísticas del objetivo solitario y los atacantes que quedan (vida, mayor causante de daño), a la derecha; sustituye al marcador de todos contra uno. Desactivada por defecto.
+mobbattle.panel.field.battle.focuscard.tip = Tarjeta con las estadísticas del objetivo solitario y los atacantes que quedan (vida, mayor causante de daño), a la derecha; sustituye al marcador de todos contra uno. Activada por defecto.
 mobbattle.panel.field.battle.pvp.label = PvP de batalla
 mobbattle.panel.field.battle.pvp.tip = Los jugadores enemigos de una misma batalla pueden hacerse daño aunque el PvP del mundo esté desactivado.
 mobbattle.panel.field.battle.unstick.label = Desatascar luchadores
@@ -1312,6 +1342,8 @@ mobbattle.panel.field.battle.standoff.hint = segundos, 0 = nunca
 mobbattle.panel.field.battle.passivewin.label = Ganar contra mobs pasivos
 mobbattle.panel.field.battle.passivewin.tip = Cuando solo un bando puede devolver los golpes, gana tras este tiempo sin golpes (si nadie puede pelear: empate). Un aviso sale abajo a la izquierda (por defecto 15).
 mobbattle.panel.field.battle.passivewin.hint = segundos, 0 = nunca
+mobbattle.panel.field.battle.loot.label = Botín de los que mueren en batalla
+mobbattle.panel.field.battle.loot.tip = Los mobs que mueren en una batalla sueltan su botín normal (huesos, equipo, flechas...). Off deja el campo limpio (por defecto off).
 mobbattle.panel.field.battle.below.label = Profundidad de la batalla (abajo)
 mobbattle.panel.field.battle.below.tip = Un royale o todos contra uno solo toma mobs hasta esta distancia por debajo de su centro (por defecto 50; 0 = sin límite, toda el área).
 mobbattle.panel.field.battle.below.hint = bloques, 0 = sin límite
@@ -1328,7 +1360,7 @@ mobbattle.panel.field.battle.idleend.label = Terminar si nadie pelea
 mobbattle.panel.field.battle.idleend.tip = Una batalla donde ningún luchador daña a un enemigo durante este tiempo termina en empate (por defecto 150 = 2,5 min).
 mobbattle.panel.field.battle.idleend.hint = segundos, 0 = nunca
 mobbattle.panel.field.battle.wave.travel.label = Alcanzar al llegar el anillo
-mobbattle.panel.field.battle.wave.travel.tip = Chasquido: el polvo empieza cuando el anillo llega a cada mob; battle royale y todos contra uno: la marca de cada mob llega con el anillo. Desactivado por defecto.
+mobbattle.panel.field.battle.wave.travel.tip = Chasquido: el polvo empieza cuando el anillo llega a cada mob; battle royale y todos contra uno: la marca de cada mob llega con el anillo. Activado por defecto.
 mobbattle.panel.field.battle.wave.groundonly.label = Solo suelo
 mobbattle.panel.field.battle.wave.groundonly.tip = Solo los mobs a menos de 3 bloques por encima o por debajo de la onda se deshacen o se unen: voladores y cuevas quedan fuera. Desactivado por defecto.
 mobbattle.panel.field.battle.timer.style.label = Caja del temporizador
@@ -1393,7 +1425,7 @@ mobbattle.panel.field.battle.timer.hint = segundos, 0 = sin límite de tiempo
 mobbattle.panel.field.battle.timeup.label = Al acabarse el tiempo
 mobbattle.panel.field.battle.timeup.tip = draw, matar a todos, continue, health (gana la mejor puntuación de Juzgar por) o judge (igual, y los perdedores mueren). Un empate de puntuación se decide con Ganador si hay empate (Empates, abajo).
 mobbattle.panel.field.battle.judgeby.label = Juzgar por
-mobbattle.panel.field.battle.judgeby.tip = Lo que puntúan health/judge de Al acabarse el tiempo: % de vida que queda (caído = 0%), parte del daño o de las bajas (por luchador, para que un bando más grande no gane por tamaño), o mix (el promedio de los tres). Un empate de puntuación se decide con Ganador si hay empate (Empates, abajo).
+mobbattle.panel.field.battle.judgeby.tip = Lo que puntúan health/judge de Al acabarse el tiempo: % de vida que queda (caído = 0%), parte del daño o de las bajas (por luchador, para que un bando más grande no gane por tamaño), o mix (el promedio de los tres; por defecto en royale, el resto health). Un empate de puntuación se decide con Ganador si hay empate (Empates, abajo).
 mobbattle.panel.field.battle.shrink.label = Arena que se cierra
 mobbattle.panel.field.battle.shrink.tip = La arena se va cerrando como la zona de un battle royale.
 mobbattle.panel.field.battle.scoreboard.label = Marcador
@@ -1587,7 +1619,9 @@ mobbattle.panel.field.summon.lifetime.hint = segundos
 mobbattle.panel.field.summon.exit.label = Cómo se van
 mobbattle.panel.field.summon.exit.tip = disintegrate: el desgarro de alma de la Varita de Muerte, sin botín (por defecto). vanish: desaparece al instante, sin botín. shatter: se rompe como cristal de jade (del color de su aspecto, si no del color de jade de invocación), sin botín.
 mobbattle.panel.field.summon.calm.label = Calma hasta una batalla
-mobbattle.panel.field.summon.calm.tip = off: actúan como siempre (por defecto). summons: las invocaciones se ignoran entre sí hasta que las toma una batalla, una pelea de varita o un ejército. all: también ignoran a jugadores y otros mobs. Un golpe le permite devolver el golpe a su atacante. Solo invocaciones nuevas.
+mobbattle.panel.field.summon.calm.tip = off: actúan como siempre. summons (por defecto): las invocaciones se ignoran entre sí hasta que las toma una batalla, una pelea de varita o un ejército. all: también ignoran a jugadores y otros mobs. Un golpe le permite devolver el golpe a su atacante. Solo invocaciones nuevas.
+mobbattle.panel.field.summon.frozen.label = Invocaciones congeladas
+mobbattle.panel.field.summon.frozen.tip = Las invocaciones salen congeladas: quietas y sin IA, para capturas y pruebas (la pantalla VS sale igual). /npc thaw --all las suelta (por defecto off).
 mobbattle.panel.field.summon.army.label = Las invocaciones se unen a mi ejército
 mobbattle.panel.field.summon.army.tip = Los mobs invocados se unen a tu ejército, como si los añadieras con la Varita de Ejército (desactivado por defecto). No si aparecen en un equipo.
 mobbattle.panel.field.summon.jade.label = Invocaciones de jade
@@ -1599,6 +1633,8 @@ mobbattle.panel.field.debug.tip = Líneas [debug] en el registro del servidor co
 mobbattle.panel.field.debug.record.label = Grabador de depuración
 mobbattle.panel.field.debug.record.tip = Guarda en memoria los últimos 5 minutos de registro y líneas [debug]; Guardar registro de depuración los escribe en debug/ (desactivado por defecto).
 mobbattle.panel.field.server.vs.label = Pantalla VS
+mobbattle.panel.field.server.vs.pictures.label = Envío de imágenes VS
+mobbattle.panel.field.server.vs.pictures.tip = boot = las imágenes VS de todos los mobs al entrar (35-55 MB la primera vez, sin tirones después); battle = ninguna al entrar, cada batalla manda las suyas en su cuenta atrás (un tirón corto para todos los conectados la primera vez que sale un mob). Desde el próximo reinicio (por defecto battle).
 mobbattle.panel.field.server.vs.tip = La pantalla VS estilo Smash antes de las batallas. Apagada: ninguna batalla muestra VS y sus imágenes (la descarga más grande) dejan de enviarse tras el próximo reinicio (por defecto activada).
 mobbattle.panel.field.server.hologram.label = Holograma de la Varita de Morph
 mobbattle.panel.field.server.hologram.tip = El holograma del mob copiado sobre la Varita de Morph. Apagado: sin holograma, y sus imágenes dejan de enviarse tras el próximo reinicio (por defecto activado).
@@ -1713,7 +1749,7 @@ mobbattle.panel.section.apply = Aplicar a jugadores o mobs
 mobbattle.panel.section.permissions = Permisos: {mode}
 mobbattle.panel.section.server = Servidor
 mobbattle.panel.section.cleanup = Limpieza (pide confirmación)
-mobbattle.panel.note.cameras = Agacharte, o /mobbattle skipCamera, salta una cámara en marcha. /mobbattle watch te permite ver una batalla en marcha (clic derecho = siguiente luchador, izquierdo = anterior, Q o /mobbattle watch exit = salir).
+mobbattle.panel.note.cameras = Agacharte, o /mobbattle skipCamera, salta una cámara en marcha. /mobbattle watch te permite ver una batalla en marcha (clic derecho = siguiente luchador, izquierdo = anterior, E = cambio automático, Q o /mobbattle watch exit = salir).
 mobbattle.panel.note.battlewaves = Las ondas de la Varita del Chasquido (sin batalla), del battle royale y de todos contra uno.
 mobbattle.panel.note.ties = Dos empates distintos: quién GANA cuando los bandos están igualados al acabarse el tiempo, y en qué ORDEN se listan los luchadores con las mismas bajas. Cada pestaña de batalla puede cambiarlos para sus propias batallas.
 mobbattle.panel.note.kindtab = Presentación y cámaras: Global = el valor de las pestañas Presentación / Cámaras (campos numéricos: déjalos vacíos).
@@ -1729,6 +1765,10 @@ mobbattle.panel.note.nopresets = Aún no hay preajustes guardados.
 mobbattle.panel.note.presetclick = Haz clic en el nombre de un preajuste para cargarlo en el formulario.
 mobbattle.panel.note.nosummonlists = Aún no hay listas guardadas: ponle un nombre a esta abajo y guárdala.
 mobbattle.panel.note.summonlistclick = Haz clic en el nombre de una lista para cargarla: reemplaza la lista de arriba y los equipos (Deshacer recupera esta).
+mobbattle.panel.row.summonlistsort.date = Más recientes primero
+mobbattle.panel.row.summonlistsort.name = Ordenadas por nombre
+mobbattle.panel.button.summonlistsort.date = Más recientes primero
+mobbattle.panel.button.summonlistsort.name = Ordenar por nombre
 mobbattle.panel.note.presetholds = Un preajuste guarda todos los ajustes excepto la lista de equipos, la lista de invocación y el modo de permisos.
 mobbattle.panel.note.permissions = open = cualquiera puede usar las varitas y cambiar ajustes. server = necesita los permisos dackoro.mob_battle.use / .config. Las acciones de admin siempre necesitan dackoro.mob_battle.admin.
 mobbattle.panel.kindtip.global.duel = Solo para duelos. Global = usa el valor de las pestañas Presentación/Cámaras.
@@ -1915,13 +1955,13 @@ mobbattle.limits.cameratime = Aviso: cámaras de más de {warn} s dejan a los es
 mobbattle.limits.speed = Aviso: un buff de velocidad de más de +{warn}% (x4) hace que los jugadores den tirones (el cliente los corrige) y los mobs pueden colarse por las esquinas.
 mobbattle.panel.note.buffwand.stack = Cada clic suma sobre el valor base del mob, nunca multiplica lo que ya tiene. Con x2 (+100%) por clic, un mob con 10 de vida tiene 20 tras un clic, 30 tras dos y 60 tras cinco (no 20, 40, 80). Todas las fuentes de buff se suman igual. La defensa es la parte del daño que se bloquea: x2 = recibe la mitad; dos clics de x2 lo bloquearían todo, así que se queda en x100 (recibe 1/100).
 mobbattle.music.battle.name = Mob Battle: batalla contra el jefe goblin (más alta, en bucle)
-mobbattle.cmd.desc.end_slow_mo = Velocidad del mundo en porcentaje justo tras el golpe final de una batalla (cámara lenta), off = normal
+mobbattle.cmd.desc.end_slow_mo = Cámara lenta justo tras el golpe final de una batalla: cuántas veces más lento (2-20), off = sin ella
 mobbattle.cmd.desc.end_slow_mo_time = Cuántos segundos dura la cámara lenta final
-mobbattle.panel.field.camera.slowmo.label = Cámara lenta tras el golpe final
-mobbattle.panel.field.camera.slowmo.tip = Velocidad del mundo en porcentaje cuando se gana una batalla (25 = cuatro veces más lento). Frena todo el mundo, así que no se aplica si hay otra batalla en él (por defecto 0 = apagado).
-mobbattle.panel.field.camera.slowmo.hint = porcentaje de velocidad, 0 = apagado
+mobbattle.panel.field.camera.slowmo.times.label = Cámara lenta al ganar
+mobbattle.panel.field.camera.slowmo.times.tip = Al ganarse una batalla, todo el mundo va este número de veces más lento durante un momento: 2 = el doble de lento, 4 = cuatro veces más lento, 10 = diez veces más lento. 0 = sin cámara lenta. No se aplica si hay otra batalla en ese mundo (por defecto 0).
+mobbattle.panel.field.camera.slowmo.times.hint = veces más lento, 0 = apagado
 mobbattle.panel.field.camera.slowmo.time.label = La cámara lenta dura
-mobbattle.panel.field.camera.slowmo.time.tip = Segundos reales hasta que el mundo vuelve a velocidad normal (por defecto 3).
+mobbattle.panel.field.camera.slowmo.time.tip = Cuántos segundos reales dura la cámara lenta antes de que el mundo vuelva a su velocidad normal (por defecto 3).
 mobbattle.panel.field.camera.slowmo.time.hint = segundos
 
 mobbattle.cmd.apply.unknownitem = Objeto desconocido: {value}.
@@ -1979,15 +2019,38 @@ mobbattle.equip.editing.legs = Eligiendo para: Piernas
 mobbattle.equip.count = {total} objetos
 mobbattle.equip.count.more = Mostrando {shown} de {total}: busca o filtra para ver el resto.
 
-mobbattle.help.battles.75 = equipWeaponDamage on|off - el arma de un mob cambia su daño: sus golpes se escalan por el poder del arma frente al arma de su rol, de x0.25 a x3 (por defecto off)
-mobbattle.cmd.desc.equip_weapon_damage = El arma de un mob cambia su daño (por defecto off)
-mobbattle.cmd.desc.equip_weapon_damage_on = Golpes escalados por el poder del arma
-mobbattle.cmd.desc.equip_weapon_damage_off = Las armas son solo apariencia (por defecto)
+mobbattle.help.battles.75 = equipWeaponDamage on|off - el arma de un mob cambia su daño: sus golpes se escalan por el poder del arma frente al arma de su rol, de x0.25 a x3 (por defecto on)
+mobbattle.cmd.desc.equip_weapon_damage = El arma de un mob cambia su daño (por defecto on)
+mobbattle.cmd.desc.equip_weapon_damage_on = Golpes escalados por el poder del arma (por defecto)
+mobbattle.cmd.desc.equip_weapon_damage_off = Las armas son solo apariencia
 mobbattle.panel.field.equip.weapon.damage.label = Bono de daño por arma
-mobbattle.panel.field.equip.weapon.damage.tip = Los golpes de un mob se escalan por el poder de su arma frente al arma de su rol (Varita de Equipo), de x0.25 a x3. Off: las armas son solo apariencia (por defecto off).
+mobbattle.panel.field.equip.weapon.damage.tip = Los golpes de un mob se escalan por el poder de su arma frente al arma de su rol (Varita de Equipo), de x0.25 a x3. Off: las armas son solo apariencia (por defecto on).
 
 mobbattle.help.battles.76 = kit list | show <kit> | save <kit> [copied|look] | set <kit> <casilla> <objeto|objeto2|-|none> | remove <kit> - kits de equipo: una casilla con varios objetos elige uno al azar por mob, - la vacía, none la deja como la tiene el mob
 mobbattle.help.battles.77 = summon kit <rol> <kit|none> / teams kit <equipo> <kit|none> / army kit <kit> / apply <quién> kit <kit> - los summons aparecen con él, un equipo lo lleva en las batallas de equipos (se lo quita al final), tu ejército lo recibe ya
+mobbattle.help.battles.78 = dummyHealth <100-10000> / dummyDamage|dummyDefense|dummySpeed|dummySize <porcentaje> - stats de todos los maniquíes de entrenamiento (MobBattle_Dummy_*) que aparezcan desde ahora: vida en puntos (por defecto 100), el resto como porcentaje extra (por defecto 0)
+mobbattle.cmd.desc.dummyhealth = Maniquíes de entrenamiento: vida de los que aparezcan, en puntos (por defecto 100)
+mobbattle.cmd.desc.dummydamage = Maniquíes de entrenamiento: daño extra en porcentaje (por defecto 0)
+mobbattle.cmd.desc.dummydefense = Maniquíes de entrenamiento: defensa en porcentaje, hasta 99 (por defecto 0)
+mobbattle.cmd.desc.dummyspeed = Maniquíes de entrenamiento: velocidad extra en porcentaje (por defecto 0)
+mobbattle.cmd.desc.dummysize = Maniquíes de entrenamiento: tamaño extra en porcentaje (por defecto 0)
+mobbattle.panel.section.dummies = Maniquíes de entrenamiento
+mobbattle.panel.note.dummies = Todos los maniquíes de entrenamiento, uno por arma (lista de invocación, o /npc spawn MobBattle_Dummy_<arma>, por ejemplo MobBattle_Dummy_Knight). Estos stats se ponen a cada uno que aparezca desde ahora; los que ya están se quedan como están. Limpiar los devuelve a los de su rol.
+mobbattle.panel.field.dummy.health.label = Vida
+mobbattle.panel.field.dummy.health.tip = Puntos de vida de cada maniquí que aparezca (los suyos son 100).
+mobbattle.panel.field.dummy.health.hint = puntos de vida, por defecto 100
+mobbattle.panel.field.dummy.damage.label = Daño extra
+mobbattle.panel.field.dummy.damage.tip = Cuánto más fuerte pegan, en porcentaje (100 = el doble).
+mobbattle.panel.field.dummy.damage.hint = porcentaje, por defecto 0
+mobbattle.panel.field.dummy.defense.label = Defensa
+mobbattle.panel.field.dummy.defense.tip = Parte de cada golpe que no reciben, en porcentaje (50 = la mitad de daño, 99 como máximo).
+mobbattle.panel.field.dummy.defense.hint = porcentaje, por defecto 0
+mobbattle.panel.field.dummy.speed.label = Velocidad extra
+mobbattle.panel.field.dummy.speed.tip = Cuánto más rápido se mueven, en porcentaje.
+mobbattle.panel.field.dummy.speed.hint = porcentaje, por defecto 0
+mobbattle.panel.field.dummy.size.label = Tamaño extra
+mobbattle.panel.field.dummy.size.tip = Cuánto más grandes son, en porcentaje (100 = el doble).
+mobbattle.panel.field.dummy.size.hint = porcentaje, por defecto 0
 mobbattle.cmd.desc.kit = Kits de equipo para summons, equipos y ejércitos
 mobbattle.cmd.desc.kit_list = Lista los kits
 mobbattle.cmd.desc.kit_show = Muestra las casillas de un kit
@@ -2013,7 +2076,103 @@ mobbattle.equip.savekit = Guardar kit
 mobbattle.equip.applykit = Aplicar kit
 mobbattle.equip.kitsaved = Guardado como kit {kit}. Úsalo con summon kit, teams kit o army kit.
 mobbattle.equip.kitapplied = Kit {kit} puesto.
+mobbattle.equip.kitapplied.dummy = Kit {kit} puesto (solo armadura, runas y stats: un maniquí de entrenamiento conserva su arma).
+mobbattle.equip.dummyhands = Maniquí de entrenamiento: sus ataques están hechos para el arma con la que aparece, así que sus manos están bloqueadas. La armadura, las runas y los stats sí se pueden cambiar.
+mobbattle.equip.kitextras = Runas que lanza en combate y stats (0 = nada)
+mobbattle.equip.stat.health = Vida (pts)
+mobbattle.equip.stat.damage = Daño %
+mobbattle.equip.stat.defense = Defensa %
+mobbattle.equip.stat.speed = Velocidad %
+mobbattle.equip.stat.size = Tamaño %
+mobbattle.cmd.kit.runes = Runas (coste, enfriamiento, alcance): {runes}
+mobbattle.cmd.kit.unknownrune = {value} no es una runa. Runas: {runes}
+mobbattle.cmd.kit.statvalue = El valor es un número entero de 0 a {max} (vida en puntos, el resto en porcentaje), o - para quitarlo.
+mobbattle.cmd.kit.dummyhands = Los maniquíes de entrenamiento conservaron su arma (solo se les puso armadura, runas y stats).
+mobbattle.cmd.apply.why.dummyhands = un maniquí de entrenamiento conserva su arma
+mobbattle.cmd.desc.kit_runes = Lista las runas que puede llevar un kit (coste, enfriamiento, alcance)
+mobbattle.cmd.desc.kit_rune = Id del objeto runa
+mobbattle.cmd.desc.kit_set_runes = Runas que lanzan los mobs del kit en combate (Runa_A+Mejora,Runa_B, - para ninguna)
+mobbattle.cmd.desc.kit_set_stat = Un stat que da el kit (vida en puntos, el resto en porcentaje, - para quitarlo)
+mobbattle.cmd.desc.kit_stat_value = Stat y luego su valor
+mobbattle.help.battles.79 = kit set <kit> runes <Runa_A+Mejora+Mejora,Runa_B|-> / kit set <kit> stat <health|damage|defense|speed|size> <valor|-> / kit runes - perfiles de combate: los mobs del kit lanzan esas runas en combate (con su maná, el enfriamiento y alcance de la runa, y las mejoras unidas con +) y reciben esos stats (vida en puntos, el resto en porcentaje; Limpiar los quita). Los mobs no pueden usar Chain Hook
+mobbattle.help.battles.80 = Vienen listos los kits tank, berserker, mage y rogue (armadura, runas y stats, sin tocar las manos). Los maniquíes de entrenamiento (MobBattle_Dummy_*) siempre conservan su arma: los kits solo cambian su armadura, runas y stats
 
 # --- maniquíes de entrenamiento (Server/NPC/Roles/MobBattle) ---
 npcRoles.MobBattle_Dummy_Knight.name = Caballero de entrenamiento
 npcRoles.MobBattle_Dummy_Archer.name = Arquero de entrenamiento
+npcRoles.MobBattle_Dummy_Mace.name = Guerrero de maza de entrenamiento
+npcRoles.MobBattle_Dummy_Daggers.name = Pícaro de entrenamiento
+npcRoles.MobBattle_Dummy_Battleaxe.name = Guerrero de hacha de batalla de entrenamiento
+npcRoles.MobBattle_Dummy_Axe.name = Hachero de entrenamiento
+npcRoles.MobBattle_Dummy_Spear.name = Lancero de entrenamiento
+npcRoles.MobBattle_Dummy_Longsword.name = Espadachín de entrenamiento
+npcRoles.MobBattle_Dummy_Club.name = Garrotero de entrenamiento
+npcRoles.MobBattle_Dummy_Flail.name = Guerrero de mangual de entrenamiento
+npcRoles.MobBattle_Dummy_Crossbow.name = Ballestero de entrenamiento
+npcRoles.MobBattle_Dummy_Staff.name = Mago de bastón de entrenamiento
+npcRoles.MobBattle_Dummy_Spellbook.name = Hechicero de entrenamiento
+mobbattle.creative.wands = Varitas
+mobbattle.creative.dev = Herramientas de desarrollo
+mobbattle.creative.battles = Batallas
+mobbattle.creative.army = Ejército e invocación
+mobbattle.creative.support = Apoyo
+mobbattle.creative.destruction = Destrucción
+mobbattle.creative.battles.description = Empieza peleas: duelos, todos contra uno, battle royale y equipos.
+mobbattle.creative.army.description = Recluta mobs en ejércitos e invócalos.
+mobbattle.creative.support.description = Cura, potencia, limpia, cambia el aspecto de los mobs y equípalos.
+mobbattle.creative.destruction.description = Mata mobs al instante: de uno en uno, en una onda a tu alrededor o a la mitad con el chasquido.
+mobbattle.watch.auto = Cambio automático
+mobbattle.battle.watch.auto.on = Watch: cambia de luchador solo cada {s} s (E para parar).
+mobbattle.battle.watch.auto.off = Watch: cambio automático apagado (E para encenderlo).
+mobbattle.equip.tab.gear = Equipo
+mobbattle.equip.tab.runes = Runas
+mobbattle.equip.runes.help = Runas que lanza en combate, como en el vinculador de runas: una runa principal y dos mejoras por línea. Toca un hueco y elige en la galería. Una mejora solo va con las runas principales que acepta.
+mobbattle.equip.kitstats = Stats del kit: vida en puntos, el resto en % (0 = nada)
+mobbattle.equip.rune.line = Habilidad {n}
+mobbattle.equip.editing.rune.core = Eligiendo para: Habilidad {n}, runa principal
+mobbattle.equip.editing.rune.support = Eligiendo para: Habilidad {n}, mejora
+mobbattle.equip.rune.remove = Sin runa
+mobbattle.equip.rune.twice = Este mob ya tiene esa runa.
+mobbattle.equip.rune.corefirst = Primero elige la runa principal de esta línea.
+mobbattle.equip.rune.nofit = Esa mejora no va con esta runa principal.
+mobbattle.equip.rune.removed = Runa quitada.
+mobbattle.equip.rune.set = Runa puesta. El mob la lanza en sus próximas peleas.
+mobbattle.equip.tab.stats = Stats
+mobbattle.equip.tab.kits = Kits
+mobbattle.equip.random = Equipo aleatorio
+mobbattle.equip.random.done = Equipo aleatorio puesto: arma, armadura y runas.
+mobbattle.equip.random.dummy = Armadura y runas aleatorias puestas (el maniquí conserva sus armas).
+mobbattle.equip.stats.help = Stats propios de este mob, como los de un kit: vida en puntos, el resto en %. 0 = sin cambio.
+mobbattle.equip.stat.health.long = Vida máxima (puntos)
+mobbattle.equip.stat.damage.long = Daño (+%)
+mobbattle.equip.stat.defense.long = Defensa (+%)
+mobbattle.equip.stat.speed.long = Velocidad (+%)
+mobbattle.equip.stat.size.long = Tamaño (+%)
+mobbattle.equip.stats.apply = Aplicar al mob
+mobbattle.equip.stats.applied = Stats aplicados al mob.
+mobbattle.equip.stats.side = Se suman a los buffs de la Varita de Buff, rachas y campeón. Al guardar un kit desde la pestaña Kits, se guardan con él.
+mobbattle.equip.overwritekit = Sobrescribir
+mobbattle.equip.deletekit = Borrar kit
+mobbattle.equip.newkit = Nuevo kit con el equipo, runas y stats de este mob:
+mobbattle.equip.kitexists = Ya existe un kit {kit}: elígelo en la lista y usa Sobrescribir.
+mobbattle.equip.kitoverwritten = Kit {kit} sobrescrito con lo que lleva este mob.
+mobbattle.equip.kitdeleted = Kit {kit} borrado.
+mobbattle.equip.kitpickfirst = Primero elige un kit de la lista.
+mobbattle.equip.kit.info = Piezas: {pieces} · Runas: {runes} · Stats: {stats}
+mobbattle.equip.editing.stats = Stats del mob
+mobbattle.equip.editing.kits = Kits guardados
+mobbattle.equip.editing.kit = Kit: {kit}
+mobbattle.equip.kits.side = Toca un kit para ver lo que lleva. Aplicar lo pone en este mob; Sobrescribir lo reemplaza con lo que lleva este mob.
+mobbattle.equip.notice.dummy = Maniquí: su arma es fija; armadura, runas y stats sí cambian.
+mobbattle.equip.notice.needs = Sus ataques necesitan {items} en la mano: esas manos están bloqueadas.
+mobbattle.cmd.kit.runenofit = {value} no va con esa runa principal (mira kit runes).
+mobbattle.cmd.kit.unknownsupport = {value} no es una runa de mejora. Mejoras: {runes}
+mobbattle.cmd.kit.supports = Mejoras (runas principales con las que van; escribe Runa_A+Mejora): {runes}
+mobbattle.cmd.desc.runecooldown = Runas: cuánto esperan los mobs entre dos usos de una runa, en % de su enfriamiento (por defecto 200)
+mobbattle.help.battles.81 = runeCooldown <50-1000> - cuánto espera un mob entre dos usos de una runa, en % del enfriamiento de la runa (100 = como un jugador, por defecto 200)
+mobbattle.help.battles.82 = battleLoot on|off - los mobs que mueren en una batalla sueltan su botín normal (por defecto off: el campo queda limpio)
+mobbattle.panel.section.runes = Runas de los mobs
+mobbattle.panel.note.runes = Las runas vienen de los kits (Varita de Equipo, pestaña Runas, o kit set <kit> runes). Un mob lanza una en cuanto la tiene lista; esto las espacia.
+mobbattle.panel.field.rune.cooldown.label = Tiempo entre runas
+mobbattle.panel.field.rune.cooldown.tip = Cuánto espera un mob para lanzar otra vez la misma runa, en % del enfriamiento de la runa: 100 = como un jugador, 200 = el doble.
+mobbattle.panel.field.rune.cooldown.hint = % del enfriamiento, por defecto 200

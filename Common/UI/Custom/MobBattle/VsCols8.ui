@@ -13,13 +13,15 @@ Group #Vs {
       Visible: false;
       Group #C8P0 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P0In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P0Pad { FlexWeight: 1000; }
@@ -27,27 +29,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P0Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P0Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P0Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -80,13 +78,15 @@ Group #Vs {
       }
       Group #C8P1 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P1In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P1Pad { FlexWeight: 1000; }
@@ -94,27 +94,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P1Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P1Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P1Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -147,13 +143,15 @@ Group #Vs {
       }
       Group #C8P2 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P2In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P2Pad { FlexWeight: 1000; }
@@ -161,27 +159,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P2Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P2Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P2Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -214,13 +208,15 @@ Group #Vs {
       }
       Group #C8P3 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P3In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P3Pad { FlexWeight: 1000; }
@@ -228,27 +224,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P3Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P3Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P3Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -281,13 +273,15 @@ Group #Vs {
       }
       Group #C8P4 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P4In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P4Pad { FlexWeight: 1000; }
@@ -295,27 +289,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P4Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P4Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P4Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -348,13 +338,15 @@ Group #Vs {
       }
       Group #C8P5 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P5In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P5Pad { FlexWeight: 1000; }
@@ -362,27 +354,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P5Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P5Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P5Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -415,13 +403,15 @@ Group #Vs {
       }
       Group #C8P6 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P6In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P6Pad { FlexWeight: 1000; }
@@ -429,27 +419,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P6Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P6Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P6Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -482,13 +468,15 @@ Group #Vs {
       }
       Group #C8P7 {
         FlexWeight: 1;
-        // the column rises from the bottom of the screen (user, 2026-10-16: they popped in): #..Pad shrinks and #..Body
+        // the column rises from the bottom of the screen (playtest, 2026-10-16: they popped in): #..Pad shrinks and #..Body
         // grows (FlexWeights set by VsScreen, never 0: a 0 takes its content's size); the content hangs from the
         // body's top, so it moves up with it (below the screen = unseen)
-        // Top -6 (user, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
+        // Top -6 (playtest, 2026-10-18: a thin see-through line on top of the risen columns): #..Pad never gets below
         // weight 1, so it kept ~1 px over the body; now that px sits above the screen and the content starts 5 down
+        // Bottom -6 and a 1086 content (playtest, 2026-10-29: a ~1 px see-through line under the columns): the body and
+        // the picture's feet run 6 px past the screen's bottom edge
         Group #C8P7In {
-          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: 0);
+          Anchor: (Left: 0, Right: 0, Top: -6, Bottom: -6);
           Visible: false;
           LayoutMode: Top;
           Group #C8P7Pad { FlexWeight: 1000; }
@@ -496,27 +484,23 @@ Group #Vs {
             FlexWeight: 1;
             Background: #000000;
             Group {
-              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1080);
+              Anchor: (Left: 0, Right: 0, Top: 5, Height: 1086);
               // the picture: the mob's face-framed square, standing on the bottom of the 1080 column content (a picture
               // taller than 1080 is cut at the bottom), centered across and wider than the column; the mask cuts it
               // to the column (overflow hidden)
+              // the picture: the mob's square already cut to this column's width (VsScreen.makeCut), as wide as the column and
+              // 1000 tall, standing on the bottom. No mask: a masked group hid its picture a moment after it showed
+              // (playtest, 2026-10-29: with or without centering, with the pictures sent at join too; without the mask it stayed)
               Group #C8P7Clip {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
-                MaskTexturePath: "Masks/Clip.png";
-                LayoutMode: Top;
-                Group { Anchor: (Height: 80); }
-                Group {
-                  Anchor: (Height: 1000);
-                  LayoutMode: Center;
-                  AssetImage #C8P7Pic { Anchor: (Width: 1000, Height: 1000); Visible: false; }
-                }
+                AssetImage #C8P7Pic { Anchor: (Left: 0, Right: 0, Top: 86, Height: 1000); Visible: false; }
               }
-              // a mob with no column picture yet (its square picture or icon, user 2026-10-16: an icon stretched to the
+              // a mob with no column picture yet (its square picture or icon, playtest 2026-10-16: an icon stretched to the
               // column's height): square, as wide as the column, standing on its bottom
               Group {
                 Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
                 LayoutMode: Top;
-                Group { Anchor: (Height: 840); }
+                Group { Anchor: (Height: 846); }
                 Group {
                   Anchor: (Height: 240);
                   LayoutMode: Center;
@@ -551,7 +535,7 @@ Group #Vs {
   }
 
 
-  // "Preparing the battle..." while the client loads the screen (2026-10-18, user: during the wait the player could
+  // "Preparing the battle..." while the client loads the screen (2026-10-18, playtest: during the wait the player could
   // think nothing happened); VsScreen hides it when the screen comes in
   Group #Loading {
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
@@ -578,7 +562,7 @@ Group #Vs {
     Visible: false;
   }
 
-  // the kind's title right under the column headers, over the space above the faces (user, 2026-10-16: in the middle
+  // the kind's title right under the column headers, over the space above the faces (playtest, 2026-10-16: in the middle
   // it covered them)
   Group #ColTitle {
     Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);

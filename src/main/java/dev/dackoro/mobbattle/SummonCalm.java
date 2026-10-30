@@ -15,7 +15,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Calm summons (/mobbattle summonCalm, 2026-10-13, user: a Feastmaster and 100 skeletons summoned together fought
+ * Calm summons (/mobbattle summonCalm, 2026-10-13, playtest: a Feastmaster and 100 skeletons summoned together fought
  * at once). A calm summon ignores the other calm summons of its world (mode summons) and also players and every other
  * mob around it (mode all), through short IGNORE attitude overrides renewed every REFRESH_MS, until:
  * <ul>

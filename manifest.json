@@ -1,7 +1,7 @@
 {
   "Group": "Dackoro",
   "Name": "Mob Battle",
-  "Version": "1.1.0",
+  "Version": "1.2.0",
   "ServerVersion": ">=0.7.0-pre <0.8.0",
   "Description": "Dackoro's Mob Battle: thirteen wands for mob duels, team battles, battle royale, summoning, healing, effects and morphs.",
   "Authors": [

@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * /mobbattle pictures status | rebuild [force] (admin, console too; 2026-10-17, user: redraw every picture from a
+ * /mobbattle pictures status | rebuild [force] (admin, console too; 2026-10-17, playtest: redraw every picture from a
  * running server, progress in chat, and at the end how long it took and how much each group of pictures weighs).
  * The drawing itself is the boot run (ThumbnailCache.rebuildAll), on its own low-priority threads: the game keeps
  * running.
@@ -79,8 +79,7 @@ final class PicturesCommand {
         ScheduledFuture<?>[] tick = new ScheduledFuture<?>[1];
         tick[0] = MobBattlePlugin.track(com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             if (finished.get() || !ThumbnailCache.running()) {
-                ScheduledFuture<?> t = tick[0];
-                if (t != null) t.cancel(false);
+                MobBattlePlugin.untrack(tick[0]);
                 return;
             }
             PictureProgress.Now now = PictureProgress.now();

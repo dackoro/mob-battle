@@ -49,7 +49,7 @@ public class TeamActionInteraction extends SimpleInstantInteraction {
                 && buffer.getComponent(target, NPCEntity.getComponentType()) != null;
 
         if (!onNpc) {
-            // crouch + right click in the air: clear every team, after two warnings (user, 2026-10-17: three clicks,
+            // crouch + right click in the air: clear every team, after two warnings (playtest 2026-10-17: three clicks,
             // a yellow then a red warning in chat before the last one)
             if (PlayerFighters.crouching(context.getEntity(), buffer)) {
                 askClear(player, draft);

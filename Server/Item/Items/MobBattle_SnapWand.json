@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_SnapWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Destruction",
   "Icon": "Icons/Items/MobBattle/SnapWand.png",
   "Quality": "Legendary",
   "ItemLevel": 1,

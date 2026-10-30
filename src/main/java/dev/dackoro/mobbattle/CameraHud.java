@@ -14,7 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * /mobbattle cameraHud hide|show (2026-10-16, user: the hotbar, compass and boss bar covered the film, as the AFK
+ * /mobbattle cameraHud hide|show (2026-10-16, playtest: the hotbar, compass and boss bar covered the film, as the AFK
  * Experience mod hides them): while an intro, end camera or battle film has the player's camera, the game's own HUD
  * pieces are hidden (vanilla HudManager.setVisibleHudComponents, as AFK Experience does), keeping the chat and the
  * big titles; the ones they had come back when the camera ends (FightCamera.reset). Our own CustomUIHuds (cinema bars,
@@ -59,7 +59,7 @@ final class CameraHud {
     private static final Set<UUID> CHAT_HIDDEN = ConcurrentHashMap.newKeySet();
 
     /**
-     * Hides the chat while a VS screen shows (user, 2026-10-17: the countdown's chat lines sat over the VS). Only when
+     * Hides the chat while a VS screen shows (playtest 2026-10-17: the countdown's chat lines sat over the VS). Only when
      * it shows now, so a player who hid their chat keeps it hidden. Any thread; queued after an earlier hide/restore.
      */
     static void hideChat(PlayerRef player) {

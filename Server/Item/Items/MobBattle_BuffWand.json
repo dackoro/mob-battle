@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_BuffWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Support",
   "Icon": "Icons/Items/MobBattle/BuffWand.png",
   "Quality": "Epic",
   "ItemLevel": 1,

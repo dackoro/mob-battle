@@ -155,7 +155,7 @@ final class LookKeeper {
         Tracked t = TRACKED.get(ref);
         if (t != null && !t.buff) TRACKED.remove(ref, t);
         // Every look on the mob goes, not only the tracked one: a look saved with the mob (world left and entered
-        // again) is not tracked, and a second look on top of it broke the re-send (user, 2026-10-12).
+        // again) is not tracked, and a second look on top of it broke the re-send (playtest 2026-10-12).
         int nextIndex = EntityEffect.getAssetMap().getIndex(next.getId());
         boolean same = false;
         for (int index : activeLooks(effects)) {
@@ -200,7 +200,7 @@ final class LookKeeper {
 
     /**
      * The client shows a look's ModelVFX only when the effect is added while it already sees the mob, never from the
-     * effect list sent when the mob comes into view (user, 2026-10-12: jade goblins came back plain after re-entering
+     * effect list sent when the mob comes into view (playtest 2026-10-12: jade goblins came back plain after re-entering
      * the world, while the server still had the look). So a player starting to see a tracked mob (vanilla tracker
      * Visible.visibleTo) gets the look re-sent once the mob reached their client. True when someone new sees it.
      */
@@ -287,7 +287,7 @@ final class LookKeeper {
      * The guardian pass for the mobs of {@code store}, every tick from {@link LookGuardSystem}: on the world thread,
      * right before the tracker sends this tick's effect changes, so a re-send goes in the same packet as the change
      * that dropped the look and the client never shows the normal skin (a pass queued with world.execute ran a tick
-     * late: hit jade mobs blinked, user 2026-10-12). Only effect changes here; the lights go on the world thread.
+     * late: hit jade mobs blinked, playtest 2026-10-12). Only effect changes here; the lights go on the world thread.
      */
     static void tick(Store<EntityStore> store) {
         if (store.isShutdown()) return;
@@ -331,7 +331,7 @@ final class LookKeeper {
             float[] left = remaining(effects, now);
             // A renewed effect (Extend/Overwrite) goes to the client as another Add with no removal, and drops the
             // look too: Red_Flash on every hit, Hit_Interrupt_Eligible refreshed by the role every 0.25 s in combat
-            // (user, 2026-10-12: hit jade mobs lost the look). Vanilla addEffect on an active effect only resets its
+            // (playtest 2026-10-12: hit jade mobs lost the look). Vanilla addEffect on an active effect only resets its
             // duration (javap), so a remaining time that went up means it was renewed. Only visual effects count
             // (visual): Hit_Interrupt_Eligible has no ApplicationEffects and re-sending for it restarted the shimmer.
             boolean lost = t.touched || t.seen != null && (anyMissing(t.seen, now) || renewed(t.seen, t.seenLeft, now, left));
@@ -479,7 +479,7 @@ final class LookKeeper {
     /**
      * True when the effect shows something on the client (tint, particles, ModelVFX, model). Only those count when
      * renewed: Skeleton roles refresh the invisible Hit_Interrupt_Eligible every 0.25 s even idle, and re-sending the
-     * look for each restarted the shimmer's veins four times a second (user, 2026-10-12, debugLog).
+     * look for each restarted the shimmer's veins four times a second (playtest 2026-10-12, debugLog).
      */
     private static boolean visual(int index) {
         EntityEffect e = EntityEffect.getAssetMap().getAsset(index);

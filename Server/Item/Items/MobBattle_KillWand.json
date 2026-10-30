@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_KillWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Destruction",
   "Icon": "Icons/Items/MobBattle/KillWand.png",
   "Quality": "Epic",
   "ItemLevel": 1,

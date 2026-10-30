@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_CleanseWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Support",
   "Icon": "Icons/Items/MobBattle/CleanseWand.png",
   "Quality": "Common",
   "ItemLevel": 1,

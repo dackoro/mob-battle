@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Kill Wand held left click (the charged branch of a vanilla Charging interaction, 2026-10-18, user: like the other
+ * Kill Wand held left click (the charged branch of a vanilla Charging interaction, 2026-10-18, playtest: like the other
  * wands' held clicks): the Snap Wand's ground slam, and when it hits a shockwave in the soul rip's color; every mob
  * within killRadius dies as by a click (soul rip, killDelay, killLoot), each when the ring reaches it (waveTravel).
  * Never the caster nor the mobs of their own army (its whole chain of command); players only with killAreaPlayers

@@ -1,0 +1,151 @@
+{
+  "$Comment": "Casts cost 25 mana here (the player pays 100: mana refills 1 per 0.3 s, so at 100 the dummy stood idle 30 s between casts). Mob Battle training spellbook caster's combat with the player's own fire spellbook (older weapon set: no signature energy). Basic = Spellbook_Primary tapped (book swings) when a target is in reach. Cast = Spellbook_Primary held: ChargeFor 1 = its cast key (Spellbook_Cast_Hurl_Charged, needs 100 mana, the Skeleton_Mage_Corruption_Orb projectile), only picked at full mana. Spellbook_Cast_Hurl_Cost is replaced by the mana cost alone (shape of Weapon_Staff_Iron's Staff_Cast_Summon_Cost): the player's cost also uses up the book (ModifyInventory AdjustHeldItemQuantity -1, no game-mode check), which would leave the dummy empty-handed. No guard: the spellbook's right click is the same attack. Close swing = Block_Swing_Left directly (the player's Spellbook_Primary is an indefinite-hold Charging an NPC never releases).",
+  "Type": "CombatActionEvaluator",
+  "TargetMemoryDuration": 10,
+  "CombatActionEvaluator": {
+    "RunConditions": [
+      {
+        "Type": "TimeSinceLastUsed",
+        "Curve": {
+          "ResponseCurve": "Linear",
+          "XRange": [
+            0,
+            2
+          ]
+        }
+      },
+      {
+        "Type": "Randomiser",
+        "MinValue": 0.8,
+        "MaxValue": 1
+      }
+    ],
+    "MinRunUtility": 0.5,
+    "MinActionUtility": 0.01,
+    "AvailableActions": {
+      "Cast": {
+        "Type": "Ability",
+        "Description": "Spellbook cast: the player's held primary (Spellbook_Cast_Hurl_Charged hurls the orb, 100 mana)",
+        "Target": "Hostile",
+        "WeaponSlot": 0,
+        "SubState": "Default",
+        "AttackDistanceRange": [
+          4,
+          15
+        ],
+        "PostExecuteDistanceRange": [
+          6,
+          12
+        ],
+        "FailureTimeout": 5,
+        "Ability": "Spellbook_Primary",
+        "ChargeFor": 1,
+        "InteractionVars": {
+          "Spellbook_Cast_Hurl_Charged": {
+            "Interactions": [
+              {
+                "Parent": "Spellbook_Cast_Hurl_Charged",
+                "Costs": {
+                  "Mana": 25
+                }
+              }
+            ]
+          },
+          "Spellbook_Cast_Hurl_Cost": {
+            "Interactions": [
+              {
+                "Parent": "Staff_Cast_Cost",
+                "StatModifiers": {
+                  "Mana": -25
+                }
+              }
+            ]
+          },
+          "Spellbook_Cast_Hurl_Launch": "Spellbook_Cast_Launch",
+          "Spellbook_Cast_Hurl_Effect": "Spellbook_Cast_Effect",
+          "Spellbook_Cast_Hurl_Fail": "Spellbook_Cast_Fail",
+          "Block_Effect": "Block_Swing_Down_Effect",
+          "Block_Swing_Left_Damage": "Block_Swing_Left_Damage",
+          "Block_Swing_Right_Damage": "Block_Swing_Right_Damage",
+          "Block_Swing_Down_Damage": "Block_Swing_Down_Damage"
+        },
+        "Conditions": [
+          {
+            "Type": "OwnStatAbsolute",
+            "Stat": "Mana",
+            "Curve": {
+              "Type": "Switch",
+              "InitialState": 0,
+              "FinalState": 1,
+              "SwitchPoint": 24.5
+            }
+          },
+          {
+            "Type": "Randomiser",
+            "MinValue": 0.7,
+            "MaxValue": 1
+          },
+          {
+            "Type": "TimeSinceLastUsed",
+            "Curve": {
+              "ResponseCurve": "Linear",
+              "XRange": [
+                0,
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ActionSets": {
+      "Default": {
+        "BasicAttacks": {
+          "Attacks": [
+            "Block_Swing_Left"
+          ],
+          "InteractionVars": {
+            "Spellbook_Cast_Hurl_Charged": {
+              "Interactions": [
+                {
+                  "Parent": "Spellbook_Cast_Hurl_Charged",
+                  "Costs": {
+                    "Mana": 25
+                  }
+                }
+              ]
+            },
+            "Spellbook_Cast_Hurl_Cost": {
+              "Interactions": [
+                {
+                  "Parent": "Staff_Cast_Cost",
+                  "StatModifiers": {
+                    "Mana": -25
+                  }
+                }
+              ]
+            },
+            "Spellbook_Cast_Hurl_Launch": "Spellbook_Cast_Launch",
+            "Spellbook_Cast_Hurl_Effect": "Spellbook_Cast_Effect",
+            "Spellbook_Cast_Hurl_Fail": "Spellbook_Cast_Fail",
+            "Block_Effect": "Block_Swing_Down_Effect",
+            "Block_Swing_Left_Damage": "Block_Swing_Left_Damage",
+            "Block_Swing_Right_Damage": "Block_Swing_Right_Damage",
+            "Block_Swing_Down_Damage": "Block_Swing_Down_Damage"
+          },
+          "Randomise": false,
+          "UseProjectedDistance": true,
+          "MaxRange": 3,
+          "Timeout": 0.001,
+          "CooldownRange": [
+            0.2,
+            0.5
+          ]
+        },
+        "Actions": [
+          "Cast"
+        ]
+      }
+    }
+  }
+}

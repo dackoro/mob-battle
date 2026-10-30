@@ -55,6 +55,7 @@ final class RoleChange {
         SummonDespawn.carry(old, ref);
         ChaseSupport.carry(old, ref);
         MorphWand.carry(old, ref);
+        RuneCaster.carry(old, ref);
         if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("role change: " + ChaosWand.nameOf(ref, store) + " carried over");
     }
 

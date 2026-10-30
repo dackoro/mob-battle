@@ -1,6 +1,6 @@
 // Mob Battle all vs one card (FocusCard.java): the lone target and its stats, the attackers below, on the right in the scoreboard's place (it replaces the board).
 // Same look as DuelCard.ui. A malformed property makes the client reject the whole HUD, so change one thing at a time.
-// Under the cinema bars (CinemaBars.shift, 2026-10-16, user): #ShiftBar takes the band's height and #ShiftPad
+// Under the cinema bars (CinemaBars.shift, 2026-10-16, playtest): #ShiftBar takes the band's height and #ShiftPad
 // hides, so the card sits just under the top band while a camera films; without bars it is where it always was.
 Group #Shift {
   Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
@@ -12,11 +12,13 @@ Group #Shift {
     LayoutMode: Top;
 
     Group #ShiftPad { Anchor: (Height: 94); }
+    // the timer box's room over the card (TimerHud.placeCards): hidden when the box goes, so the card moves up
+    Group #TimerGap { Anchor: (Height: 154); }
     Group #ShiftSlot {
       FlexWeight: 1;
 
       Group {
-        Anchor: (Right: 24, Top: 170, Width: 270);
+        Anchor: (Right: 24, Top: 16, Width: 270);
         LayoutMode: Top;
 
         Group #Header {

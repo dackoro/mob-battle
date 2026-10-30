@@ -16,7 +16,7 @@ import java.util.List;
  * Debug recorder (/mobbattle debugRecord, default off): with it on, every plugin log line and every [debug] decision
  * (even with debugLog off) is kept in memory for the last {@link #KEEP_MS}, without touching the disk.
  * /mobbattle debugDump writes them to debug/record_&lt;time&gt;.txt, so a bug noticed late still has what led to it
- * (user, 2026-10-12: bugs showed up while the debug log was off). The setting is saved; the lines are not (memory only).
+ * (playtest 2026-10-12: bugs showed up while the debug log was off). The setting is saved; the lines are not (memory only).
  */
 final class DebugRecorder {
 

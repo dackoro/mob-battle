@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Smash-like VS screen (prototype, 2026-10-16, user: "la pantalla VS"; /mobbattle test vs [seconds]): a full-screen
+ * Smash-like VS screen (prototype, 2026-10-16, playtest: "la pantalla VS"; /mobbattle test vs [seconds]): a full-screen
  * HUD ({@code Common/UI/Custom/MobBattle/VsScreen.ui}) with two sides, each in its team color, the posed thumbnail
  * (ThumbnailCache) of its 1-3 strongest fighters (max health) and "+N" for the rest, and a big VS. The two halves
  * slide in from the screen edges as FlexWeights (as CinemaBars' bands), meet in the middle with a white flash, hold,
@@ -52,14 +52,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * Who: the battle most of the nearby mobs (within {@link #RANGE}) are in, by side (more than two sides: the strongest
  * side vs everyone else); with no battle, the nearby mobs split into two sides by kind.
  * <p>
- * Look (2026-10-16, user: like the VS card made for the clip): baked halves with the slant, streaks and particles per
+ * Look (2026-10-16, playtest: like the VS card made for the clip): baked halves with the slant, streaks and particles per
  * palette color and the VS logo (scripts/gen-vs-assets.py), the name bar, and the fighters big and overlapping in
  * slots of VsScreen.ui (scripts/gen-vs-ui.py): 1-3 named, 4-9 medium, 10+ a mound, all at their slot's full size; only
  * the 3+ team columns size pictures by their softened height (tierOf).
  * <p>
  * Pictures reach the client as common assets of the mod ({@code UI/Custom/MobBattle/Vs/MobBattle_Vs_<model>_v<k>_L|R.png},
  * the right side mirrored so both look at the middle, padded square, feet at the bottom, 256-color palette PNGs).
- * Never registered while players are online (user: the asset reload hitch, never again): the epic pose of every mob
+ * Never registered while players are online (playtest: the asset reload hitch, never again): the epic pose of every mob
  * model, every pose of the summon list's mobs and the poses wanted before (used.txt) are drawn by the thumbnail boot
  * run and registered at boot (registerAtBoot / prepareInBackground). Anything else falls back to the epic pose, then
  * the panel icon (picture()).
@@ -75,7 +75,7 @@ final class VsScreen extends CustomUIHud {
     private static final String ERR = "#ff6b6b";
 
     /**
-     * Not under UI/Custom (2026-10-16, user's client log: "Texture atlas rejected image" for 515 images, vanilla UI
+     * Not under UI/Custom (2026-10-16, the client log: "Texture atlas rejected image" for 515 images, vanilla UI
      * broke): the client packs every PNG under UI/Custom into one UI texture atlas, and our pictures filled it.
      * AssetImage loads other paths on their own, as the Memories page shows Icons/ModelsGenerated.
      */
@@ -84,7 +84,7 @@ final class VsScreen extends CustomUIHud {
     static final String PICTURES = "Icons/MobBattle/VsPictures/";
     /**
      * A mob with no picture registered yet: a big "?" in the VS style, the size of a mob, on a transparent square so
-     * the team color shows behind it (2026-10-17, user: never the game's small red X or a 64 px icon blown up).
+     * the team color shows behind it (2026-10-17, playtest: never the game's small red X or a 64 px icon blown up).
      * scripts/gen-vs-assets.py --unknown. The settings panel uses it too (ConfigPage.icon).
      */
     static final String UNKNOWN = FOLDER + "Unknown.png";
@@ -93,7 +93,7 @@ final class VsScreen extends CustomUIHud {
     private static final String SILHOUETTE_R = FOLDER + "PlayerSilhouette_R.png";
     /**
      * A player's picture key: their skin's id (PlayerSkins.idOf) after this prefix, used where a mob's model id goes
-     * (2026-10-16, user: players in the VS with their real skin, cached per skin).
+     * (2026-10-16, playtest: players in the VS with their real skin, cached per skin).
      */
     static final String PLAYER_PREFIX = "MobBattlePlayer_";
     /** Player skins registered at boot, newest first (each a picture pair + a column picture, ~40 KB). */
@@ -106,21 +106,21 @@ final class VsScreen extends CustomUIHud {
     private static final int SHOWN = 3;
     /**
      * Crowd slots of VsScreen.ui (scripts/gen-vs-ui.py ROWS / SKY_SLOTS): 24 on the ground in a mound (rows narrower
-     * toward the back, peaking in the middle; user 2026-10-16: flat rows looked like a line-up), 4 in the air.
+     * toward the back, peaking in the middle; playtest 2026-10-16: flat rows looked like a line-up), 4 in the air.
      */
     private static final int CROWD = 28;
     /** 1 px picture slots that load the screen's pictures before the slide (VsScreen.ui #Pre0.., gen-vs-ui.py PRELOAD). */
     private static final int PRELOAD = 64;
     private static final int GROUND_SLOTS = 24;
     /**
-     * A crowd grows like a huddle from the ground (user, 2026-10-16: ground mobs in the upper rows looked like they
+     * A crowd grows like a huddle from the ground (playtest 2026-10-16: ground mobs in the upper rows looked like they
      * floated): GROUND = the five rows, front first, center first; SKY = the slots high in the air, for flying mobs only.
      * Fliers take the sky first, then the ground rows; ground mobs only ever take the ground rows.
      */
     private static final int[] GROUND = java.util.stream.IntStream.range(0, GROUND_SLOTS).toArray();
     private static final int[] SKY = java.util.stream.IntStream.range(GROUND_SLOTS, CROWD).toArray();
     /**
-     * A side's layout by how many fight on it (user, 2026-10-16: small crowds looked tiny; only very big crowds should
+     * A side's layout by how many fight on it (playtest 2026-10-16: small crowds looked tiny; only very big crowds should
      * shrink): NAMED = 1-3 big with names, MEDIUM = 4-9 big and spread over the half (#xM, gen-vs-ui.py MEDIUM),
      * MOUND = 10+ in the small mound (#xC). Every picture of a half is the same size for its slot (no height tiers).
      */
@@ -128,7 +128,7 @@ final class VsScreen extends CustomUIHud {
     private static final int MEDIUM_SLOTS = 9;
     /**
      * Slots from the back row to the front (scripts/gen-vs-ui.py --depth): the tallest fighters shown take the back
-     * slots, so their heads show over the smaller ones in front (user, 2026-10-16: faces were covered).
+     * slots, so their heads show over the smaller ones in front (playtest 2026-10-16: faces were covered).
      */
     /**
      * The layouts' slots (positions, sizes, drawing order), written by scripts/gen-vs-ui.py next to VsScreen.ui, and the
@@ -140,14 +140,14 @@ final class VsScreen extends CustomUIHud {
     private static final int[] NAMED_BACK_FIRST = LAYOUTS.namedDraw;
     private static final int[] MEDIUM_BACK_FIRST = LAYOUTS.mediumDraw;
     // the slots' drawing order in VsScreen.ui (gen-vs-ui.py --depth): the tallest take the first drawn, the smallest end
-    // up on top (user, 2026-10-17: big mobs behind, small ones in front; by row only, the tallest of a row was on top)
+    // up on top (playtest 2026-10-17: big mobs behind, small ones in front; by row only, the tallest of a row was on top)
     private static final int[] GROUND_BACK_FIRST = LAYOUTS.groundDraw();
     /** The name bar fits about this many characters at its font size; past it, kinds go into "+N". */
-    private static final int NAMES_CHARS = 24;   // 28 still ran over the slant on the right half (user, 2026-10-16)
+    private static final int NAMES_CHARS = 24;   // 28 still ran over the slant on the right half (playtest 2026-10-16)
     private static final String LEFT_COLOR = "#e03030";
     private static final String RIGHT_COLOR = "#3070e0";
 
-    // a frame every 20 ms (50 per second) over a 450 ms slide (user video, 2026-10-16: 6 frames at 50 ms arrived 33-67 ms
+    // a frame every 20 ms (50 per second) over a 450 ms slide (playtest video, 2026-10-16: 6 frames at 50 ms arrived 33-67 ms
     // apart and the slide looked jerky); each frame is one tiny HUD packet to that viewer
     private static final long STEP_MS = 20;
     /**
@@ -162,12 +162,12 @@ final class VsScreen extends CustomUIHud {
     private static final int HALF = 580;
     /**
      * Picture sizes of a slot (VsScreen.ui, scripts/gen-vs-ui.py TIERS): 100%, 85%, 72%, 60%. The size follows
-     * (height / tallest) ^ SIZE_POWER, like the reference card (user, 2026-10-16: a 2.5-block mob next to a 6-block
+     * (height / tallest) ^ SIZE_POWER, like the reference card (playtest 2026-10-16: a 2.5-block mob next to a 6-block
      * one at 70%, not 40%; heights shown but not exaggerated).
      */
     private static final double[] TIER_AT = {0.875, 0.65, 0.465};
     /**
-     * Softer than the reference card's 0.35 (user, 2026-10-16: sizes even like the columns, but a tiny Kweebec seedling
+     * Softer than the reference card's 0.35 (playtest 2026-10-16: sizes even like the columns, but a tiny Kweebec seedling
      * looked as big as a boss): a mob at 40% of the tallest keeps 80% of the size, one at 12% shrinks to 60%.
      */
     private static final double SIZE_POWER = 0.5;
@@ -177,8 +177,8 @@ final class VsScreen extends CustomUIHud {
     private static final int PICTURE = 384;
     /**
      * At most this many picture pairs are registered: enough for the epic pose of every mob model (~410 with the
-     * user's mods) plus the summon list's and used.txt's poses. A budget of 200 left mobs on their panel icon, and the
-     * game's icons face any way (user, 2026-10-16: a Scarak looked away from the VS). In order: the summon list's mobs
+     * the server's mods) plus the summon list's and used.txt's poses. A budget of 200 left mobs on their panel icon, and the
+     * game's icons face any way (playtest 2026-10-16: a Scarak looked away from the VS). In order: the summon list's mobs
      * (every pose), the poses VS screens wanted (used.txt), then the epic pose of the other mob models.
      */
     static final int MAX_PAIRS = 3600;   // keys: each mob model = its pose pair + its column square (2026-10-17)
@@ -260,13 +260,15 @@ final class VsScreen extends CustomUIHud {
 
     @Override
     protected void build(UICommandBuilder b) {
-        // only the document this plan shows (user, 2026-10-16: one file with the halves and all six column screens was
+        // only the document this plan shows (playtest 2026-10-16: one file with the halves and all six column screens was
         // ~570 pictures' worth of elements built for every VS, and the client froze through the animation)
         // a plain royale's fighters cross the middle (no seam to cut them at)
         b.append(plan.columns() != null ? "MobBattle/VsCols" + plan.columns().size() + ".ui" : plainRoyale(plan) ? UI_ROYALE : UI);
+        // "Preparing the battle..." is a title in the battle's title style now (loadingTitle), not this label
+        b.set("#Loading.Visible", false);
         if (plan.columns() != null) {
             fillColumns(b, plan.columns());
-            // the kind's title under the column headers (no VS logo: it covered the columns; user 2026-10-16)
+            // the kind's title under the column headers (no VS logo: it covered the columns; playtest 2026-10-16)
             if (plan.kind() != null) b.set("#ColKindTitle.AssetPath", titlePicture(plan.kind(), getPlayerRef()));
             return;
         }
@@ -275,7 +277,7 @@ final class VsScreen extends CustomUIHud {
             for (Fighter f : side.shown()) if (f != null) tallest = Math.max(tallest, f.height());
         }
         scaleScreen();
-        // a plain battle royale has no sides: one background over the whole screen, not the split halves (user,
+        // a plain battle royale has no sides: one background over the whole screen, not the split halves (playtest,
         // 2026-10-16); royale() is the only plan with both labels empty (an army royale has named sides)
         boolean oneBg = plainRoyale(plan);
         if (oneBg) {
@@ -310,7 +312,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * The 3+ team screen (user, 2026-10-16: like Smash's 4-8 player screen): #Cols{n} with one panel per team, its
+     * The 3+ team screen (playtest 2026-10-16: like Smash's 4-8 player screen): #Cols{n} with one panel per team, its
      * color under ColumnOverlay.png, "P1 · TEAM · +N" in the team color, the representative's name and picture (the
      * right half's columns mirrored, so they face the middle), sized against the tallest representative. Panels stay
      * hidden until run() reveals them one by one.
@@ -325,18 +327,18 @@ final class VsScreen extends CustomUIHud {
             Column c = columns.get(i);
             String p = "#C" + n + "P" + i;
             // shown from the start, still below the screen (Body at weight 1): the client loads every picture before
-            // the columns rise (user, 2026-10-16: with 8 columns the game froze and the rise was never seen)
+            // the columns rise (playtest 2026-10-16: with 8 columns the game froze and the rise was never seen)
             b.set(p + "In.Visible", true);
             b.setObject(p + "Body.Background", new com.hypixel.hytale.server.core.ui.PatchStyle()
                     .setColor(com.hypixel.hytale.server.core.ui.Value.of(darken(c.color(), 0.7))));
             b.set(p + "Over.AssetPath", FOLDER + "ColumnOverlay.png");
             // the label may be a translation ("Red team", "Everyone else"): joined as a Message, never its key. A raw
-            // name is cut to the width of its team's columns (labels do not shrink in game; user 2026-10-16: long
+            // name is cut to the width of its team's columns (labels do not shrink in game; playtest 2026-10-16: long
             // names ran into the next team)
             Message tag = Message.raw("");
             if (c.first()) {
                 String head = "P" + c.team() + " \u00b7 ", tail = c.others() > 0 ? " \u00b7 +" + c.others() : "";
-                Message label = c.label();
+                Message label = localLabel(c.label(), lang());
                 if (label.getRawText() != null) {
                     long cols = columns.stream().filter(o -> o.team() == c.team()).count();
                     int fit = (int) ((1920.0 / n * cols - 24) / TAG_CHAR_PX) - head.length() - tail.length();
@@ -346,15 +348,14 @@ final class VsScreen extends CustomUIHud {
                 tag = Message.join(Message.raw(head).color(c.color()), label.color(c.color()), Message.raw(tail).color(c.color()));
             }
             b.set(p + "Tag.TextSpans", tag);
-            b.set(p + "Name.Text", shortName(c.rep().name(), chars));
+            b.set(p + "Name.Text", shortName(MobNames.text(c.rep().name(), lang()).trim(), chars));
             // shown when the column lands (runColumns), with its picture
             b.set(p + "Tag.Visible", false);
             b.set(p + "Name.Visible", false);
-            // one face-framed square per mob, wider than the column and cut to it by the column's mask (#..Clip,
-            // MaskTexturePath: a Group with a mask hides what its children draw outside it; user test 2026-10-17),
-            // every portrait the same size so the faces sit on one line
+            // the mob's face-framed square cut to this column count's width (makeCut, sent with the battle), filling the
+            // column; the mask that cut a wider square hid it a moment after it showed (2026-10-29)
             boolean right = i >= (n + 1) / 2;
-            String pic = columnPicture(c.rep());
+            String pic = columnPicture(c.rep(), n);
             b.set(p + "Pic.Visible", pic != null);
             if (pic != null) b.set(p + "Pic.AssetPath", pic);
             b.set(p + "Sq.Visible", pic == null);
@@ -364,26 +365,38 @@ final class VsScreen extends CustomUIHud {
 
     /**
      * A name that fits {@code chars}: technical endings dropped first ("PHASE1", "MODEL"), then leading words
-     * ("GOBLIN GOBLITERATOR PHASE1" -> "GOBLITERATOR"), then cut with a dot (user, 2026-10-16: "GOBLIN GOBLITERAT").
+     * ("GOBLIN GOBLITERATOR PHASE1" -> "GOBLITERATOR"), then cut with a dot (playtest 2026-10-16: "GOBLIN GOBLITERAT").
      */
     static String shortName(String name, int chars) {
         String n = name.trim();
         // "Name, Title" (mods' names: "Barón, General de la Plata"): the name before the comma, not the title after it
-        // (user screenshot 2026-10-17: the VS showed "GENERAL DE LA PLATA")
+        // (playtest screenshot 2026-10-17: the VS showed "GENERAL DE LA PLATA")
         int comma = n.indexOf(',');
         if (n.length() > chars && comma > 0 && comma <= chars) n = n.substring(0, comma).trim();
-        // technical endings first ("PHASE1", "MODEL", "2"), then leading words
+        // technical endings first ("PHASE1", "MODEL", "2", "MKIIII", "FINAL": the Gobliterator showed as "MKIIII"), then
+        // leading words
         while (n.length() > chars && n.indexOf(' ') > 0
-                && n.substring(n.lastIndexOf(' ') + 1).matches("(?i)(phase[0-9]*|model|v?[0-9]+)")) {
+                && n.substring(n.lastIndexOf(' ') + 1).matches("(?i)(phase[0-9]*|model|v?[0-9]+|mk[ivx0-9.]*|[ivx]{2,}|final)")) {
             n = n.substring(0, n.lastIndexOf(' '));
+        }
+        // "Noun de complement" (Spanish and other languages that put the noun first: "Caballero de entrenamiento"):
+        // the complements go from the end (2026-10-29, night test screenshot: the VS read "DE ENTRENAMIENTO")
+        java.util.regex.Matcher tail = TAIL_COMPLEMENT.matcher(n);
+        while (n.length() > chars && tail.find()) {
+            n = n.substring(0, tail.start()).trim();
+            tail = TAIL_COMPLEMENT.matcher(n);
         }
         while (n.length() > chars && n.indexOf(' ') > 0) n = n.substring(n.indexOf(' ') + 1);
         return n.length() > chars ? n.substring(0, Math.max(1, chars - 1)) + "." : n;
     }
 
+    /** The last " de|del|da|do|di|du|of ..." complement of a name. */
+    private static final java.util.regex.Pattern TAIL_COMPLEMENT =
+            java.util.regex.Pattern.compile("(?i)\\s+(de|del|da|do|di|du|des|of)\\s+(?!.*\\s(de|del|da|do|di|du|des|of)\\s).*$");
+
     /**
-     * One half (2026-10-16, user: the look of the VS card made for the clip): its background in the side's palette
-     * color, the name bar, and each fighter in its slot of the side's layout, all at the slot's full size (user,
+     * One half (2026-10-16, playtest: the look of the VS card made for the clip): its background in the side's palette
+     * color, the name bar, and each fighter in its slot of the side's layout, all at the slot's full size (playtest,
      * 2026-10-16: like the columns; height tiers made small crowds tiny).
      */
     /** A battle royale with no named sides (royale(); an army royale names its sides): one background, one title. */
@@ -399,9 +412,9 @@ final class VsScreen extends CustomUIHud {
     private void fill(UICommandBuilder b, String s, Side side, boolean right, double tallest, boolean oneBg) {
         b.set("#" + s + "Bg.AssetPath", FOLDER + "Bg_" + Teams.nearestPalette(side.color()) + "_" + s + ".png");
         b.set("#" + s + "Bg.Visible", !oneBg);
-        b.set("#" + s + "Team.TextSpans", side.label().color(side.color()));
-        b.set("#" + s + "Names.Text", side.names());
-        // the texts come in at the clash, with the pictures (user, 2026-10-16: they showed long before the pictures
+        b.set("#" + s + "Team.TextSpans", localLabel(side.label(), lang()).color(side.color()));
+        b.set("#" + s + "Names.Text", namesOf(side.order(), lang()));
+        // the texts come in at the clash, with the pictures (playtest 2026-10-16: they showed long before the pictures
         // had loaded); shown in the impact step, so no extra update
         b.set("#" + s + "Team.Visible", false);
         b.set("#" + s + "Names.Visible", false);
@@ -420,7 +433,7 @@ final class VsScreen extends CustomUIHud {
      * the half; its halo behind it. Anchor set as vanilla MemoriesPage does (setObject).
      */
     /*
-     * Sizes (2026-10-18, user, after comparing every screen offline with scripts/vs-preview.py --rule scale): the slots
+     * Sizes (2026-10-18, playtest, after comparing every screen offline with scripts/vs-preview.py --rule scale): the slots
      * only say where a fighter stands, no more per-slot sizes (with 9 a side the tallest went to a 490 px back slot and
      * the smallest to a 760 px front one: a fire golem looked smaller than a hawk; with 3 it was the other way round).
      * One scale for the whole screen: each body is measured on its own picture (its square in blocks = ratio x the
@@ -435,7 +448,7 @@ final class VsScreen extends CustomUIHud {
             PICTURE_ZOOM = 3.0, TARGET_SHARE = 0.85, TOP = 150;
     /**
      * The split between the halves at the top and the bottom of the screen (gen-vs-assets.py TOP / BOTTOM). At the
-     * floor the left half has 820 px and the right 1100 (user, 2026-10-18: the left side's inner mob was always cut
+     * floor the left half has 820 px and the right 1100 (playtest 2026-10-18: the left side's inner mob was always cut
      * by the split, the right one had empty room by it): each half lays its slots out over the room it really has at
      * the height of each body, and a body still over the split, or past the screen's outer edge, is pushed back until
      * at most EDGE_CUT of its width is cut.
@@ -446,13 +459,23 @@ final class VsScreen extends CustomUIHud {
     /** This screen's reference body height (blocks) and the size (px) a body that tall gets; few = 1-3 a side. */
     private double screenRef = MIN_REF, screenTarget = 600;
     private boolean screenFew;
+    /**
+     * A lone fighter facing several (all vs one): the size its body gets on its own, as in a duel (its slot's
+     * TARGET_SHARE), left and right; 0 = sized with the rest. User, 2026-10-29: the lone target came out crowd-sized.
+     */
+    private double loneLeft, loneRight;
 
     /** Fills screenRef, screenTarget and screenFew from both halves (build()). */
     private void scaleScreen() {
         List<Double> bodies = new ArrayList<>();
         double target = Double.MAX_VALUE;
         int most = 0;
+        int countL = fighters(plan.left()), countR = fighters(plan.right());
+        loneLeft = countL == 1 && countR > 1 ? slotsOf(plan.left())[0][2] * TARGET_SHARE : 0;
+        loneRight = countR == 1 && countL > 1 ? slotsOf(plan.right())[0][2] * TARGET_SHARE : 0;
         for (Side side : List.of(plan.left(), plan.right())) {
+            // the lone one is sized on its own (place()); the shared scale is the crowd's
+            if (side == plan.left() ? loneLeft > 0 : loneRight > 0) continue;
             double[][] slots = slotsOf(side);
             List<Double> sizes = new ArrayList<>();
             List<Fighter> shown = side.shown();
@@ -477,6 +500,12 @@ final class VsScreen extends CustomUIHud {
         screenRef = Math.max(MIN_REF, Math.min(bodies.get(bodies.size() - 1), GIANT * median));
         screenTarget = target == Double.MAX_VALUE ? 600 : target;
         screenFew = most <= 3;
+    }
+
+    private static int fighters(Side side) {
+        int n = 0;
+        for (Fighter f : side.shown()) if (f != null) n++;
+        return n;
     }
 
     private static double[][] slotsOf(Side side) {
@@ -509,7 +538,9 @@ final class VsScreen extends CustomUIHud {
             double rel = body / screenRef;
             double share = Math.max(FLOOR, Math.min(screenFew ? GIANT_MAX_FEW : GIANT_MAX,
                     Math.pow(Math.min(1, rel), SIZE_POWER) * Math.max(1, rel)));
-            double size = Math.min(screenTarget * share * sq / body, bd.px() * PICTURE_ZOOM);
+            double lone = right ? loneRight : loneLeft;
+            double size = lone > 0 ? Math.min(lone * sq / body, bd.px() * PICTURE_ZOOM)
+                    : Math.min(screenTarget * share * sq / body, bd.px() * PICTURE_ZOOM);
             // its feet on the slot's feet line, the head never above TOP (a giant, a flier in the sky slots)
             double top = feet - size;
             if (top + bd.top() * size < TOP) top = TOP - bd.top() * size;
@@ -658,7 +689,7 @@ final class VsScreen extends CustomUIHud {
     /**
      * The picture of a fighter: its pose if registered, else its epic pose (variant 0, registered at boot for every
      * mob model), else its panel icon (the game's or ours), else the "?" icon. Never a live registration: that made
-     * every client reload its assets (user: no hitch, ever). A wanted pose that is missing is remembered, and the next
+     * every client reload its assets (playtest: no hitch, ever). A wanted pose that is missing is remembered, and the next
      * boot registers it.
      */
     /**
@@ -666,9 +697,9 @@ final class VsScreen extends CustomUIHud {
      * column then shows the square fallback (#..Sq: the halves' picture, the "?" or a player's silhouette, as wide as
      * the column on its bottom). A missing one is remembered and drawn at the next boot.
      */
-    private static String columnPicture(Fighter f) {
+    private static String columnPicture(Fighter f, int columns) {
         if (f.model() == null) return null;
-        if (usable(key(f.model(), COLUMN))) return pathOf(f.model(), COLUMN, false);
+        if (usable(key(f.model(), cut(columns)))) return pathOf(f.model(), cut(columns), false);
         WANTED.add(key(f.model(), COLUMN));
         return null;
     }
@@ -679,13 +710,13 @@ final class VsScreen extends CustomUIHud {
         WANTED.add(key(f.model(), f.variant()));
         if (usable(key(f.model(), 0))) return pathOf(f.model(), 0, right);
         // No picture yet (drawn and registered at the next boot): a player's black silhouette, else the big "?". Not
-        // the mob's own 64 px icon any more: blown up to a fighter's size it looked broken (user, 2026-10-17).
+        // the mob's own 64 px icon any more: blown up to a fighter's size it looked broken (playtest 2026-10-17).
         if (f.model().startsWith(PLAYER_PREFIX)) return right ? SILHOUETTE_R : SILHOUETTE_L;
         return UNKNOWN;
     }
 
     private static void weights(UICommandBuilder b, int half) {
-        // never 0: a FlexWeight of 0 does not collapse a group, it takes its content's size (user video, 2026-10-16:
+        // never 0: a FlexWeight of 0 does not collapse a group, it takes its content's size (playtest video, 2026-10-16:
         // the halves showed half open for 130 ms, jumped back and then slid in)
         int h = Math.max(1, Math.min(HALF, half));
         b.set("#LHalf.FlexWeight", h);
@@ -724,6 +755,8 @@ final class VsScreen extends CustomUIHud {
                 return;
             }
             TestTools.say(ctx.sender(), "VS: " + describe(plan.left()) + "  vs  " + describe(plan.right()), OK);
+            // its own picks (another column face than the battle's VS): sent like a battle's, else they showed a "?"
+            onDemand(plan);
             present(pr, plan, total);
         });
     }
@@ -777,7 +810,22 @@ final class VsScreen extends CustomUIHud {
     static boolean cancel(PlayerRef player) {
         if (player == null) return false;
         Long id = RUNS.get(player.getUuid());
-        return id != null && end(player, id);
+        if (id == null || !end(player, id)) return false;
+        dropLoadingTitle(player);
+        return true;
+    }
+
+    /**
+     * A screen called off before its slide: "Preparing the battle..." would stay up to LOADING_TITLE_SECONDS over the
+     * world (audit 2026-10-29). Sent from the timer thread, as hideLoadingTitle.
+     */
+    private static void dropLoadingTitle(PlayerRef player) {
+        HytaleServer.SCHEDULED_EXECUTOR.execute(() -> {
+            // a newer screen for this player has its own loading title up: leave it
+            if (player.isValid() && !RUNS.containsKey(player.getUuid())) {
+                com.hypixel.hytale.server.core.util.EventTitleUtil.hideEventTitleFromPlayer(player, 0.1f);
+            }
+        });
     }
 
     /** /mobbattle stop and plugin shutdown: every VS screen goes. */
@@ -785,7 +833,7 @@ final class VsScreen extends CustomUIHud {
         for (Map.Entry<UUID, Long> e : RUNS.entrySet()) {
             PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(e.getKey());
             if (p != null) {
-                end(p, e.getValue());
+                if (end(p, e.getValue())) dropLoadingTitle(p);
             } else {
                 RUNS.remove(e.getKey(), e.getValue());
                 LIVE.remove(e.getKey());
@@ -841,7 +889,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * The kind's title under the VS (user, 2026-10-16: in the VS's own style, right under it; it replaces the
+     * The kind's title under the VS (playtest 2026-10-16: in the VS's own style, right under it; it replaces the
      * countdown's title while the VS shows): Kind_<kind>_<en|es>.png, baked by scripts/gen-vs-assets.py (a Label can't
      * be slanted or outlined), in the viewer's language (Spanish for es-*, else English).
      */
@@ -852,7 +900,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * Gives repeated mobs different pictures (user, 2026-10-16: three Gobliterators looked identical): each side's
+     * Gives repeated mobs different pictures (playtest 2026-10-16: three Gobliterators looked identical): each side's
      * strongest gets variant 0 (the epic pose), every other fighter of a model already shown the next variant.
      */
     private static Plan withVariants(Plan plan) {
@@ -925,7 +973,7 @@ final class VsScreen extends CustomUIHud {
     private static final String[] SIDE_COLORS = {LEFT_COLOR, RIGHT_COLOR, "#3fbf4f", "#e0c030", "#a050e0", "#ff8c1a", "#ff6bd5", "#3ef0ff"};
 
     /**
-     * A royale with armies (2026-10-16, user: how does the VS show an army?): BattleManager.startRoyale gives each army
+     * A royale with armies (2026-10-16, playtest: how does the VS show an army?): BattleManager.startRoyale gives each army
      * chain one side, so each army (2+ fighters) is a side named "&lt;leader&gt;'s army" and every free fighter goes into
      * "Everyone else". One army: army vs everyone else; two with nobody free: army vs army; more = team columns.
      * Null when no army fights (the usual royale halves).
@@ -999,12 +1047,14 @@ final class VsScreen extends CustomUIHud {
         all.sort(Comparator.comparingDouble(f -> -f.health()));
         List<Fighter> order = varietyFirst(all);
         // the small label would repeat the names line (a duel: "SKELETON" over "SKELETON"): left empty then
-        String names = namesOf(all);
-        // also when the names line holds a shortened copy of it (user, 2026-10-16: a duel of a long-named mob showed
+        String shared = MobNames.sharedLang();
+        String names = namesOf(all, shared);
+        // also when the names line holds a shortened copy of it (playtest 2026-10-16: a duel of a long-named mob showed
         // "ARCANEPOWER SKELETON THUNDER WRAITH" over "... THUNDER WR")
-        String raw = label.getRawText();
+        String raw = localLabel(label, shared).getRawText();
         boolean oneKind = all.stream().map(Fighter::name).distinct().count() == 1;
-        if (raw != null && (raw.equalsIgnoreCase(names) || oneKind && raw.equalsIgnoreCase(all.get(0).name()))) {
+        if (raw != null && (raw.equalsIgnoreCase(names)
+                || oneKind && raw.equalsIgnoreCase(MobNames.text(all.get(0).name(), shared).trim()))) {
             label = Message.raw("");
         }
         return laidOut(new Side(label, color, List.of(), 0, NAMED, names, order), layoutFor(order.size()));
@@ -1043,11 +1093,11 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * One of each kind first, strongest kind first, then the repeats (user, 2026-10-16: with 100 skeletons, show the
+     * One of each kind first, strongest kind first, then the repeats (playtest 2026-10-16: with 100 skeletons, show the
      * unique mobs before more skeletons).
      */
     /**
-     * Close scales on both halves (user, 2026-10-16: three mobs in the big named slots beside a crowd looked twice as
+     * Close scales on both halves (playtest 2026-10-16: three mobs in the big named slots beside a crowd looked twice as
      * big as the same mobs in the crowd): the halves' layouts are at most one step apart, the smaller side moving up
      * (named -> medium) when the other is a mound. A lone fighter (all vs one's target) always stays big.
      */
@@ -1087,7 +1137,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * A royale (2026-10-16, user: "strongest vs everyone else" read as all vs one): the fighters dealt by strength into
+     * A royale (2026-10-16, playtest: "strongest vs everyone else" read as all vs one): the fighters dealt by strength into
      * the two halves in turn, both shown as crowds, "Battle royale" over the left one, so it reads as a free-for-all.
      */
     private static Plan royale(List<Ref<EntityStore>> all, ComponentAccessor<EntityStore> acc) {
@@ -1105,18 +1155,18 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * The name bar's line: each kind once, strongest first, "x3" for repeats, as many as fit in NAMES_CHARS (user,
+     * The name bar's line: each kind once, strongest first, "x3" for repeats, as many as fit in NAMES_CHARS (playtest,
      * 2026-10-16: names ran off the screen; the label does not shrink in game), the rest as "· +N". A single kind
      * longer than the bar is cut with "...".
      */
-    private static String namesOf(List<Fighter> all) {
+    private static String namesOf(List<Fighter> all, String lang) {
         Map<String, Integer> kinds = new LinkedHashMap<>();
         for (Fighter f : all) kinds.merge(f.name(), 1, Integer::sum);
         List<String> parts = new ArrayList<>();
         for (Map.Entry<String, Integer> e : kinds.entrySet()) {
             // a long name loses its leading words before it is cut ("SKELETON THUNDER WRAITH", not "ARCANEPOWER SKE...")
             String count = e.getValue() > 1 ? " x" + e.getValue() : "";
-            parts.add(shortName(e.getKey(), NAMES_CHARS - count.length()) + count);
+            parts.add(shortName(MobNames.text(e.getKey(), lang).trim(), NAMES_CHARS - count.length()) + count);
         }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < parts.size(); i++) {
@@ -1143,7 +1193,12 @@ final class VsScreen extends CustomUIHud {
         boolean npc = store.getComponent(r, NPCEntity.getComponentType()) != null;
         // a player in their own body: their skin's picture (PlayerLook + gradients); morphed into a mob: that mob
         String model = m != null && (npc || !MorphWand.PLAYER_MODEL.equals(m.getModelAssetId())) ? m.getModelAssetId() : null;
-        if (!npc && model == null) model = playerModelOf(r, store);
+        // a mob wearing a player's look (Morph Wand copy of a player): that skin's picture, not the bare body (playtest,
+        // 2026-10-29: the VS showed two naked player bodies)
+        if (model == null || MorphWand.PLAYER_MODEL.equals(model)) {
+            String skin = playerModelOf(r, store);
+            if (skin != null) model = skin;
+        }
         BoundingBox bb = store.getComponent(r, BoundingBox.getComponentType());
         double height = bb != null && bb.getBoundingBox() != null ? bb.getBoundingBox().max.y - bb.getBoundingBox().min.y : 2;
         boolean flies = false;
@@ -1152,7 +1207,8 @@ final class VsScreen extends CustomUIHud {
         } catch (RuntimeException ignored) {
             // no role data: a ground mob
         }
-        return new Fighter(model, pretty(ChaosWand.nameOf(r, store)), health(r, store), 0, height, flies);
+        // the role id: each viewer reads it in their own language (fill / fillColumns)
+        return new Fighter(model, ChaosWand.nameOf(r, store), health(r, store), 0, height, flies);
     }
 
     /** The picture id of a player's skin (remembered for drawing), or null without a skin. */
@@ -1211,7 +1267,7 @@ final class VsScreen extends CustomUIHud {
                         if (!onDisk(k) && make(k)) drawn++;
                         if (register(k)) registered++;
                     }
-                    // always, with the name (2026-10-17, user: test that a new player's skin is drawn live)
+                    // always, with the name (2026-10-17, playtest: test that a new player's skin is drawn live)
                     MobBattlePlugin.log("VS screen: " + name + "'s skin " + hash + ": " + drawn + " drawn, " + registered
                             + " registered" + (registered == 0 && !REGISTERED.contains(key(id, 0))
                             ? " (sent when they are picked for a battle, or from the next restart)" : "") + ".");
@@ -1224,7 +1280,7 @@ final class VsScreen extends CustomUIHud {
 
     /**
      * A player picked for a battle (BattleManager.markPlayer): they are about to be in a VS, so their skin picture is
-     * drawn if missing and registered now, even with people online (user, 2026-10-16: the toast is accepted here), then
+     * drawn if missing and registered now, even with people online (playtest 2026-10-16: the toast is accepted here), then
      * one asset rebuild. Mobs and morphed players use the mob pictures.
      */
     static void playerPicked(Ref<EntityStore> player) {
@@ -1286,7 +1342,7 @@ final class VsScreen extends CustomUIHud {
             else if (!kind.equals(n)) return fallback;
         }
         if (kind == null) return fallback;
-        return Message.raw(pretty(kind) + (mobs.size() > 1 ? " x" + mobs.size() : ""));
+        return Message.raw(ROLE_LABEL + kind + "|" + mobs.size());
     }
 
     /** Chat text of a label (raw names as they are, translated ones by their key: dev tool output). */
@@ -1298,10 +1354,32 @@ final class VsScreen extends CustomUIHud {
         return MobNames.shared(role).trim();
     }
 
+    /**
+     * A side labelled by its one kind of mob ("YETI", "SKELETON x5"): kept as this marker + role id + "|" + count and
+     * turned into the name in each viewer's language when the screen is built (2026-10-30, playtest: with a Spanish player
+     * online the VS showed "RAPTOR DE CUEVA" to an English one; the plan is built once for every viewer).
+     */
+    private static final String ROLE_LABEL = "\u0001role:";
+
+    /** {@code label} as {@code lang} reads it: a role marker becomes "Name" or "Name xN", anything else is kept. */
+    static Message localLabel(Message label, String lang) {
+        String raw = label.getRawText();
+        if (raw == null || !raw.startsWith(ROLE_LABEL)) return label;
+        int bar = raw.lastIndexOf('|');
+        String role = raw.substring(ROLE_LABEL.length(), bar);
+        int n = Integer.parseInt(raw.substring(bar + 1));
+        return Message.raw(MobNames.text(role, lang).trim() + (n > 1 ? " x" + n : ""));
+    }
+
+    /** This screen's viewer's language (null = English). */
+    private String lang() {
+        return getPlayerRef() != null ? getPlayerRef().getLanguage() : null;
+    }
+
     // ---- in the countdown ----
 
     /**
-     * How long the VS screen takes, in whole seconds so the countdown can grow by exactly that much (2026-10-16, user:
+     * How long the VS screen takes, in whole seconds so the countdown can grow by exactly that much (2026-10-16, playtest:
      * the VS must add its time to the countdown, not eat the intro's).
      */
     static final long COUNTDOWN_MS = 3000;
@@ -1397,7 +1475,7 @@ final class VsScreen extends CustomUIHud {
 
     /**
      * The 3+ team screen: the MAX_COLUMNS strongest teams in their team order; with 4 teams or fewer each gets up to 2
-     * columns side by side in its color (user, 2026-10-16: like Smash's team battles), never more than MAX_COLUMNS.
+     * columns side by side in its color (playtest 2026-10-16: like Smash's team battles), never more than MAX_COLUMNS.
      */
     private static Plan columnsPlan(List<Side> teams, BattleManager.Kind kind) {
         List<Side> kept = new ArrayList<>(teams);
@@ -1412,7 +1490,7 @@ final class VsScreen extends CustomUIHud {
             top.addAll(byStrength.subList(0, MAX_COLUMNS));
             kept.removeIf(t -> !top.contains(t));
         }
-        // vsTeamReps (user, 2026-10-16: some want one representative per team even with room for two)
+        // vsTeamReps (playtest 2026-10-16: some want one representative per team even with room for two)
         int k = kept.size() <= 4 ? Math.min(FxSettings.vsTeamReps, MAX_COLUMNS / kept.size()) : 1;
         List<Column> cols = new ArrayList<>();
         for (int i = 0; i < kept.size(); i++) cols.addAll(columnsOf(kept.get(i), k, i + 1));
@@ -1436,6 +1514,19 @@ final class VsScreen extends CustomUIHud {
         long id = RUN_IDS.incrementAndGet();
         RUNS.put(player.getUuid(), id);
         ENDS.put(player.getUuid(), System.currentTimeMillis() + totalMs + 300);
+        // pictures just sent (onDemand): the screen waits for the clients' asset rebuild before it exists
+        long fresh = FRESH.getOrDefault(plan, 0L);
+        if (fresh > 0) {
+            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+                if (Long.valueOf(id).equals(RUNS.get(player.getUuid()))) show(player, plan, totalMs, id, fresh);
+            }, fresh, TimeUnit.MILLISECONDS);
+            return;
+        }
+        show(player, plan, totalMs, id, 0);
+    }
+
+    /** Adds the screen (its world thread) and times the animation; {@code waited}: ms already spent before it. */
+    private static void show(PlayerRef player, Plan plan, long totalMs, long id, long waited) {
         onWorld(player, () -> {
             Player p = playerOf(player);
             if (p == null) return;
@@ -1445,30 +1536,34 @@ final class VsScreen extends CustomUIHud {
             VsScreen hud = new VsScreen(player, plan);
             huds.addCustomHud(player, hud);
             LIVE.put(player.getUuid(), hud);
-            // a title still on screen (an earlier battle's start or win) would sit over the VS (user, 2026-10-17); the
-            // ones that come while it shows wait for its end (FightFx.flushTitle, endsAt)
-            com.hypixel.hytale.server.core.util.EventTitleUtil.hideEventTitleFromPlayer(player, 0.15f);
+            // a title still on screen (an earlier battle's start or win) would sit over the VS (playtest 2026-10-17); the
+            // ones that come while it shows wait for its end (FightFx.flushTitle, endsAt). While the client loads the
+            // screen, "Preparing the battle..." takes its place, in the title style the countdown uses (2026-10-29,
+            // playtest: the bottom label had a style of its own); the slide start hides it (hideLoadingTitle).
+            com.hypixel.hytale.server.core.util.EventTitleUtil.hideEventTitleFromPlayer(player, 0f);
+            loadingTitle(player, plan);
             // build() just noted the poses it showed with a stand-in (WANTED): save them for the next boot now (they
             // used to wait for the next VS, and the session's last one never got saved)
             CompletableFuture.runAsync(VsScreen::rememberWanted);
             // the game's HUD and the chat go when the screen shows (hideHud, at the slide start), not now: the screen
             // stays hidden while the client builds it
             // the animation is timed from here, once the screen exists on the client (a busy world thread added it
-            // late and the steps queued behind it arrived all at once: no slide, user 2026-10-16), START_DELAY_MS later:
+            // late and the steps queued behind it arrived all at once: no slide, playtest 2026-10-16), START_DELAY_MS later:
             // a client still loading the battle's freshly spawned models froze through the whole slide
             // The whole screen fits the VS time: the start delay and the last step come out of it (audit 2026-10-17:
             // it ran ~320 ms past it, under the intro camera and the first countdown title).
             long delay = startDelay(plan);
+            long wait = Math.max(0, delay - waited);
             HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
                 if (!Long.valueOf(id).equals(RUNS.get(player.getUuid()))) return;
                 hideHud(player);
                 animate(player, id, plan, Math.max(SLIDE_IN_MS + SLIDE_OUT_MS + 300, totalMs - delay - STEP_MS));
-            }, delay, TimeUnit.MILLISECONDS);
+            }, wait, TimeUnit.MILLISECONDS);
         });
     }
 
     /**
-     * The game's HUD (compass, boss bar, hotbar, abilities; user, 2026-10-16) and the chat (user, 2026-10-17: the
+     * The game's HUD (compass, boss bar, hotbar, abilities; 2026-10-16) and the chat (playtest 2026-10-17: the
      * countdown lines covered the VS) go while the screen shows; both come back at its end. Any thread.
      */
     private static void hideHud(PlayerRef player) {
@@ -1503,6 +1598,150 @@ final class VsScreen extends CustomUIHud {
         return COUNTDOWN_MS + (extra + 999) / 1000 * 1000;
     }
 
+    /**
+     * serverVsPictures battle (2026-10-28): registers the pictures this plan shows that are not registered yet (on disk
+     * from the boot run) and sends them to everyone online at once, without the toast, with one asset rebuild
+     * (ThumbnailCache.registerOnline). The screen is added FRESH_WAIT_MS later, after that rebuild (one under a screen
+     * already shown cleared its pictures). The slide waits FRESH_WAIT_MS longer so the clients have them first. A picture
+     * not on disk falls back as before (variant 0, the "?") and is drawn at the next boot. Any thread.
+     */
+    static void onDemand(Plan plan) {
+        if (plan == null || !FxSettings.serverVs) return;
+        boolean battle = "battle".equals(FxSettings.vsPictures);
+        // the column cuts go per battle in both modes (boot registers the squares only)
+        // a skin worn by a mob (Morph Wand) has no picture until a battle needs it: drawn and sent in both modes
+        boolean skins = missingSkin(plan);
+        if (!battle && plan.columns() == null && !skins) return;
+        // Here (the world thread, in the battle start): only whether something is missing. The cuts, file reads and the
+        // sending run on a pool thread (audit 2026-10-29: they could hold the world tick for hundreds of ms), within the
+        // FRESH_WAIT_MS the screen waits anyway.
+        boolean missing = false;
+        if (plan.columns() != null) {
+            int n = plan.columns().size();
+            for (Column c : plan.columns()) {
+                if (c.rep() == null || c.rep().model() == null) continue;
+                String k = key(c.rep().model(), cut(n));
+                if ((!REGISTERED.contains(k) || STAND_INS.containsKey(k)) && !NOT_ON_DISK.contains(k)) missing = true;
+            }
+        } else {
+            for (Side s : new Side[] {plan.left(), plan.right()}) {
+                if (s == null) continue;
+                for (Fighter f : s.shown()) {
+                    if (f == null || f.model() == null) continue;
+                    for (String k : new String[] {key(f.model(), f.variant()), key(f.model(), 0)}) {
+                        if ((!REGISTERED.contains(k) || STAND_INS.containsKey(k)) && !NOT_ON_DISK.contains(k)) missing = true;
+                    }
+                }
+            }
+        }
+        if (!missing) return;
+        // Another battle's VS still on someone's screen: the asset rebuild would clear its pictures (audit
+        // 2026-10-29), so the sending waits for it to end and this screen waits that much longer.
+        long now = System.currentTimeMillis(), busy = 0;
+        for (Long t : ENDS.values()) if (t != null) busy = Math.max(busy, t);
+        long wait = busy > now ? Math.min(busy - now + 200, MAX_BUSY_WAIT_MS) : 0;
+        FRESH.put(plan, FRESH_WAIT_MS + wait);
+        Runnable send = () -> java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                sendFor(plan, battle);
+            } catch (RuntimeException e) {
+                MobBattlePlugin.log("VS screen: pictures for this battle not sent: " + e);
+            }
+        });
+        if (wait > 0) com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(send, wait, TimeUnit.MILLISECONDS);
+        else send.run();
+    }
+
+    /** Whether the plan shows a player skin (a player or a mob wearing one) whose picture is not registered yet. */
+    private static boolean missingSkin(Plan plan) {
+        if (plan.columns() != null) {
+            for (Column c : plan.columns()) {
+                String m = c.rep() != null ? c.rep().model() : null;
+                if (m != null && m.startsWith(PLAYER_PREFIX) && !REGISTERED.contains(key(m, COLUMN))) return true;
+            }
+            return false;
+        }
+        for (Side s : new Side[] {plan.left(), plan.right()}) {
+            if (s == null) continue;
+            for (Fighter f : s.shown()) {
+                if (f != null && f.model() != null && f.model().startsWith(PLAYER_PREFIX) && !REGISTERED.contains(key(f.model(), 0))) return true;
+            }
+        }
+        return false;
+    }
+
+    /** onDemand: the longest it waits for another battle's VS screen to end before sending. */
+    private static final long MAX_BUSY_WAIT_MS = 6000;
+
+    /** onDemand's work off the world thread: cut what is missing, register it and send it to everyone online. */
+    /**
+     * Pictures a battle wanted that have no file (past the picture budget, or not drawable): onDemand no longer counts
+     * them as missing, so later battles don't wait FRESH_WAIT_MS for nothing (audit 2026-10-29). Cleared when the
+     * pictures are drawn again (rebuild).
+     */
+    static final java.util.Set<String> NOT_ON_DISK = ConcurrentHashMap.newKeySet();
+
+    private static void sendFor(Plan plan, boolean battle) {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        if (plan.columns() != null) {
+            int n = plan.columns().size();
+            for (Column c : plan.columns()) {
+                if (c.rep() == null || c.rep().model() == null) continue;
+                drawSkin(c.rep().model());
+                // the half picture only as the fallback square, when no cut could be made
+                if (makeCut(c.rep().model(), n)) keys.add(key(c.rep().model(), cut(n)));
+                else if (battle) keys.add(key(c.rep().model(), 0));
+            }
+        } else {
+            for (Side s : new Side[] {plan.left(), plan.right()}) {
+                if (s == null) continue;
+                for (Fighter f : s.shown()) {
+                    if (f == null || f.model() == null) continue;
+                    // boot mode: only skins (every mob picture went out at boot)
+                    if (!battle && !f.model().startsWith(PLAYER_PREFIX)) continue;
+                    drawSkin(f.model());
+                    keys.add(key(f.model(), f.variant()));
+                    keys.add(key(f.model(), 0));
+                }
+            }
+        }
+        List<com.hypixel.hytale.server.core.asset.common.CommonAsset> batch = new ArrayList<>();
+        long t0 = System.nanoTime(), bytes0 = REGISTERED_BYTES.get();
+        int n = 0;
+        for (String k : keys) {
+            if (REGISTERED.contains(k) && !STAND_INS.containsKey(k)) continue;
+            try {
+                if (register(k, true, batch::add)) n++;
+                else NOT_ON_DISK.add(k);
+            } catch (IOException | RuntimeException e) {
+                MobBattlePlugin.log("VS screen: picture " + k + " not sent: " + e);
+            }
+        }
+        if (batch.isEmpty()) return;
+        // with the asset rebuild: without it the client got the files but never made them usable (empty columns,
+        // playtest 2026-10-29); the screen is added only once the rebuild is over (run waits FRESH_WAIT_MS), since a rebuild
+        // under a VS already on screen cleared its pictures
+        ThumbnailCache.registerOnline(batch, true);
+        MobBattlePlugin.log("VS screen: " + n + " pictures sent for this battle (" + MobBattlePlugin.size(REGISTERED_BYTES.get() - bytes0)
+                + ", " + MobBattlePlugin.took(t0) + ").");
+    }
+
+    /** A player skin's pictures (pose 0 pair + column square) drawn now when missing; mobs' come from the boot run. */
+    private static void drawSkin(String model) {
+        if (!model.startsWith(PLAYER_PREFIX)) return;
+        for (String k : List.of(key(model, 0), key(model, COLUMN))) {
+            try {
+                if (!onDisk(k)) make(k);
+            } catch (Exception e) {
+                MobBattlePlugin.log("VS screen: skin picture " + k + " not made: " + e);
+            }
+        }
+    }
+
+    /** Plans whose pictures onDemand just sent: their slide waits this much longer (cleared with the plan). */
+    private static final Map<Plan, Long> FRESH = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private static final long FRESH_WAIT_MS = 1500;
+
     /** START_DELAY_MS plus DELAY_PER_PICTURE_MS for every distinct picture past the fourth, at most MAX_START_DELAY_MS. */
     private static long startDelay(Plan plan) {
         java.util.Set<String> pictures = new java.util.HashSet<>();
@@ -1512,7 +1751,8 @@ final class VsScreen extends CustomUIHud {
             for (Fighter f : plan.left().shown()) if (f != null) pictures.add("L" + f.model() + f.variant());
             for (Fighter f : plan.right().shown()) if (f != null) pictures.add("R" + f.model() + f.variant());
         }
-        return Math.min(MAX_START_DELAY_MS, START_DELAY_MS + DELAY_PER_PICTURE_MS * Math.max(0, pictures.size() - 2));
+        return Math.min(MAX_START_DELAY_MS, START_DELAY_MS + DELAY_PER_PICTURE_MS * Math.max(0, pictures.size() - 2))
+                + FRESH.getOrDefault(plan, 0L);
     }
 
     /** Per player: when their VS screen ends (FightFx holds titles back until then). */
@@ -1534,7 +1774,27 @@ final class VsScreen extends CustomUIHud {
         return player != null && LIVE.containsKey(player.getUuid());
     }
 
+    /** "Preparing the battle..." as a title (the battle's kind under it), in the configured title style. */
+    private static void loadingTitle(PlayerRef player, Plan plan) {
+        Message sub = plan.kind() != null ? Message.translation("server.mobbattle.timer." + plan.kind().key) : Message.empty();
+        var style = FxSettings.pickTitleStyle();
+        com.hypixel.hytale.server.core.util.EventTitleUtil.showEventTitleToPlayer(player, I18n.tr("hud.vs.loading"), sub,
+                style, null, LOADING_TITLE_SECONDS, 0.15f, 0.1f);
+    }
+
+    /** Most seconds the loading title stays up (the slide start takes it down before). */
+    private static final float LOADING_TITLE_SECONDS = 5f;
+
+    /** The screen slides in: the loading title goes (sent from the step's timer thread, like the steps). */
+    private static void hideLoadingTitle(PlayerRef player, long id) {
+        HytaleServer.SCHEDULED_EXECUTOR.execute(() -> {
+            if (!Long.valueOf(id).equals(RUNS.get(player.getUuid())) || !player.isValid()) return;
+            com.hypixel.hytale.server.core.util.EventTitleUtil.hideEventTitleFromPlayer(player, 0.1f);
+        });
+    }
+
     private static void animate(PlayerRef player, long id, Plan plan, long totalMs) {
+        hideLoadingTitle(player, id);
         if (plan.columns() != null) {
             runColumns(player, id, plan, totalMs);
             return;
@@ -1547,7 +1807,7 @@ final class VsScreen extends CustomUIHud {
             b.set("#Preload.Visible", false);
             b.set("#Loading.Visible", false);
         });
-        // a click as each half comes in, the clash when they meet (user, 2026-10-16)
+        // a click as each half comes in, the clash when they meet (playtest 2026-10-16)
         sound(player, id, 0, CLICK_SOUND, 1f, 1f);
         sound(player, id, CLICK_GAP_MS, CLICK_SOUND, 1f, 1.12f);
         for (int i = 1; i <= inSteps; i++) {
@@ -1590,7 +1850,7 @@ final class VsScreen extends CustomUIHud {
     private static void runColumns(PlayerRef player, long id, Plan plan, long totalMs) {
         step(player, id, 0, b -> b.set("#Loading.Visible", false));
         int n = plan.columns().size();
-        // columns rise in blocks, not one by one (user, 2026-10-16: with many columns animate each team as one block):
+        // columns rise in blocks, not one by one (playtest 2026-10-16: with many columns animate each team as one block):
         // a team's columns together, and with more than MAX_RISE_BLOCKS teams neighbouring teams share a block
         int[] block = new int[n];
         int teams = 0;
@@ -1607,11 +1867,11 @@ final class VsScreen extends CustomUIHud {
         }
         for (int k = 0; k < blocks; k++) {
             // each block thumps as it lands, a little higher each time; the mace clash comes when the title shows
-            // (user, 2026-10-16: with several columns one sound each, "tum-tum-tum" then the impact)
+            // (playtest 2026-10-16: with several columns one sound each, "tum-tum-tum" then the impact)
             sound(player, id, STEP_MS + k * BLOCK_GAP_MS + RISE_MS, LAND_SOUND, 0.7f, 1f + 0.08f * k);
         }
-        // the columns rise from the bottom (user, 2026-10-16: they popped in): body grows, pad shrinks, never 0. ONE
-        // update per frame for every column moving (user, 2026-10-16: 8 columns sent ~4 updates per 20 ms and the game
+        // the columns rise from the bottom (playtest 2026-10-16: they popped in): body grows, pad shrinks, never 0. ONE
+        // update per frame for every column moving (playtest 2026-10-16: 8 columns sent ~4 updates per 20 ms and the game
         // froze), at COLUMN_STEP_MS
         long riseEnd = STEP_MS + (blocks - 1) * BLOCK_GAP_MS + RISE_MS;
         for (long t = STEP_MS + COLUMN_STEP_MS; t < riseEnd + COLUMN_STEP_MS; t += COLUMN_STEP_MS) {
@@ -1643,7 +1903,7 @@ final class VsScreen extends CustomUIHud {
         sound(player, id, hit, IMPACT_SOUND, 1f, 1f);
         step(player, id, hit, b -> {
             b.set("#Flash.Visible", true);
-            // no VS logo over 3+ team columns (user, 2026-10-16: it covered them); the kind title sits right under the
+            // no VS logo over 3+ team columns (playtest 2026-10-16: it covered them); the kind title sits right under the
             // column headers (#ColTitle), not over the faces
             b.set("#ColTitle.Visible", plan.kind() != null);
         });
@@ -1656,7 +1916,7 @@ final class VsScreen extends CustomUIHud {
         HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> end(player, id), outAt + STEP_MS, TimeUnit.MILLISECONDS);
     }
 
-    /** Game sounds of the screen (2026-10-16, user: a click as each column/half shows, a clash at the VS); change here. */
+    /** Game sounds of the screen (2026-10-16, playtest: a click as each column/half shows, a clash at the VS); change here. */
     private static final String CLICK_SOUND = "SFX_Creative_Play_Selection_Place";
     private static final String IMPACT_SOUND = "SFX_Gobliterator_Club_Slam_Impact";
     private static final long CLICK_GAP_MS = 90;
@@ -1788,7 +2048,23 @@ final class VsScreen extends CustomUIHud {
      */
     static final int COLUMN = -1;
 
+    /**
+     * The column picture cut to an n-column screen's width (2026-10-29): a column's mask hid its square a moment after it
+     * showed (playtest, with the pictures sent at join too; without the mask they stayed), so each column gets its own cut,
+     * made from the square when a battle first needs it ({@link #makeCut}) and sent with that battle. Variants -13..-18.
+     */
+    private static final int CUT_BASE = -10;
+
+    static int cut(int columns) {
+        return CUT_BASE - columns;
+    }
+
+    private static boolean isCut(int variant) {
+        return variant <= CUT_BASE - 3 && variant >= CUT_BASE - MAX_COLUMNS;
+    }
+
     static String pathOf(String model, int variant, boolean right) {
+        if (isCut(variant)) return PICTURES + "MobBattle_Vs_" + safe(model) + "_col" + (CUT_BASE - variant) + ".png";
         if (variant < 0) return PICTURES + "MobBattle_Vs_" + safe(model) + "_sq.png";
         return PICTURES + "MobBattle_Vs_" + safe(model) + "_v" + variant + (right ? "_R" : "_L") + ".png";
     }
@@ -1801,8 +2077,36 @@ final class VsScreen extends CustomUIHud {
         Path dir = used.getParent().resolve(vsFolder());
         // the column picture: the face-framed square (masked to its column; the pre-cut "_k<n>"/"_fit<n>"/"_crop<n>"
         // widths before 2026-10-17 are deleted by deleteOldCrops)
+        if (isCut(variant)) return dir.resolve(safe(model) + "_col" + (CUT_BASE - variant) + ".png");
         if (variant < 0) return dir.resolve(safe(model) + "_sq.png");
         return dir.resolve(safe(model) + "_v" + variant + (right ? "_R" : "_L") + ".png");
+    }
+
+    /**
+     * Writes a model's n-column cut from its face-framed square when missing: the middle (1920/n) / size of its width,
+     * size = the picture's size on screen in that layout (gen-vs-ui.py column_size: 1100 up to 4 columns, else 1000), its
+     * whole height. False when there is no square on disk yet.
+     */
+    private static boolean makeCut(String model, int columns) {
+        try {
+            Path out = fileOf(model, cut(columns), false);
+            if (out == null) return false;
+            if (Files.exists(out)) return true;
+            Path sq = existing(model, COLUMN, false);
+            if (sq == null || !Files.exists(sq)) return false;
+            BufferedImage src = ImageIO.read(new java.io.ByteArrayInputStream(Files.readAllBytes(sq)));
+            if (src == null) return false;
+            double size = columns <= 4 ? 1100 : 1000;
+            int w = Math.max(1, Math.min(src.getWidth(), (int) Math.round(src.getWidth() * (1920.0 / columns) / size)));
+            BufferedImage part = src.getSubimage((src.getWidth() - w) / 2, 0, w, src.getHeight());
+            BufferedImage copy = new BufferedImage(w, src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            copy.getGraphics().drawImage(part, 0, 0, null);
+            PictureCache.write(out, IndexedPng.encode(copy));
+            return true;
+        } catch (IOException | RuntimeException e) {
+            MobBattlePlugin.log("VS screen: column cut of " + model + " not made: " + e);
+            return false;
+        }
     }
 
     /** Every model a mob role wears (the panel's role list -> each role's Appearance): what a VS screen can show. */
@@ -1820,7 +2124,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * The pictures to have from boot (2026-10-16, user: no hitch, ever), at most MAX_PAIRS, in this order: every pose
+     * The pictures to have from boot (2026-10-16, playtest: no hitch, ever), at most MAX_PAIRS, in this order: every pose
      * of the summon list's mobs, the poses a VS screen wanted before (used.txt), the epic pose of the other mob models.
      */
     private static List<String> bootKeys() {
@@ -1870,7 +2174,7 @@ final class VsScreen extends CustomUIHud {
             keys.add(key(model, COLUMN));
         }
         // only models this world has loaded now: the shared cache (and used.txt) also holds other worlds' mods, and
-        // their pictures must never be sent to this world's players (user, 2026-10-16)
+        // their pictures must never be sent to this world's players (playtest 2026-10-16)
         keys.removeIf(k -> {
             String model = k.substring(0, k.lastIndexOf('|'));
             return !model.startsWith(PLAYER_PREFIX) && ModelAsset.getAssetMap().getAsset(model) == null;
@@ -1918,6 +2222,11 @@ final class VsScreen extends CustomUIHud {
     /** {@code late}: the boot run's end, also after someone connected (ThumbnailCache.lateDone sends the rebuild). */
     static void registerAtBoot(boolean late) {
         if (!FxSettings.serverVs) return;   // server feature off: nothing sent to joining players
+        if ("battle".equals(FxSettings.vsPictures)) {
+            // serverVsPictures battle: nothing at join, each battle sends its own (onDemand)
+            if (!late) MobBattlePlugin.log("VS screen: pictures are sent per battle (serverVsPictures battle), none at join.");
+            return;
+        }
         if (!ThumbnailCache.mayRegister() && !late) return;
         long t0 = System.nanoTime(), bytes0 = REGISTERED_BYTES.get();
         int n = 0;
@@ -1942,6 +2251,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     static Prepared prepareInBackground() {
+        NOT_ON_DISK.clear();
         if (!FxSettings.serverVs) {
             MobBattlePlugin.log("VS screen: off on this server (/mobbattle serverVs): no pictures drawn or sent.");
             return new Prepared(0, 0, 0);
@@ -1957,7 +2267,7 @@ final class VsScreen extends CustomUIHud {
             if (!model.startsWith(PLAYER_PREFIX) && ThumbnailCache.drawsNothing(model)) continue;
             missing.add(k);
         }
-        // every boot (user, 2026-10-16: also when nothing is drawn, to know when they were last generated)
+        // every boot (playtest 2026-10-16: also when nothing is drawn, to know when they were last generated)
         Path picturesDir = usedFile() == null ? null
                 : usedFile().getParent().resolve(vsFolder());
         if (missing.isEmpty()) {
@@ -2045,7 +2355,7 @@ final class VsScreen extends CustomUIHud {
 
     /**
      * Column crops of earlier crop rules in this version's folder ("_crop<k>", "_cut<k>"; now "_fit<k>"), never registered
-     * any more (2026-10-16, user: 123 MB on disk for 59 MB sent, 53 MB of them old crops). Only once every boot picture
+     * any more (2026-10-16, playtest: 123 MB on disk for 59 MB sent, 53 MB of them old crops). Only once every boot picture
      * is on disk, so the new crops no longer need cutting from them.
      */
     private static void deleteOldCrops(Path dir) {
@@ -2077,7 +2387,7 @@ final class VsScreen extends CustomUIHud {
 
     /**
      * The file to register for a picture: this render version's, else the newest older one still on disk (2026-10-16,
-     * user: after a render change the first boot had no VS pictures until the long background run ended, and the
+     * playtest: after a render change the first boot had no VS pictures until the long background run ended, and the
      * screen fell back to the game's small front-facing icons). The new file is registered at the next boot.
      */
     private static Path existing(String model, int variant, boolean right) {
@@ -2108,7 +2418,7 @@ final class VsScreen extends CustomUIHud {
         try (var list = Files.list(dir)) {
             for (Path f : (Iterable<Path>) list::iterator) {
                 String n = f.getFileName().toString();
-                if (n.startsWith(prefix) && n.substring(prefix.length()).matches("(v-?[0-9]+_[LR]|k[0-9]+|sq)[.]png")) {
+                if (n.startsWith(prefix) && n.substring(prefix.length()).matches("(v-?[0-9]+_[LR]|k[0-9]+|col[0-9]+|sq)[.]png")) {
                     Files.deleteIfExists(f);
                 }
             }
@@ -2160,12 +2470,18 @@ final class VsScreen extends CustomUIHud {
 
     /** {@code late}: allowed after a client connected (ThumbnailCache.mayRegister(boolean)), with its toast. */
     private static synchronized boolean register(String key, boolean late) throws IOException {
+        return register(key, late, ThumbnailCache::addAsset);
+    }
+
+    /** As above; each file made goes to {@code sink} (ThumbnailCache.addAsset, or a batch onDemand sends itself). */
+    private static synchronized boolean register(String key, boolean late,
+                                                 java.util.function.Consumer<com.hypixel.hytale.server.core.asset.common.CommonAsset> sink) throws IOException {
         // a key registered from an older version's file (a stand-in) is registered again once this version's is drawn
         // (2026-10-18: after a VS_STYLE bump the boot registered every old picture, drew the new ones 20 s later and
         // the clients got the old ones, without their ratios, until the next restart)
         if (REGISTERED.contains(key) && !STAND_INS.containsKey(key)) return false;
         // never with anyone online: each registered file showed a "Reloaded assets for Common" toast on their screen,
-        // even without an asset rebuild (user screenshot, 2026-10-16). Pictures made after someone joined (boot run
+        // even without an asset rebuild (playtest screenshot, 2026-10-16). Pictures made after someone joined (boot run
         // still drawing, a new player's skin) wait for the next boot; the fallback shows until then.
         if (!ThumbnailCache.mayRegister() && !late) return false;
         int bar = key.lastIndexOf('|');
@@ -2178,9 +2494,9 @@ final class VsScreen extends CustomUIHud {
         if (leftBytes == null || variant >= 0 && !Files.exists(right)) return false;
         if (!ThumbnailCache.mayRegister(late)) return false;
         String prefix = MorphHologram.registryPrefix();
-        ThumbnailCache.addAsset(new RuntimeCommonAsset(prefix + pathOf(model, variant, false), leftBytes, left));
+        sink.accept(new RuntimeCommonAsset(prefix + pathOf(model, variant, false), leftBytes, left));
         if (variant >= 0) {
-            ThumbnailCache.addAsset(new RuntimeCommonAsset(prefix + pathOf(model, variant, true), Files.readAllBytes(right), right));
+            sink.accept(new RuntimeCommonAsset(prefix + pathOf(model, variant, true), Files.readAllBytes(right), right));
         }
         Long before = STAND_INS.remove(key);
         if (before != null) REGISTERED_BYTES.addAndGet(-before);
@@ -2321,7 +2637,7 @@ final class VsScreen extends CustomUIHud {
             flier = flyingModel(id);
         }
         List<ThumbnailCache.PoseChoice> poses = variants(model, flier);
-        // players run (user, 2026-10-16: their idle looked stiff next to the mobs' show-off poses)
+        // players run (playtest 2026-10-16: their idle looked stiff next to the mobs' show-off poses)
         if (id.startsWith(PLAYER_PREFIX)) {
             ThumbnailCache.PoseChoice run = ThumbnailCache.poseOf(model, "run", null);
             if (run != null) poses.set(0, run);
@@ -2329,7 +2645,7 @@ final class VsScreen extends CustomUIHud {
         ThumbnailCache.PoseChoice pose = poses.get(variant < 0 ? 0 : variant % VARIANTS);
         BufferedImage img = ThumbnailCache.render(pieces, ThumbnailCache.load(pose), ModelThumbnail.THREE_QUARTER, PICTURE, true);
         if (img == null) {
-            // nothing visible in that pose (user, 2026-10-16: Snake_Marsh never got a VS picture, its column showed the
+            // nothing visible in that pose (playtest 2026-10-16: Snake_Marsh never got a VS picture, its column showed the
             // icon every boot): the other poses, then the thumbnail's own pose, then the bind pose
             List<ThumbnailCache.PoseChoice> tries = new ArrayList<>(poses);
             tries.add(ThumbnailCache.poseOf(model, "auto", null));
@@ -2362,7 +2678,7 @@ final class VsScreen extends CustomUIHud {
         BufferedImage sq = square(img, false, flying);
         byte[][] pair = IndexedPng.encodePair(sq);   // one quantization, the right one mirrored
         Files.createDirectories(left.getParent());
-        // the square's side in body heights (2026-10-18, user: a Cult Knight with its banner looked small next to a
+        // the square's side in body heights (2026-10-18, playtest: a Cult Knight with its banner looked small next to a
         // werewolf of the same height: every picture filled its own square), read by place() to put every fighter at
         // one scale
         double ratio = bodyRatio(model, sq.getWidth(), renderScale);
@@ -2376,7 +2692,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * A team column picture (user, 2026-10-16, after comparing framings): the same square and scale as the halves'
+     * A team column picture (playtest 2026-10-16, after comparing framings): the same square and scale as the halves'
      * picture, but the face centered across; a ground mob keeps its feet on the bottom edge unless its face would be
      * above COLUMN_FACE_MIN of the height (then it moves down and the feet are cut); a flying mob has its face at
      * COLUMN_FACE_FLIER whatever its size, level with the others'. What goes past the edges is cut.
@@ -2388,7 +2704,7 @@ final class VsScreen extends CustomUIHud {
     /**
      * How big a model stands in its team column: 1 from SMALL_MOB (0.8) blocks tall up, smaller below (the square root of
      * its share of SMALL_MOB, at least SMALL_MIN). Every picture fills its square, so without this a silk larva or a slime
-     * filled the whole column like a boss and its texture pixels showed as big blocks (user, 2026-10-16).
+     * filled the whole column like a boss and its texture pixels showed as big blocks (playtest 2026-10-16).
      */
     static double columnScale(Model model) {
         try {
@@ -2401,7 +2717,7 @@ final class VsScreen extends CustomUIHud {
         }
     }
 
-    // only really small mobs (user, 2026-10-16: the snakes, 0.9 blocks, look right filling the column)
+    // only really small mobs (playtest 2026-10-16: the snakes, 0.9 blocks, look right filling the column)
     private static final double SMALL_MOB = 0.8, SMALL_MIN = 0.5;
 
     static BufferedImage columnFrame(BufferedImage src, double[] head, boolean flier, double scale) {
@@ -2442,7 +2758,7 @@ final class VsScreen extends CustomUIHud {
 
     /**
      * How much closer the camera must get so the body (the model's collision box, what the game hits) fills BODY_FIT
-     * of {@code span} pixels of the last render; 1 when the drawing is mostly body (user, 2026-10-17: the Shadow Knight's
+     * of {@code span} pixels of the last render; 1 when the drawing is mostly body (playtest 2026-10-17: the Shadow Knight's
      * floating swords and the frost dragon's wings made the body small). Needs the render's scale (LAST_SCALE).
      */
     static double bodyZoom(Model model, double span) {
@@ -2492,7 +2808,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * /mobbattle test vsframes &lt;current|body&gt; [text] (2026-10-17, user: try framing by the body before changing the real
+     * /mobbattle test vsframes &lt;current|body&gt; [text] (2026-10-17, playtest: try framing by the body before changing the real
      * pictures): every mob model's first VS pose, as the column square and the halves pair, framed the current way or by
      * the body, written to {@code dir} (outside the VS folder: nothing in the game changes). Returns {done, failed, total}.
      */
@@ -2583,12 +2899,12 @@ final class VsScreen extends CustomUIHud {
         return true;
     }
 
-    // the face at least this far down the picture (user, 2026-10-16 previews: at 0.30 tall mobs had their face under the header)
+    // the face at least this far down the picture (playtest 2026-10-16 previews: at 0.30 tall mobs had their face under the header)
     private static final double COLUMN_FACE_MIN = 0.40;
     private static final double COLUMN_FACE_FLIER = 0.40;
 
     /**
-     * The model's VARIANTS poses (2026-10-16, user chose after comparing poses on many mobs): 0 = a show-off set if it
+     * The model's VARIANTS poses (2026-10-16, chosen in playtests after comparing poses on many mobs): 0 = a show-off set if it
      * has one (Roar, Taunt, Angry, SawCharge...), else standing ready (Alerted; a flying mob: hovering, FlyIdle/Fly),
      * else at rest (Idle), else its auto pose. Running looked bent and off-center in the team columns. Then its auto
      * (run) pose and a jump or idle frame for repeated mobs; when it has fewer, other frames of those (t shifted), so
@@ -2597,7 +2913,7 @@ final class VsScreen extends CustomUIHud {
     static List<ThumbnailCache.PoseChoice> variants(Model model, boolean flier) {
         List<ThumbnailCache.PoseChoice> out = new ArrayList<>();
         ThumbnailCache.PoseChoice first = null;
-        // fliers hover first (user, 2026-10-16: a flier in its ground roar looked stranded in the sky slots)
+        // fliers hover first (playtest 2026-10-16: a flier in its ground roar looked stranded in the sky slots)
         if (flier) first = ThumbnailCache.poseOf(model, "FlyIdle", 0.3);
         if (first == null && flier) first = ThumbnailCache.poseOf(model, "Fly", 0.3);
         for (int i = 0; i < EPIC_NAMED && first == null; i++) first = ThumbnailCache.poseOf(model, EPIC[i], 0.45);
@@ -2657,7 +2973,7 @@ final class VsScreen extends CustomUIHud {
     }
 
     /**
-     * The picture's square (user, 2026-10-16: the dragon looked tiny and off to one side): centered on the body (the
+     * The picture's square (playtest 2026-10-16: the dragon looked tiny and off to one side): centered on the body (the
      * middle of where most of its pixels are, so thin wings, tails and weapons count little) and zoomed in on a wide
      * model, its sides cut (the square is never narrower than WIDE_FIT of its width). A ground mob keeps its feet on
      * the bottom edge; a flier is framed on its body's dense part (BODY_SHARE of its pixels on each axis), padded.
@@ -2682,7 +2998,7 @@ final class VsScreen extends CustomUIHud {
         double cx = count > 0 ? mid(xs, count, 0.5) : w / 2.0;
         int s, oy;
         // only a flier spread wide (wings open: the dragon) is framed on its body; a tall one keeps the whole picture
-        // (user, 2026-10-16: the Nightlord, whose role can fly, lost its crown and swords)
+        // (playtest 2026-10-16: the Nightlord, whose role can fly, lost its crown and swords)
         if (flier && count > 0 && w > h * WIDE_FLIER) {
             double x0 = mid(xs, count, (1 - BODY_SHARE) / 2), x1 = mid(xs, count, (1 + BODY_SHARE) / 2);
             double y0 = mid(ys, count, (1 - BODY_SHARE) / 2), y1 = mid(ys, count, (1 + BODY_SHARE) / 2);
@@ -2715,7 +3031,7 @@ final class VsScreen extends CustomUIHud {
                 out.setRGB(tx, oy + y, argb);
             }
         }
-        // the soft edge only where the mob was really cut (2026-10-18, user: a Glutton's whole arm faded out)
+        // the soft edge only where the mob was really cut (2026-10-18, playtest: a Glutton's whole arm faded out)
         fadeSides(out, cutLeft, cutRight);
         return out;
     }
@@ -2739,13 +3055,13 @@ final class VsScreen extends CustomUIHud {
         }
     }
 
-    // 1 = the whole width (2026-10-18, user: a slime's side, an Outlander's fist, a moray's tail were cut off in the
+    // 1 = the whole width (2026-10-18, playtest: a slime's side, an Outlander's fist, a moray's tail were cut off in the
     // picture itself; with one scale for the screen the size comes from blocks, so a wide square no longer makes the
     // mob look small). It was 0.72: a wide mob zoomed in, its sides cut and faded.
     private static final double WIDE_FIT = 1.0;
     /**
      * Pictures are faded over this share of their width at the left and right edges, where a wide mob (a spider's
-     * legs, a dragon's wings) is cut by its square (user, 2026-10-16: the cut showed as a hard straight line).
+     * legs, a dragon's wings) is cut by its square (playtest 2026-10-16: the cut showed as a hard straight line).
      */
     private static final double EDGE_FADE = 0.08;
     /** Version of how the VS pictures are made (here, not RENDER_VERSION: no full thumbnail redraw): 2 = edge fade. */

@@ -1,4 +1,4 @@
-"""VS screen previews out of the game, from the picture cache (2026-10-17, user: check how every mob looks in the VS
+"""VS screen previews out of the game, from the picture cache (2026-10-17, playtest: check how every mob looks in the VS
 screens without spawning them, "no background, only the mobs").
 
 The server draws the pictures (thumbnails, VS pictures) into its picture cache; this script lays them out the way the
@@ -244,22 +244,22 @@ def share_of(height, tallest, power):
     return max(0.3, min(1.0, height / max(0.1, tallest)) ** power)
 
 
-# --rule scale (2026-10-18, user: the 3 and 9 layouts broke the proportions, a fire golem looked smaller than a rat and
+# --rule scale (2026-10-18, playtest: the 3 and 9 layouts broke the proportions, a fire golem looked smaller than a rat and
 # a bird, giants should show only their face and part of the body): one pixels-per-block for the whole screen, no
 # per-slot sizes (the slots only give where each one stands), each body measured on its own picture (the opaque rows,
 # so a model that draws far more than its hitbox or a long animal is measured as drawn), the screen's reference height
 # = the tallest body, but at most GIANT x the median one (a giant then stays at true size and is pushed down so its
 # head shows under TOP, its feet off the screen), and a body never smaller than FLOOR of the reference.
-# Then (user, same day: the bears looked tiny next to a giant, a goblin as small as a rat because both hit the floor):
+# Then (playtest, same day: the bears looked tiny next to a giant, a goblin as small as a rat because both hit the floor):
 # the height under the reference is compressed with --size-power (0.5: a body half as tall gets 71 %), so order and
 # differences stay but small ones are not crushed; giants above the reference keep growing in a straight line (cropped).
 GIANT, FLOOR, TOP, TARGET_SHARE = 1.5, 0.15, 150, 0.85
-# Then (user, same day: Shenron looked better towering over the rest than pushed down and filling the background, and
+# Then (playtest, same day: Shenron looked better towering over the rest than pushed down and filling the background, and
 # with only small mobs on screen they were blown up): a giant grows at most to GIANT_MAX x the reference height, so it
 # stands on its slot and towers (pushed down only if its top would pass TOP), and the reference is never under MIN_REF
 # blocks (a screen of fish no longer zooms them to a human's size).
 GIANT_MAX, MIN_REF = 1.6, 1.6
-# And (user: the scale worked much better for crowds than for 2-4 a side, where every picture is big): with 1-3 a side
+# And (playtest: the scale worked much better for crowds than for 2-4 a side, where every picture is big): with 1-3 a side
 # a giant grows only to GIANT_MAX_FEW, and no picture is shown above MAX_ZOOM x its own pixels (a koi drawn 1000 px wide
 # from a 384 px picture was a blur).
 GIANT_MAX_FEW, MAX_ZOOM = 1.45, 3.0
@@ -285,7 +285,7 @@ def body_box(folder, m):
     return _SPAN[key]
 
 
-# --rule scale: each half laid out in its own room (2026-10-18, user: the left side's inner mob was always cut by the
+# --rule scale: each half laid out in its own room (2026-10-18, playtest: the left side's inner mob was always cut by the
 # split, the right had empty space by it). The split runs from x SPLIT_TOP at the top to SPLIT_BOTTOM at the bottom, so
 # at the floor the left half has 820 px and the right 1100: the slots (made for a 1113 px box, mirrored around the
 # screen's middle) are spread over the room each half really has at the height of each body, and a body still over the

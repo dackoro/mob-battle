@@ -17,7 +17,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * /mobbattle measure [look|id:&lt;uuid&gt;|last] [seconds] (admin, 2026-10-13, user: calibrate the size/speed buffs on a 150-block track):
+ * /mobbattle measure [look|id:&lt;uuid&gt;|last] [seconds] (admin, 2026-10-13, playtest: calibrate the size/speed buffs on a 150-block track):
  * samples the position of you (or the mob you look at) every SAMPLE_MS for some seconds and tells in chat, once a
  * second, the speed over the last second and the height above the start; at the end the top speed (over
  * WINDOW_MS), the average while moving, the distance and the highest point. /mobbattle measure stop ends it early. For players it also shows the movement
@@ -61,7 +61,7 @@ final class MeasureTool {
      */
     static void start(UUID key, java.util.function.Consumer<Message> viewer, Ref<EntityStore> target, int seconds, Store<EntityStore> store) {
         Run old = RUNNING.remove(key);
-        if (old != null && old.task != null) old.task.cancel(false);
+        if (old != null) MobBattlePlugin.untrack(old.task);
         TransformComponent tf = store.getComponent(target, TransformComponent.getComponentType());
         if (tf == null) return;
         String name = ChaosWand.nameOf(target, store);
@@ -82,7 +82,7 @@ final class MeasureTool {
         run.task = MobBattlePlugin.track(HytaleServer.SCHEDULED_EXECUTOR.scheduleAtFixedRate(() -> {
             // A world that shut down runs no more tasks: stop here instead of queueing into it 20 times a second.
             if (store.isShutdown()) {
-                if (run.task != null) run.task.cancel(false);
+                MobBattlePlugin.untrack(run.task);
                 RUNNING.remove(key, run);
                 return;
             }
@@ -133,7 +133,7 @@ final class MeasureTool {
 
     private static void finish(UUID key, java.util.function.Consumer<Message> viewer, String name, int count, double[] stats,
                                java.util.List<Double> seconds, Run run) {
-        run.task.cancel(false);
+        MobBattlePlugin.untrack(run.task);
         RUNNING.remove(key, run);
         double avg = stats[1] > 0 ? stats[0] / stats[1] : 0;
         say(viewer, I18n.tr("cmd.measure.end").param("name", name).param("cruise", f2(cruising(seconds)))
@@ -147,7 +147,7 @@ final class MeasureTool {
 
     /**
      * The steady speed: the median of the one-second speeds within CRUISE_SHARE of the fastest one, so starting and
-     * stopping don't pull it down (user test 2026-10-13: the average while moving came out ~5% under the steady
+     * stopping don't pull it down (playtest test 2026-10-13: the average while moving came out ~5% under the steady
      * seconds). 0 if it never moved.
      */
     private static double cruising(java.util.List<Double> seconds) {
@@ -161,7 +161,7 @@ final class MeasureTool {
     }
 
     /**
-     * Its size and speed buff, and the speed they should give (user, 2026-10-13: the measure should say what it is
+     * Its size and speed buff, and the speed they should give (playtest 2026-10-13: the measure should say what it is
      * measured against): size^speedExponent (sizeSpeed) x speed buff, as BuffJump applies it.
      */
     private static String buffs(Ref<EntityStore> target, Store<EntityStore> store) {
@@ -207,7 +207,7 @@ final class MeasureTool {
     }
 
     /**
-     * To the viewer and the server log ("[measure] ..."): run through /sudo from the console (tests driven by Claude
+     * To the viewer and the server log ("[measure] ..."): run through /sudo from the console (tests run from the console
      * through the dev server's command inbox, 2026-10-13) the chat line only reaches the player.
      */
     private static void say(java.util.function.Consumer<Message> viewer, Message chat, String log, String color) {
@@ -218,7 +218,7 @@ final class MeasureTool {
     /** Plugin shutdown / stop: every measure ends. */
     static void stopAll() {
         RUNNING.values().forEach(r -> {
-            if (r.task != null) r.task.cancel(false);
+            MobBattlePlugin.untrack(r.task);
         });
         RUNNING.clear();
     }

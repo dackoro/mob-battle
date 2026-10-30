@@ -44,7 +44,7 @@ import java.util.function.Supplier;
  * debug/), then the mob is followed for {@link FxSettings#debugTrackSeconds} (0 = report only): once a second its
  * target, AI state, health and effect changes, every hit it gives or takes (DebugHitSystem: amount, cause, cancelled),
  * plus where it is every {@link #HEARTBEAT_MS}, go into the same file,
- * the server log and chat (user, 2026-10-12: one log with the snapshot and what came after). One followed mob per
+ * the server log and chat (playtest 2026-10-12: one log with the snapshot and what came after). One followed mob per
  * player; a new left click replaces it, a right click stops it. Read-only apart from the tracking state.
  * Everything that reads components runs on the mob's world thread (the interactions and BattleLifecycleSystem.tick).
  * Tracks are keyed by the player's UUID, never a PlayerRef; a track whose mob is gone or dead is dropped.

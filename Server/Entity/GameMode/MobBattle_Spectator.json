@@ -28,6 +28,15 @@
       ],
       "RequireNewClick": true,
       "HudInputBindingEntry": "server.mobbattle.watch.exit"
+    },
+    "Ability2": {
+      "Interactions": [
+        {
+          "Type": "MobBattle_WatchAuto"
+        }
+      ],
+      "RequireNewClick": true,
+      "HudInputBindingEntry": "server.mobbattle.watch.auto"
     }
   }
 }

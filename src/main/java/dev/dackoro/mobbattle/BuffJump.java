@@ -28,7 +28,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 /**
- * A size buff makes jumps grow with the body (user, 2026-10-12: a x3 player still jumped one block).
+ * A size buff makes jumps grow with the body (playtest 2026-10-12: a x3 player still jumped one block).
  * <ul>
  *   <li>Players: their MovementSettings jumpForce times sqrt(size), so the jump height grows with the size (height
  *   goes with the square of the take-off speed). Vanilla {@code ModelSystems.PlayerUpdateMovementManager} resets a
@@ -38,10 +38,10 @@ import java.util.WeakHashMap;
  *   scale doesn't touch them (javap), so they are set by reflection to base x size. Each NPC has its own
  *   controllers (BuilderMotionControllerWalk.build makes a new one), base values are kept per controller.</li>
  * </ul>
- * Speed (2026-10-13, user: a big player ran slower than they should): players' baseSpeed and mobs' walk
+ * Speed (2026-10-13, playtest: a big player ran slower than they should): players' baseSpeed and mobs' walk
  * maxHorizontalSpeed (final, same reflection) times sqrt(size), as the jump: a giant's stride is longer, but a
  * linear speed (x10 = ten times as fast) can't be steered.
- * ✅ Player jump and size tested (user, 2026-10-13); around x9 the jump stops growing (the client's air drag, which
+ * ✅ Player jump and size tested (playtest 2026-10-13); around x9 the jump stops growing (the client's air drag, which
  * grows with speed, is the likely cause; untouched so falls don't get faster). ❓ Speed untested in game.
  */
 public class BuffJump extends RefChangeSystem<EntityStore, ModelComponent> {
@@ -95,7 +95,7 @@ public class BuffJump extends RefChangeSystem<EntityStore, ModelComponent> {
         MovementSettings defaults = mm.getDefaultSettings();
         MovementSettings now = mm.getSettings();
         if (defaults == null || now == null) return;
-        // Jump: a bit over sqrt to make up for the client's drag (user, 2026-10-13, jump key held: x2 reached 6
+        // Jump: a bit over sqrt to make up for the client's drag (playtest 2026-10-13, jump key held: x2 reached 6
         // blocks as it should, x3 only 8 of 9 with sqrt). Speed: sqrt.
         float jump = (float) Math.pow(size, Buffs.jumpExponent());
         float k = (float) Math.pow(size, Buffs.speedExponent());

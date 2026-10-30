@@ -1,13 +1,13 @@
 {
-  "$Comment": "Mob Battle training knight: a copy of the game's Test_Combat_Knight (Tests_Development) with the mannequin body. Walks to any hostile mob or player within 30 blocks, swings an iron sword (CAE_Test_Combat_Knight: basic, charged and signature attacks) and raises its iron shield after taking damage. No armor, so damage numbers stay clean.",
+  "$Comment": "Mob Battle training knight: a copy of the game's Test_Combat_Knight (Tests_Development) with the mannequin body. Neutral (2026-10-29: it attacked everything around it as it spawned); it fights what a battle turns it against, within 30 blocks,, swings an iron sword (CAE_MobBattle_Dummy_Knight = the game's CAE_Test_Combat_Knight keeping the shield in hand: basic, charged and signature attacks) and raises its iron shield after taking damage. No armor, so damage numbers stay clean.",
   "Type": "Generic",
   "Appearance": "Mannequin",
-  "CombatConfig": "CAE_Test_Combat_Knight",
+  "CombatConfig": "CAE_MobBattle_Dummy_Knight",
   "HotbarItems": [
     "Weapon_Sword_Iron"
   ],
-  "DefaultPlayerAttitude": "Hostile",
-  "DefaultNPCAttitude": "Hostile",
+  "DefaultPlayerAttitude": "Neutral",
+  "DefaultNPCAttitude": "Neutral",
   "OffHandItems": [
     "Weapon_Shield_Iron"
   ],
@@ -44,7 +44,7 @@
             {
               "Sensor": {
                 "Type": "Mob",
-                "Range": 30,
+                "Range": 80,
                 "GetPlayers": true,
                 "Filters": [
                   {
@@ -80,7 +80,7 @@
                 "Sensors": [
                   {
                     "Type": "Mob",
-                    "Range": 30,
+                    "Range": 80,
                     "GetPlayers": true,
                     "LockOnTarget": false,
                     "Filters": [

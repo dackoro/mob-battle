@@ -9,7 +9,7 @@ import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 
 /**
- * Small palette PNGs for pictures sent to every client (2026-10-16, user: "turbo" optimize what the VS pictures weigh
+ * Small palette PNGs for pictures sent to every client (2026-10-16, playtest: "turbo" optimize what the VS pictures weigh
  * and how fast they are made).
  * <ul>
  *   <li>Median cut over a histogram of 5 bits per color channel and 4 bits of alpha (soft edges keep their fade; the
@@ -26,7 +26,7 @@ final class IndexedPng {
 
     /**
      * Palette size (measured 2026-10-16 over 608 models: 255 colors 384 px 18.4 KB, 128 colors 320 px 14.4 KB per
-     * picture). 255 again since the VS pictures are budgeted (VsScreen.MAX_PAIRS): the user found them pixelated.
+     * picture). 255 again since the VS pictures are budgeted (VsScreen.MAX_PAIRS): playtests found them pixelated.
      */
     static final int COLORS = 255;
     /** Pixels fainter than this are fully transparent. */

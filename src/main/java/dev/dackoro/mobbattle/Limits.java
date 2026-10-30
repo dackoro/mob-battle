@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * Soft limits (2026-10-13, user: "more freedom, with performance warnings, and say what stops working past some
+ * Soft limits (2026-10-13, playtest: "more freedom, with performance warnings, and say what stops working past some
  * amount"): the hard caps are high on purpose, and a value past {@link Rule#warn} only gets a warning in the panel
  * ({@link ConfigPage}) and after a /mobbattle command (any fx.properties key it changed). The size limit keeps its
  * own warning ({@link Buffs#sizeWarning}).

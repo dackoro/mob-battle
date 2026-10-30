@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Army Wand: each player's own mobs. The owner can also be another player (apply ... army add <player>) or a mob,
- * the army's leader (apply ... army add id:<uuid>, 2026-10-14, user): the army follows it, defends itself and it,
+ * the army's leader (apply ... army add id:<uuid>, 2026-10-14): the army follows it, defends itself and it,
  * and attacks what it attacks, by the same four rules. A leader is kept by its entity UUID in {@link #LEADERS};
  * when it dies or unloads its army is released. Army mobs don't attack their owner and can't be hurt by the owner
  * or by each other. They defend themselves and their owner and attack what the owner hits (see order()).
@@ -34,7 +34,7 @@ final class Army {
     private static final Map<UUID, Ref<EntityStore>> LEADERS = new ConcurrentHashMap<>();
 
     /**
-     * Army Wand crouch click (2026-10-14, user): whom each player recruits for. Absent = their own army. A player owner
+     * Army Wand crouch click (2026-10-14): whom each player recruits for. Absent = their own army. A player owner
      * is kept by UUID only (a stored Ref would outlive a reconnect); a mob leader by its Ref (pruned when gone).
      */
     record Pick(UUID owner, Ref<EntityStore> leader, String name) {
@@ -135,7 +135,7 @@ final class Army {
 
     /**
      * True when {@code mob} serves {@code player} somewhere down their chain of command (their army, or the army of a
-     * leader under them): the Kill Wand's wave and the Snap spare them (2026-10-18, user). False for a null player.
+     * leader under them): the Kill Wand's wave and the Snap spare them (2026-10-18). False for a null player.
      */
     static boolean servesPlayer(Ref<EntityStore> mob, UUID player) {
         return player != null && mob != null && player.equals(topOf(mob, leaderKey(mob)));
@@ -183,7 +183,7 @@ final class Army {
     /** Something changed since the armies were last written to {@link #FILE}. */
     private static volatile boolean dirty;
     /**
-     * The armies across server restarts (test 2026-10-14, user: a restart lost every army). One line per mob: its UUID,
+     * The armies across server restarts (test 2026-10-14, playtest: a restart lost every army). One line per mob: its UUID,
      * its owner key or "-", bossIsLeader, leads, fought. Read into AWAY at startup, so each mob rejoins as it loads.
      */
     static final String FILE = "armies.txt";
@@ -411,7 +411,7 @@ final class Army {
 
     /**
      * Back to their own AI after a short pause: a hostile mob turns on its ex-owner, and the fights the army gave them
-     * end on both sides, so same-faction mobs make peace again (user, 2026-10-12: disbanded goblins and the
+     * end on both sides, so same-faction mobs make peace again (playtest 2026-10-12: disbanded goblins and the
      * Feastmaster they fought kept going for the whole 10 min forced hostility). An opponent forgets every mob
      * released together: it was turned against several of them over the fight, not only its current one.
      */
@@ -632,6 +632,10 @@ final class Army {
             org.joml.Vector3d p = new org.joml.Vector3d(mt.getPosition());
             double ring = landingRing(mobs.size());
             double far = TELEPORT_DISTANCE + ring;
+            // An owner fighting in an isolated battle (a leader mob in a duel): the army waits where it is instead of
+            // crowding the arena, where it picked fights with the onlookers (playtest 2026-10-29).
+            BattleManager.Battle ownerBattle = BattleManager.battleOf(me);
+            boolean waits = ownerBattle != null && FxSettings.isolated(ownerBattle.kind);
             long now = System.currentTimeMillis();
             Renew renew = RENEWED.get(owner);
             if (renew == null || renew.me() != me || now - renew.at() > RENEW_MS) {
@@ -645,6 +649,10 @@ final class Army {
                 var entity = store.getComponent(npc, npcType);
                 var t = store.getComponent(npc, tType);
                 if (entity == null || t == null) continue;
+                if (waits && !inBattle(npc)) {
+                    if (isFree(npc, store)) entity.setLeashPoint(new org.joml.Vector3d(t.getPosition()));
+                    continue;
+                }
                 // Home = the owner only while it isn't fighting: a fighting mob's leash point is where it stands
                 // (ChaseSupport), else the soft leash pulled it back to the owner 20-30 blocks into a chase.
                 if (isFree(npc, store) && !inBattle(npc)) entity.setLeashPoint(new org.joml.Vector3d(p));

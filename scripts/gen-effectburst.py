@@ -1,4 +1,4 @@
-"""Effect Wand burst per palette color (2026-10-13, user: the chat line and the wave take the effect's color, the burst on
+"""Effect Wand burst per palette color (2026-10-13, playtest: the chat line and the wave take the effect's color, the burst on
 the mob was always purple).
 
 Writes, for every palette color:

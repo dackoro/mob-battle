@@ -3,7 +3,7 @@ package dev.dackoro.mobbattle;
 import java.util.*;
 
 /**
- * Offline check of the battle film's shot picking (FilmPicker), old picker vs new, no game needed (2026-10-16, user:
+ * Offline check of the battle film's shot picking (FilmPicker), old picker vs new, no game needed (2026-10-16, playtest:
  * "simulate a fight with 1 s frames and see whether it follows the percentages or a bad pattern").
  * Run: scripts/sim-film.ps1 (javac of FilmPicker + this file into build/sim, then java).
  * Each scenario plays many battles second by second: shots last filmShotTime 8 s +-25 %, fighters drop over the

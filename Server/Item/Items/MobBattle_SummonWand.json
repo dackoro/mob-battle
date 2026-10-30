@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_SummonWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Army",
   "Icon": "Icons/Items/MobBattle/SummonWand.png",
   "Quality": "Uncommon",
   "ItemLevel": 1,

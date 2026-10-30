@@ -41,7 +41,7 @@ final class Countdown {
         final Consumer<MobBattleApi.EndReason> onEnd;
         volatile boolean cancelled;
         /**
-         * The big countdown title shows only from this many seconds left (2026-10-16, user: the "BATTLE ROYALE / 12"
+         * The big countdown title shows only from this many seconds left (2026-10-16, playtest: the "BATTLE ROYALE / 12"
          * title covered the VS screen; it comes after it): the seconds the VS added are counted in chat only.
          */
         int titleFrom = Integer.MAX_VALUE;
@@ -146,7 +146,7 @@ final class Countdown {
             start.accept(buffer);
             return;
         }
-        // The VS screen comes first and adds its seconds (2026-10-16, user: it must not eat the intro's time), only when
+        // The VS screen comes first and adds its seconds (2026-10-16, playtest: it must not eat the intro's time), only when
         // one was really shown for these mobs (FightCamera.intro, just before this call).
         int titleFrom = seconds;
         long vsMs = VsScreen.takeShown(set);
@@ -173,11 +173,12 @@ final class Countdown {
         if (p.cancelled || p.owner != null && (player == null || !player.isValid())) {
             return;
         }
-        // A fighter fell during the countdown (2026-10-16, user: a duel's 10..1 and its camera went on after one of the
+        // A fighter fell during the countdown (2026-10-16, playtest: a duel's 10..1 and its camera went on after one of the
         // two died, then "FIGHT!" and an instant win): fewer than two standing calls it off. World thread for the check.
         if (p.mobs.size() >= 2 && !p.store.isShutdown()) {
             p.store.getExternalData().getWorld().execute(() -> {
-                if (p.cancelled) return;
+                // started meanwhile: a late truce would undo the battle's first targets
+                if (p.cancelled || !PENDING.contains(p)) return;
                 List<Ref<EntityStore>> alive = new java.util.ArrayList<>();
                 for (Ref<EntityStore> r : p.mobs) {
                     if (!BattleManager.isAlive(r, p.store)) continue;
@@ -203,14 +204,18 @@ final class Countdown {
     private static final double TRUCE_RANGE = 32;
 
     /**
-     * The fighters wait for the start (2026-10-16, user: a royale's mobs started fighting each other before the
+     * The fighters wait for the start (2026-10-16, playtest: a royale's mobs started fighting each other before the
      * countdown ended; nothing held wild hostile mobs such as bosses of two mods). Every second each NPC ignores the
      * others for TRUCE_SECONDS and lets go of one of them as its target; FightDamageSystem also cancels their hits on
      * each other ({@link #waitingTogether}). The battle start sets its own HOSTILE overrides over these.
      */
     static void truce(List<Ref<EntityStore>> alive, Store<EntityStore> store) {
+        truce(alive, store, TRUCE_SECONDS);
+    }
+
+    private static void truce(List<Ref<EntityStore>> alive, ComponentAccessor<EntityStore> store, double seconds) {
         if (alive.size() <= TRUCE_ALL_MAX) {
-            for (Ref<EntityStore> r : alive) FightManager.truce(r, alive, TRUCE_SECONDS, store);
+            for (Ref<EntityStore> r : alive) FightManager.truce(r, alive, seconds, store);
             return;
         }
         double[][] at = new double[alive.size()][];
@@ -240,9 +245,31 @@ final class Countdown {
                     }
                 }
             }
-            FightManager.truce(alive.get(i), near, TRUCE_SECONDS, store);
+            FightManager.truce(alive.get(i), near, seconds, store);
         }
     }
+
+    /**
+     * The truce ends with the countdown (2026-10-29, playtest: in a royale of 90 the fighters took about a second to start
+     * attacking): its IGNORE overrides lasted up to TRUCE_SECONDS past the start. Re-put for TRUCE_END_SECONDS so they
+     * expire at once, before the start sets each fighter's target and HOSTILE override.
+     */
+    private static void endTruce(Pending p, ComponentAccessor<EntityStore> buffer) {
+        if (p.mobs.size() < 2) return;
+        try {
+            List<Ref<EntityStore>> alive = new java.util.ArrayList<>();
+            for (Ref<EntityStore> r : p.mobs) {
+                if (r != null && r.isValid() && r.getStore() == p.store && BattleManager.isAlive(r, buffer)) alive.add(r);
+            }
+            // the same pairs as the truce (all of them, or the grid above TRUCE_ALL_MAX: audit 2026-10-29, big royales
+            // still waited up to 1.6 s)
+            truce(alive, buffer, TRUCE_END_SECONDS);
+        } catch (RuntimeException e) {
+            MobBattlePlugin.log("Countdown truce end failed: " + e);
+        }
+    }
+
+    private static final double TRUCE_END_SECONDS = 0.05;
 
     private static long cell(long x, long z) {
         return (x << 32) ^ (z & 0xffffffffL);
@@ -275,8 +302,11 @@ final class Countdown {
     private static void announce(Pending p, PlayerRef player, int left) {
         boolean title = left <= p.titleFrom;
         if (player != null) {
-            player.sendMessage(I18n.tr("battle.countdown.tick").param("label", p.label.text()).param("left", left)
-                    .color("#ffd23e"));
+            // the big title already counts; during a test script the chat keeps only the script's own lines
+            if (!TestTools.quietFor(player.getUuid())) {
+                player.sendMessage(I18n.tr("battle.countdown.tick").param("label", p.label.text()).param("left", left)
+                        .color("#ffd23e"));
+            }
             if (title && TITLE_OWNER.get(p.owner) == p) FightFx.countdownTitle(player, left, p.label.text());
         } else if (title) {
             FightFx.countdownTitle(p.anchor, left, p.label.text());
@@ -432,6 +462,7 @@ final class Countdown {
                 finish(p, p.store.isShutdown() ? MobBattleApi.EndReason.UNLOAD : MobBattleApi.EndReason.CANCELLED_COUNTDOWN);
             } else if (PENDING.remove(p)) {
                 finishStarted(p);
+                endTruce(p, buffer);
                 try {
                     p.start.accept(buffer);
                 } catch (RuntimeException e) {

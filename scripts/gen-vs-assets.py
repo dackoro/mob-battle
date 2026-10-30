@@ -1,4 +1,4 @@
-"""VS screen backgrounds and logo (2026-10-16, user: match the VS card made for the clip, art-source/Renders/VS/vs_card.py).
+"""VS screen backgrounds and logo (2026-10-16, playtest: match the VS card made for the clip, art-source/Renders/VS/vs_card.py).
 
 Writes into Common/Icons/MobBattle/Vs/:
   Bg_<Color>_L.png / Bg_<Color>_R.png for every team palette color: one half of the screen with the slanted split,
@@ -109,7 +109,7 @@ SEAM_ROOM = 14   # baked px the right mask reaches past the slant, so the right 
 
 
 def half_mask(left):
-    """A half's clip mask (VsScreen.ui #LHalf / #RHalf MaskTexturePath, 2026-10-17, user: each side cut at the slanted
+    """A half's clip mask (VsScreen.ui #LHalf / #RHalf MaskTexturePath, 2026-10-17, playtest: each side cut at the slanted
     split, as Smash): white where the half shows, transparent beyond its slanted edge; stretched to the half's box like
     its background, so the two always meet on the background's own slant."""
     x0 = 0 if left else W - BOX
@@ -156,7 +156,7 @@ def logo():
 
 
 TITLE_CANVAS = (1900, 240)   # VsScreen.ui #KindTitle keeps this aspect
-TITLES = {  # Kind.key -> (en, es): the battle kind under the VS, in the VS's own style (user, 2026-10-16)
+TITLES = {  # Kind.key -> (en, es): the battle kind under the VS, in the VS's own style (playtest, 2026-10-16)
     "duel": ("DUEL", "DUELO"),
     "royale": ("BATTLE ROYALE", "BATTLE ROYALE"),
     "teams": ("TEAM BATTLE", "BATALLA DE EQUIPOS"),
@@ -187,7 +187,7 @@ UNKNOWN_SIZE = 384   # VsScreen.PICTURE: the same square as a mob's picture, so 
 
 
 def unknown():
-    """A mob with no picture yet (2026-10-17, user: not the game's small red X; a big "?" the size of a mob, in the VS
+    """A mob with no picture yet (2026-10-17, playtest: not the game's small red X; a big "?" the size of a mob, in the VS
     style, so the team color behind it still shows): white Impact "?", dark outline, red and blue offset shadows,
     slanted, standing on the bottom edge like a mob's feet, on a transparent square."""
     k = 3
@@ -211,7 +211,7 @@ def unknown():
 
 
 def column_overlay():
-    """One team column of the 3+ team screen (Smash-like, user 2026-10-16), drawn over the team's color: a dark header
+    """One team column of the 3+ team screen (Smash-like, playtest 2026-10-16), drawn over the team's color: a dark header
     band, soft light streaks, specks, darker sides, and a soft dark shade rising from the bottom."""
     w, h = 480, 1080
     im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -226,7 +226,7 @@ def column_overlay():
             if a:
                 px[x, y] = (0, 0, 0, a)
             if fog > 0:
-                fx[x, y] = (6, 4, 10, round(120 * fog))   # a soft dark shade (user: the white fog was too strong)
+                fx[x, y] = (6, 4, 10, round(120 * fog))   # a soft dark shade (playtest: the white fog was too strong)
     im.alpha_composite(fog_layer)
     d = ImageDraw.Draw(im)
     d.rectangle([0, 0, w, 130], fill=(8, 6, 12, 238))                 # header band
@@ -276,7 +276,7 @@ def badge():
 
 
 def royale_bg():
-    """Bg_Royale.png (2026-10-16, user: a royale has no sides, so one background, not split): the whole screen at
+    """Bg_Royale.png (2026-10-16, playtest: a royale has no sides, so one background, not split): the whole screen at
     1280x720 (stretched in game), a gold arena glow in the middle of a deep violet, light streaks, gold embers on the
     left and pale sparks on the right, and the name bar across the whole width with a gold line."""
     bw, bh = 1280, 720

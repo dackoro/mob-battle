@@ -10,7 +10,7 @@ import java.util.Properties;
 import java.util.stream.Stream;
 
 /**
- * Saved summon lists (2026-10-16, user: "save my list 1, 2 with counts, colors, teams"): the whole team and summon list
+ * Saved summon lists (2026-10-16, playtest: "save my list 1, 2 with counts, colors, teams"): the whole team and summon list
  * (every {@link Presets#isListKey} key: summon.list, summon.teams, teams.*) in
  * &lt;plugin data dir&gt;/summonlists/&lt;name&gt;.properties. Loading one replaces the current lists the way the panel's Undo
  * does (teams first, then the summon list), so team names and colors come back with it. Presets never hold these keys,
@@ -65,17 +65,31 @@ final class SummonLists {
 
     /** Names of the saved lists, sorted. */
     static List<String> saved() {
+        return saved(false);
+    }
+
+    /** The saved lists by name, or newest first ({@code newestFirst}: last saved on top; panel, 2026-10-29). */
+    static List<String> saved(boolean newestFirst) {
         List<String> out = new ArrayList<>();
         Path dir = dir();
         if (dir == null || !Files.isDirectory(dir)) return out;
+        java.util.Map<String, Long> times = new java.util.HashMap<>();
         try (Stream<Path> files = Files.list(dir)) {
-            files.map(f -> f.getFileName().toString())
-                    .filter(f -> f.endsWith(".properties"))
-                    .map(f -> f.substring(0, f.length() - ".properties".length()))
-                    .sorted(String.CASE_INSENSITIVE_ORDER)
-                    .forEach(out::add);
+            files.filter(f -> f.getFileName().toString().endsWith(".properties")).forEach(f -> {
+                String n = f.getFileName().toString();
+                n = n.substring(0, n.length() - ".properties".length());
+                long t = 0;
+                try {
+                    t = Files.getLastModifiedTime(f).toMillis();
+                } catch (IOException ignored) {
+                }
+                times.put(n, t);
+            });
         } catch (IOException ignored) {
         }
+        out.addAll(times.keySet());
+        out.sort(String.CASE_INSENSITIVE_ORDER);
+        if (newestFirst) out.sort((a, b) -> Long.compare(times.get(b), times.get(a)));
         return out;
     }
 

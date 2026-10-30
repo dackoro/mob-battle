@@ -56,7 +56,7 @@ public final class BattleManager {
 
     /**
      * One fighter's kills in a battle: name and side as they were when it scored, and when it reached this count
-     * ({@code at}, ms): the last tie break of {@link Battle#ranking} (user, 2026-10-13: two fighters on 5 kills were
+     * ({@code at}, ms): the last tie break of {@link Battle#ranking} (playtest 2026-10-13: two fighters on 5 kills were
      * listed in map order).
      */
     record Kills(String name, int team, int count, long at) {
@@ -110,6 +110,11 @@ public final class BattleManager {
         final Map<Ref<EntityStore>, Boolean> canFight = new ConcurrentHashMap<>();
         /** All vs one: attackers hit by a fellow attacker, put back on the lone target next tick (FightTickSystem). */
         final Set<Ref<EntityStore>> refocus = ConcurrentHashMap.newKeySet();
+        /**
+         * Players who fell (died, went Creative) in this battle while it goes on -> the NPC members that already let
+         * them go (FightManager.dropFallen). A respawned player is the same entity: an outsider of this battle from now.
+         */
+        final Map<Ref<EntityStore>, Set<Ref<EntityStore>>> fallen = new ConcurrentHashMap<>();
         /** FocusCard: the lone target (kept after it falls and leaves teamOf) and the most attackers seen at once. */
         volatile Ref<EntityStore> cardLone;
         volatile int cardPeak;
@@ -166,7 +171,7 @@ public final class BattleManager {
         }
 
         /**
-         * Kill table order (killTieBreak of this kind, user 2026-10-13): most kills; even = more damage dealt (damage),
+         * Kill table order (killTieBreak of this kind, playtest 2026-10-13): most kills; even = more damage dealt (damage),
          * standing fighters first then damage (alive), or nothing more (first, shared); last, who reached it first.
          */
         java.util.Comparator<Map.Entry<Ref<EntityStore>, Kills>> ranking() {
@@ -234,6 +239,7 @@ public final class BattleManager {
 
         void add(Ref<EntityStore> npc, int team) {
             if (store == null) store = npc.getStore();
+            fallen.remove(npc);   // back in this battle: no longer an outsider of it (audit 2026-10-29)
             teamOf.put(npc, team);
             MANAGED.add(npc);
             MEMBERSHIP.incrementAndGet();
@@ -327,9 +333,41 @@ public final class BattleManager {
         b.hitTarget.remove(player);
         b.canFight.remove(player);
         b.refocus.remove(player);
+        // Nobody keeps him as target or attacker to answer: each mob picks another enemy on its next check
+        // (currentTarget), and FightTickSystem makes it drop him (LockedTarget, hostile memory, HOSTILE override).
+        b.targets.values().removeIf(t -> t == player);
+        b.hitBy.values().removeIf(t -> t == player);
+        b.fallen.put(player, ConcurrentHashMap.newKeySet());
+        anyFallen = true;
         FightManager.endFightsOf(List.of(player));
         releasePlayer(player);
         return b;
+    }
+
+    /** Some running battle has a fallen player (fast check for the damage systems). */
+    private static volatile boolean anyFallen;
+
+    static boolean anyFallen() { return anyFallen; }
+
+    /** The running battle {@code player} fell in (and is now an outsider of), or null. */
+    static Battle fellFrom(Ref<EntityStore> player) {
+        if (!anyFallen || player == null) return null;
+        for (Battle b : BATTLES) {
+            if (!b.over && b.fallen.containsKey(player)) return b;
+        }
+        return null;
+    }
+
+    /**
+     * Whether {@code player} fell in a running isolated battle that {@code mob} fights in: hits between them are
+     * cancelled. Every battle he fell from counts (audit 2026-10-29: only the first one was looked at).
+     */
+    static boolean fallenApart(Ref<EntityStore> player, Ref<EntityStore> mob) {
+        if (!anyFallen || player == null || mob == null || !isManaged(mob)) return false;
+        for (Battle b : BATTLES) {
+            if (!b.over && b.fallen.containsKey(player) && FxSettings.isolated(b.kind) && b.has(mob)) return true;
+        }
+        return false;
     }
 
     /**
@@ -426,6 +464,14 @@ public final class BattleManager {
         }
         draftMembers = members;
         anyFlocks = BATTLES.stream().anyMatch(b -> !b.flocks.isEmpty());
+        boolean fell = false;
+        for (Battle b : BATTLES) {
+            if (b.fallen.isEmpty()) continue;
+            b.fallen.keySet().removeIf(p -> !p.isValid());
+            b.fallen.values().forEach(done -> done.removeIf(npc -> !npc.isValid()));
+            fell |= !b.fallen.isEmpty();
+        }
+        anyFallen = fell;
         if (!PLAYER_FIGHTERS.isEmpty()) {
             // A player marked by a wand or command waits in a countdown before their battle exists: keep them.
             PLAYER_FIGHTERS.keySet().removeIf(p -> !p.isValid()
@@ -511,6 +557,23 @@ public final class BattleManager {
             List<Ref<EntityStore>> geared = new ArrayList<>(all);
             geared.addAll(formerMembers);
             Kits.teamBattleEnd(geared, battle.store);
+        }
+        // Players who fell in it: the calm-down below only covers members, so its mobs drop them here (audit
+        // 2026-10-29: a dummy that killed a player kept its 10-minute HOSTILE toward him after the battle).
+        if (!battle.fallen.isEmpty() && battle.store != null && !battle.store.isShutdown()) {
+            List<Ref<EntityStore>> fell = new ArrayList<>(battle.fallen.keySet());
+            List<Ref<EntityStore>> mobs = new ArrayList<>(all);
+            for (Ref<EntityStore> r : formerMembers) if (!mobs.contains(r)) mobs.add(r);
+            var st = battle.store;
+            try {
+                st.getExternalData().getWorld().execute(() -> {
+                    for (Ref<EntityStore> npc : mobs) {
+                        if (npc.isValid() && !isPlayerFighter(npc)) FightManager.releaseFallen(npc, fell, st);
+                    }
+                });
+            } catch (RuntimeException ignored) {
+                // world stopping
+            }
         }
         for (Ref<EntityStore> npc : all) {
             if (!npc.isValid()) continue;
@@ -831,6 +894,7 @@ public final class BattleManager {
                 duel.add(member, side);
             }
             duel.targets.putAll(old.targets);
+            duel.fallen.putAll(old.fallen);
             // Transfer membership without stopping the former participants or declaring a winner.
             old.over = true;
             BATTLES.remove(old);
@@ -881,7 +945,7 @@ public final class BattleManager {
         FightManager.endFightsOf(npcs);
         Battle battle = new Battle(owner, anchor, true, null);
         // Every mob for itself, but an army (a whole chain of command, its owner too if they fight) is one side
-        // (test 2026-10-14, user: army mobs in a royale fought each other).
+        // (test 2026-10-14, playtest: army mobs in a royale fought each other).
         Map<java.util.UUID, Integer> armySide = new java.util.HashMap<>();
         int side = 0;
         for (Ref<EntityStore> npc : npcs) {
@@ -976,7 +1040,7 @@ public final class BattleManager {
     /**
      * Chase limit: a mob that hit nobody for this long gives up its target for the best other enemy (see
      * {@link #reach}). A target used to be kept until it died, so a goblin chased a flying owl or a fleeing squirrel
-     * along the arena wall for the whole battle (user, 2026-10-12).
+     * along the arena wall for the whole battle (playtest 2026-10-12).
      */
     static final long CHASE_GIVE_UP_MS = 8000;
 
@@ -990,7 +1054,7 @@ public final class BattleManager {
      * How good {@code other} is as a target for {@code self}: out of reach when {@code self} can't fly and
      * {@code other} is flying right now, or when {@code other} is past the walled arena; else a fighter before a
      * passive mob (a royale skeleton went for a frog 36 blocks away with another skeleton 8 blocks from it, and stood
-     * "confused" once the frog hopped out of sight; user, 2026-10-12). Players count as fighters.
+     * "confused" once the frog hopped out of sight; 2026-10-12). Players count as fighters.
      */
     private static int reach(Battle battle, Medium.Can self, Ref<EntityStore> other, ComponentAccessor<EntityStore> buffer) {
         Medium.Where there = Medium.where(other, buffer);
@@ -1037,12 +1101,16 @@ public final class BattleManager {
         return f;
     }
 
+    /** passiveWin waits this long without an enemy hit (since the start or the last hit) before its countdown. */
+    private static final long PASSIVE_GRACE_MS = 20_000;
+
     /**
      * /mobbattle passiveWin (checkWinner, once a second, world thread): when the sides still alive can't all fight
      * back (only one side, or none, has a member that can attack), the battle ends after passiveWin seconds without
      * a hit: that side wins, or a draw if none can fight. Meanwhile PassiveAlert shows who wins in how long. A
-     * skeleton could never finish a royale against a passive duck flying out of its reach (user, 2026-10-12).
-     * Returns null while the battle goes on, else the winning side or -1 for a draw.
+     * skeleton could never finish a royale against a passive duck flying out of its reach (playtest 2026-10-12).
+     * Returns null while the battle goes on, else the winning side or -1 for a draw. The countdown waits
+     * PASSIVE_GRACE_MS without an enemy hit first.
      */
     private static Integer passiveEnd(Battle battle, Set<Integer> aliveTeams, ComponentAccessor<EntityStore> buffer) {
         int seconds = FxSettings.passiveWinSeconds;
@@ -1090,6 +1158,14 @@ public final class BattleManager {
             return null;
         }
         long now = System.currentTimeMillis();
+        // Only after PASSIVE_GRACE_MS without an enemy hit (since the start or the last hit): the side that can attack
+        // first gets the time to reach and kill a passive mob, and a walker the time to hit a flier that comes low
+        // (playtest 2026-10-28: a Trork vs a passive mob and a Yeti vs a low Thunder Spirit got the countdown at once).
+        if (now - battle.lastHit < PASSIVE_GRACE_MS) {
+            stopPassiveAlert(battle);
+            battle.passiveSince = 0;
+            return null;
+        }
         if (battle.passiveSince == 0) battle.passiveSince = now;
         long left = seconds * 1000L - (now - battle.passiveSince);
         // Nobody reaches anybody but several sides could fight: the side with the most health left wins (2026-10-14).
@@ -1219,7 +1295,7 @@ public final class BattleManager {
     /**
      * An enemy fighter within {@link #BESIDE} while {@code self} still walks to a target farther than
      * {@link #SWITCH_FROM}; null if none, or if {@code self} hit its target in the last SELF_DEFENSE_MS. In a royale of
-     * 500 Kweebecs mobs walked past enemies right beside them to the one picked at the start (user, 2026-10-13).
+     * 500 Kweebecs mobs walked past enemies right beside them to the one picked at the start (playtest 2026-10-13).
      * Duels and all-vs-one attackers have no other enemy. One cheap distance pass per mob and second, only when far.
      */
     private static Ref<EntityStore> nearerEnemy(Battle battle, Ref<EntityStore> self, Ref<EntityStore> target, long now,
@@ -1313,7 +1389,7 @@ public final class BattleManager {
     /**
      * selfDefense: a mob that can't fly ignores a hit from an enemy flying farther than this (a ranged flier it could
      * never reach). A flier that dives in to hit is closer, so it is answered; if it flies off again, the chase
-     * limit lets it go after CHASE_GIVE_UP_MS (user, 2026-10-12: melee goblin vs flying owl).
+     * limit lets it go after CHASE_GIVE_UP_MS (playtest 2026-10-12: melee goblin vs flying owl).
      */
     private static final double SELF_DEFENSE_FLIER_REACH = 4.0;
 
@@ -1332,9 +1408,12 @@ public final class BattleManager {
         Long last = battle.turnedAt.get(self);
         if (last != null && t - last < SELF_DEFENSE_MS && now != null && battle.has(now) && isAlive(now, buffer)) return false;
         // Busy hitting its own target: it finishes that fight. In a royale crowd every stray hit pulled it away, so
-        // trorks switched every couple of seconds and hit nobody (user, 2026-10-12).
+        // trorks switched every couple of seconds and hit nobody (playtest 2026-10-12).
+        // Not when that target is up or down another level (2026-10-29, playtest video: dummies hitting one stranded on a
+        // wooden tower took hits from the others and never answered).
         Long hit = battle.hitTarget.get(self);
-        if (hit != null && t - hit < SELF_DEFENSE_MS && now != null && battle.has(now) && isAlive(now, buffer)) return false;
+        if (hit != null && t - hit < SELF_DEFENSE_MS && now != null && battle.has(now) && isAlive(now, buffer)
+                && !otherLevel(self, now, buffer)) return false;
         // An attacker it can't get at (a flier, a fish under water) is answered only when it comes close.
         if (now != null && !canReach(self, by, buffer)) {
             Vector3d me = ChaosWand.positionOf(self, buffer);
@@ -1352,6 +1431,14 @@ public final class BattleManager {
         if (MobBattlePlugin.debugging()) MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": "
                 + ChaosWand.nameOf(self, buffer) + " defends itself against " + ChaosWand.nameOf(by, buffer));
         return true;
+    }
+
+    /** selfDefense: a target this many blocks above or below no longer keeps a mob "busy". */
+    private static final double BUSY_LEVEL_GAP = 2.5;
+
+    private static boolean otherLevel(Ref<EntityStore> a, Ref<EntityStore> b, ComponentAccessor<EntityStore> buffer) {
+        Vector3d pa = ChaosWand.positionOf(a, buffer), pb = ChaosWand.positionOf(b, buffer);
+        return pa != null && pb != null && Math.abs(pa.y - pb.y) > BUSY_LEVEL_GAP;
     }
 
     /** Sets the first target of an NPC (used at battle start). */
@@ -1503,7 +1590,12 @@ public final class BattleManager {
         }
         FightFx.winnerTitle(battle, main.msg(), sub.msg());
         if (focus != null) FightCamera.ending(battle, focus, buffer);
-        if (outcome == BattleOutcome.WIN) SlowMo.afterLastHit(battle);
+        // endSlowMo: a win, or a draw where the last ones fell together (2026-10-29, playtest: no slow motion on a draw);
+        // not the draws where nobody fought (passiveWin, idleEnd)
+        if (outcome == BattleOutcome.WIN || (outcome == BattleOutcome.EMPTY || outcome == BattleOutcome.TIMEOUT)
+                && !battle.passiveEnded && !battle.idleEnded) {
+            SlowMo.afterLastHit(battle);
+        }
     }
 
     /**
@@ -1597,6 +1689,20 @@ public final class BattleManager {
                 default -> health;
             });
         }
+        // Royale: hiding does not win (2026-10-29, playtest: at time up two dummies that never fought, 100 % health and no
+        // damage, tied and drew over the one that fought, 10 % health, 164 damage, 3 kills). Once a side still standing
+        // has dealt damage, the standing sides that dealt none score 0.
+        if (battle.kind == Kind.ROYALE) {
+            boolean anyFought = false;
+            for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
+                if (e.getValue()[0] > 0 && battle.damageBy.getOrDefault(e.getKey(), 0.0) > 0) anyFought = true;
+            }
+            if (anyFought) {
+                for (Map.Entry<Integer, double[]> e : sides.entrySet()) {
+                    if (battle.damageBy.getOrDefault(e.getKey(), 0.0) <= 0) scores.put(e.getKey(), 0.0);
+                }
+            }
+        }
         int best = -1;
         double bestScore = -1, second = -1;
         for (Map.Entry<Integer, Double> e : scores.entrySet()) {
@@ -1642,6 +1748,7 @@ public final class BattleManager {
             announce(battle, Txt.tr("battle.draw", "DRAW!"),
                     new Txt("Time is up, even on " + judgeWord(by),
                             I18n.tr("battle.sub.time.even").param("what", judgeMessage(by))), "#aaaaaa");
+            SlowMo.afterLastHit(battle);
             return;
         }
         MobBattlePlugin.debug("battle #" + battle.id.toString().substring(0, 8) + ": side " + best + " wins"
@@ -1695,6 +1802,9 @@ public final class BattleManager {
         }
         announce(battle, winMain, new Txt((judge ? "Time is up: the losers fall. " : "Time is up: ") + why.en(),
                 I18n.tr(judge ? "battle.timeup.judge" : "battle.timeup.why").param("why", why.msg())), color);
+        // endSlowMo on a win by time too (2026-10-29, playtest: a royale won when time ran out had none): this path never
+        // reaches checkWinner's call (judge goes silent, health finishes here)
+        SlowMo.afterLastHit(battle);
     }
 
     /** A line of battle text: English for the server log, the translated Message for the players. */
@@ -1725,6 +1835,10 @@ public final class BattleManager {
         if (member == null || !member.isValid()) return null;
         java.util.UUID top = Army.topOf(member, Army.keyOf(member, buffer));
         if (top == null) return null;
+        // a player is the top of its own chain: alone it is not an army (2026-10-29, playtest: a player won a duel as
+        // "DACKORO'S ARMY WINS!")
+        PlayerRef self = buffer.getComponent(member, PlayerRef.getComponentType());
+        if (self != null && top.equals(self.getUuid()) && Army.members(top).isEmpty()) return null;
         Ref<EntityStore> leader = Army.entityOf(top);
         if (leader != null && leader.isValid() && leader.getStore() == member.getStore()) return ChaosWand.nameOf(leader, buffer);
         PlayerRef p = com.hypixel.hytale.server.core.universe.Universe.get().getPlayer(top);
@@ -1812,7 +1926,7 @@ public final class BattleManager {
 
     /**
      * All vs one (FightDamageSystem): a stray hit from a fellow attacker (friendlyFire on) makes the vanilla AI turn on
-     * it; every attacker must stay on the lone target whatever hits it (user, 2026-10-12), so the victim is put back
+     * it; every attacker must stay on the lone target whatever hits it (playtest 2026-10-12), so the victim is put back
      * on its target on its next tick. The hit itself still lands.
      */
     static void allyHit(Ref<EntityStore> attacker, Ref<EntityStore> victim) {

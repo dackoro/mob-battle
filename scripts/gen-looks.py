@@ -1,6 +1,6 @@
 """
 Jade and Shimmer looks in every palette color, with their deaths (run with: python scripts/gen-looks.py).
-Built from the test looks the user picked (scripts/gen-testlooks.py, 2026-10-10): jade = JadeOnce_C (appearing:
+Built from the test looks picked in playtests (scripts/gen-testlooks.py, 2026-10-10): jade = JadeOnce_C (appearing:
 JadeAppearC held), jade death = ShatterJadeA, shimmer = ShimmerRunes (Shimmer_A veins + eye flames + the Coffer
 goblin runes), shimmer death = DeathTurnPurple then DeathBurst (turns its color from the feet up, then bursts into
 liquid; MeltA until 2026-10-12). Green keeps the exact jade colors and Purple the exact shimmer colors that
@@ -261,7 +261,7 @@ def eyes(flame, scale=None):
 # Below 100: size-buffed players, whose model is scaled too (WandFx.particleScale, 2026-10-12).
 BUFF_SIZES = (30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95,
               110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 225, 250, 275, 300)  # WandFx.LOOK_SIZES
-# Runes = this x the mob's size (user, 2026-10-11, Feastmasters with 0-10 Buff Wand stacks): with only x1.5/x2/x2.5/x3
+# Runes = this x the mob's size (playtest, 2026-10-11, Feastmasters with 0-10 Buff Wand stacks): with only x1.5/x2/x2.5/x3
 # variants, 1-2 stacks (x1.1, x1.2) fell back to the plain runes, hidden in the head, and 3+ jumped to x1.5 sizes.
 BUFF_RUNE_FACTOR = 1.6
 

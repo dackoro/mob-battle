@@ -2,6 +2,7 @@ package dev.dackoro.mobbattle;
 
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.CameraSequenceFlags;
 import com.hypixel.hytale.protocol.AttachedToType;
@@ -72,26 +73,30 @@ final class FightCamera {
     static void intro(BattleManager.Kind kind, PlayerRef owner, Vector3d center, List<List<Ref<EntityStore>>> sides,
                       ComponentAccessor<EntityStore> buffer) {
         // cameraScope: the owner, or every player nearby / in the world; each gets the shot from their own side.
-        withVs(kind, owner != null ? owner.getUuid() : null, FightFx.cameraViewers(owner), center, sides, buffer);
+        withVs(kind, owner != null ? owner.getUuid() : null, FightFx.cameraViewers(owner), FightFx.vsViewers(owner), center,
+                sides, buffer);
     }
 
     static void intro(BattleManager.Kind kind, BattleManager.Battle.Anchor anchor, Vector3d center,
                       List<List<Ref<EntityStore>>> sides, ComponentAccessor<EntityStore> buffer) {
-        withVs(kind, null, FightFx.eventViewers(anchor, FxSettings.cameraScope), center, sides, buffer);
+        withVs(kind, null, FightFx.eventViewers(anchor, FxSettings.cameraScope), FightFx.eventViewers(anchor, FxSettings.vsScope),
+                center, sides, buffer);
     }
 
     /**
-     * vsScreen (2026-10-16, user: the VS screen should open the battle's countdown): the VS screen first
+     * vsScreen (2026-10-16, playtest: the VS screen should open the battle's countdown): the VS screen first
      * (VsScreen.countdownMs, 2.5 s), then the intro camera with the time left (none under 1.5 s). Without it, the intro
      * right away as before. A camera problem never breaks the fight.
      */
-    private static void withVs(BattleManager.Kind kind, java.util.UUID owner, Iterable<PlayerRef> viewers, Vector3d center,
+    private static void withVs(BattleManager.Kind kind, java.util.UUID owner, Iterable<PlayerRef> viewers,
+                               Iterable<PlayerRef> vsViewers, Vector3d center,
                                List<List<Ref<EntityStore>>> sides, ComponentAccessor<EntityStore> buffer) {
         long vs = 0;
         VsScreen.Plan plan = null;
         try {
             vs = VsScreen.countdownMs(kind);
             plan = vs > 0 ? VsScreen.planOf(kind, owner, sides, buffer) : null;
+            VsScreen.onDemand(plan);   // serverVsPictures battle: this battle's pictures go to the players now
             // a screen with many pictures lasts longer (they load before it slides), the countdown with it
             if (plan != null) vs = VsScreen.timeFor(plan);
         } catch (RuntimeException e) {
@@ -105,7 +110,7 @@ final class FightCamera {
             }
             return;
         }
-        // The VS adds its time to the countdown (2026-10-16, user): the intro keeps its whole time after it.
+        // The VS adds its time to the countdown (2026-10-16): the intro keeps its whole time after it.
         long left = KindFx.introSeconds(kind) * 1000L;
         int seconds = KindFx.introSeconds(kind);
         com.hypixel.hytale.server.core.universe.world.World world = buffer.getExternalData().getWorld();
@@ -133,6 +138,15 @@ final class FightCamera {
                     PENDING.remove(viewer.getUuid(), pending);
                 }
             }, vs, TimeUnit.MILLISECONDS);
+        }
+        // The VS also goes to vsScope (default nearby) and the battle's player fighters, without a camera (2026-10-29,
+        // playtest: a player standing by saw neither the VS nor the countdown, the cameras only go to cameraScope)
+        java.util.Set<UUID> got = new java.util.HashSet<>();
+        for (PlayerRef viewer : viewers) if (viewer != null) got.add(viewer.getUuid());
+        for (PlayerRef viewer : vsViewers) {
+            if (viewer == null || !viewer.isValid() || got.contains(viewer.getUuid()) || BattleWatch.isWatching(viewer)) continue;
+            VsScreen.present(viewer, plan, vs);
+            shown = true;
         }
         // The countdown that follows in this tick grows by the VS time only when someone really got the VS.
         if (shown) VsScreen.markShown(fighters, vs);
@@ -296,12 +310,14 @@ final class FightCamera {
             if (Long.valueOf(end).equals(ORBITS.get(player.getUuid()))) {
                 CinemaBars.out(player);
                 CameraHud.restore(player);
+                // the orbit took a running film's camera without its reset (audit 2026-10-29): its game mode goes too
+                FilmMode.leave(player);
             }
         }, Math.max(0, (long) ((seconds - BACK_S) * 1000)), TimeUnit.MILLISECONDS);
     }
 
     /**
-     * Duel standoff, like a western (2026-10-16, user: wide shots, over the shoulder, close on the eyes, zoom): a low
+     * Duel standoff, like a western (2026-10-16, playtest: wide shots, over the shoulder, close on the eyes, zoom): a low
      * wide shot panning past both fighters, over each one's shoulder at the other, a slow push-in on each one's eyes,
      * then both from the side, then back to the player. A short intro keeps fewer of them (DUEL_CUTS). Follows the
      * fighters as they move.
@@ -314,6 +330,7 @@ final class FightCamera {
         double weights = 0;
         for (DuelShot cut : cuts) weights += cut.weight;
         Track track = new Track();
+        double[] axis = new double[3];   // A -> B direction the shots keep (ux, uz, set?), see duelAxis
         List<Shot> shots = new ArrayList<>();
         for (DuelShot cut : cuts) {
             long each = Math.max(STEP_MS, (long) (usable * cut.weight / weights));
@@ -321,9 +338,10 @@ final class FightCamera {
             shots.add(new Shot(each, (t, acc) -> {
                 Vector3d pa = track.pos(a, acc), pb = track.pos(b, acc);
                 if (pa == null || pb == null) return null;
+                duelAxis(axis, a, pa, pb, acc);
                 double f = Math.min(1, (double) t / each);
                 if (cut == DuelShot.EYES_A || cut == DuelShot.EYES_B) {
-                    // In front of the face, wherever it looks (2026-10-16, user: during the countdown the duellists don't
+                    // In front of the face, wherever it looks (2026-10-16, playtest: during the countdown the duellists don't
                     // face each other yet, so the shot along the line between them showed the side or back of the head);
                     // toward the opponent only when no facing can be read.
                     boolean first = cut == DuelShot.EYES_A;
@@ -334,13 +352,43 @@ final class FightCamera {
                     double[] u = aim.next(who, p, first ? pb : pa, eyesDist(sz, 0), p.y + eye, p.y + eye * 0.97,
                             List.of(a, b), acc);
                     double e = f * f * (3 - 2 * f);
-                    return eyes(p, sz, eye, u[0], u[1], -u[1], u[0], e);
+                    return eyes(p, sz, eye, u[0], u[1], -u[1], u[0], e, aim.lift);
                 }
-                return duelFrame(cut, f, pa, pb, track.size(a, acc), track.size(b, acc),
+                return duelFrame(cut, f, pa, pb, axis[0], axis[1], track.size(a, acc), track.size(b, acc),
                         track.eye(a, acc), track.eye(b, acc), acc);
             }));
         }
         playShots(kind, player, buffer.getExternalData().getWorld(), shots);
+    }
+
+    /**
+     * The A -> B direction the duel's shots are built on, in {@code axis} (ux, uz, 1 once set). It follows the line
+     * between them while they stand at least DUEL_AXIS_MIN apart; closer, the line flips with every step they take
+     * (2026-10-29, playtest video: two duellists spawned on one spot, the wide shot sat in the sand and the over the
+     * shoulder ones inside a shield), so it keeps the last one, or at the start takes the way A faces.
+     */
+    private static void duelAxis(double[] axis, Ref<EntityStore> a, Vector3d pa, Vector3d pb,
+                                 ComponentAccessor<EntityStore> acc) {
+        double dx = pb.x - pa.x, dz = pb.z - pa.z;
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len >= DUEL_AXIS_MIN) {
+            axis[0] = dx / len;
+            axis[1] = dz / len;
+            axis[2] = 1;
+        } else if (axis[2] == 0) {
+            double[] face = faceDir(a, acc);
+            if (face != null) {
+                axis[0] = face[0];
+                axis[1] = face[1];
+            } else if (len > 0.01) {
+                axis[0] = dx / len;
+                axis[1] = dz / len;
+            } else {
+                axis[0] = 0;
+                axis[1] = 1;
+            }
+            axis[2] = 1;
+        }
     }
 
     /** The duel's shots (see duelFrame); weight = its share of the intro time. */
@@ -391,7 +439,7 @@ final class FightCamera {
     }
 
     /**
-     * Spotlight (2026-10-16, user: close-ups when there are few mobs and the countdown is long enough; with many, only
+     * Spotlight (2026-10-16, playtest: close-ups when there are few mobs and the countdown is long enough; with many, only
      * the strongest, then a wide shot of the rest; e.g. more than two teams). Every fighter gets a close-up when they
      * all fit (SPOT_MIN_MS each, at most cameraShots); else the strongest of each side first (one champion per team,
      * then the next strongest), as many as fit after the crowd shot's share, and a low sideways crowd shot over the
@@ -444,7 +492,7 @@ final class FightCamera {
                 if (p == null) return null;
                 double[] sz = track.size(mob, acc);
                 double eye = track.eye(mob, acc);
-                // In front of its face (2026-10-16, user: during the countdown mobs still look anywhere, so the
+                // In front of its face (2026-10-16, playtest: during the countdown mobs still look anywhere, so the
                 // battle's side often showed the back of the head); toward the battle only if no facing is known.
                 double[] u = hero
                         ? aim.next(mob, p, center, heroDist(sz, 0), p.y + Math.max(0.5, sz[0] * 0.15), p.y + eye * 0.85, all, acc)
@@ -452,8 +500,8 @@ final class FightCamera {
                 double ux = u[0], uz = u[1];
                 double f = Math.min(1, (double) t / each);
                 double e = f * f * (3 - 2 * f);
-                if (hero) return heroShot(p, sz, eye, ux, uz, e);
-                return eyes(p, sz, eye, ux, uz, -uz, ux, e);
+                if (hero) return heroShot(p, sz, eye, ux, uz, e, aim.lift);
+                return eyes(p, sz, eye, ux, uz, -uz, ux, e, aim.lift);
             }));
         }
         if (crowd > 0) {
@@ -509,17 +557,20 @@ final class FightCamera {
     }
 
     /**
-     * Where a face close-up looks from (2026-10-16, user: a close-up stood inside a hill by a cave, another inside the
+     * Where a face close-up looks from (2026-10-16, playtest: a close-up stood inside a hill by a cave, another inside the
      * mob in front): the side the face points ({@link #faceDir}), turned to the nearest angle with a clear view
      * ({@link #clearSide}, looked for again every {@link #CLEAR_EVERY} frames), eased frame by frame.
      */
     static final class FaceAim {
         final double[] dir = {Double.NaN, 0};
+        /** How far the camera rises over its own height: over the crowd when no side is clear at face height. */
+        double lift;
         private double[] want;
         private int frame;
 
         void reset() {
             dir[0] = Double.NaN;
+            lift = 0;
             want = null;
             frame = 0;
         }
@@ -537,8 +588,21 @@ final class FightCamera {
                     double len = Math.hypot(dx, dz);
                     base = len < 0.5 ? new double[] {1, 0} : new double[] {dx / len, dz / len};
                 }
-                want = clearSide(p, base, dist, camY, lookY, self, others, acc);
+                double[] fresh = clearSide(p, base, dist, camY, lookY, self, others, acc, CLEAR_TRIES,
+                        new double[] {0, CLEAR_LIFTS[0], CLEAR_LIFTS[1], CLEAR_LIFTS[2]});
+                // keep the side already taken while it still sees, unless the face side itself is clear (2026-10-29,
+                // playtest video: in a packed royale the spotlight close-ups jumped between sides every few frames); with
+                // no clear side at all, stay where it is (audit 2026-10-29: it fell back to the blocked face side)
+                boolean faceClear = fresh != null && Math.hypot(fresh[0] - base[0], fresh[1] - base[1]) <= 1e-6 && fresh[2] <= 0;
+                if (want != null && want.length > 2 && !faceClear) {
+                    double[] kept = clearSide(p, new double[] {want[0], want[1]}, dist, camY, lookY, self, others, acc,
+                            new double[] {0}, new double[] {want[2]});
+                    if (kept != null || fresh == null) fresh = kept != null ? kept : want;
+                }
+                want = fresh != null ? fresh : new double[] {base[0], base[1], 0};
             }
+            double wantLift = want.length > 2 ? want[2] : 0;
+            lift = Double.isNaN(dir[0]) ? wantLift : lift + (wantLift - lift) * LIFT_EASE;
             return followFace(dir, want, null, p);
         }
     }
@@ -546,6 +610,9 @@ final class FightCamera {
     /** Turns tried, in order, when a face close-up's view is blocked (radians), and how often it is checked again. */
     private static final double[] CLEAR_TRIES = {0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.2, -2.2, Math.PI};
     private static final int CLEAR_EVERY = 5;
+    /** No side clear at face height: the camera rises this much over it, looking down at the face (over the crowd). */
+    private static final double[] CLEAR_LIFTS = {1, 2, 3};
+    private static final double LIFT_EASE = 0.12;
 
     /**
      * {@code dir} turned (CLEAR_TRIES order) until a camera {@code dist} out from {@code p} along it, at {@code camY},
@@ -555,6 +622,14 @@ final class FightCamera {
      */
     static double[] clearSide(Vector3d p, double[] dir, double dist, double camY, double lookY, Ref<EntityStore> self,
                               Iterable<Ref<EntityStore>> others, ComponentAccessor<EntityStore> acc) {
+        double[] r = clearSide(p, dir, dist, camY, lookY, self, others, acc, CLEAR_TRIES,
+                new double[] {0, CLEAR_LIFTS[0], CLEAR_LIFTS[1], CLEAR_LIFTS[2]});
+        return r != null ? r : new double[] {dir[0], dir[1], 0};
+    }
+
+    /** Same, over the given turns and lifts only; null when none sees. */
+    static double[] clearSide(Vector3d p, double[] dir, double dist, double camY, double lookY, Ref<EntityStore> self,
+                              Iterable<Ref<EntityStore>> others, ComponentAccessor<EntityStore> acc, double[] turns, double[] lifts) {
         List<double[]> bodies = new ArrayList<>();   // {x, z, bottom, top, radius}
         if (others != null) {
             for (Ref<EntityStore> r : others) {
@@ -571,13 +646,17 @@ final class FightCamera {
                 bodies.add(new double[] {q.x, q.z, q.y - 0.3, q.y + h + 0.3, w + 0.4});
             }
         }
-        for (double turn : CLEAR_TRIES) {
-            double c = Math.cos(turn), s = Math.sin(turn);
-            double ux = dir[0] * c - dir[1] * s, uz = dir[0] * s + dir[1] * c;
-            double ax = p.x + ux * dist, az = p.z + uz * dist;
-            if (viewClear(ax, camY, az, p.x, lookY, p.z, bodies, acc)) return new double[] {ux, uz};
+        // at face height first, then raised over the heads (2026-10-29, playtest video: in a packed royale every spotlight
+        // close-up stood between the bodies)
+        for (double lift : lifts) {
+            for (double turn : turns) {
+                double c = Math.cos(turn), s = Math.sin(turn);
+                double ux = dir[0] * c - dir[1] * s, uz = dir[0] * s + dir[1] * c;
+                double ax = p.x + ux * dist, az = p.z + uz * dist;
+                if (viewClear(ax, camY + lift, az, p.x, lookY, p.z, bodies, acc)) return new double[] {ux, uz, lift};
+            }
         }
-        return dir;
+        return null;
     }
 
     private static boolean viewClear(double ax, double ay, double az, double bx, double by, double bz,
@@ -585,6 +664,8 @@ final class FightCamera {
         // The camera's own block solid (FightFx.roofAbove: NaN), then ground or a wall on the way (as FilmCamera's
         // clearView: floorBelow from 3 over each sample).
         if (Double.isNaN(FightFx.roofAbove(ax, az, ay, 2, acc))) return false;
+        if (FilmCamera.inLeaves(ax, ay, az, acc)) return false;
+        if (FilmCamera.sideBlocked(new Vector3d(ax, ay, az), new Vector3d(bx, by, bz), acc)) return false;
         for (int i = 1; i <= 7; i++) {
             double k = i / 8.0 * 0.9;
             double x = ax + (bx - ax) * k, y = ay + (by - ay) * k, z = az + (bz - az) * k;
@@ -603,10 +684,10 @@ final class FightCamera {
     }
 
     /** The strongest fighter's close-up: low in front of it looking up, rising a little, lens 58 to 46 degrees. */
-    private static ServerCameraSettings heroShot(Vector3d p, double[] s, double eye, double ux, double uz, double e) {
+    private static ServerCameraSettings heroShot(Vector3d p, double[] s, double eye, double ux, double uz, double e, double lift) {
         double dist = heroDist(s, e);
         double side = Math.max(0.6, s[1] * 0.4);
-        Vector3d at = new Vector3d(p.x + ux * dist - uz * side, p.y + Math.max(0.5, s[0] * 0.15) + eye * 0.2 * e,
+        Vector3d at = new Vector3d(p.x + ux * dist - uz * side, p.y + Math.max(0.5, s[0] * 0.15) + eye * 0.2 * e + lift,
                 p.z + uz * dist + ux * side);
         return zoom(frame(at, new Vector3d(p.x, p.y + eye * 0.85, p.z), DUEL_LERP), 58 - 12 * e);
     }
@@ -619,6 +700,7 @@ final class FightCamera {
         Track track = new Track();
         double[][] holder = {null};
         double[] roof = {Double.NaN};
+        Settle settle = new Settle();
         return new Shot(ms, (t, acc) -> {
             double x = 0, y = 0, z = 0, tall = NORMAL_SIZE[0];
             List<Vector3d> pts = new ArrayList<>();
@@ -630,6 +712,12 @@ final class FightCamera {
                 tall = Math.max(tall, track.size(r, acc)[0]);
             }
             if (pts.isEmpty()) return null;
+            // one height band (a cave and the surface: the center fell inside the rock between them)
+            pts = FilmCamera.mainBand(pts, null);
+            x = 0; y = 0; z = 0;
+            for (Vector3d p : pts) {
+                x += p.x; y += p.y; z += p.z;
+            }
             Vector3d c = new Vector3d(x / pts.size(), y / pts.size(), z / pts.size());
             double spread = 0;
             for (Vector3d p : pts) spread = Math.max(spread, Math.hypot(p.x - c.x, p.z - c.z));
@@ -642,21 +730,91 @@ final class FightCamera {
                     dz = c.z - tr.getPosition().z;
                 }
                 double len = Math.hypot(dx, dz);
-                holder[0] = len < 0.5 ? new double[] {1, 0} : new double[] {dx / len, dz / len};
+                double[] dir = len < 0.5 ? new double[] {1, 0} : new double[] {dx / len, dz / len};
+                holder[0] = crowdSpot(c, dir, Math.max(8, spread * 1.1 + tall * 1.2 + 4),
+                        Math.max(2.5, tall * 0.6) + spread * 0.15, Math.max(4, spread * 1.2), tall, acc);
             }
             double ux = holder[0][0], uz = holder[0][1], px = -uz, pz = ux;
             double f = (double) t / ms;
             double e = f * f * (3 - 2 * f);
             double along = (e - 0.5) * Math.max(4, spread * 1.2);
-            double dist = Math.max(8, spread * 1.1 + tall * 1.2 + 4);
+            double dist = Math.max(8, spread * 1.1 + tall * 1.2 + 4) * holder[0][2];
             double up = Math.max(2.5, tall * 0.6) + spread * 0.15;
             double ax = c.x - ux * dist + px * along, az = c.z - uz * dist + pz * along;
             double ground = canopy(ax, az, c.y + up, c.y + 1.5, roof, true, acc);
             double ay = underRoof(Math.max(c.y + up, ground + 1.5), roof);
             Vector3d look = new Vector3d(c.x + px * along * 0.4, c.y + Math.max(1.2, tall * 0.4), c.z + pz * along * 0.4);
-            return zoom(frame(new Vector3d(ax, ay, az), look, DUEL_LERP), 74);
+            return zoom(frame(settle.next(new Vector3d(ax, ay, az), look, c.y, acc), look, DUEL_LERP), 74);
         });
     }
+
+    /**
+     * Keeps an intro shot's camera seeing its subject frame by frame (2026-10-29, playtest video: the spotlight's crowd
+     * shot, checked only at 3 points of its slide, crossed a pillar and ended in a tree on the stands): every
+     * SETTLE_EVERY frames, a camera inside a block or leaves, with no clear view, or over ground more than SETTLE_RISE
+     * above the fight (the stands) slides toward what it looks at, whole steps up to SETTLE_MAX, eased.
+     */
+    static final class Settle {
+        private double share, want;
+        private int frame;
+
+        Vector3d next(Vector3d at, Vector3d look, double level, ComponentAccessor<EntityStore> acc) {
+            if (!(acc instanceof Store<EntityStore> store)) return at;
+            boolean first = frame == 0;
+            if (frame++ % SETTLE_EVERY == 0) {
+                want = 0;
+                for (int i = 0; i <= SETTLE_STEPS; i++) {
+                    double k = i * SETTLE_MAX / SETTLE_STEPS;
+                    Vector3d q = toward(at, look, k);
+                    double g = FightFx.floorBelow(q.y - 3, store, true).applyAsDouble(q.x, q.z);
+                    if ((!Double.isFinite(g) || g <= level + SETTLE_RISE) && FilmCamera.clearView(q, look, store)) {
+                        want = k;
+                        break;
+                    }
+                }
+            }
+            share = first ? want : share + (want - share) * SETTLE_EASE;
+            return share > 0.01 ? toward(at, look, share) : at;
+        }
+
+        private static Vector3d toward(Vector3d a, Vector3d b, double k) {
+            return new Vector3d(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k);
+        }
+    }
+
+    private static final int SETTLE_EVERY = 5, SETTLE_STEPS = 8;
+    private static final double SETTLE_MAX = 0.8, SETTLE_RISE = 4, SETTLE_EASE = 0.25;
+
+    /**
+     * The crowd shot's side and distance: from the viewer's side when the camera sees the fighters from there at the
+     * start, middle and end of its slide, else turned (CROWD_TURNS), else closer (CROWD_CLOSER). Returns {ux, uz,
+     * distance share}. Without it a viewer near an arena's edge put the camera in the colosseum's corridors behind the
+     * wall (playtest 2026-10-29). A non-Store accessor (no world to read) keeps the viewer's side.
+     */
+    private static double[] crowdSpot(Vector3d c, double[] dir, double dist, double up, double slide, double tall,
+                                      ComponentAccessor<EntityStore> acc) {
+        if (!(acc instanceof Store<EntityStore> store)) return new double[] {dir[0], dir[1], 1};
+        Vector3d look = new Vector3d(c.x, c.y + Math.max(1.2, tall * 0.4), c.z);
+        for (double share : CROWD_CLOSER) {
+            for (double turn : CROWD_TURNS) {
+                double cos = Math.cos(turn), sin = Math.sin(turn);
+                double ux = dir[0] * cos - dir[1] * sin, uz = dir[0] * sin + dir[1] * cos;
+                boolean clear = true;
+                for (double k : new double[] {-0.5, 0, 0.5}) {
+                    Vector3d at = new Vector3d(c.x - ux * dist * share - uz * slide * k, c.y + up, c.z - uz * dist * share + ux * slide * k);
+                    if (!FilmCamera.clearView(at, look, store)) {
+                        clear = false;
+                        break;
+                    }
+                }
+                if (clear) return new double[] {ux, uz, share};
+            }
+        }
+        return new double[] {dir[0], dir[1], CROWD_CLOSER[CROWD_CLOSER.length - 1]};
+    }
+
+    private static final double[] CROWD_TURNS = {0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.2, -2.2, Math.PI};
+    private static final double[] CROWD_CLOSER = {1, 0.75, 0.5};
 
     /** A fighter's strength for the spotlight: its max health (buffs included), and a hair more for its height. */
     private static double strengthOf(Ref<EntityStore> r, ComponentAccessor<EntityStore> acc) {
@@ -766,13 +924,34 @@ final class FightCamera {
         Ref<EntityStore>[] held = new Ref[1];
         long[] heldSince = {-FOCUS_HOLD_MS};
         double[] focusRoof = {Double.NaN};
+        double[] ringShare = {1};   // eased share of the radius that still sees the target (walls, the arena edge)
+        double[] ringWant = {1};
+        int[] ringFrame = {0};
         shots.add(new Shot(circle, (t, acc) -> {
             Vector3d c = track.pos(target, acc);
             if (c == null) return null;
             // A big target (boss, size buff): the circle opens up and rises so it is not filmed from inside.
             double[] ts = track.size(target, acc);
-            double r = Math.max(ring, Math.min(60, ts[1] + ts[0] * 1.4 + 2));
             double a = a0 + FOCUS_SWEEP * t / circle;
+            double r0 = Math.max(ring, Math.min(60, ts[1] + ts[0] * 1.4 + 2));
+            // Closer while a wall stands between the circle and the target (review 2026-10-29: attackers by the arena
+            // wall put the ring in the colosseum's corridors).
+            // checked every CLEAR_EVERY frames (audit 2026-10-29: up to four view tests a frame), eased every frame
+            if (acc instanceof com.hypixel.hytale.component.Store<EntityStore> st && ringFrame[0]++ % CLEAR_EVERY == 0) {
+                Vector3d lookAt = new Vector3d(c.x, c.y + Math.max(1.2, ts[0] * 0.5), c.z);
+                double want = RING_SHARES[RING_SHARES.length - 1];
+                for (double k : RING_SHARES) {
+                    double rr = Math.max(4, r0 * k);
+                    Vector3d cam = new Vector3d(c.x + Math.cos(a) * rr, c.y + Math.max(2.5, ts[0] * 0.7) + rr * 0.15, c.z + Math.sin(a) * rr);
+                    if (FilmCamera.clearView(cam, lookAt, st)) {
+                        want = k;
+                        break;
+                    }
+                }
+                ringWant[0] = want;
+            }
+            ringShare[0] += (ringWant[0] - ringShare[0]) * (t == 0 ? 1 : 0.15);
+            double r = Math.max(4, r0 * ringShare[0]);
             double x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
             double y = underRoof(Math.max(c.y + Math.max(2.5, ts[0] * 0.7) + r * 0.15,
                     canopy(x, z, c.y, c.y + 1.5, focusRoof, true, acc) + 2.5), focusRoof);
@@ -809,7 +988,7 @@ final class FightCamera {
      * weaves past a few fighters (left of one, right of the next) without stopping. It keeps {@link #DRONE_LOW}
      * blocks over the ground or the tree tops under it and just ahead (climbs fast, sinks slowly), looks ahead along
      * its path, a little down, and turns toward the fighter it is coming up to, then ahead again once past it.
-     * (2026-10-13, user video: the old one stopped at each fighter, stared down at it and climbed away, and flew
+     * (2026-10-13, playtest video: the old one stopped at each fighter, stared down at it and climbed away, and flew
      * through tree tops: leaves are not Solid blocks.)
      */
     private static void drone(BattleManager.Kind kind, PlayerRef player, Vector3d center, List<Ref<EntityStore>> fighters, long total,
@@ -827,7 +1006,7 @@ final class FightCamera {
         double px = -uz, pz = ux;                          // sideways
         Vector3d from = new Vector3d(center.x - ux * r, center.y, center.z - uz * r);
         Vector3d to = new Vector3d(center.x + ux * r, center.y, center.z + uz * r);
-        // Indoor arena (a roof over the center; user video 2026-10-13: the drone started and ended inside the stands
+        // Indoor arena (a roof over the center; playtest video 2026-10-13: the drone started and ended inside the stands
         // and flew through their corridors): its ends and passing points are pulled in to open floor.
         double level = center.y + 1.5;
         boolean indoor = Double.isFinite(FightFx.roofAbove(center.x, center.z, level, (int) GROUND_SCAN, buffer));
@@ -895,7 +1074,7 @@ final class FightCamera {
             double[] cum = new double[n];
             for (int i = 1; i < n; i++) cum[i] = cum[i - 1] + Math.max(0.01, Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]));
             // Nearly even speed, easing only into the start and out of the end. After the pass (flyMs) it swings
-            // around the battle like the orbit (user, 2026-10-13), from where the pass ended, a little closer in.
+            // around the battle like the orbit (playtest 2026-10-13), from where the pass ended, a little closer in.
             boolean orbiting = t > flyMs;
             double[] p, q;
             if (!orbiting) {
@@ -987,7 +1166,7 @@ final class FightCamera {
 
     /**
      * Top of the ground or tree leaves at (x, z), searched from a bit above {@code fromY} down. Under a roof seen from
-     * the fighters' {@code level} (an indoor arena, user 2026-10-13: the drone flew over it and then rode on the roof)
+     * the fighters' {@code level} (an indoor arena, playtest 2026-10-13: the drone flew over it and then rode on the roof)
      * the search starts right under the roof. {@code roof[0]} is the last roof met: a wall column keeps it, open sky
      * clears it (only when {@code update}); callers keep the camera ROOF_CLEAR under it.
      */
@@ -1146,7 +1325,7 @@ final class FightCamera {
      * meanwhile); its cameraBlur sets each frame's depth of field (null kind = the global values).
      * <p>
      * An intro (introFor set {@link #INTRO_FIGHTERS}) never comes back to the player through a shot of them (2026-10-16,
-     * user: the glide behind the player between the intro and the fight felt wrong): with autoFilm it hands the camera
+     * playtest: the glide behind the player between the intro and the fight felt wrong): with autoFilm it hands the camera
      * straight to the battle film ({@link #handOff}), else it ends on a wide shot of the fighters running at each
      * other ({@link #wideTail}) and then cuts back to the player.
      */
@@ -1228,7 +1407,7 @@ final class FightCamera {
     }
 
     /**
-     * The last shot of an intro (2026-10-16, user: instead of coming back to the player, a wide shot of the mobs,
+     * The last shot of an intro (2026-10-16, playtest: instead of coming back to the player, a wide shot of the mobs,
      * above all when they start far apart and run at each other): from the player's side of the battle, high and far
      * enough to hold every fighter (their spread, live), drifting slowly sideways, never under the ground or a roof.
      * The player is never in it: the camera stands between them and the battle.
@@ -1237,6 +1416,7 @@ final class FightCamera {
         Track track = new Track();
         double[][] holder = {null};   // the viewing direction, fixed at the first frame
         double[] roof = {Double.NaN};
+        Settle settle = new Settle();
         return new Shot(TAIL_MS, (t, acc) -> {
             double x = 0, y = 0, z = 0;
             List<Vector3d> pts = new ArrayList<>();
@@ -1247,6 +1427,12 @@ final class FightCamera {
                 x += p.x; y += p.y; z += p.z;
             }
             if (pts.isEmpty()) return null;
+            // one height band (a cave and the surface: the center fell inside the rock between them)
+            pts = FilmCamera.mainBand(pts, null);
+            x = 0; y = 0; z = 0;
+            for (Vector3d p : pts) {
+                x += p.x; y += p.y; z += p.z;
+            }
             Vector3d c = new Vector3d(x / pts.size(), y / pts.size(), z / pts.size());
             double spread = 0;
             for (Vector3d p : pts) spread = Math.max(spread, Math.hypot(p.x - c.x, p.z - c.z));
@@ -1260,25 +1446,30 @@ final class FightCamera {
                     dz = c.z - tr.getPosition().z;
                 }
                 double len = Math.hypot(dx, dz);
-                holder[0] = len < 0.5 ? new double[] {1, 0} : new double[] {dx / len, dz / len};
+                double[] dir = len < 0.5 ? new double[] {1, 0} : new double[] {dx / len, dz / len};
+                // a side that sees the fighters (as the crowd shot: from the viewer's side it filmed the colosseum's
+                // corridors behind the wall, review 2026-10-29)
+                double d0 = Math.max(9, spread * 1.7 + 6);
+                holder[0] = crowdSpot(c, dir, d0, Math.max(4, spread * 0.55 + 3), d0 * 0.35, 2, acc);
             }
             double f = (double) t / TAIL_MS;
             double turn = (f - 0.5) * 0.35;   // a slow sideways drift over the shot
             double ux = holder[0][0] * Math.cos(turn) - holder[0][1] * Math.sin(turn);
             double uz = holder[0][0] * Math.sin(turn) + holder[0][1] * Math.cos(turn);
-            double dist = Math.max(9, spread * 1.7 + 6);
+            double dist = Math.max(9, spread * 1.7 + 6) * holder[0][2];
             double up = Math.max(4, spread * 0.55 + 3);
             double ax = c.x - ux * dist, az = c.z - uz * dist;
             double ground = canopy(ax, az, c.y + up, c.y + 1.5, roof, true, acc);
             double ay = underRoof(Math.max(c.y + up, ground + 1.5), roof);
-            return frame(new Vector3d(ax, ay, az), new Vector3d(c.x, c.y + 1.2, c.z), DUEL_LERP);
+            Vector3d look = new Vector3d(c.x, c.y + 1.2, c.z);
+            return frame(settle.next(new Vector3d(ax, ay, az), look, c.y, acc), look, DUEL_LERP);
         });
     }
 
     /**
      * One frame of a duel shot, {@code f} (0..1) into it. {@code sa}/{@code sb}: each fighter's {height, half width}
      * (Track.size), {@code ea}/{@code eb}: eye heights (Track.eye); a normal mob (2 high) gets the framing below, a
-     * bigger one is filmed from further away and higher, so a giant boss shows more than its legs (user, 2026-10-13).
+     * bigger one is filmed from further away and higher, so a giant boss shows more than its legs (playtest 2026-10-13).
      * <ul>
      *   <li>WIDE: low, well off to one side, panning slowly along the line between them, a bit wide (FOV 80 to 72).</li>
      *   <li>OVER_A / OVER_B: just behind and over the shoulder of one, looking at the other, pushing in a little.</li>
@@ -1286,16 +1477,25 @@ final class FightCamera {
      *   <li>SIDE: both from the side, facing each other (the old last shot).</li>
      * </ul>
      */
-    private static ServerCameraSettings duelFrame(DuelShot shot, double f, Vector3d pa, Vector3d pb, double[] sa,
-                                                  double[] sb, double ea, double eb, ComponentAccessor<EntityStore> acc) {
+    private static ServerCameraSettings duelFrame(DuelShot shot, double f, Vector3d pa, Vector3d pb, double ux, double uz,
+                                                  double[] sa, double[] sb, double ea, double eb,
+                                                  ComponentAccessor<EntityStore> acc) {
         double dx = pb.x - pa.x, dz = pb.z - pa.z;
-        double len = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
-        double ux = dx / len, uz = dz / len;   // from A toward B
+        double len = Math.sqrt(dx * dx + dz * dz);   // (ux, uz): from A toward B, kept by duelAxis
         double px = -uz, pz = ux;               // sideways
         double e = f * f * (3 - 2 * f);         // eased progress
         Vector3d mid = new Vector3d((pa.x + pb.x) / 2, (pa.y + pb.y) / 2, (pa.z + pb.z) / 2);
         double tall = Math.max(sa[0], sb[0]);
         double wide = Math.max(sa[1], sb[1]);
+        // Over one's shoulder at the other needs room between them: closer than their two half widths and a block,
+        // the camera behind one sat inside the other (or looked at its own back), so it is a side shot instead,
+        // from opposite sides for A and B.
+        if ((shot == DuelShot.OVER_A || shot == DuelShot.OVER_B) && len < sa[1] + sb[1] + 1) {
+            double sign = shot == DuelShot.OVER_A ? 1 : -1;
+            double side = Math.max(6, tall * 1.6 + wide);
+            return frame(new Vector3d(mid.x - sign * px * side, mid.y + Math.max(2.5, tall * 0.6), mid.z - sign * pz * side),
+                    new Vector3d(mid.x, mid.y + Math.max(1, tall * 0.4), mid.z), DUEL_LERP);
+        }
         return switch (shot) {
             case WIDE -> {
                 // Other side than SIDE, low, the pan runs along A -> B.
@@ -1309,8 +1509,8 @@ final class FightCamera {
             }
             case OVER_A -> overShoulder(pa, sa, ea, pb, sb, ux, uz, px, pz, e);
             case OVER_B -> overShoulder(pb, sb, eb, pa, sa, -ux, -uz, -px, -pz, e);
-            case EYES_A -> eyes(pa, sa, ea, ux, uz, px, pz, e);
-            case EYES_B -> eyes(pb, sb, eb, -ux, -uz, -px, -pz, e);
+            case EYES_A -> eyes(pa, sa, ea, ux, uz, px, pz, e, 0);
+            case EYES_B -> eyes(pb, sb, eb, -ux, -uz, -px, -pz, e, 0);
             case SIDE -> {
                 double side = Math.max(Math.max(6, len + 4), tall * 1.6 + wide);
                 yield frame(new Vector3d(mid.x + px * side, mid.y + Math.max(2.5, tall * 0.6), mid.z + pz * side),
@@ -1337,10 +1537,10 @@ final class FightCamera {
      * height, a little off its nose line, dollying in a bit while the lens zooms from 52 to 36 degrees.
      */
     private static ServerCameraSettings eyes(Vector3d p, double[] s, double eye, double ux, double uz,
-                                             double px, double pz, double e) {
+                                             double px, double pz, double e, double lift) {
         double dist = eyesDist(s, e);
         double side = Math.max(0.5, s[1] * 0.3);
-        Vector3d at = new Vector3d(p.x + ux * dist + px * side, p.y + eye, p.z + uz * dist + pz * side);
+        Vector3d at = new Vector3d(p.x + ux * dist + px * side, p.y + eye + lift, p.z + uz * dist + pz * side);
         return zoom(frame(at, new Vector3d(p.x, p.y + eye * 0.97, p.z), DUEL_LERP), 52 - 16 * e);
     }
 
@@ -1361,7 +1561,7 @@ final class FightCamera {
 
     /**
      * Close-up distance: {@code min} blocks, {@code k} x the eye height, or its half width + 1.1 x its hitbox height,
-     * whichever is most (2026-10-13, user: showcase, focus and end shots only grew with the eye height, so a wide boss
+     * whichever is most (2026-10-13, playtest: showcase, focus and end shots only grew with the eye height, so a wide boss
      * or a size-buffed mob was filmed from inside). Capped at MAX_FRAMED.
      */
     private static double closeDist(double min, double k, double eye, double[] size) {
@@ -1381,7 +1581,7 @@ final class FightCamera {
     /** Time the shots leave free at the end of an intro: none since the glide back to the player is gone (2026-10-16). */
     private static final long BACK_MS = 0;
     /**
-     * Spotlight: shortest close-up, the crowd shot's share of the time and its least length (2026-10-16, user: a 5 s
+     * Spotlight: shortest close-up, the crowd shot's share of the time and its least length (2026-10-16, playtest: a 5 s
      * countdown with 17 mobs showed one face; 2 s / 0.3 / 2.5 s left room for one, now three).
      */
     private static final long SPOT_MIN_MS = 1100;
@@ -1396,6 +1596,9 @@ final class FightCamera {
     private static final int MAX_TEAM_SHOTS = 6;
     /** Focus: how far the camera circles the target (radians, about 200 degrees). */
     private static final double FOCUS_SWEEP = 3.5;
+    /** Focus circle: shares of its radius tried, widest first, until the target is in clear view. */
+    private static final double[] RING_SHARES = {1, 0.75, 0.5, 0.35};
+
     /** Focus circle: the attacker it looks at is kept at least this long. */
     private static final long FOCUS_HOLD_MS = 1500;
     /**
@@ -1436,6 +1639,8 @@ final class FightCamera {
     static final double ROOF_CLEAR = 1.2;
     /** Glide between frames: follows a walking mob, and moves between shots in about half a second. */
     private static final float DUEL_LERP = 0.15f;
+    /** Duel: closer than this (blocks) the line between the duellists is not trusted as the shots' axis (duelAxis). */
+    private static final double DUEL_AXIS_MIN = 1.5;
     /** Duel: shortest shot; a short intro plays fewer of them (DUEL_CUTS). */
     private static final long MIN_DUEL_SHOT_MS = 700;
     /** Depth of field: farthest focus (blocks) and the near blur's share of the far one. */
@@ -1544,6 +1749,7 @@ final class FightCamera {
     static void reset(PlayerRef player) {
         if (player == null || !player.isValid()) return;
         CinemaBars.out(player);   // every end of a camera (glide back, cut, skip, stop, battle over) passes here
+        FilmMode.leave(player);
         CameraHud.restore(player);
         Ref<EntityStore> ref = player.getReference();
         if (ref != null && ref.isValid()) {
@@ -1588,7 +1794,7 @@ final class FightCamera {
 
     /**
      * As a shot sequence ends: the player's normal camera (bars out, HUD back). It used to glide to a shot just behind
-     * the player first; that shot of the player is gone (2026-10-16, user).
+     * the player first; that shot of the player is gone (2026-10-16).
      */
     static void glideBack(PlayerRef player, long id) {
         if (SHOT.remove(player.getUuid(), id)) reset(player);
@@ -1608,6 +1814,7 @@ final class FightCamera {
         CinemaBars.prune();
         CameraHud.prune();
         FilmCamera.prune();
+        FilmMode.prune();
         if (ORBITS.isEmpty() && INTROS.isEmpty()) return;
         long now = System.currentTimeMillis();
         ORBITS.values().removeIf(end -> end <= now);
@@ -1686,6 +1893,29 @@ final class FightCamera {
         boolean shot = SHOT.remove(id) != null;
         if (orbit || shot) cut(player, orbit);
         return orbit || shot || vs;
+    }
+
+    /**
+     * The watch takes the camera over (BattleWatch.watch): a running shot stops with its bands, HUD and film mode put
+     * back, but WITHOUT the camera reset, which reached the client after the watch's follow camera and left it flying
+     * free until the next re-attach (2026-10-29, playtest video). An orbit (client keyframes) still glides back as cancel.
+     */
+    static void handOver(PlayerRef player) {
+        if (player == null) return;
+        UUID id = player.getUuid();
+        INTROS.remove(id);
+        PENDING.remove(id);
+        VsScreen.cancel(player);
+        Long end = ORBITS.remove(id);
+        if (end != null && end > System.currentTimeMillis()) {
+            cut(player, true);
+            return;
+        }
+        if (SHOT.remove(id) != null) {
+            CinemaBars.out(player);
+            FilmMode.leave(player);
+            CameraHud.restore(player);
+        }
     }
 
     /** Back to the player's view: a short glide for an orbit (a new sequence replaces it), then the normal camera. */

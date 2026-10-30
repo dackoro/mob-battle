@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * roof or a wall can, so they are moved after FLY_STUCK_MS whatever the height. A walker is never moved towards an
  * opponent that is flying right now (it would land under it): the flier comes down to attack.
  * Stand-off (2026-10-12): a walker on its opponent's level that, for standoffTime, got no closer, hit nothing and was
- * not hit, and is beyond melee reach, is shoved toward it (not teleported, user). Two Goblin_Feastmaster each keep 8
+ * not hit, and is beyond melee reach, is shoved toward it (not teleported). Two Goblin_Feastmaster each keep 8
  * blocks from their target (role CombatMaintainDistance) and only close in with a charge, which the role turns off
  * while another goblin is within 5 blocks, so a duel of two in a crowd of goblins stood still for good. The shove goes
  * straight to the role's motion controller: the Feastmaster's role has KnockbackScale 0, and Role.processSetVelocity /
@@ -36,6 +36,8 @@ import java.util.concurrent.ConcurrentHashMap;
 final class Unstick {
 
     static final long STUCK_MS = 10_000;
+    /** Stand-off shoves without effect before the mob is moved next to its opponent instead. */
+    private static final int STANDOFF_SHOVES = 2;
     private static final long FLY_STUCK_MS = 20_000;
     private static final double MIN_HEIGHT_GAP = 3;
     /** Closer than this they are fighting, not stuck. */
@@ -43,13 +45,6 @@ final class Unstick {
     /** It counts as getting closer only if it gained at least this much. */
     private static final double PROGRESS = 1;
     private static final int STAND_RANGE = 6;
-    /** Stand-off shove: horizontal speed per block of gap (gap = distance - SHOVE_STOP), clamped, plus a hop. */
-    private static final double SHOVE_PER_BLOCK = 1.6;
-    private static final double SHOVE_MIN = 5;
-    private static final double SHOVE_MAX = 14;
-    private static final double SHOVE_UP = 4;
-    /** The shove aims to land about this far from the opponent (inside melee reach). */
-    private static final double SHOVE_STOP = 2;
     /** No stand-off shove past this gap: a mob that far is still walking in (ChaseSupport). */
     private static final double STANDOFF_MAX_GAP = 16;
 
@@ -57,6 +52,8 @@ final class Unstick {
         Ref<EntityStore> target;
         double best;
         long since;
+        /** Stand-off shoves in a row that brought no hit and no progress. */
+        int shoves;
     }
 
     /** Who hit a battle mob last, and when. */
@@ -113,16 +110,28 @@ final class Unstick {
         double dist = me.distance(them);
         Track t = TRACKS.computeIfAbsent(mob, k -> new Track());
         boolean flier = canFly(mob, store);
-        if (t.target != target || dist < t.best - PROGRESS || dist < MELEE
+        boolean newTarget = t.target != target;
+        if (t.target == null || !newTarget && dist < t.best - PROGRESS || dist < MELEE
                 || now - LAST_HIT.getOrDefault(mob, 0L) < STUCK_MS || hurtOnItsLevel(mob, me, now, store)
                 || !flier && flyingNow(target, store)) {
-            // New opponent, getting closer, in melee range, fighting, or after a flier it can't follow: not stuck.
+            // First look, getting closer, in melee range, fighting, or after a flier it can't follow: not stuck.
             t.target = target;
             t.best = dist;
             t.since = now;
+            t.shoves = 0;
             return;
         }
-        if (!flier && Math.abs(them.y - me.y) <= MIN_HEIGHT_GAP) {
+        if (newTarget) {
+            // Another opponent keeps the clock (2026-10-29, playtest video: a dummy stranded on a wooden tower was never
+            // brought down; the chase limit gave it a new target every 8 s, and each one restarted the 10 s count).
+            t.target = target;
+            t.best = dist;
+        }
+        // After STANDOFF_SHOVES shoves that changed nothing (2026-10-29, playtest video: daggers dummies 5 blocks apart on
+        // both sides of the stands' low wall were shoved every 15 s for a minute, and the battle waited for them), the
+        // stand-off is treated as stuck: moved next to the opponent below.
+        // With unstick off nothing would move it after that, so the shoves just go on (audit 2026-10-29).
+        if (!flier && Math.abs(them.y - me.y) <= MIN_HEIGHT_GAP && (t.shoves < STANDOFF_SHOVES || !FxSettings.unstick)) {
             // Same level and still apart: a stand-off. Shove it toward the opponent; again after standoffTime if needed.
             long standoffMs = FxSettings.standoffSeconds * 1000L;
             if (standoffMs <= 0 || now - t.since < standoffMs) return;
@@ -136,7 +145,8 @@ final class Unstick {
             t.since = now;
             t.best = dist;
             if (!FightManager.canAttack(mob, store)) return;
-            if (shove(mob, me, them, dist, store)) {
+            t.shoves++;
+            if (shove(mob, target, me, them, dist, store)) {
                 MobBattlePlugin.debug("unstick: " + ChaosWand.nameOf(mob, store) + " stood off from " + ChaosWand.nameOf(target, store)
                         + " (" + String.format(java.util.Locale.ROOT, "%.1f", dist) + " blocks, no hit) for " + stood / 1000
                         + " s: shoved toward it");
@@ -165,6 +175,7 @@ final class Unstick {
             float yaw = (float) Math.atan2(them.x - x, them.z - z);
             // Already moved this tick (the arena wall): it stays tracked and tries again later.
             if (!FightFx.teleport(mob, to, new Rotation3f(0f, yaw, 0f), store)) return;
+            t.shoves = 0;
             WandFx.burst(WandFx.SUMMON_PARTICLE, null, to, store);
             MobBattlePlugin.debug("unstick: " + ChaosWand.nameOf(mob, store) + (flier ? " (flier)" : "") + " could not reach "
                     + ChaosWand.nameOf(target, store) + " (" + Math.round(Math.abs(them.y - me.y)) + " blocks up/down) for "
@@ -179,17 +190,55 @@ final class Unstick {
      * Stand-off shove toward {@code them}, through the role's active motion controller (not scaled by the role's
      * KnockbackScale, see the class comment). False if the mob has no role or motion controller.
      */
-    private static boolean shove(Ref<EntityStore> mob, Vector3d me, Vector3d them, double dist, Store<EntityStore> store) {
+    /**
+     * A steady walk toward the opponent instead of one hard shove (2026-10-29, playtest video: the stand-off shoves, 5-14
+     * blocks/s with a hop, looked like blows): NUDGE_STEPS small pushes at walking speed, NUDGE_EVERY_MS apart on the
+     * world thread, each re-aimed at where the opponent is, stopping once in melee reach. A low hop only when the last
+     * push did not move it (a step or a slab in the way).
+     */
+    private static boolean shove(Ref<EntityStore> mob, Ref<EntityStore> target, Vector3d me, Vector3d them, double dist,
+                                 Store<EntityStore> store) {
         Role role = roleOf(mob, store);
-        var controller = role != null ? role.getActiveMotionController() : null;
-        if (controller == null) return false;
-        double dx = them.x - me.x, dz = them.z - me.z;
-        double flat = Math.sqrt(dx * dx + dz * dz);
-        if (flat < 0.01) return false;
-        double speed = Math.max(SHOVE_MIN, Math.min(SHOVE_MAX, (dist - SHOVE_STOP) * SHOVE_PER_BLOCK));
-        controller.setVelocity(new Vector3d(dx / flat * speed, SHOVE_UP, dz / flat * speed), null, false);
+        if (role == null || role.getActiveMotionController() == null) return false;
+        double[] last = {me.x, me.z};
+        store.getExternalData().getWorld().scheduleAfter(() -> nudge(mob, target, store, last, 0), 0,
+                java.util.concurrent.TimeUnit.MILLISECONDS);
         return true;
     }
+
+    /**
+     * One push of the walk, then the next one NUDGE_EVERY_MS later (one task at a time, audit 2026-10-29: twelve queued
+     * at once per shove, thousands in a big royale). Stops when either side is dead, the battle no longer sets them
+     * against each other (ended, a fallen player respawned) or the mob is in melee reach.
+     */
+    private static void nudge(Ref<EntityStore> mob, Ref<EntityStore> target, Store<EntityStore> store, double[] last, int step) {
+        if (step >= NUDGE_STEPS || !mob.isValid() || !target.isValid() || store.isShutdown()) return;
+        if (!BattleManager.isAlive(mob, store) || !BattleManager.isAlive(target, store)) return;
+        BattleManager.Battle battle = BattleManager.battleOf(mob);
+        if (battle == null || battle.over || !battle.has(target)) return;
+        Vector3d a = ChaosWand.positionOf(mob, store), b = ChaosWand.positionOf(target, store);
+        Role r = roleOf(mob, store);
+        var c = r != null ? r.getActiveMotionController() : null;
+        if (a == null || b == null || c == null) return;
+        double dx = b.x - a.x, dz = b.z - a.z;
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        if (flat < MELEE * 0.6) return;
+        boolean stuck = step > 0 && Math.hypot(a.x - last[0], a.z - last[1]) < 0.15;
+        last[0] = a.x;
+        last[1] = a.z;
+        c.setVelocity(new Vector3d(dx / flat * NUDGE_SPEED, stuck ? NUDGE_HOP : 0, dz / flat * NUDGE_SPEED), null, false);
+        try {
+            store.getExternalData().getWorld().scheduleAfter(() -> nudge(mob, target, store, last, step + 1),
+                    NUDGE_EVERY_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (RuntimeException ignored) {
+            // world stopping
+        }
+    }
+
+    /** shove(): pushes, their spacing, walking speed (blocks/s) and the hop over a step. */
+    private static final int NUDGE_STEPS = 12;
+    private static final long NUDGE_EVERY_MS = 150;
+    private static final double NUDGE_SPEED = 4.5, NUDGE_HOP = 2.2;
 
     /** True if something on the mob's level (or right next to it) hit it within STUCK_MS. */
     private static boolean hurtOnItsLevel(Ref<EntityStore> mob, Vector3d me, long now, ComponentAccessor<EntityStore> accessor) {

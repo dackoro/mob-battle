@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Makes every client drop an entity and take it again from scratch, the way it does when the entity leaves view range
  * and comes back. Used when a copied PlayerSkin leaves a mob: the client can't remove a PlayerSkin component (it
- * crashes, "Removing PlayerSkin component isn't supported!", user 2026-10-13, both players in view), and vanilla never
+ * crashes, "Removing PlayerSkin component isn't supported!", playtest 2026-10-13, both players in view), and vanilla never
  * sends one, so without a fresh spawn the client keeps drawing the skin.
  * <p>
  * Same place as vanilla {@code EntityTrackerSystems.HideFromPlayer} (FIND_VISIBLE_ENTITIES_GROUP, after

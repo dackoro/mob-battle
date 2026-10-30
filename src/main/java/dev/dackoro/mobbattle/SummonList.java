@@ -51,7 +51,7 @@ public final class SummonList {
         return s != null && (RANDOM.equalsIgnoreCase(s.trim()) || s.trim().matches("\\d{1,9}"));
     }
 
-    /** Lower case "random", or the number clamped to 0..MAX_MOBS_LIMIT (no 999 cap since 2026-10-13, user). */
+    /** Lower case "random", or the number clamped to 0..MAX_MOBS_LIMIT (no 999 cap since 2026-10-13). */
     static String normalCount(String s) {
         String v = s.trim().toLowerCase(java.util.Locale.ROOT);
         if (RANDOM.equals(v)) return v;
@@ -73,7 +73,7 @@ public final class SummonList {
             return null;
         }
         // A mob already listed first, then the game's own spelling: hasRoleName ignores case, and "zombie" became an
-        // entry of its own next to "Zombie" (user, 2026-10-13), so the counts didn't add up.
+        // entry of its own next to "Zombie" (playtest 2026-10-13), so the counts didn't add up.
         for (String known : snapshot().keySet()) {
             if (known.equalsIgnoreCase(name) || roleOf(known).equalsIgnoreCase(name)) {
                 return roleOf(known);
@@ -90,7 +90,7 @@ public final class SummonList {
     }
 
     /*
-     * Entry keys (2026-10-13, user: 10 Skeleton_Archer in red and 10 in green): the first entry of a role is keyed by
+     * Entry keys (2026-10-13, playtest: 10 Skeleton_Archer in red and 10 in green): the first entry of a role is keyed by
      * the role itself, more entries of the same role (another count or team) by "role#2", "role#3"... ENTRIES and TEAMS
      * are keyed by entry; spawning uses roleOf(key). Old lists (one entry per role) load unchanged.
      */
@@ -261,6 +261,9 @@ public final class SummonList {
         batch.run();
     }
 
+    /** A summon's spot: tries on the ring, and how far above/below the player's height a floor may be. */
+    private static final int SPOT_TRIES = 6, SPOT_RANGE = 3;
+
     /** Mobs spawned per world tick at most; also stops early once SPAWN_BUDGET_MS is used up (at least one). */
     private static final int SPAWN_PER_TICK = 20;
     private static final long SPAWN_BUDGET_MS = 25;
@@ -328,13 +331,24 @@ public final class SummonList {
 
         private void spawnOne(NPCPlugin npc, ThreadLocalRandom rnd, String key) {
             String role = roleOf(key);
-            double angle = rnd.nextDouble(Math.PI * 2);
-            double dist = 1.5 + Math.sqrt(rnd.nextDouble()) * (ring - 1.5);
-            double x = center.x + Math.cos(angle) * dist;
-            double z = center.z + Math.sin(angle) * dist;
-            double y = floor.applyAsDouble(x, z);
-            // floorBelow is 0.25 above the block top; no floor loaded nearby: the player's height.
-            Vector3d pos = new Vector3d(x, Double.isFinite(y) ? y - 0.25 : center.y, z);
+            // A spot with a floor and room to stand near the player's height (2026-10-29, playtest: a 1000-mob summon in
+            // the colosseum put mobs inside its pillars and stands, where they died: ~880 of 1000 made it to the
+            // battle). A few tries elsewhere on the ring, then the old floor rule.
+            Vector3d pos = null;
+            double angle = 0, dist = 0, x = 0, z = 0;
+            for (int t = 0; t < SPOT_TRIES && pos == null; t++) {
+                angle = rnd.nextDouble(Math.PI * 2);
+                dist = 1.5 + Math.sqrt(rnd.nextDouble()) * (ring - 1.5);
+                x = center.x + Math.cos(angle) * dist;
+                z = center.z + Math.sin(angle) * dist;
+                double y = FightFx.standableY(x, z, center.y, SPOT_RANGE, store);
+                if (Double.isFinite(y)) pos = new Vector3d(x, y, z);
+            }
+            if (pos == null) {
+                double y = floor.applyAsDouble(x, z);
+                // floorBelow is 0.25 above the block top; no floor loaded nearby: the player's height.
+                pos = new Vector3d(x, Double.isFinite(y) ? y - 0.25 : center.y, z);
+            }
             try {
                 var result = npc.spawnNPC(store, role, null, pos, new Rotation3f(0f, (float) rnd.nextDouble(Math.PI * 2), 0f));
                 if (result == null || result.first() == null) {
@@ -342,6 +356,8 @@ public final class SummonList {
                     return;
                 }
                 SummonDespawn.track(result.first());
+                // summonFrozen: standing still, no AI, until /npc thaw (the game's Frozen, as /npc freeze)
+                if (FxSettings.summonFrozen) store.ensureComponent(result.first(), com.hypixel.hytale.server.core.entity.Frozen.getComponentType());
                 String kit = KIT_OF.get(key);
                 if (kit != null) toKit.add(Map.entry(result.first(), kit));
                 Integer team = TEAMS.get(key);

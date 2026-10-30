@@ -382,7 +382,7 @@ public final class FightFx {
     }
 
     /**
-     * Roof over (x, z) seen from {@code level} (e.g. an indoor arena, user 2026-10-13: the drone rode on the arena
+     * Roof over (x, z) seen from {@code level} (e.g. an indoor arena, playtest 2026-10-13: the drone rode on the arena
      * roof): the bottom of the first solid block above it within {@code range}, leaves not counted (trees are flown
      * over, not under). POSITIVE_INFINITY = open sky; NaN = {@code level} itself is solid (a wall, a hill) or unloaded.
      */
@@ -423,7 +423,7 @@ public final class FightFx {
     }
 
     /**
-     * Where a teleported mob may land (2026-10-14, user: the unstick moved fish out of the water, walkers would drown
+     * Where a teleported mob may land (2026-10-14, playtest: the unstick moved fish out of the water, walkers would drown
      * at the bottom of a lake): ANY = as before (water counts as free), LAND = solid floor with 2 dry blocks over it,
      * WATER = 2 blocks of water (any floor, the feet in the lower one) for a swimmer.
      */
@@ -810,7 +810,15 @@ public final class FightFx {
      * winner titles all play.
      */
     static java.util.List<PlayerRef> titleViewers(PlayerRef owner) {
-        java.util.List<PlayerRef> viewers = scopeViewers(owner);
+        return withFighters(owner, scopeViewers(owner));
+    }
+
+    /** /mobbattle vsScope: who gets the VS screen of {@code owner}'s battles, plus the players fighting in them. */
+    static java.util.List<PlayerRef> vsViewers(PlayerRef owner) {
+        return withFighters(owner, scopeViewers(owner, FxSettings.vsScope));
+    }
+
+    private static java.util.List<PlayerRef> withFighters(PlayerRef owner, java.util.List<PlayerRef> viewers) {
         if (owner == null || !BattleManager.hasPlayerFighters()) {
             return viewers;
         }
@@ -858,7 +866,7 @@ public final class FightFx {
         java.util.UUID world = owner.getWorldUuid();
         var center = owner.getTransform() != null ? owner.getTransform().getPosition() : null;
         boolean nearby = "nearby".equals(scope);
-        double max = FxSettings.TITLE_NEARBY_BLOCKS * FxSettings.TITLE_NEARBY_BLOCKS;
+        double max = (double) FxSettings.scopeRadius * FxSettings.scopeRadius;
         java.util.List<PlayerRef> out = new java.util.ArrayList<>();
         out.add(owner);
         for (PlayerRef p : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
@@ -872,11 +880,11 @@ public final class FightFx {
         return out;
     }
 
-    /** Ownerless `owner` scope falls back to the 64-block event audience around its launch anchor. */
+    /** Ownerless `owner` scope falls back to the nearby (scopeRadius) audience around its launch anchor. */
     private static java.util.List<PlayerRef> scopeViewers(BattleManager.Battle.Anchor anchor, String scope) {
         if (anchor == null || anchor.world() == null || anchor.center() == null) return java.util.List.of();
         boolean nearby = !"world".equals(scope);
-        double max = FxSettings.TITLE_NEARBY_BLOCKS * FxSettings.TITLE_NEARBY_BLOCKS;
+        double max = (double) FxSettings.scopeRadius * FxSettings.scopeRadius;
         java.util.List<PlayerRef> out = new java.util.ArrayList<>();
         for (PlayerRef p : com.hypixel.hytale.server.core.universe.Universe.get().getPlayers()) {
             if (!p.isValid() || !anchor.world().equals(p.getWorldUuid())) continue;
@@ -933,7 +941,7 @@ public final class FightFx {
             return;
         }
         long now = System.currentTimeMillis();
-        // a VS screen covers this player: the title waits for its end, as the countdown's numbers do (user,
+        // a VS screen covers this player: the title waits for its end, as the countdown's numbers do (playtest,
         // 2026-10-17: a title showed over the VS)
         long busyUntil = Math.max(TITLE_BUSY_UNTIL.getOrDefault(id, 0L), VsScreen.endsAt(id));
         if (now >= busyUntil) {

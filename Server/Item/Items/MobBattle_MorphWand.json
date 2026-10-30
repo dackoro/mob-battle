@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_MorphWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Support",
   "Icon": "Icons/Items/MobBattle/MorphWand.png",
   "Quality": "Uncommon",
   "ItemLevel": 1,

@@ -65,7 +65,7 @@ final class KindFx {
     static final String[] CAMERA_BLURS = {"off", "soft", "strong"};
     static final String[] TIE_BREAKS = {"damage", "kills", "random", "draw"};
     /**
-     * Kill table ties (user, 2026-10-13): damage = more damage dealt, alive = standing fighters first then damage,
+     * Kill table ties (playtest 2026-10-13): damage = more damage dealt, alive = standing fighters first then damage,
      * first = who reached the count first, shared = even counts share a place. Every one ends with "first".
      */
     static final String[] KILL_TIE_BREAKS = {"damage", "alive", "first", "shared"};
@@ -113,7 +113,7 @@ final class KindFx {
 
     /**
      * The intro camera style, "auto" resolved: duel western shots, allvsone focus, teams and royale spotlight
-     * (2026-10-16, user; royale was orbit, teams the sweep).
+     * (2026-10-16, playtest; royale was orbit, teams the sweep).
      */
     static String cameraStyle(BattleManager.Kind kind) {
         String s = get(kind, Opt.CAMERA_STYLE);

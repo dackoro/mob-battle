@@ -10,7 +10,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.lang.reflect.Method;
 
 /**
- * MajorDungeons bosses in Mob Battle fights (2026-10-16, user: a duel of two Barons ended at once). MajorDungeons'
+ * MajorDungeons bosses in Mob Battle fights (2026-10-16, playtest: a duel of two Barons ended at once). MajorDungeons'
  * BossArenaSystem (javap, 0.4.14) resets a boss whose arena has had no player in it for the boss's ResetAfterSeconds
  * (Baron: 10 s): it removes the boss and spawns a new one at its leash point, which Mob Battle counted as a death. It
  * starts that clock when BossComponent.arenaEmptySinceMs is 0 and resets once now - arenaEmptySinceMs passes the

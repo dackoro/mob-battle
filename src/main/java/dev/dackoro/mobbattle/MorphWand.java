@@ -25,14 +25,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * (a new ModelComponent; NPCSystems.ModelChangeSystem updates hitbox and movement), but it lasts
  * until restored. The mob keeps its role: AI, weapon, attacks and health.
  * <p>
- * Skins (2026-10-12, user: a copied player came out as the bare "Player" body): a player's look is a PlayerSkin, and
+ * Skins (2026-10-12, playtest: a copied player came out as the bare "Player" body): a player's look is a PlayerSkin, and
  * their model is built from it (vanilla CosmeticsModule.createModel(skin, scale), as /model reset does). A copy of an
  * entity with a PlayerSkinComponent (players, random-skin NPCs) keeps the skin; applying it puts that skin and its
  * model on the target. The tracker sends PlayerSkinUpdate for any entity with the component (EntityTrackerSystems
  * EntitySkin), so a mob shows it too.
  * <p>
  * Players' size: the client draws a player's body at the entity scale but puts their camera by the model's scale
- * (user, 2026-10-12: entity scale alone grew the body only, model scale alone the camera only). So a size buff on a
+ * (playtest 2026-10-12: entity scale alone grew the body only, model scale alone the camera only). So a size buff on a
  * player sets both: Buffs keeps the entity scale and {@link #setPlayerSize} the model's.
  */
 public final class MorphWand {
@@ -156,7 +156,7 @@ public final class MorphWand {
             return new Copy(mc.getModel().getModelAssetId(), scale, skin.getPlayerSkin(), ChaosWand.nameOf(entity, accessor));
         }
         // The player body without a skin is not a look (a mob that wore a copied player look across a restart: the
-        // skin is not saved with it). Copied, it made a player bald (user, 2026-10-13, Morph swap wave with
+        // skin is not saved with it). Copied, it made a player bald (playtest 2026-10-13, Morph swap wave with
         // morphBurstSelf).
         if (PLAYER_MODEL.equals(mc.getModel().getModelAssetId())) return null;
         return new Copy(mc.getModel().getModelAssetId(), scale);
@@ -290,7 +290,7 @@ public final class MorphWand {
     /**
      * Removes a copied skin from a mob. Vanilla only ever sends PlayerSkin updates (EntityTrackerSystems.EntitySkin,
      * javap), never a removal, so the client kept the old skin and the cleansed mob came out as a bare player body
-     * (user, 2026-10-13). ❌ Sending the removal (EntityViewer.queueRemove PlayerSkin) crashed every client that saw it:
+     * (playtest 2026-10-13). ❌ Sending the removal (EntityViewer.queueRemove PlayerSkin) crashed every client that saw it:
      * "Removing PlayerSkin component isn't supported!" (client log, 2026-10-13). So the clients get the mob again from
      * scratch instead ({@link SkinRespawnSystem}).
      */

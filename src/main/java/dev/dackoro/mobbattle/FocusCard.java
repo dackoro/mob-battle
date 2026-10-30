@@ -43,6 +43,7 @@ final class FocusCard extends CustomUIHud {
     protected void build(UICommandBuilder builder) {
         builder.append(UI);
         CinemaBars.shift(builder, getPlayerRef());
+        builder.set("#TimerGap.Visible", TimerHud.boxShown(getPlayerRef()));
     }
 
     static boolean any() {
@@ -73,11 +74,14 @@ final class FocusCard extends CustomUIHud {
             }
         }
         // One fill per battle, shared by its viewers (audit 2026-10-14: it walked every member once per viewer).
-        Map<BattleManager.Battle, UICommandBuilder> filled = new HashMap<>();
+        // and language: the names are written in each viewer's (2026-10-30)
+        Map<BattleManager.Battle, Map<String, UICommandBuilder>> filled = new HashMap<>();
         for (Map.Entry<UUID, BattleManager.Battle> e : want.entrySet()) {
             PlayerRef p = Universe.get().getPlayer(e.getKey());
             if (p == null || !onStore(p, store)) continue;
-            show(p, store, filled.computeIfAbsent(e.getValue(), b -> fill(b, store)));
+            String lang = p.getLanguage();
+            show(p, store, filled.computeIfAbsent(e.getValue(), b -> new HashMap<>())
+                    .computeIfAbsent(String.valueOf(lang), k -> fill(e.getValue(), store, lang)));
             SHOWN.add(e.getKey());
         }
     }
@@ -94,7 +98,7 @@ final class FocusCard extends CustomUIHud {
         }
     }
 
-    private static UICommandBuilder fill(BattleManager.Battle battle, Store<EntityStore> store) {
+    private static UICommandBuilder fill(BattleManager.Battle battle, Store<EntityStore> store, String lang) {
         // Side 1 = the lone target, side 0 = the attackers. The lone target leaves teamOf when it falls: keep it.
         Ref<EntityStore> lone = null;
         int attackers = 0;
@@ -128,7 +132,7 @@ final class FocusCard extends CustomUIHud {
         UICommandBuilder b = new UICommandBuilder();
         boolean up = lone != null && lone.isValid() && BattleManager.isAlive(lone, store);
         String name = lone != null && lone.isValid() ? ChaosWand.nameOf(lone, store) : battle.focusName;
-        line(b, "#Name", DuelCard.shorten(MobNames.shared(name)), up ? "#ffd23e" : "#888888");
+        line(b, "#Name", DuelCard.shorten(MobNames.text(name, lang)), up ? "#ffd23e" : "#888888");
         if (lone != null) {
             line(b, "#Health", DuelCard.healthText(lone, store, up), up ? "#ff6b5e" : "#888888");
             line(b, "#Attack", I18n.tr("hud.attack").param("v", DuelCard.stat(lone, Buffs.Stat.DAMAGE)), DuelCard.color(lone, Buffs.Stat.DAMAGE));
@@ -144,7 +148,7 @@ final class FocusCard extends CustomUIHud {
                 : I18n.tr("hud.health.none"), attackers > 0 ? "#ff6b5e" : "#888888");
         if (top != null && topDamage > 0) {
             String topName = ChaosWand.nameOf(top, store);
-            line(b, "#TopName", I18n.tr("hud.focus.top").param("name", DuelCard.shorten(MobNames.shared(topName))), "#7dff8a");
+            line(b, "#TopName", I18n.tr("hud.focus.top").param("name", DuelCard.shorten(MobNames.text(topName, lang))), "#7dff8a");
             line(b, "#TopLine", I18n.tr("hud.focus.damage").param("n", Math.round(topDamage)), PLAIN);
         } else {
             line(b, "#TopName", I18n.tr("hud.focus.top.none"), PLAIN);

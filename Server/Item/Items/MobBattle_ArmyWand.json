@@ -4,8 +4,9 @@
     "Description": "server.items.MobBattle_ArmyWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Wands"
   ],
+  "SubCategory": "Army",
   "Icon": "Icons/Items/MobBattle/ArmyWand.png",
   "Quality": "Rare",
   "ItemLevel": 1,

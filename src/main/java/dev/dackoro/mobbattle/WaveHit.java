@@ -13,7 +13,7 @@ import java.util.function.BiConsumer;
 
 /**
  * The waves' hits: wand waves (Morph, Cleanse, Effect, Heal: waveTravel / waveGroundOnly) and battle waves (Snap
- * without a battle, royale, all vs one: battleWaveTravel / battleWaveGroundOnly, both off by default) (wand waves 2026-10-13, user: vanilla's Gobliterator slam is a growing
+ * without a battle, royale, all vs one: battleWaveTravel / battleWaveGroundOnly, both off by default) (wand waves 2026-10-13, playtest: vanilla's Gobliterator slam is a growing
  * Donut selector that hits each entity when its ring gets there, ours hit everyone at once).
  * <ul>
  *   <li>waveTravel on (default): each target is hit when the visible ring (FightFx.shockwave) reaches its horizontal

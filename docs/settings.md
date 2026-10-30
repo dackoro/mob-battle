@@ -93,7 +93,7 @@ A preset changes many settings at once. In the panel, loading a preset only fill
 | Preset | What it sets |
 |---|---|
 | `default` | Every setting back to its default and every per-kind override removed. |
-| `fight` | Just the fights: no countdown, intro or end camera, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
+| `fight` | Just the fights: no countdown, intro or end camera, duel or all vs one card, titles, music, laser, runes, area drawing, crown, waves, border glow or mob looks; every timer off; arenas that were on keep only their invisible wall. A closing royale arena is still drawn: use `arenaShrink royale off` to hide it. |
 | `effects` | All the show but no cameras: countdown 3, titles, music, runes, area `discBorder`, a scoreboard for every kind; duels, all vs one and teams get a 2 minute timer with `timeUp health`, the royale keeps its 3 minutes and `judge`. |
 | `debug` | Everything visible for testing: no countdown or cameras, fighter laser (only this preset turns it on), runes, area `wall`, team look `both` (tint and mist on team members), the duel card, the all vs one card and every scoreboard; every arena drawn (`show`, or `on` where it had a wall). |
 | `cinematic` | 8 seconds to get in position (`readyTime`), countdown 5, intro camera (`auto`, royale `drone`), end camera `winner` (`lastHit` for royale and all vs one), `cameraBars wide`, titles and music; area look and waves at their defaults, no laser, runes or border glow; every arena as it comes by default. Mob looks and the crown stay. |
@@ -132,12 +132,13 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 
 | Setting (panel) | Command | Key | Values | Default | Reset group |
 |---|---|---|---|---|---|
-| Countdown | `/mobbattle countdown <seconds>` | `fight.countdown` | 0-10, 0 = start at once | 0 | titles |
+| Countdown | `/mobbattle countdown <seconds>` | `fight.countdown` | 0-10, 0 = start at once | 3 | titles |
 | Time to get in position | `/mobbattle readyTime <seconds>\|off` | `fight.ready` | 0-60, 0 = none. Seconds to get to your spot before the VS screen and the countdown; crouch to start at once. Never when you fight in the battle yourself | 0 | titles |
 | Start title | `/mobbattle startTitle on\|off` | `title.enabled` | true, false | on | titles |
 | Winner title | `/mobbattle winTitle on\|off` | `wintitle.enabled` | true, false | on | titles |
 | Title style | `/mobbattle titleStyle <style>` | `title.style` | `Default`, `Major`, `GoblinBreach`, `VoidEviction`, `random` | `Major` | titles |
-| Who sees the titles | `/mobbattle titleScope owner\|nearby\|world` | `title.scope` | owner, nearby (64 blocks), world | nearby | titles |
+| Who sees the titles | `/mobbattle titleScope owner\|nearby\|world` | `title.scope` | owner, nearby (`scopeRadius` blocks), world | nearby | titles |
+| How far "nearby" reaches | `/mobbattle scopeRadius <8-1024>` | `title.scope.radius` | blocks, for titleScope, cameraScope and vsScope | 64 | titles |
 | Battle music | `/mobbattle music on\|off\|<track>` | `battle.music` | true, false | on | titles |
 | Music track | `/mobbattle music <track>` | `battle.music.track` | any music container ID | `MobBattle_Battle_Music` | titles |
 | Fighter laser | `/mobbattle fightLaser on\|off` | `laser.enabled` | true, false | off | effects |
@@ -157,28 +158,33 @@ Defaults are the values the plugin starts with when `fx.properties` doesn't set 
 | Camera time | `/mobbattle cameraTime <seconds>` | `camera.time` | 0-600, 0 = as long as the countdown (above 30 warns: viewers have no controls meanwhile) | 0 | cameras |
 | Close-up shots (showcase, spotlight) | `/mobbattle cameraShots <n>` | `camera.shots` | 1 to maxMobs | 4 | cameras |
 | Who sees the cameras | `/mobbattle cameraScope owner\|nearby\|world` | `camera.scope` | owner, nearby, world | owner | cameras |
+| Who sees the VS screen | `/mobbattle vsScope owner\|nearby\|world` | `camera.vs.scope` | owner, nearby, world; players fighting always see it | nearby | cameras |
 | Game HUD while filming | `/mobbattle cameraHud hide\|show` | `camera.hud` | hide, show | hide | cameras |
-| End camera | `/mobbattle endCamera off\|winner\|lastHit` | `camera.end` | off, winner, lasthit | off | cameras |
+| Timer in the film bands | `/mobbattle bandTimer off\|top\|bottom` | `camera.bands.timer` | off, top, bottom | top | cameras |
+| Title in the film bands | `/mobbattle bandTitle off\|top\|bottom` | `camera.bands.title` | off, top, bottom | top | cameras |
+| Rows when they share a band | `/mobbattle bandRows 1\|2` | `camera.bands.rows` | 1, 2 | 2 | cameras |
+| Fighters left in the film bands | `/mobbattle bandInfo off\|top\|bottom\|box` | `camera.bands.info` | off, top, bottom, box | bottom | cameras |
+| End camera | `/mobbattle endCamera off\|winner\|lastHit` | `camera.end` | off, winner, lasthit | winner | cameras |
 | End camera time | `/mobbattle endCameraTime <seconds>` | `camera.end.time` | 1-600 (above 15 warns) | 5 | cameras |
-| Auto watch | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
+| Auto spectate | `/mobbattle autoWatch on\|off` | `camera.autowatch` | true, false | off | cameras |
 | Watch: changing fighter | `/mobbattle watchTransition cut\|glide` | `camera.watch.transition` | cut, glide | glide | cameras |
 | Watch: next fighter every | `/mobbattle watchAutoSwitch <seconds>\|off` | `camera.watch.autoswitch` | 0 (off), 3-600 | 0 | cameras |
-| Slow motion after the final blow | `/mobbattle endSlowMo <percent>\|off` | `camera.slowmo` | 0 (off), 5-99 | 0 | cameras |
+| Slow motion after the final blow (times slower) | `/mobbattle endSlowMo <times>\|off` | `camera.slowmo.times` | 0 (off), 2-20 | 0 | cameras |
 | Slow motion lasts | `/mobbattle endSlowMoTime <seconds>` | `camera.slowmo.time` | 1-20 | 3 | cameras |
 | Film bands | `/mobbattle cameraBars off\|slim\|classic\|wide` | `camera.bars` | off, slim, classic, wide | classic | cameras |
 | Background blur | `/mobbattle cameraBlur off\|soft\|strong` | `camera.blur` | off, soft, strong | soft | cameras |
 | Auto film | `/mobbattle autoFilm on\|off` | `camera.autofilm` | true, false | off | cameras |
-| Shots of you | `/mobbattle filmPlayerShots <0-100>` | `camera.film.player` | 0-100 (percent, 0 = only the battle) | 20 | cameras |
+| Shots of you | `/mobbattle filmPlayerShots <0-100>` | `camera.film.player` | 0-100 (percent, 0 = only the battle) | 5 | cameras |
 | Far wide shots | `/mobbattle filmWideShots <0-100>` | `camera.film.wide` | 0-100 (percent, +15 with a mob over 4 blocks tall) | 30 | cameras |
 | Close-ups face the mob | `/mobbattle cameraFace on\|off` | `camera.face` | true, false | on | cameras |
-| Shot length | `/mobbattle filmShotTime <seconds>` | `camera.film.shot` | 3-60 | 8 | cameras |
+| Shot length | `/mobbattle filmShotTime <seconds>` | `camera.film.shot` | 3-60 | 6 | cameras |
 | Shot length variation | `/mobbattle filmShotVariation <0-90>` | `camera.film.variation` | 0-90 (percent) | 25 | cameras |
 | Camera pace | `/mobbattle filmPace <25-300>` | `camera.film.pace` | 25-300 (percent) | 100 | cameras |
 | Between shots | `/mobbattle filmTransition cut\|glide` | `camera.film.transition` | cut, glide | cut | cameras |
-| Film shots | `/mobbattle filmShot <shot> <0-300>` (`filmShots <list>` = those on, the rest off; `filmShots default` = all back to default; panel: Defaults button) | `camera.film.weight.<shot>` | 0-300 percent of normal per shot: wide, track, arc, pushin, closeup, landscape, playerback, playerclose, zenith, spiral, telephoto, descent, groundrise, profile | 100; spiral 80, telephoto and descent 70, landscape and groundrise 50, zenith 40 | cameras |
+| Film shots | `/mobbattle filmShot <shot> <0-300>` (`filmShots <list>` = those on, the rest off; `filmShots default` = all back to default; panel: Defaults button) | `camera.film.weight.<shot>` | 0-300 percent of normal per shot: wide, track, arc, pushin, closeup, landscape, playerback, playerclose, zenith, spiral, telephoto, descent, groundrise, profile | 100; spiral 80, telephoto and descent 70, groundrise 50, zenith 40, landscape 10 | cameras |
 | Film style | `/mobbattle filmStyle default\|battle\|action\|cinematic` (panel: the four buttons above the film shots) | (sets every `camera.film.*` key) | battle = fight always in view; action = close on the fighters; cinematic = open, slow, gliding shots | default | cameras |
-| Duel card | `/mobbattle duelCard on\|off` | `battle.duelCard` | true, false | off | arenas |
-| All vs one card | `/mobbattle focusCard on\|off` | `battle.focusCard` | true, false | off | arenas |
+| Duel card | `/mobbattle duelCard on\|off` | `battle.duelCard` | true, false | on | arenas |
+| All vs one card | `/mobbattle focusCard on\|off` | `battle.focusCard` | true, false | on | arenas |
 
 Not settings: `/mobbattle skipCamera` ends your running camera, `/mobbattle watch [exit]` spectates a battle, `/mobbattle film [exit]` films one.
 
@@ -190,6 +196,7 @@ Not settings: `/mobbattle skipCamera` ends your running camera, `/mobbattle watc
 | Unstick stalled fighters | `/mobbattle unstick on\|off` | `battle.unstick` | true, false | on | arenas |
 | Stand-off shove | `/mobbattle standoffTime <seconds>\|off` | `battle.standoff` | 0-3600, 0 = never | 15 | arenas |
 | Win against passive mobs | `/mobbattle passiveWin <seconds>\|off` | `battle.passivewin` | 0-3600, 0 = never | 15 | arenas |
+| Loot from battle deaths | `/mobbattle battleLoot on\|off` | `battle.loot` | on, off | off | arenas |
 | Battle depth (below) | `/mobbattle battleBelow <blocks>\|off` | `battle.below` | 0-512 (0 = no limit) | 50 | arenas |
 | Battle height (above) | `/mobbattle battleAbove <blocks>\|off` | `battle.above` | 0-512 (0 = no limit) | 40 | arenas |
 | Arena vertical limit | `/mobbattle arenaVertical <blocks>\|off` | `battle.arena.vertical` | 0-512 (0 = no limit) | off | arenas |
@@ -214,10 +221,10 @@ The presentation and camera overrides of these tabs are listed under [Per-kind o
 | Self defense | `/mobbattle selfDefense <kind\|all> on\|off` | `battle.selfdefense.<kind>` | true, false | on / on / on / on | rules |
 | Friendly fire (All vs one, Team battles) | `/mobbattle friendlyFire <allVsOne\|teams\|all> on\|off` | `battle.friendlyfire.<kind>` | true, false | - / on / - / off | rules |
 | Players can fight | `/mobbattle playerFights <kind\|all> on\|off` | `battle.players.<kind>` | true, false | on / on / on / on | rules |
-| Arena | `/mobbattle arena <kind\|all> on\|show\|wall\|off` | `battle.arena.<kind>` | on, show, wall, off | off / on / on / off | arenas |
+| Arena | `/mobbattle arena <kind\|all> on\|show\|wall\|off` | `battle.arena.<kind>` | on, show, wall, off | off / on / on / on | arenas |
 | Timer | `/mobbattle timer <kind\|all> <time>\|off` | `battle.timer.<kind>` | 0-86400 seconds (24 h), 0 = none | off / off / 3 min (180) / off | arenas |
 | At time up | `/mobbattle timeUp <kind\|all> <rule>` | `battle.timeup.<kind>` | draw, kill, continue, health, judge | draw / draw / judge / draw | arenas |
-| Judge by | `/mobbattle judgeBy <kind\|all> <score>` | `battle.judgeby.<kind>` | health, damage, kills, mix | health for all | arenas |
+| Judge by | `/mobbattle judgeBy <kind\|all> <score>` | `battle.judgeby.<kind>` | health, damage, kills, mix | mix for royale, health for the rest | arenas |
 | Closing arena | `/mobbattle arenaShrink <kind\|all> on\|off` | `battle.shrink.<kind>` | true, false | off / off / on / off | arenas |
 | Scoreboard | `/mobbattle scoreboard <kind\|all> on\|off` | `battle.scoreboard.<kind>` | true, false | off / off / off / on | arenas |
 
@@ -246,7 +253,13 @@ Creative players never fight, whatever Players can fight says.
 | Army tint | `/mobbattle armyTint on\|off` | `army.tint` | true, false | off | effects |
 | Army tint color | `/mobbattle armyTintColor <color>` | `army.tint.color` | palette color | Blue | effects |
 | Army friendly fire | `/mobbattle armyFriendlyFire on\|off` | `army.friendlyfire` | true, false | off | rules |
-| Weapon damage bonus | `/mobbattle equipWeaponDamage on\|off` | `equip.weapon.damage` | true, false | off | rules |
+| Weapon damage bonus | `/mobbattle equipWeaponDamage on\|off` | `equip.weapon.damage` | true, false | on | rules |
+| Training dummies: health | `/mobbattle dummyHealth <hit points>` | `dummy.health` | 100-10000 (never under their own 100) | 100 | rules |
+| Training dummies: extra damage | `/mobbattle dummyDamage <percent>` | `dummy.damage` | 0-9900 | 0 | rules |
+| Training dummies: defense | `/mobbattle dummyDefense <percent>` | `dummy.defense` | 0-99 | 0 | rules |
+| Training dummies: extra speed | `/mobbattle dummySpeed <percent>` | `dummy.speed` | 0-900 | 0 | rules |
+| Training dummies: extra size | `/mobbattle dummySize <percent>` | `dummy.size` | 0-900 | 0 | rules |
+| Mob runes: time between two casts of one rune | `/mobbattle runeCooldown <percent>` | `rune.cooldown` | 50-1000 (% of the rune's own cooldown; 100 = as a player) | 200 | rules |
 | Crown on the lone target | `/mobbattle crown gold\|<color>\|off` | `fx.crown` | Gold, palette color, off | Gold | effects |
 | Cleanse Wand color | `/mobbattle cleanseColor <color>` | `wand.cleanse.color` | palette color | White | effects |
 | Look glow | `/mobbattle lookGlow <0-15>` | `fx.glow.look` | 0-15, 0 = off | 6 | effects |
@@ -279,7 +292,7 @@ Sources (`<who>`): `lone` (the all vs one target, for that battle), `streak` (pe
 | Damage | `/mobbattle buff <who> damage <percent>` | `buff.<who>.damage` | 0-99900 | 0; wand 10 | rules |
 | Defense | `/mobbattle buff <who> defense <percent>` | `buff.<who>.defense` | 0-99 | 0; wand 5 | rules |
 | Speed | `/mobbattle buff <who> speed <percent>` | `buff.<who>.speed` | 0-4900 (above 300 warns) | 0 | rules |
-| Heal when given | `/mobbattle buff <who> heal on\|off` | `buff.<who>.heal` | true, false | off | rules |
+| Heal when given | `/mobbattle buff <who> heal on\|off` | `buff.<who>.heal` | true, false | off; wand on | rules |
 | Streak max kills | `/mobbattle buff streak maxKills <n>` | `buff.streak.maxkills` | 1-1000 | 5 | rules |
 | Buff Wand max stacks | `/mobbattle buff wand maxStacks <n>` | `buff.wand.maxstacks` | 1-1000 | 5 | rules |
 | Buff color | `/mobbattle buffColor <color>` | `wand.buff.color` | palette color | Purple | effects |
@@ -302,7 +315,7 @@ Shortcuts: `/mobbattle buff <who> all <percent>` sets every stat at once, speed 
 | Effect Wand effect | `/mobbattle wandEffect <id>` | `effect.id` | any loaded effect ID; a chain `A>B>C`; `jade[:color]`, `shimmer[:color]` | `Burn` | wands |
 | Wand waves: hit as the ring arrives | `/mobbattle waveTravel on\|off` | `wand.wave.travel` | true, false | on | wands |
 | Wand waves: ground only | `/mobbattle waveGroundOnly on\|off` | `wand.wave.groundonly` | true, false | off | wands |
-| Battle waves: reach as the ring arrives | `/mobbattle battleWaveTravel on\|off` | `battle.wave.travel` | true, false | off | arenas |
+| Battle waves: reach as the ring arrives | `/mobbattle battleWaveTravel on\|off` | `battle.wave.travel` | true, false | on | arenas |
 | Battle waves: ground only | `/mobbattle battleWaveGroundOnly on\|off` | `battle.wave.groundonly` | true, false | off | arenas |
 | Heal wave (hold left click) | `/mobbattle healArea on\|off` | `heal.area` | true, false | on | wands |
 | Heal wave reach | `/mobbattle healRadius <blocks>` | `heal.area.radius` | 2-2048 (above 128 warns) | 12 | wands |
@@ -356,7 +369,8 @@ The team list itself (names and colors, at most 14 teams, at least 2) is saved a
 | Summons leave | `/mobbattle summonDespawn never\|battleEnd\|timer` | `summon.despawn` | never, battleEnd, timer | never | rules |
 | Summon lifetime | `/mobbattle summonLifetime <seconds>` | `summon.lifetime` | 5-3600 | 60 | rules |
 | How they leave | `/mobbattle summonExit disintegrate\|vanish\|shatter` | `summon.exit` | disintegrate, vanish, shatter | disintegrate | rules |
-| Calm until a battle | `/mobbattle summonCalm off\|summons\|all` | `summon.calm` | off, summons, all | off | rules |
+| Calm until a battle | `/mobbattle summonCalm off\|summons\|all` | `summon.calm` | off, summons, all | summons | rules |
+| Summons frozen | `/mobbattle summonFrozen on\|off` | `summon.frozen` | true, false | off | rules |
 | Summons join my army | `/mobbattle summonArmy on\|off` | `summon.army` | true, false | off | rules |
 | Summons in jade | `/mobbattle summonJade on\|off` | `summon.jade` | true, false | off | effects |
 | Summon jade color | `/mobbattle summonJadeColor <color>` | `summon.jade.color` | palette color | Green | effects |
@@ -372,6 +386,7 @@ These are changed only by their own commands (admin), never by presets, resets o
 | Debug log | `/mobbattle debugLog on\|off` | `debug` | true, false | off |
 | Debug recorder | `/mobbattle debugRecord on\|off` | `debug.record` | true, false | off |
 | Server feature: VS screen | `/mobbattle serverVs on\|off` | `server.vs` | true, false | on |
+| Server feature: VS pictures sent | `/mobbattle serverVsPictures boot\|battle` | `server.vs.pictures` | boot, battle | battle |
 | Server feature: Morph Wand hologram | `/mobbattle serverHolograms on\|off` | `server.hologram` | true, false | on |
 | Server feature: panel mob pictures | `/mobbattle serverIcons on\|off` | `server.icons` | true, false | on |
 | Permission mode (Admin tab buttons) | `/mobbattle permissions open\|server` | `permissions.mode` | open, server | open |

@@ -1,0 +1,22 @@
+{
+  "$Comment": "Equipment Wand: the mob's gear was copied (blue tint, blue burst ring; sound played by the code).",
+  "Duration": 1.0,
+  "ApplicationEffects": {
+    "EntityTopTint": "#2a8cff",
+    "EntityBottomTint": "#0a2f8a",
+    "Particles": [
+      {
+        "SystemId": "MobBattle_Mark_Burst_Blue",
+        "TargetEntityPart": "Entity",
+        "TargetNodeName": "Pelvis"
+      }
+    ],
+    "FirstPersonParticles": [
+      {
+        "SystemId": "MobBattle_Nothing"
+      }
+    ]
+  },
+  "OverlapBehavior": "Overwrite",
+  "Debuff": false
+}

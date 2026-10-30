@@ -41,19 +41,23 @@ public class KillTracker extends RefChangeSystem<EntityStore, DeathComponent> {
         if (!BattleManager.hasBattles() || !BattleManager.isManaged(victim) && !BattleManager.isPlayerFighter(victim)) {
             return;
         }
-        BattleManager.Battle battle = BattleManager.battleOf(victim);
-        Damage info = death.getDeathInfo();
-        if (battle == null || info == null || !(info.getSource() instanceof Damage.EntitySource source)) {
-            return;
+        // battleLoot off: the corpse drops nothing (vanilla DropDeathItems ticks on the corpse and skips a marked role)
+        if (!FxSettings.battleLoot) {
+            NPCEntity npc = buffer.getComponent(victim, NPCEntity.getComponentType());
+            if (npc != null && npc.getRole() != null) npc.getRole().setDeathItemsDropped();
         }
-        Ref<EntityStore> killer = source.getRef();
-        if (killer == null || killer == victim || !battle.has(killer)) {
+        BattleManager.Battle battle = BattleManager.battleOf(victim);
+        // endSlowMo: starts at the final blow, not at the next once-a-second winner check
+        SlowMo.finalBlow(battle, victim, buffer);
+        if (battle == null) return;
+        Damage info = death.getDeathInfo();
+        Ref<EntityStore> killer = info != null && info.getSource() instanceof Damage.EntitySource source ? source.getRef() : null;
+        if (killer == null || killer == victim || !battle.has(killer) || battle.team(killer) == battle.team(victim)) {
+            // no kill to credit (fall, burn, an ally): the watch still holds on the body
+            BattleWatch.onKill(victim, null, buffer);
             return;
         }
         int team = battle.team(killer);
-        if (team == battle.team(victim)) {
-            return;
-        }
         battle.recordKill(killer, ChaosWand.nameOf(killer, buffer), team);
         // /mobbattle watch: whoever watched the victim now follows its killer.
         BattleWatch.onKill(victim, killer, buffer);

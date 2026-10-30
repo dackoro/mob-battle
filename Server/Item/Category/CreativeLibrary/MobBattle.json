@@ -1,0 +1,24 @@
+{
+  "Icon": "Icons/ItemCategories/MobBattle.png",
+  "Order": 5,
+  "Children": [
+    {
+      "Id": "Wands",
+      "Name": "server.mobbattle.creative.wands",
+      "Icon": "Icons/ItemCategories/Items-Weapons.png",
+      "Order": 0,
+      "SubCategories": [
+        { "Id": "Battles", "Name": "server.mobbattle.creative.battles", "Order": 10, "Description": "server.mobbattle.creative.battles.description" },
+        { "Id": "Army", "Name": "server.mobbattle.creative.army", "Order": 20, "Description": "server.mobbattle.creative.army.description" },
+        { "Id": "Support", "Name": "server.mobbattle.creative.support", "Order": 30, "Description": "server.mobbattle.creative.support.description" },
+        { "Id": "Destruction", "Name": "server.mobbattle.creative.destruction", "Order": 40, "Description": "server.mobbattle.creative.destruction.description" }
+      ]
+    },
+    {
+      "Id": "Dev",
+      "Name": "server.mobbattle.creative.dev",
+      "Icon": "Icons/ItemCategories/Items-Tools.png",
+      "Order": 1
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-"""Morph Wand hologram motion (2026-10-16, user: the panel should move).
+"""Morph Wand hologram motion (2026-10-16, playtest: the panel should move).
 
 Writes Server/Item/Animations/MobBattle_MorphWand.json (Parent Staff, as the Team Wand's set) overriding every
 looping Staff entry with copies of its animations plus a "Hologram" node track: the panel floats up and down and

@@ -49,11 +49,35 @@ final class BattleWatch extends CustomUIHud {
     private static final long CARD_MS = 1000;
     private static final String WARN = "#ffcc55";
 
+    /** Auto switch seconds for this viewer: the setting, or AUTO_DEFAULT_S when E turned it on with the setting off. */
+    private static int autoSeconds(Watch w) {
+        Boolean on = w.auto;
+        if (on == null) return FxSettings.watchAutoSwitch;
+        return on ? (FxSettings.watchAutoSwitch > 0 ? FxSettings.watchAutoSwitch : AUTO_DEFAULT_S) : 0;
+    }
+
+    /** E while watching: the automatic switch on or off for this viewer only (2026-10-29). */
+    static void toggleAuto(PlayerRef player) {
+        Watch w = WATCHING.get(player.getUuid());
+        if (w == null) return;
+        boolean on = autoSeconds(w) <= 0;
+        w.auto = on;
+        w.lastSwitch = System.currentTimeMillis();
+        player.sendMessage(I18n.tr(on ? "battle.watch.auto.on" : "battle.watch.auto.off").param("s", autoSeconds(w)).color(on ? "#7CFF8A" : "#aaaaaa"));
+    }
+
+    private static final int AUTO_DEFAULT_S = 6;
+
+    /** How long the watch stays on a fighter that fell before going on (its killer, else another fighter). */
+    private static final long FALL_HOLD_MS = 1800;
+
     private static final class Watch {
         final BattleManager.Battle battle;
         final Store<EntityStore> store;
         final Vector3d home;
         final Rotation3f homeLook;
+        /** Flying before the watch (or the film before it): given back on exit (Flight). */
+        boolean flying;
         volatile long endsAt;
         long nextCard;
         /** Fighters watched before, latest last (left click goes back). */
@@ -66,6 +90,16 @@ final class BattleWatch extends CustomUIHud {
         volatile Glide glide;
         /** When the camera last went to another fighter (watchAutoSwitch counts from here). */
         volatile long lastSwitch = System.currentTimeMillis();
+        /** The watched fighter fell at this time (0 = not): the camera stays on it FALL_HOLD_MS before moving on. */
+        volatile long fellAt;
+        /** Auto switch for this viewer: null = the watchAutoSwitch setting, else E turned it on or off. */
+        volatile Boolean auto;
+        /** Who to go to after the hold: its killer, else a replacement. */
+        volatile Ref<EntityStore> fellNext;
+        /** The follow camera was put on the fallen body for the hold (holdOnFall). */
+        volatile boolean fallCam;
+        /** The body the fall hold films: once it is removed the hold ends early (else the client flies free). */
+        volatile Ref<EntityStore> fellOn;
 
         Watch(BattleManager.Battle battle, Store<EntityStore> store, Vector3d home, Rotation3f homeLook) {
             this.battle = battle;
@@ -77,6 +111,23 @@ final class BattleWatch extends CustomUIHud {
 
     /** Watching players by UUID (never a PlayerRef: a reconnect makes a new one). */
     private static final Map<UUID, Watch> WATCHING = new ConcurrentHashMap<>();
+
+    /**
+     * The bodies of the players watching in {@code store} (WatcherHideSystem hides them from everyone else: the game
+     * shows spectators to other spectators, so two players watching saw each other standing among the fighters and
+     * the arrows hitting the other one, playtest 2026-10-29). Empty when nobody watches.
+     */
+    static List<Ref<EntityStore>> watcherBodies(Store<EntityStore> store) {
+        if (WATCHING.isEmpty()) return List.of();
+        List<Ref<EntityStore>> out = new ArrayList<>(WATCHING.size());
+        for (Map.Entry<UUID, Watch> e : WATCHING.entrySet()) {
+            if (e.getValue().store != store) continue;
+            PlayerRef p = Universe.get().getPlayer(e.getKey());
+            Ref<EntityStore> r = p != null && p.isValid() ? p.getReference() : null;
+            if (r != null && r.isValid() && r.getStore() == store) out.add(r);
+        }
+        return out;
+    }
 
     /** Built with the duel layout (UI_DUEL) or the one-fighter card (UI). */
     private final boolean duel;
@@ -93,6 +144,14 @@ final class BattleWatch extends CustomUIHud {
 
     static boolean any() {
         return !WATCHING.isEmpty();
+    }
+
+    /** The fighter a watcher's camera is on (null if {@code me} is not watching). */
+    static Ref<EntityStore> watchedBy(Ref<EntityStore> me, ComponentAccessor<EntityStore> acc) {
+        if (WATCHING.isEmpty() || me == null || !me.isValid()) return null;
+        PlayerRef p = acc.getComponent(me, PlayerRef.getComponentType());
+        Watch w = p != null ? WATCHING.get(p.getUuid()) : null;
+        return w != null ? watched(w, me, acc) : null;
     }
 
     static boolean isWatching(PlayerRef player) {
@@ -169,18 +228,27 @@ final class BattleWatch extends CustomUIHud {
         HeadRotation head = store.getComponent(me, HeadRotation.getComponentType());
         Rotation3f look = head != null ? new Rotation3f(head.getRotation()) : new Rotation3f(t.getRotation());
         // An intro still playing (cameraTime longer than the countdown) or an orbit gives way to the watch camera.
-        FightCamera.cancel(player);
+        FightCamera.handOver(player);
+        // from a film: out of its game mode first, else leaving the watch would give that one back; the watch then
+        // brings them back where they stood before the film, not to the film's flying body
+        Boolean filmFlying = FilmMode.flyingBefore(player);
+        boolean flying = filmFlying != null ? filmFlying : Flight.of(me, store);
+        Vector3d filmHome = FilmMode.leaveNow(player, me, store);
+        if (filmHome != null) at = filmHome;
         if (!GameModeTypes.enter(me, store, GAME_MODE)) {
             player.sendMessage(I18n.tr("battle.watch.cant.start").color(WARN));
             return;
         }
         switchTo(me, target, store);
-        WATCHING.put(player.getUuid(), new Watch(battle, store, at, look));
+        Watch watch = new Watch(battle, store, at, look);
+        watch.flying = flying;
+        WATCHING.put(player.getUuid(), watch);
         // Cutting that camera gives the player their normal camera back a moment later (and an orbit glides back
         // first), after the spectator camera was attached: the client was left flying free while the server still
         // thought it followed a fighter. Attach it again once the cut is done.
         // Always, not only when we cut one: an intro that ends right now (duels: cameraTime 0 = the countdown, so it
         // ends exactly when the battle starts and autoWatch runs) sends its own camera reset after ours.
+        reattachLater(player, store, REATTACH_FIRST_MS);
         reattachLater(player, store, REATTACH_MS);
         reattachLater(player, store, REATTACH_LATE_MS);
         reattachLater(player, store, REATTACH_LAST_MS);
@@ -210,7 +278,7 @@ final class BattleWatch extends CustomUIHud {
             }
             if (next == null) {
                 // nothing earlier: the fighter before the watched one in team order, the first wrapping to the last
-                // (user, 2026-10-17: "if I'm on the first, jump to the last of the list")
+                // (playtest 2026-10-17: "if I'm on the first, jump to the last of the list")
                 List<Ref<EntityStore>> alive = aliveSorted(w.battle, acc);
                 int at = current != null ? alive.indexOf(current) : -1;
                 Ref<EntityStore> before = alive.isEmpty() ? null : alive.get(at < 0 ? alive.size() - 1 : (at - 1 + alive.size()) % alive.size());
@@ -256,7 +324,7 @@ final class BattleWatch extends CustomUIHud {
     // ---- going to another fighter: cut or glide ----
 
     /**
-     * The camera on its way from one fighter to the next (watchTransition glide, 2026-10-18, user: the watch cut
+     * The camera on its way from one fighter to the next (watchTransition glide, 2026-10-18, playtest: the watch cut
      * between fighters, the film can glide). Server camera frames (FightCamera.frame) every FRAME_MS: the point it
      * looks at slides from the old fighter's eyes to the new one's (both followed while they move), the distance from
      * one follow distance to the other, and the direction turns from the watcher's own to the line from where the
@@ -275,6 +343,10 @@ final class BattleWatch extends CustomUIHud {
         float yaw, pitch;              // last frame
         double dist;
         Vector3d look;
+        /** A fall hold: a still camera on the fallen fighter until tick() goes on (it never ends by itself). */
+        boolean hold;
+        /** What the watcher turned with the mouse meanwhile (onMouse), on top of the glide's own direction. */
+        volatile float dYaw, dPitch;
 
         Glide(Ref<EntityStore> from, Ref<EntityStore> to, Vector3d fromLook, Vector3d toLook, double fromDist, double toDist,
               float yaw0, float pitch0, float yaw1, float pitch1, long durMs) {
@@ -310,6 +382,10 @@ final class BattleWatch extends CustomUIHud {
     /** Goes to {@code target}: a glide (watchTransition glide) or a cut. World thread. */
     private static void go(PlayerRef player, Watch w, Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
         w.lastSwitch = System.currentTimeMillis();
+        w.fellAt = 0;
+        w.fellNext = null;
+        w.fallCam = false;
+        w.fellOn = null;
         if ("glide".equals(FxSettings.watchTransition) && glide(player, w, me, target, acc)) return;
         w.glide = null;
         switchTo(me, target, acc);
@@ -386,6 +462,12 @@ final class BattleWatch extends CustomUIHud {
         }
         try {
             frame(player, g, store);
+            if (g.hold) {
+                // tick() moves on after FALL_HOLD_MS (a new glide or a cut replaces this one); a safety end after that
+                if (System.currentTimeMillis() - g.start < FALL_HOLD_MS + HOLD_SAFETY_MS) scheduleGlide(player, w, g);
+                else w.glide = null;
+                return;
+            }
             if (System.currentTimeMillis() - g.start < g.durMs + SETTLE_MS) {
                 scheduleGlide(player, w, g);
                 return;
@@ -421,18 +503,75 @@ final class BattleWatch extends CustomUIHud {
         }
         Vector3d look = new Vector3d(g.fromLook).lerp(g.toLook, e);
         double turn = Math.atan2(Math.sin(g.yaw1 - g.yaw0), Math.cos(g.yaw1 - g.yaw0));
-        g.yaw = (float) (g.yaw0 + turn * e);
-        g.pitch = (float) (g.pitch0 + (g.pitch1 - g.pitch0) * e);
+        g.yaw = (float) (g.yaw0 + turn * e) + g.dYaw;
+        g.pitch = Math.max(MOUSE_PITCH_MIN, Math.min(MOUSE_PITCH_MAX, (float) (g.pitch0 + (g.pitch1 - g.pitch0) * e) + g.dPitch));
         g.dist = g.fromDist + (g.toDist - g.fromDist) * e;
         g.look = look;
-        Vector3d cam = behind(look, g.yaw, g.pitch, g.dist);
-        FightCamera.send(player, FightCamera.blurred(FightCamera.frame(cam, look, GLIDE_LERP), 0));
+        Vector3d cam = behind(look, g.yaw, g.pitch, clearDistance(look, g.yaw, g.pitch, g.dist, acc));
+        var s = FightCamera.blurred(FightCamera.frame(cam, look, GLIDE_LERP), 0);
+        // the watcher's own spectator body stays on the old fighter until the switch, and a third-person frame drew it
+        // as a ghost in front of the camera (playtest 2026-10-28); a first-person frame does not draw the local body
+        s.isFirstPerson = true;
+        // the client reports mouse moves while this camera holds (onMouse), so the watcher still turns around the
+        // fighter during a glide or a fall hold (2026-10-29, playtest: the mouse froze there), as the game's CameraDemo does
+        s.sendMouseMotion = true;
+        // ❓ the client sent nothing with FightCamera.frame's None target and a hidden cursor (2026-10-29, playtest test);
+        // the game's CameraDemo leaves the target at Any and shows the cursor: both tried from /mobbattle test watchmouse
+        s.mouseInputTargetType = mouseTarget;
+        s.displayCursor = mouseCursor;
+        FightCamera.send(player, s);
+    }
+
+    /** Test knobs for the glide's mouse (/mobbattle test watchmouse): what the camera asks the client for. */
+    static volatile com.hypixel.hytale.protocol.MouseInputTargetType mouseTarget = com.hypixel.hytale.protocol.MouseInputTargetType.Any;
+    // ✅ 2026-10-29: the client only sends mouse motion with the cursor shown; off by default (playtest: the cursor in the
+    // watch is a bother), so glides turn by themselves; the fall hold uses the game's follow camera instead
+    static volatile boolean mouseCursor = false;
+    static volatile float mouseTurn = 0.004f;
+    /** Mouse motion events seen (any player), and the last one's motion: tells whether the client sends any. */
+    static final java.util.concurrent.atomic.AtomicLong MOUSE_EVENTS = new java.util.concurrent.atomic.AtomicLong();
+    static volatile String lastMouse = "-";
+
+    private static final float MOUSE_PITCH_MIN = -1.2f, MOUSE_PITCH_MAX = 0.8f;
+
+    /**
+     * PlayerMouseMotionEvent (world thread, InteractionModule.doMouseInteraction): a watcher whose camera the mod holds
+     * (glide or fall hold) turns it; the next frame adds the turn. Nothing to do for anyone else.
+     */
+    static void onMouse(com.hypixel.hytale.server.core.event.events.player.PlayerMouseMotionEvent event) {
+        var motion = event.getMouseMotion();
+        if (motion == null || motion.relativeMotion == null) return;
+        MOUSE_EVENTS.incrementAndGet();
+        lastMouse = motion.relativeMotion.x + "," + motion.relativeMotion.y;
+        if (WATCHING.isEmpty()) return;
+        Ref<EntityStore> ref = event.getPlayerRef();
+        if (ref == null || !ref.isValid()) return;
+        PlayerRef p = ref.getStore().getComponent(ref, PlayerRef.getComponentType());
+        Watch w = p != null ? WATCHING.get(p.getUuid()) : null;
+        Glide g = w != null ? w.glide : null;
+        if (g == null) return;
+        g.dYaw -= motion.relativeMotion.x * mouseTurn;
+        g.dPitch = Math.max(-2f, Math.min(2f, g.dPitch - motion.relativeMotion.y * mouseTurn));
     }
 
     /** The camera spot {@code dist} back from {@code look} along the direction yaw/pitch (the game's convention). */
     private static Vector3d behind(Vector3d look, float yaw, float pitch, double dist) {
         double c = Math.cos(pitch);
         return new Vector3d(look.x + Math.sin(yaw) * c * dist, look.y - Math.sin(pitch) * dist, look.z + Math.cos(yaw) * c * dist);
+    }
+
+    /**
+     * How far back from {@code look} the camera can sit before a block (as the follow camera's DistanceOffsetRaycast):
+     * the glide and the fall hold went through walls (playtest 2026-10-29). Steps of 0.25 from 0.5 blocks out.
+     */
+    private static double clearDistance(Vector3d look, float yaw, float pitch, double dist, ComponentAccessor<EntityStore> acc) {
+        for (double d = 0.5; d <= dist; d += 0.25) {
+            Vector3d q = behind(look, yaw, pitch, d);
+            if (FightFx.solidAt((int) Math.floor(q.x), (int) Math.floor(q.y), (int) Math.floor(q.z), acc)) {
+                return Math.max(0.5, d - 0.35);
+            }
+        }
+        return dist;
     }
 
     /** Where the follow camera looks on {@code r}: its eyes, at least 1 block up (as followCamera). */
@@ -442,6 +581,9 @@ final class BattleWatch extends CustomUIHud {
         float eye = com.hypixel.hytale.server.core.modules.entity.component.ModelComponent.getEyeHeight(r, acc);
         return new Vector3d(p).add(0, Math.max(1, eye), 0);
     }
+
+    /** First try: a camera reset already queued on the world thread lands within a tick or two. */
+    private static final long REATTACH_FIRST_MS = 150;
 
     /** After a cut camera's glide back (FightCamera.cut: 0.3 s sequence, then the camera reset). */
     private static final long REATTACH_MS = 500;
@@ -455,7 +597,7 @@ final class BattleWatch extends CustomUIHud {
      * Sends the watcher's follow camera again, on the same target. Putting the same Spectating again does nothing:
      * vanilla OnSpectatingChange.onComponentSet skips it when the target is equal (javap, 2026-10-12), so the old
      * re-put never re-attached and a watcher whose intro reset came after the watch start was left floating free
-     * (user). Calls vanilla's private applyFollowCamera instead.
+     *. Calls vanilla's private applyFollowCamera instead.
      */
     private static void reattachLater(PlayerRef player, Store<EntityStore> store, long delayMs) {
         if (store.isShutdown()) return;
@@ -494,7 +636,7 @@ final class BattleWatch extends CustomUIHud {
      * The follow camera on {@code target}, as vanilla SpectatorSystems.OnSpectatingChange.applyFollowCamera (javap,
      * 0.7.0: attached third person at the eyes, raycast distance, the watcher's own rotation, raised to 1 block for
      * tiny eyes) but sized: vanilla keeps 4 blocks for anything, so a giant boss filled the screen with the camera
-     * inside it (user, 2026-10-13). Distance = its half width + 1.1 x its hitbox height (a size buff grows the
+     * inside it (playtest 2026-10-13). Distance = its half width + 1.1 x its hitbox height (a size buff grows the
      * hitbox), at least 4. Also used to re-attach after an intro reset. World thread.
      */
     static void followCamera(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
@@ -507,11 +649,6 @@ final class BattleWatch extends CustomUIHud {
         PlayerRef player = acc.getComponent(me, PlayerRef.getComponentType());
         var net = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId.getComponentType());
         if (player == null || net == null) return;
-        var transform = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
-        if (transform != null) {
-            acc.putComponent(me, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
-                    com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createForPlayer(transform.getPosition(), transform.getRotation()));
-        }
         var s = new com.hypixel.hytale.protocol.ServerCameraSettings();
         s.attachedToType = com.hypixel.hytale.protocol.AttachedToType.EntityId;
         s.attachedToEntityId = net.getId();
@@ -525,15 +662,51 @@ final class BattleWatch extends CustomUIHud {
         s.rotationType = com.hypixel.hytale.protocol.RotationType.Custom;
         s.applyLookType = com.hypixel.hytale.protocol.ApplyLookType.Rotation;
         var mine = acc.getComponent(me, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
+        // where the watcher looks now (HeadRotation follows the orbit): a re-attach used the body's rotation and turned
+        // the view by itself a moment after each switch (2026-10-29, playtest video)
+        var head = acc.getComponent(me, HeadRotation.getComponentType());
         if (rot != null) {
             s.rotation = rot;
+        } else if (head != null) {
+            var r = new Rotation3f(head.getRotation());
+            s.rotation = new com.hypixel.hytale.protocol.Direction(r.yaw(), r.pitch(), 0f);
         } else if (mine != null) {
             var r = mine.getRotation();
             s.rotation = new com.hypixel.hytale.protocol.Direction(r.yaw(), r.pitch(), r.roll());
         }
+        // the body goes to the fighter (as vanilla applyFollowCamera) but keeps the look above: vanilla teleports with
+        // the TARGET's rotation, which turned the watcher's view to where the mob faced on every re-attach (2026-10-29,
+        // playtest video: the view swung round by itself)
+        var transform = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
+        if (transform != null && bodyMustMove(me, target, acc)) {
+            Rotation3f look = s.rotation != null ? new Rotation3f(s.rotation.pitch, s.rotation.yaw, 0f) : transform.getRotation();
+            // Projectiles collide with every player body, spectators too (EntityCollisionProvider takes the player
+            // spatial set, Intangible or not): arrows at the watched fighter hit the watcher's invisible body there.
+            // Lifting the body made the camera jump (every player teleport resets it, and the spectating client moves
+            // its body back), so PlayerBattleDamageSystem hands such a hit to the watched fighter instead.
+            acc.putComponent(me, com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.getComponentType(),
+                    com.hypixel.hytale.server.core.modules.entity.teleport.Teleport.createForPlayer(transform.getPosition(), look));
+        }
         player.getPacketHandler().writeNoCache(new com.hypixel.hytale.protocol.packets.camera.SetServerCamera(
                 com.hypixel.hytale.protocol.ClientCameraView.Custom, true, s));
     }
+
+    /**
+     * Whether followCamera has to move the watcher's body: only when far from the fighter (chunks, as vanilla
+     * FollowTarget's 32 blocks). Every player teleport resets the client's camera a moment (2026-10-29, playtest video).
+     */
+    private static boolean bodyMustMove(Ref<EntityStore> me, Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
+        var mine = acc.getComponent(me, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
+        var theirs = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType());
+        if (mine == null || theirs == null) return true;
+        var bb = acc.getComponent(target, com.hypixel.hytale.server.core.modules.entity.component.BoundingBox.getComponentType());
+        var box = bb != null ? bb.getBoundingBox() : null;
+        double top = box != null ? box.max.y : 2, half = box != null ? Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 : 0.5;
+        var a = mine.getPosition();
+        var b = theirs.getPosition();
+        return a.distanceSquared(b) > 24 * 24;
+    }
+
 
     /** Follow distance for {@code target}: 4 blocks for a normal mob, its half width + 1.1 x its height when bigger (max 60). */
     static double followDistance(Ref<EntityStore> target, ComponentAccessor<EntityStore> acc) {
@@ -565,6 +738,7 @@ final class BattleWatch extends CustomUIHud {
         // Spectators fly through blocks: back where they started watching, not inside a hill.
         if (w != null && w.store == me.getStore()) {
             acc.putComponent(me, Teleport.getComponentType(), Teleport.createForPlayer(w.home, w.homeLook));
+            Flight.restoreLater(me, w.store, w.flying);
         }
         player.sendMessage(I18n.tr("battle.watch.stopped").color("#aaaaaa"));
     }
@@ -601,15 +775,104 @@ final class BattleWatch extends CustomUIHud {
         });
     }
 
+    /** When the follow camera goes back on a fallen body (ms after its death). */
+    private static final long[] FALL_CAM_AT_MS = {100, 400};
+
+    /** A fall hold that tick() never replaced ends by itself after FALL_HOLD_MS + this. */
+    private static final long HOLD_SAFETY_MS = 3000;
+
+    /**
+     * The watched fighter fell: the camera stays on the body for the fall hold (2026-10-29, playtest: vanilla's FollowTarget
+     * lets go of a dead target, empty Spectating = free camera, so the hold showed the watcher's own free-fly camera).
+     * The game's follow camera goes back on the body (it is still there through its death animation) right after
+     * vanilla's reset, so the mouse turns it and it keeps out of blocks as the normal watch does (playtest: our own camera
+     * needed a visible cursor for the mouse and went through blocks). A glide on its way to it keeps going instead.
+     * Fallback with no body to attach to: a still glide on its last spot.
+     */
+    private static void holdOnFall(PlayerRef player, Watch w, Ref<EntityStore> me, Ref<EntityStore> victim,
+                                   ComponentAccessor<EntityStore> acc) {
+        Glide now = w.glide;
+        if (now != null && now.hold || w.fallCam) return;
+        if (now == null && victim != null && victim.isValid()
+                && acc.getComponent(victim, com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId.getComponentType()) != null) {
+            w.fallCam = true;
+            w.fellOn = victim;
+            HeadRotation head = acc.getComponent(me, HeadRotation.getComponentType());
+            Rotation3f r = head != null ? new Rotation3f(head.getRotation()) : null;
+            var rot = r != null ? new com.hypixel.hytale.protocol.Direction(r.yaw(), r.pitch(), 0f) : null;
+            Store<EntityStore> store = me.getStore();
+            // after vanilla's detach (next tick) and once more in case its reset reaches the client late
+            for (long ms : FALL_CAM_AT_MS) {
+                store.getExternalData().getWorld().scheduleAfter(() -> {
+                    if (store.isShutdown() || !me.isValid() || !victim.isValid() || WATCHING.get(player.getUuid()) != w
+                            || !w.fallCam || w.glide != null) return;
+                    followCamera(me, victim, store, rot);
+                }, ms, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }
+            return;
+        }
+        Vector3d look = now != null ? now.look : victim != null && victim.isValid() ? eyesOf(victim, acc) : null;
+        if (look == null) return;
+        float yaw, pitch;
+        double dist;
+        if (now != null) {
+            // it fell while the camera was on its way to it: hold from where the glide is
+            yaw = now.yaw;
+            pitch = now.pitch;
+            dist = now.dist;
+        } else {
+            HeadRotation head = acc.getComponent(me, HeadRotation.getComponentType());
+            Rotation3f r = head != null ? new Rotation3f(head.getRotation()) : null;
+            yaw = r != null ? r.yaw() : 0f;
+            pitch = r != null ? r.pitch() : -0.3f;
+            dist = followDistance(victim, acc);
+        }
+        Glide g = new Glide(null, victim != null ? victim : me, look, look, dist, dist, yaw, pitch, yaw, pitch, FALL_HOLD_MS);
+        g.hold = true;
+        w.glide = g;
+        frame(player, g, acc);
+        scheduleGlide(player, w, g);
+    }
+
     /** KillTracker: the camera of whoever watched {@code victim} goes to its {@code killer}. */
     static void onKill(Ref<EntityStore> victim, Ref<EntityStore> killer, ComponentAccessor<EntityStore> acc) {
-        if (WATCHING.isEmpty() || killer == null || !killer.isValid() || killer.getStore() != victim.getStore()) return;
+        if (WATCHING.isEmpty()) return;
+        // no known killer (or one in another world): still hold on the body, then tick picks a replacement
+        if (killer != null && (!killer.isValid() || killer.getStore() != victim.getStore())) killer = null;
         for (UUID id : WATCHING.keySet()) {
             PlayerRef p = Universe.get().getPlayer(id);
             Ref<EntityStore> ref = p != null && p.isValid() ? p.getReference() : null;
             if (ref == null || !ref.isValid() || ref.getStore() != victim.getStore()) continue;
             Watch w = WATCHING.get(id);
-            if (w != null && watched(w, ref, acc) == victim) go(p, w, ref, killer, acc);
+            // stays on the fallen fighter a moment (2026-10-29, playtest: it cut away the instant the fighter died, so
+            // the fall was never seen); tick goes to the killer after FALL_HOLD_MS
+            if (w != null && watched(w, ref, acc) == victim) {
+                if (w.fellAt == 0) w.fellAt = System.currentTimeMillis();
+                w.fellNext = killer;
+                holdOnFall(p, w, ref, victim, acc);
+            }
+        }
+    }
+
+    /**
+     * WatchDetachSystem: vanilla let go of the watched fighter (FollowTarget empties Spectating when its target dies)
+     * and its reset put the watcher in first person. The follow camera goes back on the body in the same tick, after
+     * that reset (2026-10-29, playtest: a tick of first person every time the watched mob died; FALL_CAM_AT_MS came 100 ms
+     * late). Starts the fall hold if KillTracker has not yet.
+     */
+    static void detached(Ref<EntityStore> me, Ref<EntityStore> lost, ComponentAccessor<EntityStore> acc) {
+        if (WATCHING.isEmpty() || lost == null || !lost.isValid() || lost.getStore() != me.getStore()) return;
+        PlayerRef p = acc.getComponent(me, PlayerRef.getComponentType());
+        Watch w = p != null ? WATCHING.get(p.getUuid()) : null;
+        if (w == null || w.glide != null) return;
+        if (!w.fallCam) {
+            if (w.fellAt == 0) w.fellAt = System.currentTimeMillis();
+            holdOnFall(p, w, me, lost, acc);
+        }
+        if (w.fallCam && w.fellOn == lost) {
+            HeadRotation head = acc.getComponent(me, HeadRotation.getComponentType());
+            Rotation3f r = head != null ? new Rotation3f(head.getRotation()) : null;
+            followCamera(me, lost, acc, r != null ? new com.hypixel.hytale.protocol.Direction(r.yaw(), r.pitch(), 0f) : null);
         }
     }
 
@@ -664,14 +927,26 @@ final class BattleWatch extends CustomUIHud {
                     continue;
                 }
             } else if (target == null || !target.isValid() || !w.battle.has(target) || !BattleManager.isAlive(target, store)) {
-                Ref<EntityStore> next = replacement(w.battle, target, me, store);
+                if (w.fellAt == 0) w.fellAt = now;
+                // a body removed before the hold ends (death looks, quick despawns) leaves the follow camera with
+                // nothing: the client flew free until the hold ran out (2026-10-29, playtest video), so move on at once
+                Ref<EntityStore> body = w.fellOn;
+                boolean bodyGone = w.fallCam && (body == null || !body.isValid());
+                if (now - w.fellAt < FALL_HOLD_MS && !bodyGone) {
+                    // fell with no killer (KillTracker never called onKill): hold here too
+                    if (!w.fallCam && (w.glide == null || !w.glide.hold)) holdOnFall(p, w, me, target, store);
+                    continue;
+                }
+                Ref<EntityStore> killer = w.fellNext;
+                Ref<EntityStore> next = killer != null && killer.isValid() && killer.getStore() == store && w.battle.has(killer)
+                        && BattleManager.isAlive(killer, store) ? killer : replacement(w.battle, target, me, store);
                 if (next != null) {
                     go(p, w, me, next, store);
                     target = next;
                 }
-            } else if (FxSettings.watchAutoSwitch > 0 && w.glide == null
-                    && now - w.lastSwitch >= FxSettings.watchAutoSwitch * 1000L) {
-                // watchAutoSwitch (2026-10-18, user): on to the next fighter by itself, as a right click
+            } else if (autoSeconds(w) > 0 && w.glide == null
+                    && now - w.lastSwitch >= autoSeconds(w) * 1000L) {
+                // watchAutoSwitch (2026-10-18): on to the next fighter by itself, as a right click
                 w.lastSwitch = now;
                 cycle(p, me, store, 1);
                 target = watched(w, me, store);

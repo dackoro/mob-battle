@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Server-side software renderer for .blockymodel files (dev prototype, 2026-10-16, user: a thumbnail of ANY mob, modded
+ * Server-side software renderer for .blockymodel files (dev prototype, 2026-10-16, playtest: a thumbnail of ANY mob, modded
  * ones too, for a Smash-like VS screen). No Hytale classes: it takes the model JSON and its textures, so it also runs
  * offline. Geometry follows Blockbench's Hytale plugin (hytale_plugin.js, codec parse / parseNode) and Blockbench's
  * own cube code (Cube.preview_controller.updateGeometry / updateUV, read live through the Blockbench MCP):
@@ -203,7 +203,7 @@ final class ModelThumbnail {
     /**
      * A box whose listed faces all sit at the standard box unwrap (top (d,0), bottom (d+w,0), left (0,d), right (d+w,d),
      * back (2d+w,d), front (d,d); w, h, d = size x, y, z) gets its missing faces at their standard spots too
-     * (2026-10-16, user: the Outlanders came out faceless): Player_With_Face's head lists no front, and the Outlander
+     * (2026-10-16, playtest: the Outlanders came out faceless): Player_With_Face's head lists no front, and the Outlander
      * texture paints the face exactly there (with holes for the Eyes attachment), so the game draws it. A box with any
      * face off the pattern keeps its missing faces hidden. ❓ Inferred from the textures, not from the client.
      */
@@ -323,11 +323,11 @@ final class ModelThumbnail {
                 ? anim.getAsJsonObject("nodeAnimations") : new JsonObject();
         for (Group g : m.groups) {
             // an attachment piece (a hood on "Head") already moves with its bone: animating it too turned it twice as
-            // far, so hoods and helmets covered the face in every animated pose (user, 2026-10-16)
+            // far, so hoods and helmets covered the face in every animated pose (playtest 2026-10-16)
             if (g.piece) continue;
             if (!nodes.has(g.name) || !nodes.get(g.name).isJsonObject()) continue;
             // a node inside one of the same name (BetterMobExpansion's leopard: "Head" in "Head", the forearms too) is
-            // carried by it: animating both turned the inner one twice, a second head beside the first (user,
+            // carried by it: animating both turned the inner one twice, a second head beside the first (playtest,
             // 2026-10-17); only the outermost of the name takes the animation
             if (insideSameName(g)) continue;
             JsonObject n = nodes.getAsJsonObject(g.name);
@@ -367,7 +367,7 @@ final class ModelThumbnail {
             tb = b.get("time").getAsDouble();
         } else if (loop > 0 && kfs.size() > 1) {
             // past the last keyframe (or before the first) of a looping animation: on its way from the last back to the
-            // first (2026-10-16, user: the flipbook's punch restarted before the arm came back)
+            // first (2026-10-16, playtest: the flipbook's punch restarted before the arm came back)
             JsonObject first = kfs.get(0).getAsJsonObject(), last = kfs.get(kfs.size() - 1).getAsJsonObject();
             double tf = first.get("time").getAsDouble(), tl = last.get("time").getAsDouble();
             a = last;
@@ -522,7 +522,7 @@ final class ModelThumbnail {
         double ox = -minX * scale + 2, oy = maxY * scale + 2;   // screen y grows downward
         // where the head lands in the picture (centers of the "Head" bone's boxes), for framing on the face
         // A Head bone with no box of its own (Dragon_Frost: forehead and jaws hang under it) takes its whole subtree,
-        // attachment pieces left out (user, 2026-10-16: the dragon's face was not in its team column)
+        // attachment pieces left out (playtest 2026-10-16: the dragon's face was not in its team column)
         double hx = 0, hy = 0;
         int hn = 0;
         for (int pass = 0; pass < 2 && hn == 0; pass++) {

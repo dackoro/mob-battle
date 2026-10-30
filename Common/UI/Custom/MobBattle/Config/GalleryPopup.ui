@@ -1,6 +1,6 @@
 $C = "../../Common.ui";
 
-// Mob gallery as a popup over the settings panel (2026-10-16, user: not inside the page, not another window; a popup).
+// Mob gallery as a popup over the settings panel (2026-10-16, playtest: not inside the page, not another window; a popup).
 // Appended at the page root after ConfigPage.ui, as the game's own pickers (TriggerVolumeInspectorPage
 // #AssetPickerPage: a second hidden @PageOverlay over the main one). Search, the Summon list's Show filters and a grid
 // of Config/SummonCell.ui tiles; a tile puts its mob in the "Add a mob" row and closes the popup.

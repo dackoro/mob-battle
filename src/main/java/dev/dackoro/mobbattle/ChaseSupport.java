@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Keeps battle mobs on their target with the role's own chase (2026-10-13, user video: 500 Kweebecs vs a Gobliterator,
+ * Keeps battle mobs on their target with the role's own chase (2026-10-13, playtest video: 500 Kweebecs vs a Gobliterator,
  * the far ones walked, stopped and turned with a green "?", the near ones stopped attacking; in a royale mobs walked
  * away from the center past enemies right beside them). Two vanilla limits, read from Assets.zip:
  * <ul>
@@ -40,6 +40,13 @@ final class ChaseSupport {
     private static final Set<String> CHASE_STATES = Set.of("Combat", "Chase", "Attack");
     /** States in which a mob has given up (soft leash home, lost target): put back in its chase state. */
     private static final Set<String> GAVE_UP = Set.of("Idle", "Search", "ReturnHome", "TargetLost", "Leash");
+
+    /** Whether the mob's main state is one of those that dropped the fight (Idle, Search, ReturnHome, ...). */
+    static boolean gaveUp(StateSupport state) {
+        String current = state != null ? state.getStateName() : null;
+        String main = current != null && current.indexOf('.') > 0 ? current.substring(0, current.indexOf('.')) : current;
+        return main != null && GAVE_UP.contains(main);
+    }
     /** The written LastSeen point stays this far inside the chase range. */
     private static final double RANGE_MARGIN = 4;
     /** Beyond this share of the chase range the slot is written (the chase's own sight test may fail first). */

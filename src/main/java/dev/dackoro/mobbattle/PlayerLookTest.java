@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 /**
- * /mobbattle test playerlook [n] (dev tool, 2026-10-16, user: check PlayerLook against every cosmetic of the game
+ * /mobbattle test playerlook [n] (dev tool, 2026-10-16, playtest: check PlayerLook against every cosmetic of the game
  * without trying them by hand). The game's own server model of a player is only the bare body (createModel), the client
  * dresses it, so there is no vanilla server result to compare with. What this checks instead, for every part of every
  * slot (each variant, each color) on a base skin, plus {@code n} random skins (CosmeticsModule.generateRandomSkin) and
@@ -148,7 +148,7 @@ final class PlayerLookTest {
                     }
                 }
             }
-            // the barest skin vanilla accepts (2026-10-16, user: a player with no cosmetics at all): every slot emptied
+            // the barest skin vanilla accepts (2026-10-16, playtest: a player with no cosmetics at all): every slot emptied
             // that validateSkin lets go empty, then each part of the slots left swept on it
             PlayerSkin minimal = new PlayerSkin(base);
             List<String> emptied = new ArrayList<>();

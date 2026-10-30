@@ -1,5 +1,5 @@
 {
- "$Comment": "Team Wand: the staff's poses (Parent Staff) plus TeamSpinLeft/TeamSpinRight (right click): copies of the vanilla Staff SwingLeft/SwingRight (spear swings) with one full turn of the color wheel (node bone, the idle's) over the swing (2026-10-13, user, like the Effect Wand's gem head).",
+ "$Comment": "Team Wand: the staff's poses (Parent Staff) plus TeamSpinLeft/TeamSpinRight (right click): copies of the vanilla Staff SwingLeft/SwingRight (spear swings) with one full turn of the color wheel (node bone, the idle's) over the swing (2026-10-13, playtest, like the Effect Wand's gem head).",
  "Parent": "Staff",
  "Animations": {
   "TeamSpinLeft": {

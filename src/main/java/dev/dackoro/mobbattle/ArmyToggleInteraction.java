@@ -101,7 +101,7 @@ public class ArmyToggleInteraction extends SimpleInstantInteraction {
     }
 
     /**
-     * Crouch + left click (2026-10-14, user): a mob = recruit for it (it leads its army), another player = recruit for
+     * Crouch + left click (2026-10-14): a mob = recruit for it (it leads its army), another player = recruit for
      * them, nothing (the air) or yourself = for your own army again.
      */
     private static void pick(PlayerRef player, Ref<EntityStore> me, Ref<EntityStore> target, boolean mob,

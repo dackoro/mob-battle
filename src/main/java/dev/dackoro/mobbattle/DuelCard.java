@@ -45,6 +45,7 @@ final class DuelCard extends CustomUIHud {
     protected void build(UICommandBuilder builder) {
         builder.append(UI);
         CinemaBars.shift(builder, getPlayerRef());
+        builder.set("#TimerGap.Visible", TimerHud.boxShown(getPlayerRef()));
     }
 
     /** Cheap check for BattleLifecycleSystem: anything to show or to take down? */
@@ -188,7 +189,7 @@ final class DuelCard extends CustomUIHud {
         EntityStatValue h = stats != null ? stats.get(DefaultEntityStatTypes.getHealth()) : null;
         if (h == null || h.getMax() <= 0) return I18n.tr("hud.health.unknown");
         int pct = Buffs.totalOf(mob, Buffs.Stat.HEALTH);
-        // A living mob never shows 0: 0.3 HP left (fractional damage) read "0 / 90" on a winner (user, 2026-10-13).
+        // A living mob never shows 0: 0.3 HP left (fractional damage) read "0 / 90" on a winner (playtest 2026-10-13).
         long now = h.get() > 0 ? Math.max(1, Math.round(h.get())) : 0;
         Message m = I18n.tr(pct > 0 ? "hud.health.buff" : "hud.health")
                 .param("now", now).param("max", Math.round(h.getMax()));

@@ -40,5 +40,9 @@ public class DebugInspectInteraction extends SimpleInstantInteraction {
             return;
         }
         DebugWand.inspect(player, target, buffer);
+        // feedback as the other wands (2026-10-29): red swirl, red tint and burst, a click sound
+        WandFx.swirlNow(target, "Red", buffer);
+        WandFx.onTarget(target, WandFx.DEBUG_MARK, buffer);
+        WandFx.burst(null, "SFX_Creative_Play_Selection_Place", ChaosWand.positionOf(target, buffer), buffer);
     }
 }

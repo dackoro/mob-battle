@@ -4,7 +4,7 @@
     "Description": "server.items.MobBattle_DebugWand.description"
   },
   "Categories": [
-    "Items.Weapons"
+    "MobBattle.Dev"
   ],
   "Icon": "Icons/Items/MobBattle/DebugWand.png",
   "Quality": "Common",

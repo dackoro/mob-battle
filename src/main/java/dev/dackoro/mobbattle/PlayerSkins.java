@@ -20,7 +20,7 @@ import java.util.Properties;
 import java.util.stream.Stream;
 
 /**
- * Player skins for the VS screen's player pictures (2026-10-16, user: players in the VS with their real skin, cached
+ * Player skins for the VS screen's player pictures (2026-10-16, playtest: players in the VS with their real skin, cached
  * per skin): a skin's id is a short hash of its parts, and each skin seen is kept as a small properties file
  * (thumbnails/vs/players/&lt;id&gt;.properties, one line per PlayerSkin part) so its pictures can be drawn again after a
  * restart or a render change without the player online.

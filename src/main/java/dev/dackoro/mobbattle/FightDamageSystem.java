@@ -82,7 +82,7 @@ public class FightDamageSystem extends DamageEventSystem {
         java.util.UUID victimLeads = Army.leaderKey(victim);
         // Same army: one chain of command (mates, a leader and its mobs, an owner and every army under it). Unless the
         // battle put them on different sides (army summons in a royale): they target each other, so a cancelled hit
-        // left them hitting for nothing and the battle could never end (user, 2026-10-12).
+        // left them hitting for nothing and the battle could never end (playtest 2026-10-12).
         boolean sameArmy = Army.sameChain(attacker, player != null ? player.getUuid() : attackerLeads, victim, victimLeads);
         if (sameArmy && !BattleManager.areEnemies(attacker, victim)) {
             // armyFriendlyFire: the hit lands, but nobody fights back or calls the others (they stay allies).
@@ -102,18 +102,43 @@ public class FightDamageSystem extends DamageEventSystem {
         return false;
     }
 
+    /**
+     * The countdown / ready-time truce: a fighter waiting for its battle to start takes no hit from anyone, fighter or
+     * not, nor the burn of an effect (2026-10-29, playtest: the owner, outside the battle, hit the all vs one's dummies
+     * during the ready time with a fire weapon; the burn it left has no owner, ActiveEntityEffect itself as the source,
+     * and killed one before the start). Falls, lava and the like still hurt.
+     */
+    static boolean waitingHit(Damage damage, Ref<EntityStore> victim) {
+        Damage.Source source = damage.getSource();
+        return (source instanceof Damage.EntitySource
+                || source instanceof com.hypixel.hytale.server.core.entity.effect.ActiveEntityEffect)
+                && Countdown.involves(victim);
+    }
+
     @Override
     public void handle(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store,
                        CommandBuffer<EntityStore> buffer, Damage damage) {
         // Medium: a projectile hit tells which roles fight at range (they can reach fliers and fish at the surface).
-        if (damage.getSource() instanceof Damage.ProjectileSource shot) Medium.sawProjectile(shot.getRef(), buffer);
+        if (damage.getSource() instanceof Damage.ProjectileSource shot) {
+            Medium.sawProjectile(shot.getRef(), buffer);
+            // only a hit that lands so far (audit 2026-10-29: blocked arrows filled the dummies' signature too)
+            if (!damage.isCancelled()) TrainingDummies.signatureHit(shot.getRef(), buffer);
+        }
         // Countdown truce: two fighters waiting for the same start don't hurt each other yet (Countdown.truce). First,
         // so a cancelled hit sends no army after the victim and wakes no calm summon; a player's hits too (the mob
         // ignores them meanwhile, so they were free hits; audit 2026-10-17).
-        if (Countdown.anyWaiting() && !damage.isCancelled() && damage.getSource() instanceof Damage.EntitySource waiting
-                && Countdown.waitingTogether(waiting.getRef(), chunk.getReferenceTo(index))) {
+        if (Countdown.anyWaiting() && !damage.isCancelled() && waitingHit(damage, chunk.getReferenceTo(index))) {
             damage.setCancelled(true);
             return;
+        }
+        // A player who fell in a battle that goes on (died and respawned, went Creative) is an outsider of it: with
+        // battleIsolation his hits on its mobs are cancelled like any outsider's, before they can call an army or make
+        // the mob turn on him (vanilla damage reactions put the attacker in its target memory).
+        if (BattleManager.anyFallen() && !damage.isCancelled() && damage.getSource() instanceof Damage.EntitySource fell) {
+            if (BattleManager.fallenApart(fell.getRef(), chunk.getReferenceTo(index))) {
+                damage.setCancelled(true);
+                return;
+            }
         }
         if (Army.any() && damage.getSource() instanceof Damage.EntitySource armySource && armyHit(armySource.getRef(),
                 chunk.getReferenceTo(index), damage, buffer)) {
@@ -161,7 +186,13 @@ public class FightDamageSystem extends DamageEventSystem {
         }
         if (damage.isCancelled()) {
             // Only what the NPC/flock filter cancelled comes back: a victim vanilla protects stays unhurt (audit 0.7.2).
-            if (vanillaProtects(index, chunk, store)) return;
+            if (vanillaProtects(index, chunk, store)) {
+                if (MobBattlePlugin.debugging()) {
+                    MobBattlePlugin.debug("hit " + roleOf(source.getRef(), buffer) + " -> " + roleOf(victim, buffer) + " "
+                            + damage.getAmount() + " stays cancelled: " + protectedBy(index, chunk, store));
+                }
+                return;
+            }
             damage.setCancelled(false);
         }
         BattleManager.recordDamage(source.getRef(), victim, damage.getAmount());
@@ -173,6 +204,37 @@ public class FightDamageSystem extends DamageEventSystem {
      * (DamageSystems.FilterUnkillable / FilterNPCWorldConfig, which have no order against this system, decompiled
      * 0.7.2). Read only for a cancelled hit between enemies.
      */
+    /** Why vanillaProtects said yes (debugLog line): the victim's state, and its active effects. */
+    private static String protectedBy(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store) {
+        var archetype = chunk.getArchetype();
+        StringBuilder why = new StringBuilder();
+        if (archetype.contains(DeathComponent.getComponentType())) why.append("dead ");
+        if (archetype.contains(Invulnerable.getComponentType())) why.append("Invulnerable ");
+        if (archetype.contains(Intangible.getComponentType())) why.append("Intangible ");
+        EffectControllerComponent effects = chunk.getComponent(index, EffectControllerComponent.getComponentType());
+        if (effects != null && effects.isInvulnerable() && anyInvulnerableEffect(effects)) {
+            why.append("invulnerability effect [");
+            var all = effects.getAllActiveEntityEffects();
+            if (all != null) {
+                for (var e : all) {
+                    var asset = com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect.getAssetMap().getAsset(e.getEntityEffectIndex());
+                    why.append(asset != null ? asset.getId() : "?").append(' ');
+                }
+            }
+            why.append("] ");
+        }
+        if (why.length() == 0) why.append("NPC incoming damage off in this world");
+        return why.toString().trim();
+    }
+
+    /** True when an active effect really makes the entity invulnerable (the controller's flag can be stale). */
+    static boolean anyInvulnerableEffect(EffectControllerComponent effects) {
+        var all = effects.getAllActiveEntityEffects();
+        if (all == null) return false;
+        for (var e : all) if (e != null && e.isInvulnerable()) return true;
+        return false;
+    }
+
     private static boolean vanillaProtects(int index, ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store) {
         var archetype = chunk.getArchetype();
         if (archetype.contains(DeathComponent.getComponentType()) || archetype.contains(Invulnerable.getComponentType())
@@ -180,7 +242,13 @@ public class FightDamageSystem extends DamageEventSystem {
             return true;
         }
         EffectControllerComponent effects = chunk.getComponent(index, EffectControllerComponent.getComponentType());
-        if (effects != null && effects.isInvulnerable()) return true;
+        if (effects != null && effects.isInvulnerable()) {
+            if (anyInvulnerableEffect(effects)) return true;
+            // stale: LivingEntityEffectSystem only recomputes the flag while some effect is active, so an
+            // invulnerability effect that was the last one leaves it on for good (decompiled 0.7.4; 2026-10-29: a
+            // Longsword dummy stayed immortal after Endgame's Prismatic Aegis ended). Clear it and let the hit land.
+            effects.setInvulnerable(false);
+        }
         return store.getExternalData().getWorld().getGameplayConfig().getCombatConfig().isNpcIncomingDamageDisabled()
                 && !archetype.contains(IgnoreDisableNPCIncomingDamage.getComponentType());
     }
